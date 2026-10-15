@@ -12,7 +12,7 @@
 //! | I10 | `check_ix` | an exit (`Close`, `Liquidate`, `Expire`, `SolSettle`) names neither `oracle_cache` nor `venue_guard` among its accounts |
 //! | I11 | `check_ix` (event part) | a liquidation's spend `≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋` with the position's locked δ, an expiry's `≤ ⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋`; `B ≤ max_in + ert` and `max_in ≤` that fixed bound; penalty / expiry fee `≤ ⌈rate·min(B̂_live,risk, B̂_ref)/10⁴⌉`; an expiry's `π_ref = ⌈fee·B̂_ref/10⁴⌉`, its `K_e = min(fixed + ⌊bps·B̂_ref/10⁴⌋, cap, V − B − r − e)`, and its rent (`R_due` on the post-accrual basis) and fee paid in full whenever `V − R − π_ref − ert ≥ ⌊B̂_ref·(10⁴ + ε)/10⁴⌋`. The liveness clause (I-E11) is a scenario test (`tests/liquidate_it.rs`, `tests/attacks_exit_it.rs`) |
 //! | I12 | `check_ix` (event part and the state around it) | S1 take `= V − K_s`; an S2/S3 take inside `[x_lo, x_hi]` (±2) with the corners within `fv_dev_bps`; `K_s` = the locked terms' reward; a liquidation that leaves the borrower equity pays the keeper `≥ K_s`; S1/S2 only on a live clock (armed, last evaluation within `settle_arm_gap_s`) that has run `settle_persist_n` EMA updates (the position's `s_count` before, the market's `ema_count` after); S3 only on a continuous no-route chain observed now and at least `s3_wait_s` (and the graduation / migration timers) long, with the position's locked terms; `p'` per corner: the penalty on both corners of a position not expired, and on an expired one the expiry fee at the dearer corner `(P_hi, L_lo)` only if the cheaper corner has it too |
-//! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire` (on the curve `B` less the venue-side rent of the pre-state — pump's creator-vault top-up and a short curve's growth to the size of the build pump's ProgramData holds — 166 bytes since its 2026-10-08 redeploy, 141 on the 2026-10-02 build, 125 before, `fork::PumpDeploy::held` —, ≤ `ert`, `VenueView::venue_rent` — T-RENT); on every venue the harness has a view of — the mock, the Raydium venues, the curve and PumpSwap (M6) — an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` (the curve: `S` + that rent; PumpSwap: `S` + the rent of a pool's growth to 287 bytes — 271 on the 2026-09 build, by the build PumpSwap's ProgramData holds —, which `Open.venue_rent` reports, R-VEN H8) and a `Close`'s `b_live` = `B̂_live(q)` (the curve: up to `rT`), both re-quoted (`quote::cpmm` / `quote::ray_v4` / `quote::sol_leg` on the readers' state, `venue_view`) on the venue just before the instruction; one EMA integration of a confirmed state (`ema_warm = 0`, M4R) moves `P_ema` and `L_ema` within their single-step bounds |
+//! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire` (on a curve exit past `rT`, pump-final §5.2's bound in place of 5; on the curve `B` less the venue-side rent of the pre-state — a short curve's growth to the size of the build pump's ProgramData holds — 166 bytes since its 2026-10-08 redeploy, 141 on the 2026-10-02 build, 125 before, `fork::PumpDeploy::held` —, ≤ `ert`, `VenueView::venue_rent` — T-RENT); on every venue the harness has a view of — the mock, the Raydium venues, the curve and PumpSwap (M6) — an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` (the curve: `S` + that rent; PumpSwap: `S` + the rent of a pool's growth to 287 bytes — 271 on the 2026-09 build, by the build PumpSwap's ProgramData holds —, which `Open.venue_rent` reports, R-VEN H8) and a `Close`'s `b_live` = `B̂_live(q)` (the curve: `B̂_v3` past `rT`), both re-quoted (`quote::cpmm` / `quote::ray_v4` / `quote::sol_leg` on the readers' state, `venue_view`) on the venue just before the instruction; one EMA integration of a confirmed state (`ema_warm = 0`, M4R) moves `P_ema` and `L_ema` within their single-step bounds |
 //! | I14 | structural tests (`tests/engine_it/structure.rs`; `tests/add_margin_it.rs`; `tests/liquidate_it.rs` `remaining_accounts_are_strict` / `named_accounts_are_checked`; `tests/settle_it.rs` account checks) | every ReadSet / TradeExtras slot is mandatory and key-checked on `open_short`, `close_short`, `crank_price`, `liquidate`, `expire` and `sol_settle` (omitted, replaced, swapped, appended); the named accounts of every M2 instruction |
 //! | I16 | `check_ix` | no observation is recorded while the (mock, Raydium, curve or PumpSwap) venue is not executable (a migrating curve is still observed, A64); the route chains are sound (A40, V2-1, R3A-4): a hit of the S3 chain only when `s3_no_route` (at `min(global hard cap, min_open_hard_cap_bps)`, AIR-19) held on the state just before the instruction, a clear only when it did not (a `None →` pump re-detection clears both chains, M5); a hit of the `pool_fail` chain only when `pool_fail` held (not executable or fee above the **global** hard cap — never because of the route-broken flag), a clear only when it did not; the risk-quote part (every CR leg, box corner, `B̂_ref` and FV at `min(φ_live, venue_fee_hard_cap_bps_pos)`) is checked by scenario: `tests/route_it.rs` `fee_hike` (FV exactly at the locked cap under a 6 % live fee), `tests/expire_it.rs` `a_fee_far_above_the_hard_cap_holds_expiries_for_s3`, `tests/liquidate_it.rs` `liquidations_ignore_…_fee_cap_…` (the oracle prices at the capped fee) |
 //!
@@ -458,17 +458,19 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                         c.rent_protocol, c.rent, p.rent_protocol_bps
                     )
                 })?;
-                // I13: the venue charged within [B̂ − 5, B̂] (quotes are upper bounds); on the
-                // curve `B` also carries the venue-side rent pump took from the trader (the
-                // creator-vault top-up and a short curve's growth of the pre-state, at most `ert`;
-                // ARCH §2.4 rule 3, T-RENT), which is not part of the charge.
+                // I13: the venue charged within [B̂ − slack, B̂] (quotes are upper bounds;
+                // `quote_slack`: 5, or §5.2's bound on a synthetic exit past `rT`); on the curve
+                // `B` also carries the venue-side rent pump took from the trader (a short curve's
+                // growth of the pre-state, at most `ert`; v3 tops up no creator vault; ARCH §2.4
+                // rule 3, T-RENT), which is not part of the charge.
                 let r = mp.venue.map_or(0, |v| v.venue_rent);
                 ensure(r <= p.ert, "I13", || {
                     format!("close of {pk}: venue-side rent {r} above ert {}", p.ert)
                 })?;
                 let charge = c.buyback_cost.saturating_sub(r);
+                let slack = quote_slack(mp.venue, p.q);
                 ensure(
-                    c.buyback_cost >= r && charge <= c.b_live && c.b_live - charge <= 5,
+                    c.buyback_cost >= r && charge <= c.b_live && c.b_live - charge <= slack,
                     "I13",
                     || {
                         format!(
@@ -507,8 +509,14 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
             // The curve's venue-side rent as for a close (above).
             let r = mp.venue.map_or(0, |v| v.venue_rent);
             let charge = cost.saturating_sub(r);
+            let q = mp
+                .positions
+                .iter()
+                .find(|(k, _, _)| *k == pk)
+                .map_or(0, |(_, p, _)| p.q);
+            let slack = quote_slack(mp.venue, q);
             ensure(
-                cost >= r && charge <= quote && quote - charge <= 5,
+                cost >= r && charge <= quote && quote - charge <= slack,
                 "I13",
                 || {
                     format!(
@@ -665,13 +673,13 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
             // I13 (the mock, Raydium, the curve, PumpSwap): the sale's proceeds within [S_exp,
             // S_exp + 5] of the quote on the pool just before (quotes are lower bounds on
             // proceeds); on the curve `S` is net of the venue-side rent pump took from the trader
-            // — the creator-vault top-up and a short curve's growth of the pre-state — which stays
-            // within the position's `ert` (ARCH §2.4 rule 3; T-RENT).
+            // — a short curve's growth of the pre-state (`sell_v3` tops up no creator vault) —
+            // which stays within the position's `ert` (ARCH §2.4 rule 3; T-RENT).
             if let Some(v) = mp.venue
                 && let Some(want) = v.sell(o.q)
             {
-                // The venue-side rent (the curve's creator-vault top-up and growth to 166 bytes;
-                // PumpSwap's growth of a pool under 287 bytes, M6); 0 on the mock and Raydium.
+                // The venue-side rent (the curve's growth to 166 bytes; PumpSwap's growth of a
+                // pool under 287 bytes, M6); 0 on the mock and Raydium.
                 let r = v.venue_rent;
                 let ert = read::borsh::<ShortPosition>(svm, &o.position).map_or(0, |p| p.ert);
                 ensure(r <= ert, "I13", || {
@@ -981,6 +989,35 @@ fn route_chains(
         }
     }
     Ok(())
+}
+
+/// I13's slack between the venue's charge and the event's quote: 5 lamports (ε₁ and each fee
+/// rounded up), and on a curve buy of `q` above the pre-state's `rT` — pump's synthetic migration,
+/// two parts each quoted with ε₁ — pump-final §5.2's bound `(1 + Σ⌈bᵢ/10⁴⌉) + (Δ₂ +
+/// Σ⌈Δ₂·bᵢ/10⁴⌉)`, `Δ₂ = 1 + ⌈q₂/(X_s − q₂)⌉` (≤ 7 for `q₂ ≤ X_s/2`, which the per-market cap
+/// always keeps).
+fn quote_slack(view: Option<VenueView>, q: u64) -> u64 {
+    let Some(v) = view else { return 5 };
+    let (Some((c, _)), Some((fs, m))) = (v.curve, v.synthetic) else {
+        return 5;
+    };
+    let q = u128::from(q);
+    if q <= c.rt {
+        return 5;
+    }
+    let (q2, xs) = (q - c.rt, m.pool_tokens);
+    if q2 >= xs {
+        return 5;
+    }
+    let d2 = 1 + q2.div_ceil(xs - q2);
+    let b: Vec<u128> = [fs.protocol, fs.creator]
+        .into_iter()
+        .filter(|b| *b > 0)
+        .map(u128::from)
+        .collect();
+    let bound = (1 + b.iter().map(|b| b.div_ceil(10_000)).sum::<u128>())
+        + (d2 + b.iter().map(|b| (d2 * b).div_ceil(10_000)).sum::<u128>());
+    u64::try_from(bound).unwrap_or(u64::MAX).max(5)
 }
 
 /// `⌊b·(10⁴ + bps)/10⁴⌋`.

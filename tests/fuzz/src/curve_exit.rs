@@ -8,9 +8,12 @@
 //! after a same-second `crank_price` on a clone of the VM (the exit's own prologue is exactly a
 //! crank's), in the program's order (ARCH §3.6 precondition 1, 1b, steps 2–6; §3.7):
 //!
-//! `NoRoute` (not executable) → `CurveStraddle` (`q > rT`) → `EmaWarmingUp` → `ReferenceStale` →
-//! `NotLiquidatable` / `NotExpired` … `UseSolSettle` → `UseExpire` / `UseLiquidate` →
-//! `ExitBoundNotMet` (an undefined reference quote, or `B̂_live > max_in`) → executes.
+//! `NoRoute` (not executable) → `EmaWarmingUp` → `ReferenceStale` → `NotLiquidatable` /
+//! `NotExpired` … `UseSolSettle` → `UseExpire` / `UseLiquidate` → `ExitBoundNotMet` (an undefined
+//! reference quote, or `B̂_live > max_in`) → executes. Since pump-final §6 a keeper exit of `q > rT`
+//! is no refusal of its own: it completes the curve by pump's synthetic migration, priced `B̂_v3`
+//! (the keeper view's `CurveCtx`), and one the would-be pool cannot deliver has no `B̂_live`, so it
+//! is `UseSolSettle` (§6.7).
 //!
 //! The exit must then do exactly that: land when the prediction executes (with the event's
 //! `b_live`, `b_ref` and `max_in` equal to the prediction's), or be refused with the predicted code.
@@ -135,9 +138,6 @@ fn decide(
     let decision = (|| {
         if !st.executable {
             return Err(E::NoRoute);
-        }
-        if u128::from(q) > live.rt {
-            return Err(E::CurveStraddle);
         }
         if m.ema_warm != 0 {
             return Err(E::EmaWarmingUp);

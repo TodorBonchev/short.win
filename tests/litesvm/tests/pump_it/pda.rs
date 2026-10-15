@@ -1,17 +1,19 @@
-//! T-PDA-USER, curve part (ARCH §8.2, §12 U1; R-PUMP §6.1, U6, U9; C1-7): pump's `buy_v2` with
-//! the **trader PDA** as `user`, signed by short.win's `invoke_signed`, on the real pump ELF —
-//! read off the transaction's own inner instructions, with the sell leg for comparison:
+//! T-PDA-USER, curve part (ARCH §8.2, §12 U1; R-PUMP §6.1, U6, U9; C1-7; pump-final §6.1.3):
+//! pump's `buy_v3` with the **trader PDA** as `user`, signed by short.win's `invoke_signed`, on the
+//! real pump ELF — read off the transaction's own inner instructions, with the sell leg for
+//! comparison:
 //!
 //! - the buy (close): short.win (height 1) funds the trader with direct lamport moves (no inner
 //!   instruction), syncs the balances with a 0-lamport System transfer, and invokes pump at height
-//!   2 with `user` = the trader (signer) and `associated_user` = `trader_base_ata`; pump's own
-//!   System transfers debit the **trader** at height 3 (the curve's net and the fees); pump's
-//!   token transfer credits `trader_base_ata` at height 3; short.win then moves exactly `q` from
-//!   `trader_base_ata` to the lending vault (`TransferChecked`, authority the trader) at height 2
-//!   and refunds the trader's lamports to the position;
+//!   2 with the IDL's 17 accounts — `user` = the trader (#9, the only signer) and
+//!   `associated_base_user` = `trader_base_ata` (#10) — and 24 data bytes (no `partial_fill`);
+//!   pump's own System transfer debits the **trader** at height 3; pump's token transfer credits
+//!   `trader_base_ata` at height 3; short.win then moves exactly `q` from `trader_base_ata` to the
+//!   lending vault (`TransferChecked`, authority the trader) at height 2 and refunds the trader's
+//!   lamports to the position;
 //! - the sell (open): the lending vault pays `q` into `trader_base_ata` (`TransferChecked`,
 //!   authority the market PDA) and the borrower funds `ert` (System, height 2) before pump's
-//!   `sell_v2` at height 2 with the trader as `user`;
+//!   `sell_v3` at height 2 with the trader as `user`;
 //! - nothing runs deeper than height 3 (two spare levels), and the trader PDA is the only
 //!   account short.win signs for in pump's instruction.
 
@@ -55,6 +57,16 @@ fn inner(env: &Env, ix: &Instruction, meta: &TransactionMetadata) -> Vec<Inner> 
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// pump's v3 trade accounts for `pm`'s trader (the harness's own list, `PumpCurve::v3_accounts`,
+/// with the TradeExtras' buyback recipient): what short.win's CPI must name, in order.
+pub fn v3_accounts(pm: &PumpMarket) -> Vec<Pubkey> {
+    pm.curve
+        .v3_accounts(&pm.trader(), &pm.trader_base_ata, &pm.buyback_recipient)
+        .iter()
+        .map(|a| a.pubkey)
+        .collect()
 }
 
 fn is_token(p: &Pubkey) -> bool {
@@ -115,11 +127,16 @@ fn check(coin: PumpCoin) {
     let pump_ix = ins
         .iter()
         .find(|i| i.program == PUMP_PROGRAM_ID)
-        .expect("sell_v2");
+        .expect("sell_v3");
     assert_eq!(pump_ix.height, 2);
-    assert_eq!(pump_ix.data[..8], fork::PUMP_SELL_V2);
-    assert_eq!(pump_ix.accounts[13], trader, "user = the trader PDA");
-    assert_eq!(pump_ix.accounts[14], pm.trader_base_ata, "associated_user");
+    assert_eq!(pump_ix.data[..8], fork::PUMP_SELL_V3);
+    assert_eq!(pump_ix.data.len(), 24);
+    assert_eq!(pump_ix.accounts, v3_accounts(&pm), "the IDL's 17 accounts");
+    assert_eq!(pump_ix.accounts[8], trader, "user = the trader PDA");
+    assert_eq!(
+        pump_ix.accounts[9], pm.trader_base_ata,
+        "associated_base_user"
+    );
     let pump_at = ins
         .iter()
         .position(|i| i.program == PUMP_PROGRAM_ID)
@@ -151,18 +168,22 @@ fn check(coin: PumpCoin) {
     let pump_at = ins
         .iter()
         .position(|i| i.program == PUMP_PROGRAM_ID)
-        .expect("buy_v2");
+        .expect("buy_v3");
     let pump_ix = &ins[pump_at];
     assert_eq!(pump_ix.height, 2, "pump under short.win's CPI");
-    assert_eq!(pump_ix.data[..8], fork::PUMP_BUY_V2);
-    assert_eq!(pump_ix.data.len(), 24, "no trailing cap byte");
+    assert_eq!(pump_ix.data[..8], fork::PUMP_BUY_V3);
+    assert_eq!(pump_ix.data.len(), 24, "no partial_fill byte");
     assert_eq!(
         u64::from_le_bytes(pump_ix.data[8..16].try_into().unwrap()),
         q,
         "exactly q"
     );
-    assert_eq!(pump_ix.accounts[13], trader, "user = the trader PDA");
-    assert_eq!(pump_ix.accounts[14], pm.trader_base_ata, "associated_user");
+    assert_eq!(pump_ix.accounts, v3_accounts(&pm), "the IDL's 17 accounts");
+    assert_eq!(pump_ix.accounts[8], trader, "user = the trader PDA");
+    assert_eq!(
+        pump_ix.accounts[9], pm.trader_base_ata,
+        "associated_base_user"
+    );
     let msg = Message::new(&tx(&close), Some(&env.payer.pubkey()));
     let signer_in_tx = |k: &Pubkey| {
         msg.account_keys

@@ -42,15 +42,10 @@
 //!   leaving every account as it was (R3B-11);
 //! - `max_sol_cost` bounds what the completer pays: a sale that raises the completion cost above
 //!   it reverts the bundle at tx1 (pump 6002), nothing committed;
-//! - the whole path for a straddled short.win position: the close refuses `CurveStraddle`, the
-//!   program's `B̂_str` is stable across a curve trade (the post-migration pool is path
-//!   independent), the bundle leaves every short.win account untouched, and tx3 (M6) — the
-//!   venue accounts, then `crank_price` moving the market `PumpCurve → PumpSwap` and the
-//!   borrower's `close_short` on the pool in one transaction — buys `Q` on the new pool for at
-//!   most `B̂_str`;
-//! - a borrower's self-made straddle (it buys `rT − q + 1` itself; M5-SEC-4): no exit on the
-//!   curve, the bundle, the pool pumped ×3 before any observation, tx3's crank `→ PumpSwap`, and
-//!   the keeper's liquidation on the pool once the warm-up has run;
+//! - (pump-final P2) a straddled short.win position no longer waits for the bundle: its close and
+//!   the keeper's exits complete the curve by pump's synthetic migration (`synthetic_exit_it`),
+//!   which replaced this file's tests of `CurveStraddle` and of `B̂_str` against the bundle; the
+//!   bundle stays a third party's path to the migration until P6 retires the helper;
 //! - ★ the whole three-transaction bundle, tx3 built before the trade, against a curve trade
 //!   between the keeper's read and the bundle (a buy, a sale, a third-party completion, a
 //!   completion and migration): it lands and moves the market onto the pool every time; a third
@@ -84,8 +79,8 @@ use shortwin::constants::{
 use shortwin::errors::ShortwinError as E;
 use shortwin::events::VenueStateChanged;
 use shortwin::state::VenueKind;
-use shortwin_litesvm_tests::engine::{Borrower, VenueMarket, crank_price_ix};
-use shortwin_litesvm_tests::errors::{assert_err, custom_code, ok};
+use shortwin_litesvm_tests::engine::{Borrower, crank_price_ix};
+use shortwin_litesvm_tests::errors::{custom_code, ok};
 use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve, PumpV2};
 use shortwin_litesvm_tests::pump::{self, CurveUser, PumpMarket, PumpSpec};
 use shortwin_litesvm_tests::{Env, TxResult, events, pda, raydium, read};
@@ -809,27 +804,6 @@ fn max_sol_cost_bounds_the_completion() {
 
 // ---- the straddled position ---------------------------------------------------------------------
 
-/// The program's own venue state of `pm` now (the host build of `venues::read_state` on the
-/// ReadSet as the VM holds it: what the next instruction reads).
-fn host_state(env: &Env, pm: &PumpMarket) -> shortwin::venues::VenueState {
-    use anchor_lang::prelude::AccountInfo;
-    let mut accs: Vec<(Pubkey, u64, Vec<u8>, Pubkey)> = pm
-        .read_set(false)
-        .iter()
-        .map(|a| {
-            let acc = env.svm.get_account(&a.pubkey).unwrap_or_default();
-            (a.pubkey, acc.lamports, acc.data, acc.owner)
-        })
-        .collect();
-    let infos: Vec<AccountInfo> = accs
-        .iter_mut()
-        .map(|(k, l, d, o)| AccountInfo::new(k, false, false, l, d, o, false))
-        .collect();
-    let m = env.market(&pm.market());
-    let kind = m.venue_kind().expect("venue");
-    shortwin::venues::read_state(&m, kind, &infos, env.now())
-}
-
 /// A pump market on the near-complete curve with `40·q` lent, `q = vT/200`, the helper deployed.
 fn market_with_helper() -> (Env, PumpMarket, u64) {
     let (mut env, c) = fork_with_helper(PumpCoin::Near);
@@ -855,197 +829,11 @@ fn shortwin_accounts(pm: &PumpMarket, b: &Borrower, nonce: u64) -> Vec<Pubkey> {
     ]
 }
 
-/// The whole curve part of the straddle for a short.win position (ARCH §4.3, §5.4; V1-9): `q >
-/// rT` on a live curve, so the close refuses `CurveStraddle`; the program's `B̂_str(q)` (the live
-/// leg: all of `q` on the deterministic post-migration pool) barely moves when a curve buy lands
-/// before the bundle (the pool `migrate_v2` creates does not depend on the path); the bundle
-/// (tx1 `complete_curve`, tx2 `migrate_v2` + tip) names and touches no short.win account; the
-/// tx3 (M6) — the venue accounts, then `crank_price` moving the market `PumpCurve → PumpSwap`
-/// and the borrower's `close_short` on the pool in one transaction — buys all of `q` on the new
-/// pool for at most `B̂_str` (within a few lamports).
-#[test]
-fn a_straddled_position_prices_the_bundle_it_waits_for() {
-    let (mut env, pm, q) = market_with_helper();
-    let c = pm.curve;
-    let mut b = env.borrower();
-    let (res, nonce) = env.open(&pm, &mut b, q);
-    ok(res);
-    env.warp(2);
-    buy_down_to(&mut env, &c, q / 2);
-    env.warp(1);
-    ok(env.send(&[crank_price_ix(&pm)], &[]));
-    assert_err(&env.close(&pm, &b, nonce), E::CurveStraddle);
-
-    // The program's B̂_str on the keeper's read, and after a buy lands before the bundle.
-    let b_str_read = host_state(&env, &pm).buy(q).expect("B̂_str").cost;
-    let who = Completer::new(&mut env, &c, true);
-    let max = completion_cost(&env, &c) * 105 / 100;
-    let tx1 = who.tx1(&env, &c, max);
-    let tx2 = who.tx2(&env, &c, true);
-    let u = CurveUser::new(&mut env, &c);
-    ok(u.buy(&mut env, &c, q / 8, u64::MAX));
-    let st = host_state(&env, &pm);
-    assert!(st.executable && st.curve.as_ref().unwrap().live.rt < u128::from(q));
-    let b_str = st.buy(q).expect("B̂_str").cost;
-    eprintln!("B̂_str on the read {b_str_read}, after a buy {b_str}");
-    assert!(
-        b_str.abs_diff(b_str_read) <= 4,
-        "the post-migration pool does not depend on the curve's path"
-    );
-
-    // The bundle, with short.win's accounts watched: tx1 and tx2 name and touch none of them.
-    for ix in tx1.iter().chain(&tx2) {
-        assert_ne!(ix.program_id, shortwin::ID);
-        assert!(ix.accounts.iter().all(|a| a.pubkey != pm.market()
-            && a.pubkey != pm.keys.trader
-            && a.pubkey != pm.keys.pool_vault));
-    }
-    let keys = shortwin_accounts(&pm, &b, nonce);
-    let before = snapshot(&env, &keys);
-    let saved = env.svm.clone();
-    ok_bundle(bundle(
-        &mut env,
-        &[(tx1.clone(), &who.kp), (tx2.clone(), &who.kp)],
-    ));
-    assert_eq!(snapshot(&env, &keys), before, "no short.win account moved");
-    env.svm = saved;
-
-    // M6: the borrower's client bundles its own tx3, built before the pool exists — the pool
-    // accounts the existence requirement names (paid by the borrower), then `crank_price` on the
-    // curve's ReadSet (the valid canonical pool: `PumpCurve → PumpSwap`, the ring rewrite, the
-    // warm-up) and the borrower's `close_short` on the pool, which the warm-up does not gate: all
-    // of `q` bought on the pool the bundle created, for at most `B̂_str`.
-    let pam = pool_market_before_migration(&env, &pm);
-    let mut tx3 = vec![pump::cu_limit_ix(700_000)];
-    tx3.extend(pool_account_ixs(&env, &b.key(), &pam, &pm));
-    tx3.push(crank_price_ix(&pm));
-    tx3.push(shortwin_litesvm_tests::engine::close_short_ix(
-        &pam,
-        &b.key(),
-        nonce,
-        u64::MAX,
-        shortwin::venues::ExtrasSel::NONE,
-        &[],
-    ));
-    let kp = b.kp.insecure_clone();
-    let metas = ok_bundle(bundle(
-        &mut env,
-        &[(tx1, &who.kp), (tx2, &who.kp), (tx3.clone(), &kp)],
-    ));
-    let meta = &metas[2];
-    let ev: VenueStateChanged = events::one(meta);
-    assert_eq!(
-        (ev.from, ev.to),
-        (VenueKind::PumpCurve as u8, VenueKind::PumpSwap as u8)
-    );
-    assert_eq!(
-        pam.coin_creator,
-        shortwin_litesvm_tests::pamm::PammMarket::graduated(&env.svm, &pm).coin_creator,
-        "the pool's coin creator is the curve's"
-    );
-    let close: shortwin::events::Close = events::one(meta);
-    let spent = close.buyback_cost;
-    eprintln!("tx3 on the pool: B̂_str {b_str}, executed {spent}");
-    assert!(spent <= b_str, "B̂_str covers the executed leg");
-    assert!(b_str - spent <= 8, "within a few lamports");
-    assert_eq!(env.market(&pm.market()).open_positions, 0);
-    let s3 = stats(&env, meta, &tx3, &b.key());
-    eprintln!("the borrower's tx3 (accounts, crank → PumpSwap, close_short): {s3:?}");
-    assert!(
-        s3.trace <= 64 && s3.v0_alt.0 <= 1_232,
-        "T-SIZE / T-TRACE: {s3:?}"
-    );
-}
-
-/// A borrower's **self-made straddle** (M5-SEC-4's second case, ARCH §5.4, §9 M6): with its
-/// position open the borrower buys `rT − q + 1` itself (any wallet), so `q > rT` and every exit on
-/// the curve refuses `CurveStraddle` — the borrower's close and a keeper's liquidation alike. The
-/// keeper's bundle (tx1 `complete_curve`, tx2 `migrate_v2`) completes and migrates the curve; the
-/// pool then trades up ×3 before short.win observes anything. tx3's `crank_price` moves the market
-/// `PumpCurve → PumpSwap` (the ring at the pool's `lp_supply`, the warm-up), keeper liquidations
-/// wait `EmaWarmingUp` for the eight integrations of the pool's own buckets, and then liquidate the
-/// straddled position **on the pool**: the straddle bought the borrower nothing but the wait.
-#[test]
-fn a_self_made_straddle_is_liquidated_on_the_pool_after_the_bundle() {
-    let (mut env, pm, q) = market_with_helper();
-    let c = pm.curve;
-    let mut b = env.borrower();
-    let (res, nonce) = env.open(&pm, &mut b, q);
-    ok(res);
-    let rt = c.state(&env.svm).real_token_reserves;
-    assert!(rt > q, "the position fits the curve");
-    env.warp(2);
-    // The borrower's own buy of rT − q + 1: rT = q − 1 < q.
-    buy_down_to(&mut env, &c, q - 1);
-    env.warp(1);
-    ok(env.send(&[crank_price_ix(&pm)], &[]));
-    assert_err(&env.close(&pm, &b, nonce), E::CurveStraddle);
-    let kp = env.funded_keypair();
-    fn liq(env: &mut Env, mm: &impl VenueMarket, kp: &Keypair, b: &Pubkey, nonce: u64) -> TxResult {
-        let ix = shortwin_litesvm_tests::engine::liquidate_ix(mm, &kp.pubkey(), b, nonce);
-        env.send(&[pump::cu_limit_ix(400_000), ix], &[kp])
-    }
-    assert_err(&liq(&mut env, &pm, &kp, &b.key(), nonce), E::CurveStraddle);
-
-    // The keeper's bundle.
-    let who = Completer::new(&mut env, &c, true);
-    let max = completion_cost(&env, &c) * 105 / 100;
-    let tx1 = who.tx1(&env, &c, max);
-    let tx2 = who.tx2(&env, &c, true);
-    ok_bundle(bundle(&mut env, &[(tx1, &who.kp), (tx2, &who.kp)]));
-    assert!(c.state(&env.svm).is_migrated());
-
-    // The pool trades up ×3 before any observation.
-    let pam = shortwin_litesvm_tests::pamm::PammMarket::graduated(&env.svm, &pm);
-    let payer = env.payer.pubkey();
-    let ixs = shortwin_litesvm_tests::pamm::venue_account_ixs(&env.svm, &payer, &pam);
-    ok(env.send(&ixs, &[]));
-    let u = shortwin_litesvm_tests::pamm::PammUser::new(&mut env, &pam.pool, 5_000 * 1_000_000_000);
-    ok(u.push_price(&mut env, &pam.pool, 3, 1));
-
-    // tx3: the crank moves the market onto the pool; keeper liquidations wait for the warm-up.
-    env.warp(1);
-    let meta = ok(env.send(&[crank_price_ix(&pm)], &[]));
-    let ev: VenueStateChanged = events::one(&meta);
-    assert_eq!(
-        (ev.from, ev.to),
-        (VenueKind::PumpCurve as u8, VenueKind::PumpSwap as u8)
-    );
-    let m = env.market(&pm.market());
-    assert_eq!((m.ema_warm, m.ema_guard), (8, 1));
-    let vault0 = tokens(&env, &pm.keys.pool_vault);
-    let mut liquidated = None;
-    for sec in 1..=300 {
-        env.warp(1);
-        ok(env.send(&[crank_price_ix(&pam)], &[]));
-        let warm = env.market(&pm.market()).ema_warm;
-        match liq(&mut env, &pam, &kp, &b.key(), nonce) {
-            Ok(meta) => {
-                assert_eq!(warm, 0, "+{sec} s: never while warming up");
-                liquidated = Some((sec, events::one::<shortwin::events::Liquidate>(&meta)));
-                break;
-            }
-            Err(f) => {
-                let want = if warm > 0 {
-                    E::EmaWarmingUp
-                } else {
-                    E::NotLiquidatable
-                };
-                assert_eq!(custom_code(&Err(f)), Some(u32::from(want)), "+{sec} s");
-            }
-        }
-    }
-    let (sec, ev) = liquidated.expect("liquidated on the pool");
-    eprintln!(
-        "self-made straddle: liquidated on the pool {sec} s after the transition, buyback {}",
-        ev.buyback_cost
-    );
-    assert!(sec >= 8, "after the warm-up's eight integrations");
-    assert!(ev.buyback_cost > 0 && ev.penalty > 0);
-    assert_eq!(tokens(&env, &pm.keys.pool_vault) - vault0, q);
-    assert_eq!(env.market(&pm.market()).open_positions, 0);
-}
-
+// (pump-final P2: the straddled position no longer waits for this bundle. Its close and the
+// keeper's liquidation and expiry complete the curve by pump's synthetic migration in one
+// instruction, quoted `B̂_v3` — `synthetic_exit_it` (T-SYNTH-1, T-SYNTH-2) replaces the tests that
+// asserted `CurveStraddle` here and priced the bundle with `B̂_str`. The bundle below stays a
+// third party's path to a migration until P6 retires the helper.)
 // ---- M6: tx3 (the transition) and the exit on the pool -------------------------------------------
 
 /// The PumpSwap market `pm` becomes at its graduation, built **before** the pool exists (what a
@@ -1130,7 +918,8 @@ fn keeper_tx3(env: &Env, who: &Completer, pm: &PumpMarket, observe: bool) -> Vec
 }
 
 /// An expired straddled position on the near curve (`q > rT` after an outside buy to `rT = q/2`,
-/// the deadline passed): liquidatable, every exit on the curve refused `CurveStraddle`.
+/// the deadline passed): an `expire` is due at once. (On the curve it would complete the curve
+/// synthetically, `synthetic_exit_it`; here a third party's bundle migrates the curve first.)
 fn expired_straddle() -> (Env, PumpMarket, u64, Borrower, u64) {
     let (mut env, pm, q) = market_with_helper();
     let mut b = env.borrower();
@@ -1142,7 +931,7 @@ fn expired_straddle() -> (Env, PumpMarket, u64, Borrower, u64) {
     let now = env.now();
     env.warp(deadline - now + 1);
     ok(env.send(&[crank_price_ix(&pm)], &[]));
-    assert_err(&env.close(&pm, &b, nonce), E::CurveStraddle);
+    assert!(pm.curve.state(&env.svm).real_token_reserves < q, "q > rT");
     (env, pm, q, b, nonce)
 }
 

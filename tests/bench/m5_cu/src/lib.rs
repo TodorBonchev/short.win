@@ -592,10 +592,10 @@ pub fn donate_to_trader(env: &mut Env, pm: &PumpMarket) {
 }
 
 /// The costliest curve-leg path the fixtures allow (on top of normalisation): the curve's creator
-/// changed after the listing to [`NEW_CREATOR`], whose vault is **empty** — the adapter
-/// re-derives both creator-vault slots (T12, T13) from the live creator, and pump tops the new
-/// vault up to `Rent.minimum_balance(0)` from the trader (T-RENT) — and the **last** fee and
-/// buyback recipients of the live `Global` (the longest key scans, short.win's and pump's).
+/// changed after the listing to [`NEW_CREATOR`], whose vault is **empty** — since pump-final §6.1
+/// (`sell_v3` / `buy_v3`) neither short.win nor pump names or tops up a creator vault, so this
+/// costs nothing more and stays only to show it — and the **last** buyback recipient of the live
+/// `Global` (TradeExtras T7: the longest key scans, short.win's and pump's).
 pub fn costliest_legs(env: &mut Env, pm: &mut PumpMarket) {
     let creator = Pubkey::new_from_array(NEW_CREATOR);
     fork::set_curve_creator(&mut env.svm, &pm.curve.curve, &creator);
@@ -863,8 +863,8 @@ fn open_normalising(coin: PumpCoin) -> Prepared {
     prepared(env, ix, &[&b.kp])
 }
 
-/// `vT/100`: large enough that the sale covers the creator-vault top-up within `exec_tol_bps`
-/// (`S_exp` ≥ 650.24 M; `pump_it::rent`).
+/// `vT/100`: the costliest open's size (twice [`q_of`]). It once had to cover v2's creator-vault
+/// top-up within `exec_tol_bps`; `sell_v3` makes none (pump-final §6.1).
 pub fn q_top_up(env: &Env, c: &PumpCurve) -> u64 {
     c.state(&env.svm).virtual_token_reserves / 100
 }
@@ -897,7 +897,7 @@ fn close(coin: PumpCoin, normalise: bool) -> Prepared {
     prepared(env, ix, &[&b.kp])
 }
 
-/// The costliest close: normalising, after a creator change into an empty vault (the top-up
+/// The costliest close: normalising, after a creator change into an empty vault (no top-up
 /// inside `B`), the last recipients.
 fn close_costliest(coin: PumpCoin) -> Prepared {
     let Positioned {
@@ -1215,7 +1215,7 @@ pub fn cases() -> Vec<Case> {
     add(
         "open_short",
         format!(
-            "{}: costliest — first open, normalising, after a creator change into an empty vault (top-up), last recipients",
+            "{}: costliest — first open, normalising, after a creator change into an empty vault, the last buyback recipient",
             label(NEAR)
         ),
         OPEN,
@@ -1244,7 +1244,7 @@ pub fn cases() -> Vec<Case> {
         add(
             "close_short",
             format!(
-                "{}: costliest — normalising, after a creator change into an empty vault (top-up in B), last recipients",
+                "{}: costliest — normalising, after a creator change into an empty vault, the last buyback recipient",
                 label(c)
             ),
             CLOSE,
@@ -1652,7 +1652,7 @@ fn tx_sandwiched_open(coin: PumpCoin) -> (Env, Vec<Instruction>, Vec<Keypair>) {
 }
 
 /// `k` opens of one wallet in one transaction on the near-complete curve (the first creates the
-/// exposure record), each of `vT/800` (0.125 %: four stay under the wallet cap and above the
+/// exposure record), each of `vT/800` (0.125 %: five stay under the wallet cap and above the
 /// notional floor; the other curves' prices put `vT/800` under the floor).
 pub fn opens_of_one_wallet(k: u64) -> (Env, Vec<Instruction>, Vec<Keypair>) {
     let (mut env, pm, _) = setup(NEAR);
@@ -1762,7 +1762,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
                 label(c)
             ),
             arch: "2 + ≤ 15 (§6.2 curve `open_short` max)",
-            expected: 2 + 17,
+            expected: 2 + 16,
             peak: 3,
             v1: false,
             cu_limit: CURVE_TRADE,
@@ -1771,7 +1771,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         v.push(TraceTx {
             name: format!("{}: ComputeBudget ×2 + close_short, normalising", label(c)),
             arch: "2 + ≤ 15 (§6.2 curve exit max)",
-            expected: 2 + if c == SPL { 15 } else { 16 },
+            expected: 2 + 12,
             peak: 3,
             v1: false,
             cu_limit: CURVE_TRADE,
@@ -1780,11 +1780,11 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
     }
     v.push(TraceTx {
         name: format!(
-            "{}: ComputeBudget ×2 + the costliest open (first, normalising, creator change into an empty vault, last recipients)",
+            "{}: ComputeBudget ×2 + the costliest open (first, normalising, creator change into an empty vault, the last buyback recipient)",
             label(NEAR)
         ),
         arch: "2 + ≤ 15 (§6.2 curve `open_short` max)",
-        expected: 2 + 18 + NEAR_GROWTH,
+        expected: 2 + 16 + NEAR_GROWTH,
         peak: 3,
         v1: false,
         cu_limit: CURVE_TRADE,
@@ -1792,11 +1792,11 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
     });
     v.push(TraceTx {
         name: format!(
-            "{}: ComputeBudget ×2 + the costliest close (normalising, creator change into an empty vault, last recipients)",
+            "{}: ComputeBudget ×2 + the costliest close (normalising, creator change into an empty vault, the last buyback recipient)",
             label(NEAR)
         ),
         arch: "2 + ≤ 15 (§6.2 curve exit max)",
-        expected: 2 + 17,
+        expected: 2 + 12,
         peak: 3,
         v1: false,
         cu_limit: CURVE_TRADE,
@@ -1808,7 +1808,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
             label(NEAR)
         ),
         arch: "2 + ≤ 15 (§6.2 curve exit max)",
-        expected: 2 + 15,
+        expected: 2 + 11,
         peak: 3,
         v1: false,
         cu_limit: CURVE_TRADE,
@@ -1822,7 +1822,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
             ),
             arch: "no row (an attacker's atomic sandwich, §8.2; v1: it does not fit v0 through the protocol ALT)",
             // A user's `buy_v2` is 7 entries (8 with a creator fee), its `sell_v2` 4.
-            expected: 2 + if c == SPL { 7 } else { 8 } + 17 + 4,
+            expected: 2 + if c == SPL { 7 } else { 8 } + 16 + 4,
             peak: 3,
             v1: true,
             cu_limit: 1_400_000,
@@ -1831,15 +1831,15 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
     }
     v.push(TraceTx {
         name: format!(
-            "{}: ComputeBudget ×2 + four opens of one wallet (the most that fit: 2 + 14 + 1 + 3·13, the first sale growing the curve)",
+            "{}: ComputeBudget ×2 + five opens of one wallet (the most that fit: 2 + 13 + 1 + 4·12 = 64, the first sale growing the curve)",
             label(NEAR)
         ),
-        arch: "no row (v1: four do not fit v0 through the protocol ALT; `t_trace::opens_per_v0_transaction`)",
-        expected: 2 + 14 + NEAR_GROWTH + 3 * 13,
+        arch: "no row (v1: five do not fit v0 through the protocol ALT; `t_trace::opens_per_v0_transaction`)",
+        expected: 2 + 13 + NEAR_GROWTH + 4 * 12,
         peak: 3,
         v1: true,
         cu_limit: 1_400_000,
-        setup: Box::new(|| opens_of_one_wallet(4)),
+        setup: Box::new(|| opens_of_one_wallet(5)),
     });
     v.push(TraceTx {
         name: "ComputeBudget ×2 + crank_price ×4 on four curve markets, each just completed (`→ PumpMigrating`)"
@@ -1858,7 +1858,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
                 label(c)
             ),
             arch: "2 + 2 + ≤ 15 on the curve (§6.2)",
-            expected: 2 + 2 + if c == SPL { 12 } else { 13 },
+            expected: 2 + 2 + 9,
             peak: 3,
             v1: false,
             cu_limit: CURVE_KEEPER,
@@ -1870,7 +1870,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
                 label(c)
             ),
             arch: "2 + 2 + ≤ 15 on the curve (§6.2)",
-            expected: 2 + 2 + if c == SPL { 12 } else { 13 },
+            expected: 2 + 2 + 9,
             peak: 3,
             v1: false,
             cu_limit: CURVE_KEEPER,
@@ -1883,7 +1883,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
             label(T22)
         ),
         arch: "2 + 2 + ≤ 15 on the curve (§6.2)",
-        expected: 2 + 2 + 17,
+        expected: 2 + 2 + 12,
         peak: 3,
         v1: false,
         cu_limit: CURVE_KEEPER,
@@ -2182,7 +2182,10 @@ pub fn depth_cases() -> Vec<DepthCase> {
     }
     v.push(DepthCase {
         handler: "open_short",
-        case: format!("{}: the costliest open (creator vault top-up)", label(NEAR)),
+        case: format!(
+            "{}: the costliest open (normalising, growth, the last buyback recipient)",
+            label(NEAR)
+        ),
         direct_peak: 3,
         setup: Box::new(open_costliest),
     });

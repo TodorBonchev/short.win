@@ -125,12 +125,7 @@ const ROWS: readonly Row[] = [
         'blocked',
         'This market’s route is marked broken. New shorts are refused; exits are not paused.',
     ],
-    [
-        6031,
-        'CurveStraddle',
-        'wait',
-        'Buying back this position would complete the Pump.fun curve, which one transaction cannot do. It is exited on the pool right after graduation; you can add margin meanwhile.',
-    ],
+    [6031, 'CurveStraddle', 'wait', 'Buyback exceeds what the curve and its post-migration pool can deliver.'],
     [6032, 'VenueDisabled', 'blocked', 'New shorts are disabled for this venue.'],
     [
         6033,
@@ -357,6 +352,12 @@ const ROWS: readonly Row[] = [
         'PoolDrained',
         'wait',
         'This pool is drained: at most 1/1,000 of its tokens are unborrowed. Deposits wait until repayments or settlements free more.',
+    ],
+    [
+        6109,
+        'CurveCashbackCoin',
+        'blocked',
+        'pump.fun’s current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap.',
     ],
 ];
 

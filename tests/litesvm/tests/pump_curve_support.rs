@@ -191,10 +191,11 @@ pub fn rent_due(env: &Env, pm: &PumpMarket, pos: &ShortPosition) -> u64 {
 
 // ---- the curve as short.win quotes it (shortwin-math on the readers) ------------------------
 
-/// What the curve's quotes read (ARCH §4.2, §4.3), read from the dumped accounts with the
-/// venue-state readers: the live curve, its resolved fees, the constant offsets, the live leg's
-/// `X_p = curve_base_ata − rT`, `Global.pool_migration_fee` and the post-migration pool's
-/// PumpSwap schedule.
+/// What the curve's quotes read (ARCH §4.2, §4.3; pump-final §6.2), read from the dumped accounts
+/// with the venue-state readers: the live curve, its resolved fees, the constant offsets, the live
+/// leg's `X_s = curve_base_ata − rT`, `Global.pool_migration_fee`, the post-migration pool's
+/// PumpSwap schedule, the synthetic route's fee of a live curve and the post-complete quote of a
+/// complete one.
 #[derive(Clone, Debug)]
 pub struct CurveCtx {
     pub live: CurveState,
@@ -205,6 +206,11 @@ pub struct CurveCtx {
     pub pool_tiers: Vec<FeeTier>,
     pub pool_creator_fee_configurable: bool,
     pub creator_is_default: bool,
+    /// The fee of pump's synthetic route past `rT` (`fees::pump_curve_at_supply` on the mint's
+    /// live supply): a live, non-cashback, non-mayhem curve only (pump-final §6.1.5).
+    pub synthetic: Option<FeeBps>,
+    /// A complete curve's pool part: `(curve_base_ata, pcQ)` when `pcB` or `pcQ` is set.
+    pub post_complete: Option<(u128, u64)>,
 }
 
 impl CurveCtx {
@@ -239,6 +245,13 @@ impl CurveCtx {
                 .expect("GlobalConfig")
                 .creator_fee_configurable();
         let base = u128::from(tokens(env, &pm.curve.curve_base_ata));
+        let c = pm.curve.state(svm);
+        let synthetic = (!live.complete && !c.is_cashback_coin && !c.is_mayhem_mode)
+            .then(|| pm.curve.synthetic_fees(svm))
+            .flatten();
+        let post_complete = (live.complete
+            && (c.post_complete_base_out != 0 || c.post_complete_quote_in != 0))
+            .then_some((base, c.post_complete_quote_in));
         Some(Self {
             live,
             fees,
@@ -247,21 +260,28 @@ impl CurveCtx {
             migration_fee,
             pool_tiers,
             pool_creator_fee_configurable,
-            creator_is_default: pm.curve.state(svm).creator_is_default(),
+            creator_is_default: c.creator_is_default(),
+            synthetic,
+            post_complete,
         })
     }
 
-    /// `CurvePricing` at the live fee with the deterministic (EMA-leg) migration (the standard
-    /// 206.9 M tokens) and the post-migration pool's schedule (`base_supply` 10¹⁵, a new pool's
-    /// own creator fee 0), as ARCH §4.3 prices hypothetical curve states.
+    /// `CurvePricing` at the live fee (pump-final §6.2) with the EMA-leg migration (the standard
+    /// 206.9 M tokens, or the live `curve_base_ata` and `pcQ` after a synthetic pool part), the
+    /// post-migration pool's schedule (`base_supply` 10¹⁵, a new pool's own creator fee 0) and
+    /// the live curve's synthetic route (`B̂_v3` above `rT`), as ARCH §4.3 prices hypothetical
+    /// curve states.
     pub fn pricing(&self) -> CurvePricing<'_> {
+        let (pool_tokens, post_complete_quote_in) = self
+            .post_complete
+            .unwrap_or((shortwin::venues::STANDARD_POOL_TOKENS, 0));
         CurvePricing {
             fees: self.fees,
             offsets: self.offsets,
             migration: MigrationParams {
                 migration_fee: self.migration_fee,
-                pool_tokens: shortwin::venues::STANDARD_POOL_TOKENS,
-                post_complete_quote_in: 0,
+                pool_tokens,
+                post_complete_quote_in,
             },
             pool: PammFeeSchedule {
                 tiers: &self.pool_tiers,
@@ -271,15 +291,16 @@ impl CurveCtx {
                 coin_creator_is_default: self.creator_is_default,
                 cap_bps: None,
             },
-            // B̂_str above rT, as the program's adapter prices it until it trades v3
-            // (pump-final §6).
-            synthetic: None,
+            synthetic: self.synthetic,
         }
     }
 
-    /// `B̂(q)` on the live curve (the live leg's `X_p` above `rT`), at the live fee or capped at
-    /// `cap_bps` (the risk view).
+    /// `B̂(q)` on the live curve (`B̂_v3` above `rT` with the live leg's `X_s`), at the live fee
+    /// or capped at `cap_bps` (the risk view); `None` above `rT` without a synthetic route.
     pub fn buy_live(&self, q: u64, cap_bps: Option<u64>) -> Option<BuyQuote> {
+        if !self.live.complete && self.synthetic.is_none() && u128::from(q) > self.live.rt {
+            return None;
+        }
         let mut p = self.pricing();
         if let Some(c) = cap_bps {
             p = p.capped(c);
@@ -1014,20 +1035,17 @@ pub fn fair_value(pos: &ShortPosition, now: i64, r_due: u64, b_fv: u64) -> u64 {
     risk::fair_value(Some(b_fv), rate, r_due).expect("FV")
 }
 
-/// `B̂_FV(q; P)` of a stuck migration (a `PumpMigrating` market; ARCH §4.5 "stuck migration"):
-/// the deterministic post-migration pool `migrate_v2` would build from the complete curve (the
-/// standard 206.9 M tokens, `rQ − pool_migration_fee`), repriced at `P` on its own liquidity,
-/// at its PumpSwap tier with the position's hard cap (the risk view) — from `shortwin-math`
-/// and the readers.
+/// `B̂_FV(q; P)` of a stuck migration (a `PumpMigrating` market; ARCH §4.5 "stuck migration";
+/// pump-final §5.4): the pool `migrate_v2` will build from the complete curve (the standard
+/// 206.9 M tokens and `rQ − pool_migration_fee`, or after a synthetic pool part the live
+/// `curve_base_ata` and `+ pcQ`, `P` then ρ-scaled), repriced at `P` on its own liquidity, at its
+/// PumpSwap tier with the position's hard cap (the risk view) — `quote::migrating_fv` on the
+/// readers.
 pub fn b_fv_migrating(env: &Env, pm: &PumpMarket, pos: &ShortPosition, p: u128) -> u64 {
     let ctx = CurveCtx::read(env, pm).expect("a complete curve with vT > 0");
     assert!(ctx.live.complete && ctx.live.vt > 0, "a stuck migration");
     let pr = ctx.pricing().capped(u64::from(pos.venue_fee_hard_cap_bps));
-    let (xp, yp) = quote::migrated_pool(&ctx.live, &pr.migration).expect("migrated pool");
-    let f = fees::pump_amm(yp, xp, &pr.pool).expect("pool fee");
-    let l_pool = quote::liquidity(xp, yp).expect("L");
-    let (x, y) = quote::reprice(l_pool, p).expect("reprice");
-    quote::sol_leg::buy_exact_out(pos.q, x, y, false, &f)
+    quote::migrating_fv(pos.q, p, &ctx.live, &pr.migration, &pr.pool)
         .expect("B̂_FV")
         .cost
 }

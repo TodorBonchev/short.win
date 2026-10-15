@@ -14,19 +14,23 @@
 //!   `quote::ray_v4` / `quote::cpmm` (per direction) on `vault − need_take_pnl` / `vault −
 //!   counters`.
 //!
-//! - **Pump curve** (M5; ARCH §3.12 PumpCurve, §4.1–§4.3, §5.3): the curve parses (owner,
-//!   discriminator, bools), is SOL-quoted, not mayhem, at least 115 bytes and not complete, and
-//!   pump's `Global` and `FeeConfig`, the curve's base ATA (holding at least `rT`) and PumpSwap's
-//!   `FeeConfig` and `GlobalConfig` parse; pricing `(vT, vQ)` with `fees::pump_curve` on the
-//!   live tier; the quotes `quote::sol_leg` (ε₁ = 1) up to `rT` (the straddle above it is not
-//!   re-quoted here), the sale capped by `rQ`. `venue_rent`: the creator-vault top-up and a curve
-//!   under the build's growth size growing to it on the trade, its rent reserve (`lamports − rQ −`
-//!   the fee buckets, `fork::curve_growth_top_up`) topped up to the size's minimum balance from
-//!   the trader: 166 bytes since pump's 2026-10-08 redeploy (`fork::CURVE_LEN_2026_10_08`), 141
-//!   on the 2026-10-02 build (`fork::CURVE_LEN_2026_10`), 125 on the 2026-09 build (R-PUMP Update
-//!   U10) — the build pump's ProgramData holds, `fork::PumpDeploy::held` (T-LATCH replays the
-//!   upgrades). A migrating curve (complete, `vT > 0`) is not executable but still **observed**
-//!   (ARCH §3.0 step 7).
+//! - **Pump curve** (M5; ARCH §3.12 PumpCurve, §4.1–§4.3, §5.3; pump-final §6.1.5–§6.1.6): the
+//!   curve parses (owner, discriminator, bools), is SOL-quoted (`depth` 0), not mayhem, at least
+//!   115 bytes, not complete, **not a cashback coin** (pump's v3 trades refuse one) and carries no
+//!   post-complete fields (`pcB` / `pcQ` @150 / @158 on a live curve: G-3), and pump's `Global`
+//!   and `FeeConfig`, the curve's base ATA (holding at least `rT`) and PumpSwap's `FeeConfig` and
+//!   `GlobalConfig` parse; pricing `(vT, vQ)` with `fees::pump_curve` on the live tier; the quotes
+//!   `quote::sol_leg` (ε₁ = 1) up to `rT` and above it pump's synthetic migration `B̂_v3`
+//!   (`quote::curve_synthetic` at `fees::pump_curve_at_supply` on the mint's live supply, the
+//!   would-be pool on `curve_base_ata − rT` and `Global.pool_migration_fee`), the sale capped by
+//!   `rQ`. `venue_rent`: a curve under the build's growth size growing to it on the trade, its
+//!   rent reserve (`lamports − rQ −` the fee buckets, `fork::curve_growth_top_up`) topped up to the
+//!   size's minimum balance from the trader: 166 bytes since pump's 2026-10-08 redeploy
+//!   (`fork::CURVE_LEN_2026_10_08`), 141 on the 2026-10-02 build (`fork::CURVE_LEN_2026_10`), 125
+//!   on the 2026-09 build (R-PUMP Update U10) — the build pump's ProgramData holds,
+//!   `fork::PumpDeploy::held` (T-LATCH replays the upgrades). short.win's v3 trades keep their
+//!   fees in the curve's buckets and never top up a creator vault. A migrating curve (complete,
+//!   `vT > 0`; a cashback one too) is not executable but still **observed** (ARCH §3.0 step 7).
 //!
 //! - **PumpSwap** (M6; ARCH §3.12 PumpSwap, §4.1–§4.2, §5.3): the market's canonical pool parses
 //!   (owner, discriminator, bools), is the mint's valid canonical pool (index 0, created by pump's
@@ -53,7 +57,7 @@ use litesvm::LiteSVM;
 use shortwin::constants::{RAYDIUM_V4_AUTHORITY_NONCE, TOKEN_PROGRAM_ID};
 use shortwin::state::{MARKET_FLAG_SOL_IS_TOKEN0_OR_COIN, Market, VenueKind, raydium_cache};
 use shortwin_math::fees::{self, CpmmConfig, CpmmPoolFees, CurveFeeSchedule, Direction, FeeBps};
-use shortwin_math::quote::{CurveState, Pricing, sol_leg};
+use shortwin_math::quote::{CurveState, MigrationParams, Pricing, curve_synthetic, sol_leg};
 use shortwin_venue_state::{mint, pump, pump_amm, raydium_cpmm, raydium_v4, token_account};
 use solana_clock::Clock;
 
@@ -79,11 +83,14 @@ pub struct VenueView {
     pub pricing: Option<Pricing>,
     /// The pump curve's live state and resolved fees when executable.
     pub curve: Option<(CurveState, FeeBps)>,
+    /// The pump curve's synthetic route past `rT` when executable (pump-final §5.2): the fee
+    /// pump charges both parts (the tier at the mint's live supply) and the would-be pool
+    /// (`pool_tokens = curve_base_ata − rT`, the migration fee).
+    pub synthetic: Option<(FeeBps, MigrationParams)>,
     /// The venue-side rent a trade on this state takes from `user` (the trader) besides its
-    /// charge: pump's creator-vault top-up to `Rent.minimum_balance(0)` when the curve charges a
-    /// creator fee and the vault holds less (R-PUMP U6, Update 2026-09-29; T-RENT) plus the
-    /// curve's growth to 166 bytes (141 on the 2026-10-02 build, 125 on the 2026-09 one); a short
-    /// PumpSwap pool's growth to 287 bytes (271). 0 elsewhere.
+    /// charge: the curve's growth to 166 bytes (141 on the 2026-10-02 build, 125 on the 2026-09
+    /// one; short.win's v3 trades top up no creator vault); a short PumpSwap pool's growth to 287
+    /// bytes (271). 0 elsewhere.
     pub venue_rent: u64,
     /// PumpSwap (M6R-1, owner decision of 2026-09-30): the canonical pool's locked depth `D =
     /// ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋`, `λ_bps = ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋`
@@ -108,16 +115,19 @@ impl VenueView {
         cap_fee_ppm: 0,
         pricing: None,
         curve: None,
+        synthetic: None,
         venue_rent: 0,
         locked_depth: None,
         pump_tier: None,
     };
 
-    /// `B̂_live(q)`: the exact-out buy of `q` tokens on this state (the curve: up to `rT`).
+    /// `B̂_live(q)`: the exact-out buy of `q` tokens on this state (the curve: up to `rT`, and
+    /// past it `B̂_v3` by pump's synthetic migration; `None` without that route).
     pub fn buy(&self, q: u64) -> Option<u64> {
         if let Some((c, f)) = self.curve {
             if u128::from(q) > c.rt {
-                return None;
+                let (fs, m) = self.synthetic?;
+                return curve_synthetic(q, &c, &f, &fs, &m).map(|b| b.cost);
             }
             return sol_leg::buy_exact_out(q, c.vt, c.vq, true, &f).map(|b| b.cost);
         }
@@ -269,6 +279,7 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         cap_fee_ppm: f.oneway_ppm().min(at_ema),
         pricing: Some(Pricing::PumpSwap(f)),
         curve: None,
+        synthetic: None,
         venue_rent,
         locked_depth: Some(locked_depth),
         pump_tier: Some((
@@ -286,7 +297,10 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
     let Ok(c) = pump::read_curve(&acc.owner.to_bytes(), &acc.data) else {
         return VenueView::DEAD;
     };
-    let listable = acc.data.len() >= pump::CURVE_MIN_LEN && c.is_sol_quote() && !c.is_mayhem_mode;
+    let listable = acc.data.len() >= pump::CURVE_MIN_LEN
+        && c.is_sol_quote()
+        && !c.is_mayhem_mode
+        && c.depth == 0;
     let state = CurveState {
         vt: u128::from(c.virtual_token_reserves),
         vq: u128::from(c.virtual_quote_reserves),
@@ -300,7 +314,10 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
         observed,
         ..VenueView::DEAD
     };
-    if !listable || !reserves || c.complete {
+    // pump-final §6.1.5–§6.1.6: a live cashback curve never executes (v3 refuses it), nor does a
+    // live curve carrying post-complete fields (G-3).
+    let post_complete = c.post_complete_base_out != 0 || c.post_complete_quote_in != 0;
+    if !listable || !reserves || c.complete || c.is_cashback_coin || post_complete {
         return dead;
     }
     let read = |k: &Pubkey| svm.get_account(k);
@@ -361,23 +378,27 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
         .flatten()
         .and_then(|vq| fees::pump_curve(state.vt, vq, &sched).ok())
         .map_or(u32::MAX, |e| e.oneway_ppm());
-    let vault = Pubkey::find_program_address(
-        &[b"creator-vault", &c.creator],
-        &shortwin::constants::PUMP_PROGRAM_ID,
-    )
-    .0;
-    let held = svm.get_account(&vault).map_or(0, |a| a.lamports);
-    let min0 = svm.minimum_balance_for_rent_exemption(0);
-    let vault_top_up = if f.creator > 0 {
-        min0.saturating_sub(held)
-    } else {
-        0
-    };
+    // The synthetic route (pump-final §5.2): both parts at the tier of the curve's market cap on
+    // the mint's live supply; the would-be pool on the live `curve_base_ata − rT`.
+    let synthetic = svm
+        .get_account(&m.mint)
+        .and_then(|a| mint::read_base(&a.owner.to_bytes(), &a.data).ok())
+        .and_then(|mi| fees::pump_curve_at_supply(state.vt, state.vq, mi.supply, &sched).ok())
+        .map(|fs| {
+            (
+                fs,
+                MigrationParams {
+                    migration_fee: global.pool_migration_fee(),
+                    pool_tokens: u128::from(base.amount - c.real_token_reserves),
+                    post_complete_quote_in: 0,
+                },
+            )
+        });
     let grows_to = PumpDeploy::held(svm, PumpProgram::Pump)
         .unwrap_or(PumpDeploy::CURRENT)
         .curve_len();
     let (creator_fee, protocol_fees) = crate::fork::curve_fee_buckets(&acc.data);
-    let growth = crate::fork::curve_growth_top_up(
+    let venue_rent = crate::fork::curve_growth_top_up(
         svm,
         acc.data.len(),
         acc.lamports,
@@ -385,7 +406,6 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
         creator_fee.saturating_add(protocol_fees),
         grows_to,
     );
-    let venue_rent = vault_top_up + growth;
     VenueView {
         executable: true,
         observed: true,
@@ -394,6 +414,7 @@ fn pump_curve(svm: &LiteSVM, m: &Market) -> VenueView {
         cap_fee_ppm: f.oneway_ppm().min(at_ema),
         pricing: None,
         curve: Some((state, f)),
+        synthetic,
         venue_rent,
         locked_depth: None,
         pump_tier: None,
@@ -421,6 +442,7 @@ fn mock(svm: &LiteSVM, m: &Market) -> VenueView {
         cap_fee_ppm: p.fee_ppm,
         pricing: Some(Pricing::Cpmm { buy: f, sell: f }),
         curve: None,
+        synthetic: None,
         venue_rent: 0,
         locked_depth: None,
         pump_tier: None,
@@ -506,6 +528,7 @@ fn ray_v4(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         cap_fee_ppm: fee.oneway_ppm(),
         pricing: Some(Pricing::RayV4(fee)),
         curve: None,
+        synthetic: None,
         venue_rent: 0,
         locked_depth: None,
         pump_tier: None,
@@ -592,6 +615,7 @@ fn ray_cpmm(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
         cap_fee_ppm: fee_ppm,
         pricing: Some(Pricing::Cpmm { buy, sell }),
         curve: None,
+        synthetic: None,
         venue_rent: 0,
         locked_depth: None,
         pump_tier: None,

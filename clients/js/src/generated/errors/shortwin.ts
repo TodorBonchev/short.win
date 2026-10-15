@@ -76,7 +76,7 @@ export const SHORTWIN_ERROR__VENUE_MIGRATING = 0x178c; // 6028
 export const SHORTWIN_ERROR__NO_ROUTE = 0x178d; // 6029
 /** RouteBroken: Route is flagged broken */
 export const SHORTWIN_ERROR__ROUTE_BROKEN = 0x178e; // 6030
-/** CurveStraddle: Buyback exceeds the curve's real token reserves; use the straddle bundle */
+/** CurveStraddle: Buyback exceeds what the curve and its post-migration pool can deliver */
 export const SHORTWIN_ERROR__CURVE_STRADDLE = 0x178f; // 6031
 /** VenueDisabled: Venue is disabled for opens */
 export const SHORTWIN_ERROR__VENUE_DISABLED = 0x1790; // 6032
@@ -232,6 +232,8 @@ export const SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY = 0x17da; // 6106
 export const SHORTWIN_ERROR__REBASE_NEEDS_OWNER = 0x17db; // 6107
 /** PoolDrained: The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more */
 export const SHORTWIN_ERROR__POOL_DRAINED = 0x17dc; // 6108
+/** CurveCashbackCoin: pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap. */
+export const SHORTWIN_ERROR__CURVE_CASHBACK_COIN = 0x17dd; // 6109
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -253,6 +255,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__COVERAGE_AUTHORITY_DISABLED
   | typeof SHORTWIN_ERROR__COVERAGE_PAUSED
   | typeof SHORTWIN_ERROR__CREATION_FEE_ABOVE_MAX
+  | typeof SHORTWIN_ERROR__CURVE_CASHBACK_COIN
   | typeof SHORTWIN_ERROR__CURVE_MAYHEM_UNSUPPORTED
   | typeof SHORTWIN_ERROR__CURVE_NEEDS_EXTEND
   | typeof SHORTWIN_ERROR__CURVE_QUOTE_NOT_SOL
@@ -366,10 +369,11 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__COVERAGE_AUTHORITY_DISABLED]: `The coverage authority is disabled`,
     [SHORTWIN_ERROR__COVERAGE_PAUSED]: `Opens are paused for keeper coverage`,
     [SHORTWIN_ERROR__CREATION_FEE_ABOVE_MAX]: `Market creation fee above the maximum`,
+    [SHORTWIN_ERROR__CURVE_CASHBACK_COIN]: `pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap.`,
     [SHORTWIN_ERROR__CURVE_MAYHEM_UNSUPPORTED]: `Mayhem-mode curves and pools are not supported`,
     [SHORTWIN_ERROR__CURVE_NEEDS_EXTEND]: `Bonding curve account must be extended first`,
     [SHORTWIN_ERROR__CURVE_QUOTE_NOT_SOL]: `Curve quote mint is not SOL`,
-    [SHORTWIN_ERROR__CURVE_STRADDLE]: `Buyback exceeds the curve's real token reserves; use the straddle bundle`,
+    [SHORTWIN_ERROR__CURVE_STRADDLE]: `Buyback exceeds what the curve and its post-migration pool can deliver`,
     [SHORTWIN_ERROR__DELEGATE_NOT_CLEARED]: `Pool vault delegate was not cleared`,
     [SHORTWIN_ERROR__DENIED_ACCOUNT]: `A protocol account was passed where it is denied (e.g. as a venue extra)`,
     [SHORTWIN_ERROR__EMA_WARMING_UP]: `The price state is warming up after a venue change; opens and keeper exits wait`,

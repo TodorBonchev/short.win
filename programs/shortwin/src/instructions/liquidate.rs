@@ -20,8 +20,10 @@
 //!    mint that fails the filter now is reported with `MintSafetyTripped`, never a revert).
 //!    The venue trades (`NoRoute` for `None`, `VenueMigrating` while `PumpMigrating` — also when
 //!    the prologue's venue sync just moved a curve market there) and is `venue_executable`
-//!    (`NoRoute`). On a live curve with `q > rT`, `CurveStraddle` (the bundle of ARCH §5.4: the
-//!    risk quotes below price that path, `B̂_str`, but the buy cannot run on the curve).
+//!    (`NoRoute`). On a live curve a `q > rT` buyback is an ordinary exit (pump-final §6.1.7):
+//!    `buy_v3` completes the curve and buys the rest from the would-be pool, and every quote
+//!    prices that path (`B̂_v3`, owner D3); a buyback the curve and its would-be pool cannot
+//!    deliver has no execution quote, so it fails precondition 4 (`UseSolSettle`, §6.7).
 //!    **1b** (M4R, **PROPOSED**, owner item O18): the post-change warm-up is over, `ema_warm ==
 //!    0` after the roll (`EmaWarmingUp`): a restart — a Raydium adoption, a listing, a `→
 //!    PumpSwap` graduation or a PumpSwap price start — wrote an anchor, and the next
@@ -567,7 +569,7 @@ pub(crate) fn keeper_exit<'info>(
             clock.unix_timestamp,
             clock.slot,
         )?;
-        venues::pump_curve::exit_venue_checks(&pro, &state, pos.q)?;
+        venues::pump_curve::exit_venue_checks(&pro, &state)?;
         // Precondition 1b (M4R): no keeper exit while the observation state is in its
         // post-change warm-up on this (executable) venue.
         require!(market.ema_warm == 0, ShortwinError::EmaWarmingUp);

@@ -16,9 +16,11 @@
 //!    fails it now is reported with a `MintSafetyTripped` log event, M1-SEC-11).
 //! 2. The venue trades (`NoRoute` for `None`, `VenueMigrating` while `PumpMigrating` — also when
 //!    this instruction's venue sync just moved a curve market there) and is executable
-//!    (`NoRoute`). On a live curve with `q > rT`, `CurveStraddle`: pump refuses a buy above `rT`
-//!    (6021), so the client uses the bundle of ARCH §5.4 (complete the curve, `migrate_v2`, then
-//!    close on PumpSwap, M6).
+//!    (`NoRoute`). On a live curve a `q > rT` buyback is an ordinary exit (pump-final §6.1.7):
+//!    `buy_v3` buys `rT` on the curve and the rest from the would-be PumpSwap pool by pump's
+//!    synthetic migration, priced `B̂_v3`; `CurveStraddle` only when that pool cannot deliver
+//!    `q − rT` (`q − rT ≥ X_s`, unreachable under the per-market cap, pump-final C8) or the
+//!    curve has no synthetic route (`venues::pump_curve::close_venue_checks`).
 //! 3. `R = rent::due(position, basis)`.
 //! 4. `B̂ = B̂_live(q)` at the **live** fee; `B̂ + R + ert ≤ V`, else `InsufficientVault` (an
 //!    undefined quote too).
@@ -31,8 +33,9 @@
 //!    the remainder stays on the position).
 //! 7. The market: `pool::repay(R, 0)` (token return, rent true-up, `resolve(q)`), the
 //!    position aggregates, `exposure.q_open −= q`. Post-conditions (I2, I7, `pool_vault ≥ T`).
-//!    A buyback that completed the curve (`q == rT`) moves the market to `PumpMigrating` after
-//!    the leg (ARCH §3.5 step 7, §5.4 case 1; `migration_seen_at = now`).
+//!    A buyback that completed the curve (`q ≥ rT`: exactly `rT`, or past it by the synthetic
+//!    migration) moves the market to `PumpMigrating` after the leg (ARCH §3.5 step 7, §5.4
+//!    case 1; `migration_seen_at = now`).
 //! 8. Event `Close` (and `TraderSwept` if the normalisation moved anything, `VenueStateChanged`
 //!    if the buyback completed the curve).
 
@@ -180,7 +183,7 @@ pub fn handler<'info>(
             clock.unix_timestamp,
             clock.slot,
         )?;
-        venues::pump_curve::exit_venue_checks(&pro, &state, pos.q)?;
+        venues::pump_curve::close_venue_checks(&pro, &state, pos.q)?;
         let r_due = rent::due(&pos.pos_rent(), &market.basis()).math()?;
         let b_hat = state
             .buy(pos.q)

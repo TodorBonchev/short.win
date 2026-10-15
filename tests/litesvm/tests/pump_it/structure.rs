@@ -1,13 +1,13 @@
-//! I14 on the curve (ARCH §3.0 A6, §3.12 PumpCurve, §8.3; C0-2, C0-14): every account of the
-//! curve's ReadSet (C0–C6) and TradeExtras (T0–T19) is present and key-checked in `open_short`,
-//! `close_short`, `crank_price` and `sol_settle` — each slot omitted, replaced by a foreign key,
-//! a trailing extra and the first two slots swapped make the instruction fail with
+//! I14 on the curve (ARCH §3.0 A6, §3.12 PumpCurve, §8.3; C0-2, C0-14; pump-final §6.1.1): every
+//! account of the curve's ReadSet (C0–C6) and TradeExtras (T0–T9) is present and key-checked in
+//! `open_short`, `close_short`, `crank_price` and `sol_settle` — each slot omitted, replaced by a
+//! foreign key, a trailing extra and the first two slots swapped make the instruction fail with
 //! `BadRemainingAccounts` / `VenueAccountMismatch`, never "no route" or a silent default; then
-//! the recipient slots take any key of the live `Global` lists, and the creator-vault slots
-//! follow the **live** curve creator (a creator change after the listing: the stale cached vault
-//! is refused, the re-derived one accepted). M10 batch 3: the bonding curve and its base / quote
-//! ATAs on every extras site and the position's borrower on the keeper exits are `DeniedAccount`
-//! extras, with a fresh-key control.
+//! the buyback slot takes any key of the live `Global`'s list, and a curve creator change after
+//! the listing needs no new account (pump's v3 trades name no creator vault: the fee stays in the
+//! curve's bucket). M10 batch 3: the bonding curve and its base / quote ATAs on every extras site
+//! and the position's borrower on the keeper exits are `DeniedAccount` extras, with a fresh-key
+//! control.
 //!
 //! Every instruction goes through `Env::send`: the invariant hooks run after each one.
 
@@ -61,6 +61,9 @@ fn assert_all_fail(
     }
 }
 
+/// The curve's ReadSet and TradeExtras of a trading instruction: 7 + 10.
+const CURVE_SLOTS: usize = 7 + shortwin::venues::pump_curve::TRADE_LEN;
+
 /// Every slot of the four instructions (module docs).
 #[test]
 fn open_close_crank_and_settle_check_every_curve_slot() {
@@ -77,7 +80,7 @@ fn open_close_crank_and_settle_check_every_curve_slot() {
         ExtrasSel::NONE,
         &[],
     );
-    assert_all_fail(&mut env, &open, 27, &[&b.kp]);
+    assert_all_fail(&mut env, &open, CURVE_SLOTS, &[&b.kp]);
     ok(env.send(&with_cu_limit(&pm, open), &[&b.kp]));
     env.warp(1);
     let crank_ix = crank_price_ix(&pm);
@@ -86,15 +89,14 @@ fn open_close_crank_and_settle_check_every_curve_slot() {
     let settle_ix = sol_settle_ix(&env, &pm, &kp.pubkey(), &b.key(), 0);
     assert_all_fail(&mut env, &settle_ix, 7, &[&kp]);
     let close = close_short_ix(&pm, &b.key(), 0, u64::MAX, ExtrasSel::NONE, &[]);
-    assert_all_fail(&mut env, &close, 27, &[&b.kp]);
+    assert_all_fail(&mut env, &close, CURVE_SLOTS, &[&b.kp]);
     ok(env.send(&[crank_ix], &[]));
     ok(env.send(&[settle_ix], &[&kp]));
     ok(env.send(&with_cu_limit(&pm, close), &[&b.kp]));
 }
 
-/// The recipient slots (T6, T8 and their derived WSOL ATAs T7, T9) take any key of the live
-/// `Global` lists: an open with the last fee recipient and the third buyback recipient, a close
-/// with others, both exact.
+/// The buyback slot (T7) takes any key of the live `Global`'s buyback list: an open with the third
+/// buyback recipient, a close with the seventh, both exact.
 #[test]
 fn any_listed_recipient_is_accepted() {
     let (mut env, mut pm, q) = setup(PumpCoin::Legacy115);
@@ -107,54 +109,35 @@ fn any_listed_recipient_is_accepted() {
     assert_trader_clean(&env, &pm);
 }
 
-/// A curve creator change after the listing (the creator vault moves): the market's cached
-/// vault (T12, T13) is refused, the vault re-derived from the live creator is accepted — on
-/// the open and on the close (pump itself checks the vault against the live creator).
+/// A curve creator change after the listing (pump's admin action): v3 keeps the creator fee in
+/// the curve's bucket and names no creator vault, so the market's unchanged TradeExtras carry the
+/// open and the close, and neither tops up a vault (the new creator's is empty).
 #[test]
-fn the_creator_vault_follows_the_live_creator() {
-    let (mut env, mut pm, q) = setup(PumpCoin::T22_115);
-    let stale = pm.creator_vault;
+fn a_creator_change_needs_no_new_account() {
+    let (mut env, pm, q) = setup(PumpCoin::T22_115);
+    let extras = pm.trade_extras();
     let new_creator = Pubkey::new_unique();
     fork::set_curve_creator(&mut env.svm, &pm.curve.curve, &new_creator);
+    let vault = fork::pump_creator_vault(&new_creator);
+    assert!(env.svm.get_account(&vault).is_none(), "an empty vault");
     let mut b = env.borrower();
-    let (res, _) = env.open(&pm, &mut b, q);
-    assert_err(&res, E::VenueAccountMismatch);
-    pm.refresh_creator(&env.svm);
-    assert_ne!(pm.creator_vault, stale);
-    assert_eq!(pm.creator_vault, fork::pump_creator_vault(&new_creator));
-    // The new creator's vault holds its rent-exempt minimum (an empty one costs the sale pump's
-    // top-up: `rent`).
-    let min0 = env.svm.minimum_balance_for_rent_exemption(0);
-    env.fund(&pm.creator_vault, min0);
-    // Re-deriving both vault keys lifts the open just above the 200 k default: within ARCH
-    // §6.1's PROPOSED 250 k limit for curve opens and closes.
-    let open = open_short_ix(
-        &pm,
-        &b.key(),
-        0,
-        q,
-        0,
-        u64::MAX,
-        u64::MAX,
-        ExtrasSel::NONE,
-        &[],
-    );
-    let meta = ok(env.send(&[pump::cu_limit_ix(pump::CURVE_TRADE_CU), open], &[&b.kp]));
+    let (_, nonce, meta) = open_ok(&mut env, &pm, &mut b, q);
     eprintln!(
         "open after a creator change: {} CU",
         meta.compute_units_consumed
     );
+    assert_eq!(pm.trade_extras(), extras);
     env.warp(1);
-    let close = close_short_ix(&pm, &b.key(), 0, u64::MAX, ExtrasSel::NONE, &[]);
-    let meta = ok(env.send(&[pump::cu_limit_ix(pump::CURVE_TRADE_CU), close], &[&b.kp]));
+    let (_, meta) = close_ok(&mut env, &pm, &b, nonce);
     eprintln!(
         "close after a creator change: {} CU",
         meta.compute_units_consumed
     );
+    assert!(env.svm.get_account(&vault).is_none(), "no top-up");
     assert_trader_clean(&env, &pm);
 }
 
-/// I14 on the curve's keeper exits (M10 G-A1b): every ReadSet (C0–C6) and TradeExtras (T0–T19)
+/// I14 on the curve's keeper exits (M10 G-A1b): every ReadSet (C0–C6) and TradeExtras (T0–T9)
 /// slot of `liquidate` and `expire` omitted, replaced by a foreign key, a trailing extra and the
 /// first two slots swapped fail with `BadRemainingAccounts` / `VenueAccountMismatch` and leave the
 /// position as it was; the controls: the honest `liquidate` of the healthy position gets past the
@@ -172,7 +155,7 @@ fn liquidate_and_expire_check_every_curve_slot() {
     let position = pda::position(&pm.market(), &b.key(), nonce).0;
     let before = env.svm.get_account(&position).map(|a| a.data);
     let liq = liquidate_ix(&pm, &kp.pubkey(), &b.key(), nonce);
-    assert_all_fail(&mut env, &liq, 27, &[&kp]);
+    assert_all_fail(&mut env, &liq, CURVE_SLOTS, &[&kp]);
     assert_eq!(env.svm.get_account(&position).map(|a| a.data), before);
     let cu = pump::cu_limit_ix(pump::CURVE_KEEPER_EXIT_CU);
     assert_err(&env.send(&[cu.clone(), liq], &[&kp]), E::NotLiquidatable);
@@ -182,7 +165,7 @@ fn liquidate_and_expire_check_every_curve_slot() {
     env.warp(1);
     let exp = expire_ix(&pm, &kp.pubkey(), &b.key(), nonce);
     let before = env.svm.get_account(&position).map(|a| a.data);
-    assert_all_fail(&mut env, &exp, 27, &[&kp]);
+    assert_all_fail(&mut env, &exp, CURVE_SLOTS, &[&kp]);
     assert_eq!(env.svm.get_account(&position).map(|a| a.data), before);
     let charge = pm.curve.charge_buy(&env.svm, q).unwrap();
     let vault0 = tokens(&env, &pm.keys.pool_vault);
@@ -244,7 +227,7 @@ fn open_with_extras(
     env.send(&open_with_extras_ixs(pm, b, q, set, extras), &[&b.kp])
 }
 
-/// The account list of the one pump CPI at height 2 (short.win's `sell_v2` / `buy_v2`) inside
+/// The account list of the one pump CPI at height 2 (short.win's `sell_v3` / `buy_v3`) inside
 /// the last instruction of `ixs`, a transaction the harness payer sent.
 fn curve_leg_cpi_accounts(
     env: &Env,
@@ -272,7 +255,7 @@ fn curve_leg_cpi_accounts(
 }
 
 /// G-H2 on the curve (A41, V2-6; C0-4 a): the Emergency publishes a harmless fixed extra on the
-/// curve's sell leg and an open selects `current`: short.win appends it to the `sell_v2` CPI
+/// curve's sell leg and an open selects `current`: short.win appends it to the `sell_v3` CPI
 /// (read from the transaction's inner instructions: the plain open's accounts plus the extra
 /// last), and pump ignores the trailing account, so the proceeds equal those of the same open
 /// without extras (from the same state).
@@ -297,13 +280,13 @@ fn extras_on_the_sell_leg_ride_along_and_a_hostile_set_is_bypassed() {
     let ixs = open_with_extras_ixs(&pm, &b, q, EXTRAS_SET_CURRENT, &harmless);
     let meta = ok(env.send(&ixs, &[&b.kp]));
     let with: Open = events::one(&meta);
-    // The extra reaches pump: the `sell_v2` CPI is the plain open's account list plus the
+    // The extra reaches pump: the `sell_v3` CPI is the plain open's account list plus the
     // published key at its end (forwarded, not dropped), and pump runs it.
     let with_cpi = curve_leg_cpi_accounts(&env, &ixs, &meta);
     assert_eq!(
         with_cpi.split_last(),
         Some((&extra, plain_cpi.as_slice())),
-        "sell_v2 carries the extra last"
+        "sell_v3 carries the extra last"
     );
     assert_eq!(
         (with.s, with.n_open),

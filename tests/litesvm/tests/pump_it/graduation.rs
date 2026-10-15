@@ -16,7 +16,13 @@
 //! 2026-09-30: curve opens refuse `GraduationHalted` exactly while PumpSwap's `create_pool` halt is
 //! set; a position opened before it keeps the stalled-graduation path to S3). M10 G-A2: a
 //! stranger's real `create_pool(index = 1)` of the coin after the completion never graduates the
-//! market (nor do its bytes at the canonical address); the real `migrate_v2` does.
+//! market (nor do its bytes at the canonical address); the real `migrate_v2` does. pump-final
+//! P2: the wipe gate's regressions on a non-cashback curve with lamports seeded into the trader's
+//! pump UVA (T-WIPE-GATE: pump's v3 trades refuse a live cashback coin, owner D1 (a)); and a
+//! `PumpMigrating` market after pump's synthetic migration — priced on the pool `migrate_v2`
+//! creates (the live `curve_base_ata`, `pcQ`; FV ρ-scaled), donations included, no FV when the
+//! post-complete fields are not known, a live curve carrying them not executable, a complete
+//! cashback curve observed (T-MIG-*, T-LIVE-PC-GUARD, T-LISTING).
 //!
 //! Every instruction goes through `Env::send`: the invariant hooks run after each one. The only
 //! planted state is the venue's (pump's curve account: reserves zeroed as by a migration to
@@ -44,13 +50,24 @@ fn venue(env: &Env, pm: &PumpMarket) -> VenueKind {
     market(env, pm).venue_kind().expect("venue")
 }
 
-/// `B̂_FV(q; P)` of a `PumpMigrating` market (ARCH §4.5, `Quoter::fv_repriced`), recomputed from
-/// the math crate and the dumped accounts: the deterministic pool `migrate_v2` builds from the
-/// complete curve (`migrated_pool` with the standard 206.9 M tokens), repriced at `P` with its
-/// own liquidity, at its PumpSwap tier with the position's hard cap (the risk view).
+/// `B̂_FV(q; P)` of a `PumpMigrating` market (ARCH §4.5, `Quoter::fv_repriced`; pump-final §5.4),
+/// recomputed from the math crate and the dumped accounts: the pool `migrate_v2` builds from the
+/// complete curve — the standard 206.9 M tokens and `rQ − fee`, or after a synthetic pool part the
+/// live `curve_base_ata` and `rQ − fee + pcQ` — repriced at `P` (ρ-scaled after a pool part) with
+/// its own liquidity, at its PumpSwap tier with the position's hard cap (the risk view).
 fn migrating_fv_quote(env: &Env, pm: &PumpMarket, q: u64, p: u128, cap_bps: u64) -> u64 {
     let live = pm.curve.curve_state(&env.svm);
     assert!(live.complete && live.vt > 0, "a stuck migration");
+    let c = pm.curve.state(&env.svm);
+    let (pool_tokens, post_complete_quote_in) =
+        if c.post_complete_base_out != 0 || c.post_complete_quote_in != 0 {
+            (
+                u128::from(tokens(env, &pm.curve.curve_base_ata)),
+                c.post_complete_quote_in,
+            )
+        } else {
+            (shortwin::venues::STANDARD_POOL_TOKENS, 0)
+        };
     let g = env
         .svm
         .get_account(&shortwin::constants::PUMP_GLOBAL)
@@ -74,31 +91,29 @@ fn migrating_fv_quote(env: &Env, pm: &PumpMarket, q: u64, p: u128, cap_bps: u64)
         .get_account(&shortwin::constants::PUMP_AMM_GLOBAL_CONFIG)
         .unwrap();
     let gcfg = vamm::read_global_config(&gc.owner.to_bytes(), &gc.data).unwrap();
-    let (xp, yp) = mq::migrated_pool(
-        &live,
-        &MigrationParams {
-            migration_fee: global.pool_migration_fee(),
-            pool_tokens: shortwin::venues::STANDARD_POOL_TOKENS,
-            post_complete_quote_in: 0,
-        },
-    )
-    .unwrap();
-    let f = fees::pump_amm(
-        yp,
-        xp,
-        &PammFeeSchedule {
-            tiers: &tiers,
-            base_supply: 1_000_000_000_000_000,
-            creator_fee_configurable: gcfg.creator_fee_configurable(),
-            pool_creator_fee_bps: 0,
-            coin_creator_is_default: pm.curve.state(&env.svm).creator_is_default(),
-            cap_bps: Some(cap_bps),
-        },
-    )
-    .unwrap();
-    let l_pool = mq::liquidity(xp, yp).unwrap();
-    let (x, y) = mq::reprice(l_pool, p).unwrap();
-    sol_leg::buy_exact_out(q, x, y, false, &f).unwrap().cost
+    let m = MigrationParams {
+        migration_fee: global.pool_migration_fee(),
+        pool_tokens,
+        post_complete_quote_in,
+    };
+    let sched = PammFeeSchedule {
+        tiers: &tiers,
+        base_supply: 1_000_000_000_000_000,
+        creator_fee_configurable: gcfg.creator_fee_configurable(),
+        pool_creator_fee_bps: 0,
+        coin_creator_is_default: c.creator_is_default(),
+        cap_bps: Some(cap_bps),
+    };
+    let fv = mq::migrating_fv(q, p, &live, &m, &sched).unwrap().cost;
+    if post_complete_quote_in == 0 {
+        // Without a pool part: the pre-v3 FV on the deterministic pool, to the lamport.
+        let (xp, yp) = mq::migrated_pool(&live, &m).unwrap();
+        let f = fees::pump_amm(yp, xp, &sched).unwrap();
+        let l_pool = mq::liquidity(xp, yp).unwrap();
+        let (x, y) = mq::reprice(l_pool, p).unwrap();
+        assert_eq!(fv, sol_leg::buy_exact_out(q, x, y, false, &f).unwrap().cost);
+    }
+    fv
 }
 
 /// A buyback of exactly `rT` completes the curve: the close succeeds (pump's charge, `q` back in
@@ -237,10 +252,11 @@ fn a_stuck_migration_pauses_exits_and_settles_s3_after_the_pause() {
 /// pool appears with exactly the deterministic reserves short.win prices on a complete curve
 /// (`X_p` = the curve's 206.9 M pool tokens, effective quote `Y_p = rQ − pool_migration_fee`)
 /// and the boost of `⌊0.2069·Y⌋`; the curve's reserves are zeroed. (Priced before the
-/// completion, `Y_p` is one lamport above: `straddle::b_str_prices_the_executed_bundle`.) The next
-/// crank moves the market onto the pool (M6: `PumpMigrating → PumpSwap`, the ring rewritten to the
-/// pool's `lp_supply`, the post-change warm-up; in M5 it stayed `PumpMigrating`); the curve's
-/// account lists no longer fit the market (`VenueAccountMismatch`).
+/// completion, `Y_p` is one lamport above:
+/// `straddle::b_v3_prices_the_live_exit_and_b_str_the_post_migration_pool`.) The next crank moves
+/// the market onto the pool (M6: `PumpMigrating → PumpSwap`, the ring rewritten to the pool's
+/// `lp_supply`, the post-change warm-up; in M5 it stayed `PumpMigrating`); the curve's account
+/// lists no longer fit the market (`VenueAccountMismatch`).
 #[test]
 fn migrate_v2_on_the_real_elf_graduates_the_market_onto_its_pool() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
@@ -711,6 +727,32 @@ fn claimable_cashback(env: &Env, user: &Pubkey) -> u64 {
     acc.lamports - env.svm.minimum_balance_for_rent_exemption(acc.data.len())
 }
 
+/// T-WIPE-GATE (pump-final §14, C6): the lamports seeded into the trader's pump UVA where a cashback
+/// coin's trades used to pay its cashback — pump's v3 trades refuse a live cashback coin and
+/// short.win no longer lists one (owner D1 (a)), but `claim_cashback` pays any balance above the
+/// UVA's rent, donated lamports included, so the wipe gate (`engine::lender::rewards_required`,
+/// `sweep_trader`'s pump-UVA leg) stays needed and reachable. Above a 0-byte account's rent-exempt
+/// minimum, as keeper-litesvm's `wipe` scenario needs.
+const SEEDED_CASHBACK: u64 = 1_000_000;
+
+/// Seeds [`SEEDED_CASHBACK`] into the trader's pump UVA (a System transfer anyone can make) and
+/// returns what `claim_cashback` would pay now.
+fn seed_uva(env: &mut Env, pm: &PumpMarket) -> u64 {
+    assert!(
+        !pm.curve.state(&env.svm).is_cashback_coin,
+        "a non-cashback curve (D1 (a))"
+    );
+    let trader = pm.trader();
+    let before = claimable_cashback(env, &trader);
+    env.fund(
+        &fork::pump_user_volume_accumulator(&trader),
+        SEEDED_CASHBACK,
+    );
+    let after = claimable_cashback(env, &trader);
+    assert_eq!(after - before, SEEDED_CASHBACK);
+    after
+}
+
 /// The keeper's chain through a stuck migration (ARCH §5.3): a crank and a `sol_settle` every
 /// 30 s until the position settles; returns the event and the second it settled at.
 fn settle_through_the_pause(
@@ -742,21 +784,18 @@ fn settle_through_the_pause(
 /// trader bit only (cashback outstanding); `[pump claim_cashback(user = trader), sweep_trader]` —
 /// no signature but the fee payer's — credits the cashback to the wiped epoch's record and sets
 /// both bits (no deadlock: the curve kinds' sweep sets the bit once nothing is claimable), and the
-/// deposit lands.
+/// deposit lands. T-WIPE-GATE: since D1 (a) on a non-cashback curve, the claimable balance seeded
+/// into the trader's pump UVA after the open ([`seed_uva`]) — every wipe-gate assertion kept.
 #[test]
 fn m6_sec_5_a_full_wipe_during_the_migration_pause_waits_for_the_curve_cashback() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
     let market_key = pm.market();
-    fork::patch(&mut env.svm, &pm.curve.curve, |d| {
-        d[vpump::OFF_IS_CASHBACK_COIN] = 1
-    });
-    assert!(pm.curve.state(&env.svm).is_cashback_coin);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
     let trader = pm.trader();
     assert!(
-        claimable_cashback(&env, &trader) > 0,
-        "the open's sale paid cashback into the trader's pump UVA"
+        seed_uva(&mut env, &pm) > 0,
+        "a claimable balance in the trader's pump UVA"
     );
     withdraw_all_free(&mut env, &pm);
     // 30 min before the position's deadline an outside buy completes the curve and nobody
@@ -861,19 +900,18 @@ fn m6_sec_5_a_full_wipe_during_the_migration_pause_waits_for_the_curve_cashback(
 /// venue-reward sweep and `sweep_trader` reads the UVA there (it alone is the token leg off the pump
 /// venues): the deposit waits on `None` and still after the Raydium adoption, until `[pump
 /// claim_cashback(user = trader), sweep_trader]` credits the cashback to the wiped epoch's record.
+/// T-WIPE-GATE: since D1 (a) on a non-cashback curve, the claimable balance seeded into the trader's
+/// pump UVA after the open ([`seed_uva`]) — every wipe-gate assertion kept.
 #[test]
 fn air05_a_full_wipe_after_the_market_left_pump_waits_for_the_curve_cashback() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
     let market_key = pm.market();
-    fork::patch(&mut env.svm, &pm.curve.curve, |d| {
-        d[vpump::OFF_IS_CASHBACK_COIN] = 1
-    });
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
     let trader = pm.trader();
     assert!(
-        claimable_cashback(&env, &trader) > 0,
-        "the open's sale paid cashback into the trader's pump UVA"
+        seed_uva(&mut env, &pm) > 0,
+        "a claimable balance in the trader's pump UVA"
     );
     withdraw_all_free(&mut env, &pm);
     // The position expires; the curve completes and pump migrates it elsewhere: `→ None`.
@@ -987,7 +1025,8 @@ fn air05_a_full_wipe_after_the_market_left_pump_waits_for_the_curve_cashback() {
 }
 
 /// M6-SEC-5, no deadlock: on a non-cashback curve the same S3 wipe during the migration pause is
-/// unlocked by `sweep_trader` alone (the pump UVA holds nothing claimable: both bits at once).
+/// unlocked by `sweep_trader` alone (the pump UVA holds nothing claimable — unfunded, unlike the
+/// T-WIPE-GATE twins: both bits at once).
 #[test]
 fn m6_sec_5_without_cashback_the_sweep_alone_unlocks_a_migrating_market() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
@@ -1201,4 +1240,524 @@ fn a_real_non_canonical_pool_does_not_graduate_the_market() {
         VenueKind::PumpMigrating,
         VenueKind::PumpSwap,
     );
+}
+
+// ---- pump's synthetic migration on a PumpMigrating market (pump-final §5.4, §6.1.5) -------------
+
+/// A third party's `buy_v3(rT + δ)`: the curve completes and `δ` comes from the would-be pool
+/// (`pcB = δ`).
+fn synthetic_completion(env: &mut Env, pm: &PumpMarket, delta: u64) {
+    let u = CurveUser::new(env, &pm.curve);
+    env.fund(&u.kp.pubkey(), 1_000_000_000_000);
+    let rt = pm.curve.state(&env.svm).real_token_reserves;
+    let ix = u.buy_v3_ix(&env.svm, &pm.curve, rt + delta, u64::MAX);
+    ok(u.send(env, ix));
+    let c = pm.curve.state(&env.svm);
+    assert!(c.complete && c.post_complete_base_out == delta);
+}
+
+/// `migrate_v2` by anyone.
+fn migrate(env: &mut Env, pm: &PumpMarket) -> TxResult {
+    let migrator = env.funded_keypair();
+    let ix = pump::migrate_v2_ix(&env.svm, &migrator.pubkey(), &pm.curve);
+    env.send(&[pump::cu_limit_ix(600_000), ix], &[&migrator])
+}
+
+/// The pool `migrate_v2` will create from the complete curve as short.win prices it (§5.4):
+/// `migrated_pool` on the live `curve_base_ata` and `pcQ` after a pool part, else on the standard
+/// 206.9e12 (a donation ignored, ARCH §4.3).
+fn priced_pool(env: &Env, pm: &PumpMarket) -> (u128, u128) {
+    let c = pm.curve.state(&env.svm);
+    let g = env
+        .svm
+        .get_account(&shortwin::constants::PUMP_GLOBAL)
+        .unwrap();
+    let fee = vpump::read_global(&g.owner.to_bytes(), &g.data)
+        .unwrap()
+        .pool_migration_fee();
+    let pc = c.post_complete_base_out != 0 || c.post_complete_quote_in != 0;
+    mq::migrated_pool(
+        &pm.curve.curve_state(&env.svm),
+        &MigrationParams {
+            migration_fee: fee,
+            pool_tokens: if pc {
+                u128::from(tokens(env, &pm.curve.curve_base_ata))
+            } else {
+                shortwin::venues::STANDARD_POOL_TOKENS
+            },
+            post_complete_quote_in: c.post_complete_quote_in,
+        },
+    )
+    .unwrap()
+}
+
+/// FV of `pos` at the EMA point now (ARCH §4.5, D3; R4A-3): `B̂_FV + ⌈p'·B̂_FV/10⁴⌉ + R_due`,
+/// `p'` the expiry fee if expired and not CR-liquidatable there, else the penalty.
+fn fv_of(pos: &ShortPosition, now: i64, r_due: u64, b_fv: u64) -> u64 {
+    use shortwin_math::risk;
+    let v_eff = risk::v_eff(pos.v, r_due);
+    let below = risk::cr_below(v_eff, Some(b_fv), pos.cr_liq_bps).unwrap();
+    let rate = risk::fv_rate_bps(
+        !(now >= pos.deadline && !below),
+        u32::from(pos.penalty_bps),
+        u32::from(pos.expiry_fee_bps),
+    );
+    risk::fair_value(Some(b_fv), rate, r_due).unwrap()
+}
+
+/// A position on `near166` 30 min from its deadline, the keeper's crank, and the market's
+/// keeper: `(env, pm, b, nonce, q, keeper)`.
+fn near166_before_deadline() -> (Env, PumpMarket, Borrower, u64, u64, solana_keypair::Keypair) {
+    let (mut env, pm, q) = setup(PumpCoin::Near166);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    let kp = keeper(&mut env);
+    warp_to_deadline(&mut env, &pm, &b.key(), nonce, -1_800);
+    crank(&mut env, &pm);
+    env.warp(1);
+    (env, pm, b, nonce, q, kp)
+}
+
+/// S3 of the position after its pause, checked against [`migrating_fv_quote`] at `P_ema` (§5.4)
+/// and [`fv_of`]; returns the event.
+fn s3_at_the_priced_pool(
+    env: &mut Env,
+    pm: &PumpMarket,
+    kp: &solana_keypair::Keypair,
+    b: &Borrower,
+    nonce: u64,
+) -> shortwin::events::SolSettle {
+    let t0 = market(env, pm).migration_seen_at;
+    let pos = env.position(pm, &b.key(), nonce);
+    let (ev, at) = settle_through_the_pause(env, pm, kp, &b.key(), nonce, |_| {});
+    assert_eq!(ev.condition, 3, "S3");
+    assert!(at >= t0 + i64::from(pos.max_migration_pause_s) + i64::from(pos.s3_wait_s));
+    let m = market(env, pm);
+    let b_fv = migrating_fv_quote(
+        env,
+        pm,
+        pos.q,
+        m.ema_price.get(),
+        u64::from(pos.venue_fee_hard_cap_bps),
+    );
+    let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+    let fv = fv_of(&pos, at, r_due, b_fv);
+    assert!(ev.fv > 0, "a defined FV");
+    assert_eq!(
+        ev.fv, fv,
+        "FV at §5.4's price on the pool migrate_v2 creates"
+    );
+    assert_eq!(ev.lender_amount, fv.min(pos.v - k_s(&pos)));
+    ev
+}
+
+/// T-MIG-PRICE (pump-final §5.4): a third party's synthetic completion (`buy_v3(rT + 10e12)`), the
+/// crank moves the market to `PumpMigrating`. On pump's ELF `rQ` excludes `pcQ` (`vQ − rQ =
+/// ivqr`); the program prices the pause on `(X₁, Y₁)` = (the live `curve_base_ata`, `rQ − fee +
+/// pcQ`) with its post-complete fields known, and `migrate_v2` creates exactly that pool. The EMA
+/// leg's quote on the completed curve's ring state, `B̂_str` on `(X₁, Y₁)`, covers a PumpSwap `buy(q)`
+/// on the new pool within a few lamports (it was off by ρ before pump-final).
+#[test]
+fn a_third_partys_synthetic_completion_is_priced_on_the_pool_migrate_v2_creates() {
+    let (mut env, pm, q) = setup(PumpCoin::Near166);
+    let mut b = env.borrower();
+    open_ok(&mut env, &pm, &mut b, q);
+    env.warp(1);
+    synthetic_completion(&mut env, &pm, 10_000_000_000_000);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpCurve,
+        VenueKind::PumpMigrating,
+    );
+    let c = pm.curve.state(&env.svm);
+    assert_eq!(
+        c.virtual_quote_reserves - c.real_quote_reserves,
+        c.initial_virtual_quote_reserves,
+        "rQ excludes the pool part"
+    );
+    let a = u128::from(tokens(&env, &pm.curve.curve_base_ata));
+    let st = host_state_with(&env, &pm, Some(mint_supply(&env, &pm)));
+    let shortwin::venues::Quoter::Curve(cq) = st.quoter().expect("the curve quoter") else {
+        panic!("a curve quoter");
+    };
+    assert!(cq.migrating && cq.post_complete_known);
+    assert_eq!(
+        (
+            cq.pricing.migration.pool_tokens,
+            cq.pricing.migration.post_complete_quote_in
+        ),
+        (a, c.post_complete_quote_in)
+    );
+    assert!(cq.pricing.synthetic.is_none(), "no synthetic route: G-2");
+    let (x1, y1) = priced_pool(&env, &pm);
+    assert_eq!(
+        mq::migrated_pool(&cq.live, &cq.pricing.migration),
+        Some((x1, y1))
+    );
+    // The EMA leg's quote on a ring state `(vT, vQ)`, here the completed curve's own (a ring entry
+    // recorded before the completion would price an older, cheaper pool).
+    let b_ema = st
+        .buy_at(
+            q,
+            u128::from(c.virtual_token_reserves),
+            u128::from(c.virtual_quote_reserves),
+        )
+        .expect("the EMA leg's quote")
+        .cost;
+    ok(migrate(&mut env, &pm));
+    let np = pump::NewPool::of(&pm.curve);
+    let r = np.reserves(&env.svm).expect("the canonical pool");
+    assert_eq!(
+        (u128::from(r.base), r.effective_quote),
+        (x1, y1),
+        "migrate_v2 created (X₁, Y₁)"
+    );
+    let buyer = env.funded_keypair();
+    let payer = env.payer.pubkey();
+    let program = pm.curve.token_program.id();
+    ok(env.send(
+        &[fork::create_ata_idempotent_ix(
+            &payer,
+            &buyer.pubkey(),
+            &pm.keys.mint,
+            &program,
+        )],
+        &[],
+    ));
+    let buyer_base = pda::ata(&buyer.pubkey(), &pm.keys.mint, &program);
+    let wsol = fork::fund_wsol(&mut env, &buyer.pubkey(), b_ema + 1_000_000_000);
+    let wsol0 = tokens(&env, &wsol);
+    let ixs = [
+        pump::pamm_extend_account_ix(&buyer.pubkey(), &np.pool),
+        pump::pamm_buy_ix(&env.svm, &np, &buyer.pubkey(), &buyer_base, &wsol, q, b_ema),
+    ];
+    ok(env.send(&ixs, &[&buyer]));
+    let spent = wsol0 - tokens(&env, &wsol);
+    assert_eq!(tokens(&env, &buyer_base), q);
+    eprintln!("EMA leg B̂ {b_ema} vs the pool's buy(q) {spent}");
+    assert!(spent <= b_ema && b_ema - spent <= 7);
+}
+
+/// T-MIG-S3 (pump-final §5.4): a third party's synthetic completion 30 min before the position's
+/// deadline, PumpSwap's `create_pool` halted (bit 0): nobody can migrate. The keeper's chain
+/// settles the expired position S3 after `max_migration_pause_s + s3_wait_s` at FV on the pool
+/// `migrate_v2` would create, `P_ema` ρ-scaled — above the pre-v3 FV on the standard pool.
+#[test]
+fn s3_on_a_stuck_synthetic_migration_settles_at_the_post_buy_pool() {
+    let (mut env, pm, b, nonce, _, kp) = near166_before_deadline();
+    synthetic_completion(&mut env, &pm, 10_000_000_000_000);
+    pamm::set_disable_flags(&mut env.svm, 0x01);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpCurve,
+        VenueKind::PumpMigrating,
+    );
+    let pos = env.position(&pm, &b.key(), nonce);
+    let ev = s3_at_the_priced_pool(&mut env, &pm, &kp, &b, nonce);
+    // Before pump-final the same FV priced the standard pool at P_ema (ρ = 1): lower by ≈ 1 − 1/ρ.
+    let live = pm.curve.curve_state(&env.svm);
+    let m = market(&env, &pm);
+    let g = env
+        .svm
+        .get_account(&shortwin::constants::PUMP_GLOBAL)
+        .unwrap();
+    let fee = vpump::read_global(&g.owner.to_bytes(), &g.data)
+        .unwrap()
+        .pool_migration_fee();
+    let (x0, y0) = mq::migrated_pool(
+        &live,
+        &MigrationParams {
+            migration_fee: fee,
+            pool_tokens: shortwin::venues::STANDARD_POOL_TOKENS,
+            post_complete_quote_in: 0,
+        },
+    )
+    .unwrap();
+    let (x1, y1) = priced_pool(&env, &pm);
+    let p = m.ema_price.get();
+    let rho_p = mq::migrating_fv_price(p, x0, y0, x1, y1).unwrap();
+    eprintln!(
+        "T-MIG-S3: ρ = {:.4}, FV {} (lenders {}), take {}",
+        rho_p as f64 / p as f64,
+        ev.fv,
+        ev.lender_amount,
+        pos.v - k_s(&pos)
+    );
+    assert!(rho_p > p);
+}
+
+/// T-MIG-DONATION (pump-final §5.4, §6.8; R-2): a token donation and a synthetic completion, each
+/// case followed by a `create_pool` halt, an S3 and — the bit cleared — `migrate_v2`. In every case
+/// with a pool part `X₁` is the live `curve_base_ata` and the S3's FV is defined and equals §5.4's
+/// on the live `(X₁, Y₁)`; the lenders get `min(FV, take)`; `migrate_v2` then creates exactly `(X₁,
+/// Y₁)`:
+///
+/// 1. `D` = 1e12 donated before a synthetic completion of `δ` = 10e12;
+/// 2. the review's edge: `D` = 206.9e12, then `δ` = 250e12 (`pcB ≥ 206.9e12`: revision 1's
+///    deterministic `206.9e12 − pcB` had no value at all);
+/// 3. `D` = 3e12 donated after the completion (`δ` = 10e12);
+/// 4. `D` = 206.9e12 and `δ` = 206.9e12 − 1e9 (revision 1's rule gave ρ ≈ 2e5): the `B̂_FV` behind the
+///    settled FV is within 0.1 % of the same capped-fee quote on the pool `migrate_v2` then creates;
+/// 5. control: `D` = 2e12 and a completion of exactly `rT` (no pool part): the donation is ignored
+///    (ARCH §4.3) — FV on the standard 206.9e12 — while `migrate_v2` seeds it.
+#[test]
+fn a_donation_and_a_synthetic_completion_price_the_pool_migrate_v2_creates() {
+    const T: u64 = 206_900_000_000_000;
+    for (case, before, delta, after) in [
+        (1, 1_000_000_000_000, 10_000_000_000_000, 0),
+        (2, T, 250_000_000_000_000, 0),
+        (3, 0, 10_000_000_000_000, 3_000_000_000_000),
+        (4, T, T - 1_000_000_000, 0),
+        (5, 2_000_000_000_000, 0, 0),
+    ] {
+        let (mut env, pm, b, nonce, q, kp) = near166_before_deadline();
+        if before > 0 {
+            donate_tokens(&mut env, &pm, &pm.curve.curve_base_ata, before);
+        }
+        if delta > 0 {
+            synthetic_completion(&mut env, &pm, delta);
+        } else {
+            buy_down_to(&mut env, &pm, 0);
+        }
+        if after > 0 {
+            donate_tokens(&mut env, &pm, &pm.curve.curve_base_ata, after);
+        }
+        pamm::set_disable_flags(&mut env.svm, 0x01);
+        env.warp(1);
+        venue_changed(
+            &crank(&mut env, &pm),
+            VenueKind::PumpCurve,
+            VenueKind::PumpMigrating,
+        );
+        let a = u128::from(tokens(&env, &pm.curve.curve_base_ata));
+        let (x1, y1) = priced_pool(&env, &pm);
+        if delta > 0 {
+            assert_eq!(x1, a, "case {case}: X₁ = the live curve_base_ata");
+        } else {
+            assert_eq!(x1, u128::from(T), "case {case}: the donation ignored");
+            assert_eq!(a, u128::from(T + before));
+        }
+        let pos = env.position(&pm, &b.key(), nonce);
+        let ev = s3_at_the_priced_pool(&mut env, &pm, &kp, &b, nonce);
+        if case == 4 {
+            let m = market(&env, &pm);
+            let cap = u64::from(pos.venue_fee_hard_cap_bps);
+            let b_fv = migrating_fv_quote(&env, &pm, q, m.ema_price.get(), cap);
+            let pfc = env
+                .svm
+                .get_account(&shortwin::constants::PUMP_AMM_FEE_CONFIG)
+                .unwrap();
+            let tiers: Vec<fees::FeeTier> =
+                vpump::read_fee_config(&pfc.owner.to_bytes(), &pfc.data)
+                    .unwrap()
+                    .fee_tiers
+                    .iter()
+                    .map(|t| fees::FeeTier {
+                        threshold: t.threshold,
+                        fees: FeeBps::new(t.fees.lp, t.fees.protocol, t.fees.creator),
+                    })
+                    .collect();
+            let gc = env
+                .svm
+                .get_account(&shortwin::constants::PUMP_AMM_GLOBAL_CONFIG)
+                .unwrap();
+            let gcfg = vamm::read_global_config(&gc.owner.to_bytes(), &gc.data).unwrap();
+            let f = fees::pump_amm(
+                y1,
+                x1,
+                &PammFeeSchedule {
+                    tiers: &tiers,
+                    base_supply: 1_000_000_000_000_000,
+                    creator_fee_configurable: gcfg.creator_fee_configurable(),
+                    pool_creator_fee_bps: 0,
+                    coin_creator_is_default: pm.curve.state(&env.svm).creator_is_default(),
+                    cap_bps: Some(cap),
+                },
+            )
+            .unwrap();
+            let on_pool = sol_leg::buy_exact_out(q, x1, y1, false, &f).unwrap().cost;
+            let dev = u128::from(b_fv.abs_diff(on_pool)) * 10_000 / u128::from(on_pool);
+            eprintln!("case 4: B̂_FV {b_fv} vs the created pool's quote {on_pool}");
+            assert!(dev <= 10, "within 0.1 %");
+        }
+        eprintln!(
+            "T-MIG-DONATION case {case}: X₁ {x1}, Y₁ {y1}, FV {}, lenders {}",
+            ev.fv, ev.lender_amount
+        );
+        pamm::set_disable_flags(&mut env.svm, 0);
+        ok(migrate(&mut env, &pm));
+        let r = pump::NewPool::of(&pm.curve)
+            .reserves(&env.svm)
+            .expect("the canonical pool");
+        if delta > 0 {
+            assert_eq!(
+                (u128::from(r.base), r.effective_quote),
+                (x1, y1),
+                "case {case}: migrate_v2 created (X₁, Y₁)"
+            );
+        } else {
+            assert_eq!(u128::from(r.base), a, "the donation seeded");
+            assert_eq!(r.effective_quote, y1);
+        }
+    }
+}
+
+/// T-MIG-GUARD (pump-final §6.1.5): a synthetic completion's post-complete fields patched so they
+/// are not known — (i) `vQ − rQ ≠ ivqr` with both set, (ii) `pcQ` = 0 with `pcB` set, (iii) `pcB` =
+/// 0 with `pcQ` set. The program keeps the curve quoter (never the cap-only view) and has no FV: the
+/// S3 pays the lenders the whole take (`V − K_s`), the borrower nothing, `fv` 0. The control, the
+/// fields as pump wrote them, settles at a defined FV below the take.
+#[test]
+fn a_migrating_curve_with_unknown_post_complete_fields_has_no_fv() {
+    for case in 0..4 {
+        let (mut env, pm, b, nonce, _, kp) = near166_before_deadline();
+        synthetic_completion(&mut env, &pm, 10_000_000_000_000);
+        let c = pm.curve.state(&env.svm);
+        fork::patch(&mut env.svm, &pm.curve.curve, |d| {
+            let put =
+                |d: &mut Vec<u8>, o: usize, v: u64| d[o..o + 8].copy_from_slice(&v.to_le_bytes());
+            match case {
+                1 => put(
+                    d,
+                    vpump::OFF_INITIAL_VIRTUAL_QUOTE_RESERVES,
+                    c.initial_virtual_quote_reserves + 1,
+                ),
+                2 => put(d, vpump::OFF_POST_COMPLETE_QUOTE_IN, 0),
+                3 => put(d, vpump::OFF_POST_COMPLETE_BASE_OUT, 0),
+                _ => {}
+            }
+        });
+        pamm::set_disable_flags(&mut env.svm, 0x01);
+        env.warp(1);
+        venue_changed(
+            &crank(&mut env, &pm),
+            VenueKind::PumpCurve,
+            VenueKind::PumpMigrating,
+        );
+        let pos = env.position(&pm, &b.key(), nonce);
+        let st = host_state_with(&env, &pm, Some(mint_supply(&env, &pm)));
+        let m = market(&env, &pm);
+        let r = shortwin::venues::risk_quoter(&m, &st, &[], u64::from(pos.venue_fee_hard_cap_bps))
+            .unwrap();
+        assert!(
+            matches!(r, shortwin::venues::Quoter::Curve(_)),
+            "case {case}: the curve quoter, never cap-only"
+        );
+        let fv = r.fv_repriced(pos.q, m.ema_liq.get(), m.ema_price.get());
+        assert_eq!(
+            fv.is_some(),
+            case == 0,
+            "case {case}: FV defined only when known"
+        );
+        let (ev, _) = settle_through_the_pause(&mut env, &pm, &kp, &b.key(), nonce, |_| {});
+        assert_eq!(ev.condition, 3);
+        let take = pos.v - k_s(&pos);
+        if case == 0 {
+            assert!(ev.fv > 0 && ev.lender_amount < take, "the control");
+        } else {
+            assert_eq!(ev.fv, 0, "case {case}: undefined FV");
+            assert_eq!(
+                ev.lender_amount, take,
+                "case {case}: the lenders take it all"
+            );
+            assert_eq!(ev.borrower_amount, 0);
+        }
+    }
+}
+
+/// T-LIVE-PC-GUARD (pump-final G-3, §6.1.5): post-complete fields on a **live** curve (planted @150 /
+/// @158 — pump writes them only in the buy that completes a curve): the venue is not executable
+/// (closes and opens `NoRoute`), not observed, and the S3 chain counts; the expired position
+/// settles S3 at A63's cap-only view on the frozen `(P_ema, L_ema)`.
+#[test]
+fn a_live_curve_carrying_post_complete_fields_is_not_executable() {
+    let (mut env, pm, q) = setup(PumpCoin::Near166);
+    let mut b = env.borrower();
+    let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
+    let kp = keeper(&mut env);
+    warp_to_deadline(&mut env, &pm, &b.key(), nonce, 1);
+    crank(&mut env, &pm);
+    fork::patch(&mut env.svm, &pm.curve.curve, |d| {
+        d[vpump::OFF_POST_COMPLETE_BASE_OUT..vpump::OFF_POST_COMPLETE_BASE_OUT + 8]
+            .copy_from_slice(&1u64.to_le_bytes());
+        d[vpump::OFF_POST_COMPLETE_QUOTE_IN..vpump::OFF_POST_COMPLETE_QUOTE_IN + 8]
+            .copy_from_slice(&1u64.to_le_bytes());
+    });
+    let st = host_state_with(&env, &pm, Some(mint_supply(&env, &pm)));
+    assert!(!st.executable && st.quoter().is_none(), "no pricing (G-3)");
+    env.warp(1);
+    no_venue_change(&crank(&mut env, &pm));
+    let m0 = market(&env, &pm);
+    assert!(m0.no_route_since > 0, "the S3 chain counts");
+    assert_err(&env.close(&pm, &b, nonce), E::NoRoute);
+    let mut b2 = env.borrower();
+    assert_err(&env.open(&pm, &mut b2, q).0, E::NoRoute);
+    let pos = env.position(&pm, &b.key(), nonce);
+    let since = m0.no_route_since;
+    let ev = loop {
+        env.warp(30);
+        crank(&mut env, &pm);
+        let meta = ok(settle(&mut env, &pm, &kp, &b.key(), nonce));
+        if let Some(ev) = settled(&meta) {
+            break ev;
+        }
+        assert!(env.now() < since + i64::from(pos.s3_wait_s) + 60);
+    };
+    assert_eq!(ev.condition, 3);
+    let m = market(&env, &pm);
+    let (p, l) = (m.ema_price.get(), m.ema_liq.get());
+    assert_eq!((p, l), (m0.ema_price.get(), m0.ema_liq.get()), "frozen");
+    let cap = shortwin_math::quote::Pricing::PumpSwap(FeeBps::new(
+        0,
+        u64::from(pos.venue_fee_hard_cap_bps),
+        0,
+    ));
+    let bq = cap.buy_repriced(pos.q, l, p).unwrap().cost;
+    let r_due = rent::due(&pos.pos_rent(), &m.basis()).unwrap();
+    assert_eq!(
+        ev.fv,
+        fv_of(&pos, ev.ts, r_due, bq),
+        "FV at the cap-only view"
+    );
+}
+
+/// T-LISTING (pump-final §6.1.6, R-4): a listed market whose curve is patched to a cashback coin
+/// while live (pump has no such instruction) is not executable (`NoRoute`) and records no
+/// observation; once the curve completes (a third party's `buy_v2` of `rT`; v2 still trades a
+/// cashback coin) the market is `PumpMigrating`, its observations are recorded again (`listable`
+/// does not refuse cashback: C2), and the expired position settles S3 at a defined FV.
+#[test]
+fn a_complete_cashback_curve_is_observed_during_the_pause() {
+    let (mut env, pm, b, nonce, _, kp) = near166_before_deadline();
+    fork::patch(&mut env.svm, &pm.curve.curve, |d| {
+        d[vpump::OFF_IS_CASHBACK_COIN] = 1
+    });
+    env.warp(1);
+    no_venue_change(&crank(&mut env, &pm));
+    let m0 = market(&env, &pm);
+    assert!(
+        m0.b_sec < env.now(),
+        "a live cashback curve is not observed"
+    );
+    assert_err(&env.close(&pm, &b, nonce), E::NoRoute);
+    buy_down_to(&mut env, &pm, 0);
+    env.warp(1);
+    venue_changed(
+        &crank(&mut env, &pm),
+        VenueKind::PumpCurve,
+        VenueKind::PumpMigrating,
+    );
+    env.warp(1);
+    crank(&mut env, &pm);
+    assert_eq!(
+        market(&env, &pm).b_sec,
+        env.now(),
+        "observed during the pause"
+    );
+    let st = host_state_with(&env, &pm, Some(mint_supply(&env, &pm)));
+    assert!(st.observed() && !st.executable);
+    let ev = s3_at_the_priced_pool(&mut env, &pm, &kp, &b, nonce);
+    assert!(ev.fv > 0);
 }

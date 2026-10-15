@@ -9,12 +9,14 @@
 //!   init set; a list-only listing),
 //!   `crank_price` (roll and record; `PumpCurve → PumpMigrating`, `PumpMigrating → None`,
 //!   `None → PumpCurve`), `open_short` (a wallet's first open, a repeat borrower, with
-//!   normalisation, with the creator-vault top-up), `close_short` (plain, normalising, the top-up
-//!   inside `B`, a completing buyback), `liquidate`, `expire`, `sol_settle` (no-op; S3 on
-//!   `PumpMigrating` and on `None`), `sweep_trader`'s token leg, `flag_venue_upgraded` and
-//!   `revalidate_venue`. Every curve leg is one pump CPI at height 2 whose pump-fees, token,
-//!   System and event CPIs sit at height 3, the peak: short.win keeps two spare levels (ARCH
-//!   §6.3; the bench `tests/bench/m5_cu` runs them through one and two wrapper programs).
+//!   normalisation, with a short curve's growth), `close_short` (plain, normalising, a completing
+//!   buyback, a synthetic completion above `rT`), `liquidate`, `expire`, `sol_settle` (no-op; S3
+//!   on `PumpMigrating` and on `None`), `sweep_trader`'s token leg, `flag_venue_upgraded` and
+//!   `revalidate_venue`. Every curve leg is one pump CPI at height 2 (`sell_v3` / `buy_v3`,
+//!   pump-final §6.1) whose token, System and event CPIs sit at height 3, the peak: short.win
+//!   keeps two spare levels (ARCH §6.3; the bench `tests/bench/m5_cu` runs them through one and
+//!   two wrapper programs). v3 makes no pump-fees CPI and names no creator vault: a curve with a
+//!   creator traces like one without, and an empty creator vault costs nothing.
 //! - **Worst-case transactions** (ComputeBudget included): the largest open and close, an atomic
 //!   sandwich of an open with the curve's own trades, the most opens of one wallet in one
 //!   transaction, a batch of four cranks that all move their market to `PumpMigrating`, the
@@ -22,19 +24,20 @@
 //!   (`MAX_INSTRUCTION_TRACE_LENGTH`); one open more is refused by the runtime itself.
 //!
 //! Figures against ARCH §6.2's curve column (open 9 + 1 + 2 = 12, ≤ 15; exits 11 + 1 = 12,
-//! ≤ 15): an open is 14 entries for a wallet's first position (the table omits the position
-//! `init` and the exposure `init_if_needed`, as on Raydium), 13 for a repeat borrower, 17 with
-//! normalisation and 18 with the creator-vault top-up (19 when the sale is also a 151-byte
-//! curve's first trade on pump's 2026-10-08 build, which grows it to 166 bytes); an exit is 12 on a curve without a
-//! creator fee and 13 with one (pump's creator-vault transfer), 15 / 16 normalising, 17 with the
-//! top-up; a crank that moves the venue is 3–4 (its `VenueStateChanged` and chain events). The
-//! table's maxima of 15 are exceeded by the normalising and top-up paths.
+//! ≤ 15) and pump-final §6.6 (sell leg 1 + 3 + 2, buy leg 1 + 4 + 2, a synthetic buy + 2): an
+//! open is 13 entries for a wallet's first position (the table omits the position `init` and the
+//! exposure `init_if_needed`, as on Raydium), 12 for a repeat borrower, 16 with normalisation (17
+//! when the sale is also a 151-byte curve's first trade on pump's 2026-10-08 build, which grows
+//! it to 166 bytes); an exit is 9, 12 normalising, 11 with a completing buyback (pump's
+//! `CompleteEvent` and short.win's `VenueStateChanged`) and 12 with a synthetic completion above
+//! `rT` (pump's `CompleteEvent` and `PostCompleteBuyEvent` too); a crank that moves the venue is
+//! 3–4 (its `VenueStateChanged` and chain events). Every path is within the table's maxima of 15.
 //!
 //! Every transaction goes through `Env::send`: the invariant hooks run after each instruction.
 //! A keeper's decision to send is a `simulate_transaction` on the current state, never a
-//! committed probe. The only planted state is the venue's (pump's curve account: a creator
-//! change, reserves zeroed by a migration elsewhere, a curve removed before a listing; the
-//! header of a ProgramData for the latch).
+//! committed probe. The only planted state is the venue's (pump's curve account: reserves zeroed
+//! by a migration elsewhere, a curve removed before a listing; the header of a ProgramData for
+//! the latch).
 
 // `TxResult` is LiteSVM's own `TransactionResult` (as in the harness library).
 #![allow(clippy::result_large_err)]
@@ -161,52 +164,61 @@ fn peak(meta: &TransactionMetadata) -> u8 {
         .unwrap_or(1)
 }
 
-/// pump's `sell_v2` under short.win (ARCH §2.4.1 PumpCurve row): pump at height 2, its fee
-/// lookup in pump-fees, the token transfer `trader_base_ata → curve_base_ata` and its event at
-/// height 3 (the proceeds are credited by direct lamport moves: no inner instruction); an empty
-/// creator vault adds pump's top-up System transfer from the trader after the token transfer and
-/// before the proceeds are credited (T-RENT).
-fn sell(top_up: bool) -> Vec<(P, u8)> {
-    let mut v = vec![(P::Pump, 2), (P::Pfee, 3), (P::Token, 3)];
-    if top_up {
-        v.push((P::System, 3));
-    }
-    v.push((P::Pump, 3));
-    v
+/// pump's `sell_v3` under short.win (ARCH §2.4.1 PumpCurve row; pump-final §6.1): pump at height
+/// 2, the token transfer `trader_base_ata → curve_base_ata` and its `TradeEvent` at height 3 (the
+/// proceeds are credited by direct lamport moves, the fees stay in the curve's buckets: no inner
+/// instruction, no pump-fees lookup, no creator vault).
+fn sell() -> Vec<(P, u8)> {
+    vec![(P::Pump, 2), (P::Token, 3), (P::Pump, 3)]
 }
 
 /// The sell leg of an open: `q` from the lending vault into `trader_base_ata` (the market signs),
-/// `ert` from the borrower to the trader, `sell_v2`, then `S` to the position and `ert` back to
+/// `ert` from the borrower to the trader, `sell_v3`, then `S` to the position and `ert` back to
 /// the borrower (System transfers the trader signs).
-fn sell_leg(top_up: bool) -> Vec<(P, u8)> {
+fn sell_leg() -> Vec<(P, u8)> {
     let mut v = vec![(P::Token, 2), (P::System, 2)];
-    v.extend(sell(top_up));
+    v.extend(sell());
     v.extend([(P::System, 2), (P::System, 2)]);
     v
 }
 
-/// pump's `buy_v2` under short.win with the trader PDA as `user` (T-PDA-USER): pump at height 2,
-/// its fee lookup, the token transfer `curve_base_ata → trader_base_ata`, the System transfers
-/// **from the trader** — the curve's net, the protocol fee, the buyback fee, the creator fee when
-/// the curve has a creator, and the top-up of an empty creator vault — and its event at height 3;
-/// a buy that completes the curve emits pump's second event (its completion event).
-fn buy(creator_fee: bool, top_up: bool, completing: bool) -> Vec<(P, u8)> {
-    let mut v = vec![(P::Pump, 2), (P::Pfee, 3), (P::Token, 3)];
-    let transfers = 3 + usize::from(creator_fee) + usize::from(top_up);
-    v.extend(std::iter::repeat_n((P::System, 3), transfers));
-    v.extend(std::iter::repeat_n(
-        (P::Pump, 3),
-        1 + usize::from(completing),
-    ));
+/// What a buy does to the curve: the `TradeEvent` alone, pump's `CompleteEvent` too when it buys
+/// exactly `rT`, and its `PostCompleteBuyEvent` as well when it buys past `rT` (the synthetic
+/// migration, pump-final §5.2).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Buy {
+    Plain,
+    Completing,
+    Synthetic,
+}
+
+impl Buy {
+    /// pump's events at height 3.
+    fn events(self) -> usize {
+        match self {
+            Self::Plain => 1,
+            Self::Completing => 2,
+            Self::Synthetic => 3,
+        }
+    }
+}
+
+/// pump's `buy_v3` under short.win with the trader PDA as `user` (T-PDA-USER): pump at height 2,
+/// the token transfer `curve_base_ata → trader_base_ata` and one System transfer **from the
+/// trader** (the whole charge: v3 keeps its fees in the curve's buckets) at height 3, then its
+/// events (`buy`).
+fn buy(buy: Buy) -> Vec<(P, u8)> {
+    let mut v = vec![(P::Pump, 2), (P::Token, 3), (P::System, 3)];
+    v.extend(std::iter::repeat_n((P::Pump, 3), buy.events()));
     v
 }
 
 /// The buy leg of an exit: the position funds the trader by direct lamport moves, a 0-lamport
-/// System transfer syncs both balances for the runtime's per-CPI check, `buy_v2`, the refund of
+/// System transfer syncs both balances for the runtime's per-CPI check, `buy_v3`, the refund of
 /// what is left to the position, and `q` from `trader_base_ata` to the lending vault.
-fn buy_leg(creator_fee: bool, top_up: bool, completing: bool) -> Vec<(P, u8)> {
+fn buy_leg(b: Buy) -> Vec<(P, u8)> {
     let mut v = vec![(P::System, 2)];
-    v.extend(buy(creator_fee, top_up, completing));
+    v.extend(buy(b));
     v.extend([(P::System, 2), (P::Token, 2)]);
     v
 }
@@ -218,19 +230,19 @@ const NORMALISE: [(P, u8); 3] = [(P::System, 2), (P::Token, 2), (P::Own, 2)];
 
 /// An open: `inits` System creations (the position; a first open also the exposure record), the
 /// normalisation if any, the sell leg, the margin and fee transfers, the event.
-fn open_shape(inits: usize, normalise: bool, top_up: bool) -> Vec<(P, u8)> {
+fn open_shape(inits: usize, normalise: bool) -> Vec<(P, u8)> {
     let mut v = vec![(P::System, 2); inits];
     if normalise {
         v.extend(NORMALISE);
     }
-    v.extend(sell_leg(top_up));
+    v.extend(sell_leg());
     v.extend([(P::System, 2), (P::System, 2), (P::Own, 2)]);
     v
 }
 
 /// `s` with pump's growth of a short curve on its first trade (the 151-byte `near` curve to 166
 /// bytes on the 2026-10-08 build, `PumpCurve::growth_top_up`): the trader's rent top-up of the
-/// curve, one System transfer at height 3 right after pump's own entry, before its fee lookup.
+/// curve, one System transfer at height 3 right after pump's own entry, before its token transfer.
 fn with_growth(mut s: Vec<(P, u8)>, grow: bool) -> Vec<(P, u8)> {
     if grow {
         let at = s
@@ -244,17 +256,17 @@ fn with_growth(mut s: Vec<(P, u8)>, grow: bool) -> Vec<(P, u8)> {
 }
 
 /// An exit: the normalisation if any, the buy leg, a completing buyback's `VenueStateChanged`
-/// (`→ PumpMigrating` in the instruction), the exit's event.
-fn exit_shape(normalise: bool, creator_fee: bool, top_up: bool, completing: bool) -> Vec<(P, u8)> {
+/// (`→ PumpMigrating` in the instruction, after `rT` exactly or past it), the exit's event.
+fn exit_shape(normalise: bool, b: Buy) -> Vec<(P, u8)> {
     let mut v = if normalise {
         NORMALISE.to_vec()
     } else {
         Vec::new()
     };
-    v.extend(buy_leg(creator_fee, top_up, completing));
+    v.extend(buy_leg(b));
     v.extend(std::iter::repeat_n(
         (P::Own, 2),
-        1 + usize::from(completing),
+        1 + usize::from(b != Buy::Plain),
     ));
     v
 }
@@ -384,18 +396,6 @@ fn donate_to_trader(env: &mut Env, pm: &PumpMarket) {
     donate_tokens(env, pm, &pm.trader_base_ata, 777);
 }
 
-/// The curve's creator changed to a fresh key whose vault is empty (the adapter re-derives
-/// T12 / T13; pump tops the new vault up from the trader, T-RENT).
-fn change_creator(env: &mut Env, pm: &mut PumpMarket) {
-    fork::set_curve_creator(&mut env.svm, &pm.curve.curve, &Pubkey::new_unique());
-    pm.refresh_creator(&env.svm);
-    assert_eq!(read_lamports(env, &pm.creator_vault), 0);
-}
-
-fn read_lamports(env: &Env, key: &Pubkey) -> u64 {
-    env.svm.get_account(key).map_or(0, |a| a.lamports)
-}
-
 /// `simulate_transaction` of `ixs` (nothing is committed): its metadata if it would succeed.
 fn simulate(env: &Env, ixs: &[Instruction], signers: &[&Keypair]) -> Option<TransactionMetadata> {
     let mut all: Vec<&Keypair> = vec![&env.payer];
@@ -409,7 +409,7 @@ fn simulate(env: &Env, ixs: &[Instruction], signers: &[&Keypair]) -> Option<Tran
     env.svm.simulate_transaction(tx).ok().map(|s| s.meta)
 }
 
-/// A third party buys `rT − rt_left` on the curve (a real `buy_v2`).
+/// A third party buys `rT − rt_left` on the curve (a real `buy_v2`, which stops at `rT`).
 fn buy_down_to(env: &mut Env, c: &PumpCurve, rt_left: u64) {
     let u = CurveUser::new(env, c);
     let rt = c.state(&env.svm).real_token_reserves;
@@ -552,7 +552,8 @@ fn with_cb(ixs: Vec<Instruction>) -> Vec<Instruction> {
     v
 }
 
-/// Whether `coin`'s curve charges a creator fee (a creator is set): the buy's extra transfer.
+/// Whether `coin`'s curve charges a creator fee (a creator is set): a user's `buy_v2` makes one
+/// more System transfer for it (`buy_v3` makes one transfer either way).
 fn has_creator(env: &Env, pm: &PumpMarket) -> bool {
     !pm.curve.state(&env.svm).creator_is_default()
 }
@@ -755,10 +756,10 @@ fn crank_price() {
     assert_eq!((entries(&meta, 0), peak(&meta)), (4, 2));
 }
 
-/// `open_short` on the curve: 14 entries for a wallet's first position, 13 for a repeat, 17
-/// normalising, 18 with pump's top-up of an empty creator vault, 19 when that sale is also the
-/// 151-byte curve's first trade on the 2026-10-08 build (its growth to 166 bytes); one pump CPI,
-/// peak 3.
+/// `open_short` on the curve: 13 entries for a wallet's first position, 12 for a repeat, 16
+/// normalising, 17 when that sale is also the 151-byte curve's first trade on the 2026-10-08
+/// build (its growth to 166 bytes); one pump CPI, peak 3. A curve with a creator (T22) traces
+/// like one without (SPL): `sell_v3` names no creator vault.
 #[test]
 fn open_short() {
     for coin in VARIANTS {
@@ -769,17 +770,17 @@ fn open_short() {
         let meta = send(&mut env, &first, &[&b.kp]);
         let _: Open = events::one(&meta);
         let s = shown(&env, &format!("{coin:?} open (first)"), &first, &meta, 1);
-        assert_eq!(s, open_shape(2, false, false), "{coin:?}");
+        assert_eq!(s, open_shape(2, false), "{coin:?}");
         assert_eq!(pump_calls(&s), 1);
-        assert_eq!((entries(&meta, 1), peak(&meta)), (14, 3));
+        assert_eq!((entries(&meta, 1), peak(&meta)), (13, 3));
 
         let repeat = client(open_ix(&pm, &b.key(), 1, q));
         let meta = send(&mut env, &repeat, &[&b.kp]);
         let s = shown(&env, &format!("{coin:?} open (repeat)"), &repeat, &meta, 1);
-        assert_eq!(s, open_shape(1, false, false), "{coin:?}");
+        assert_eq!(s, open_shape(1, false), "{coin:?}");
         assert_eq!(
             (entries(&meta, 1), peak(&meta)),
-            (13, 3),
+            (12, 3),
             "the exposure exists"
         );
 
@@ -796,15 +797,13 @@ fn open_short() {
             &meta,
             1,
         );
-        assert_eq!(s, open_shape(2, true, false), "{coin:?}");
-        assert_eq!((entries(&meta, 1), peak(&meta)), (17, 3));
+        assert_eq!(s, open_shape(2, true), "{coin:?}");
+        assert_eq!((entries(&meta, 1), peak(&meta)), (16, 3));
     }
 
-    // The creator-vault top-up (T-RENT) inside the sale: a creator change into an empty vault
-    // and a sale large enough to cover it within exec_tol_bps.
-    let (mut env, mut pm, _) = setup(NEAR);
-    let q = pm.curve.state(&env.svm).virtual_token_reserves / 100;
-    change_creator(&mut env, &mut pm);
+    // The growth of a short curve inside the sale (normalising too): the 151-byte curve's first
+    // trade since the dump.
+    let (mut env, pm, q) = setup(NEAR);
     env.tick(&pm, 1);
     donate_to_trader(&mut env, &pm);
     let b = env.borrower();
@@ -812,39 +811,32 @@ fn open_short() {
     assert!(pm.curve.growth_top_up(&env.svm) > 0);
     let ixs = client(open_ix(&pm, &b.key(), 0, q));
     let meta = send(&mut env, &ixs, &[&b.kp]);
-    let s = shown(
-        &env,
-        "open (normalising, creator-vault top-up, growth)",
-        &ixs,
-        &meta,
-        1,
-    );
-    assert_eq!(s, with_growth(open_shape(2, true, true), true));
-    assert_eq!((entries(&meta, 1), peak(&meta)), (18 + 1, 3));
-    assert!(read_lamports(&env, &pm.creator_vault) > 0, "topped up");
+    let s = shown(&env, "open (normalising, growth)", &ixs, &meta, 1);
+    assert_eq!(s, with_growth(open_shape(2, true), true));
+    assert_eq!((entries(&meta, 1), peak(&meta)), (16 + 1, 3));
     assert_eq!(pm.curve.growth_top_up(&env.svm), 0, "grown");
 }
 
-/// Exits on the curve: a close is its buy leg and event — 12 entries without a creator fee, 13
-/// with one; 15 / 16 normalising; 17 with the creator-vault top-up inside `B`; a completing
-/// buyback adds pump's completion event and short.win's `VenueStateChanged` (15). One pump CPI,
-/// peak 3.
+/// Exits on the curve: a close is its buy leg and event — 9 entries, with a creator fee or
+/// without; 12 normalising; a completing buyback adds pump's `CompleteEvent` and short.win's
+/// `VenueStateChanged` (11); a buyback past `rT` completes the curve by synthetic migration and
+/// adds pump's `PostCompleteBuyEvent` too (12; pump-final §5.2, §6.6). One pump CPI, peak 3.
 #[test]
 fn close_short() {
     for coin in VARIANTS {
         let (mut env, pm, b, nonce, _) = with_position(coin);
-        let creator = has_creator(&env, &pm);
-        assert_eq!(creator, coin != SPL, "legacy115 has no creator");
+        assert_eq!(
+            has_creator(&env, &pm),
+            coin != SPL,
+            "legacy115 has no creator"
+        );
         let ixs = client(close_ix(&pm, &b.key(), nonce));
         let meta = send(&mut env, &ixs, &[&b.kp]);
         let _: Close = events::one(&meta);
         let s = shown(&env, &format!("{coin:?} close"), &ixs, &meta, 1);
-        assert_eq!(s, exit_shape(false, creator, false, false), "{coin:?}");
+        assert_eq!(s, exit_shape(false, Buy::Plain), "{coin:?}");
         assert_eq!(pump_calls(&s), 1);
-        assert_eq!(
-            (entries(&meta, 1), peak(&meta)),
-            (12 + usize::from(creator), 3)
-        );
+        assert_eq!((entries(&meta, 1), peak(&meta)), (9, 3));
 
         let (mut env, pm, b, nonce, _) = with_position(coin);
         donate_to_trader(&mut env, &pm);
@@ -857,19 +849,9 @@ fn close_short() {
             &meta,
             1,
         );
-        assert_eq!(s, exit_shape(true, creator, false, false), "{coin:?}");
-        assert_eq!(entries(&meta, 1), 15 + usize::from(creator));
+        assert_eq!(s, exit_shape(true, Buy::Plain), "{coin:?}");
+        assert_eq!(entries(&meta, 1), 12);
     }
-
-    // The top-up of an empty creator vault inside the buy (normalising, T22 with a creator).
-    let (mut env, mut pm, b, nonce, _) = with_position(T22);
-    change_creator(&mut env, &mut pm);
-    donate_to_trader(&mut env, &pm);
-    let ixs = client(close_ix(&pm, &b.key(), nonce));
-    let meta = send(&mut env, &ixs, &[&b.kp]);
-    let s = shown(&env, "close (normalising, top-up)", &ixs, &meta, 1);
-    assert_eq!(s, exit_shape(true, true, true, false));
-    assert_eq!((entries(&meta, 1), peak(&meta)), (17, 3));
 
     // A completing buyback: `→ PumpMigrating` in the instruction, its events before `Close`.
     let (mut env, pm, b, nonce, q) = with_position(NEAR);
@@ -880,37 +862,45 @@ fn close_short() {
     let ev: VenueStateChanged = events::one(&meta);
     assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
     let s = shown(&env, "close (completing)", &ixs, &meta, 1);
-    assert_eq!(s, exit_shape(false, true, false, true), "{s:?}");
+    assert_eq!(s, exit_shape(false, Buy::Completing), "{s:?}");
+    assert_eq!((entries(&meta, 1), peak(&meta)), (11, 3));
+
+    // A buyback past `rT` (a straddle, `rT = q/2`): the synthetic completion, normalising too.
+    let (mut env, pm, b, nonce, q) = with_position(NEAR);
+    buy_down_to(&mut env, &pm.curve, q / 2);
+    env.warp(1);
+    donate_to_trader(&mut env, &pm);
+    let ixs = client(close_ix(&pm, &b.key(), nonce));
+    let meta = send(&mut env, &ixs, &[&b.kp]);
+    let ev: VenueStateChanged = events::one(&meta);
+    assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
+    assert_eq!(fork::pump_post_complete_buy_events(&meta).len(), 1);
+    let s = shown(&env, "close (normalising, synthetic)", &ixs, &meta, 1);
+    assert_eq!(s, exit_shape(true, Buy::Synthetic), "{s:?}");
+    assert_eq!(pump_calls(&s), 1);
     assert_eq!((entries(&meta, 1), peak(&meta)), (15, 3));
 }
 
-/// A liquidation after a real pump and an expiry at the deadline: the exit shape (12 / 13).
+/// A liquidation after a real pump and an expiry at the deadline: the exit shape (9).
 #[test]
 fn liquidate_and_expire() {
     for coin in VARIANTS {
         let (mut env, pm, b, nonce, keeper) = liquidatable(coin);
         env.crank(&pm);
-        let creator = has_creator(&env, &pm);
         let ixs = keeper_tx(liquidate_ix(&pm, &keeper.pubkey(), &b.key(), nonce));
         let meta = send(&mut env, &ixs, &[&keeper]);
         let _: Liquidate = events::one(&meta);
         let s = shown(&env, &format!("{coin:?} liquidate"), &ixs, &meta, 1);
-        assert_eq!(s, exit_shape(false, creator, false, false), "{coin:?}");
-        assert_eq!(
-            (entries(&meta, 1), peak(&meta)),
-            (12 + usize::from(creator), 3)
-        );
+        assert_eq!(s, exit_shape(false, Buy::Plain), "{coin:?}");
+        assert_eq!((entries(&meta, 1), peak(&meta)), (9, 3));
 
         let (mut env, pm, b, nonce, keeper) = expired(coin);
         let ixs = keeper_tx(expire_ix(&pm, &keeper.pubkey(), &b.key(), nonce));
         let meta = send(&mut env, &ixs, &[&keeper]);
         let _: Expire = events::one(&meta);
         let s = shown(&env, &format!("{coin:?} expire"), &ixs, &meta, 1);
-        assert_eq!(s, exit_shape(false, creator, false, false), "{coin:?}");
-        assert_eq!(
-            (entries(&meta, 1), peak(&meta)),
-            (12 + usize::from(creator), 3)
-        );
+        assert_eq!(s, exit_shape(false, Buy::Plain), "{coin:?}");
+        assert_eq!((entries(&meta, 1), peak(&meta)), (9, 3));
     }
 }
 
@@ -1043,15 +1033,14 @@ fn worst(env: &mut Env, what: &str, ixs: &[Instruction], signers: &[&Keypair], d
     n
 }
 
-/// The largest client transactions: a wallet's first open, normalising, with the creator-vault
-/// top-up and the 151-byte curve's growth to 166 bytes (2 + 19) and a normalising close with the
-/// top-up (2 + 17); an atomic sandwich of a normalising open with the curve's own trades (a
-/// user's `buy_v2` 7 entries, 8 with a creator fee; `sell_v2` 4).
+/// The largest client transactions: a wallet's first open, normalising, with the 151-byte curve's
+/// growth to 166 bytes (2 + 17) and a normalising close past `rT`, completing the curve by
+/// synthetic migration (2 + 15); an atomic sandwich of a normalising open with the curve's own
+/// trades (a user's `buy_v2` 7 entries, 8 with a creator fee; `sell_v2` 4: pump's 2026-10-13
+/// build still has both, and they trace longer than its v3 pair).
 #[test]
 fn worst_case_client_transactions() {
-    let (mut env, mut pm, _) = setup(NEAR);
-    let q = pm.curve.state(&env.svm).virtual_token_reserves / 100;
-    change_creator(&mut env, &mut pm);
+    let (mut env, pm, q) = setup(NEAR);
     env.tick(&pm, 1);
     donate_to_trader(&mut env, &pm);
     assert!(
@@ -1062,24 +1051,25 @@ fn worst_case_client_transactions() {
     let ixs = with_cb(vec![open_ix(&pm, &b.key(), 0, q)]);
     let n = worst(
         &mut env,
-        "CB×2 + open (normalising, top-up, growth)",
+        "CB×2 + open (normalising, growth)",
         &ixs,
         &[&b.kp],
         3,
     );
-    assert_eq!(n, 2 + 18 + 1);
+    assert_eq!(n, 2 + 16 + 1);
     env.tick(&pm, 1);
-    change_creator(&mut env, &mut pm);
+    buy_down_to(&mut env, &pm.curve, q / 2);
+    env.warp(1);
     donate_to_trader(&mut env, &pm);
     let ixs = with_cb(vec![close_ix(&pm, &b.key(), 0)]);
     let n = worst(
         &mut env,
-        "CB×2 + close (normalising, top-up)",
+        "CB×2 + close (normalising, synthetic completion)",
         &ixs,
         &[&b.kp],
         3,
     );
-    assert_eq!(n, 2 + 17);
+    assert_eq!(n, 2 + 15);
 
     for coin in VARIANTS {
         let (mut env, pm, q) = setup(coin);
@@ -1116,14 +1106,14 @@ fn worst_case_client_transactions() {
             &[&attacker, &v.kp],
             3,
         );
-        assert_eq!(n, 2 + (7 + usize::from(creator)) + 17 + 4);
+        assert_eq!(n, 2 + (7 + usize::from(creator)) + 16 + 4);
     }
 }
 
-/// Four opens of one wallet fit the trace (2 + 14 + 3·13 = 55, + 1 for the 151-byte curve's
-/// growth to 166 bytes in the first sale on the 2026-10-08 build: 56); a fifth (69) is refused by
-/// the runtime itself with `MaxInstructionTraceLengthExceeded`, before any hook could blame
-/// short.win. (Each of `vT/800` on the near-complete curve: four stay under the wallet cap.)
+/// Five opens of one wallet fill the trace exactly (2 + 13 + 4·12 = 63, + 1 for the 151-byte
+/// curve's growth to 166 bytes in the first sale on the 2026-10-08 build: 64); a sixth (76) is
+/// refused by the runtime itself with `MaxInstructionTraceLengthExceeded`, before any hook could
+/// blame short.win. (Each of `vT/800` on the near-complete curve: five stay under the wallet cap.)
 #[test]
 fn the_most_opens_of_one_wallet() {
     let (mut env, pm, _) = setup(NEAR);
@@ -1133,15 +1123,16 @@ fn the_most_opens_of_one_wallet() {
     assert_eq!(grow, 1);
     let b = env.borrower();
     let opens = |k: u64| with_cb((0..k).map(|n| open_ix(&pm, &b.key(), n, q)).collect());
-    let res = env.send(&opens(5), &[&b.kp]);
-    let err = res.expect_err("69 entries");
+    let res = env.send(&opens(6), &[&b.kp]);
+    let err = res.expect_err("76 entries");
     assert!(
         format!("{:?}", err.err).contains("MaxInstructionTraceLengthExceeded"),
         "{:?}",
         err.err
     );
-    let n = worst(&mut env, "CB×2 + open ×4", &opens(4), &[&b.kp], 3);
-    assert_eq!(n, 2 + 14 + grow + 3 * 13);
+    let n = worst(&mut env, "CB×2 + open ×5", &opens(5), &[&b.kp], 3);
+    assert_eq!(n, 2 + 13 + grow + 4 * 12);
+    assert_eq!(n, MAX_TRACE);
 }
 
 /// A keeper batch of four cranks on the four live curves of the dump, each just completed by a
@@ -1182,14 +1173,13 @@ fn a_crank_batch_of_four_transitions() {
     }
 }
 
-/// The keeper's exits with their crank: `[CB×2, crank, liquidate | expire]` (2 + 2 + 12 / 13),
+/// The keeper's exits with their crank: `[CB×2, crank, liquidate | expire]` (2 + 2 + 9),
 /// `[CB×2, crank, sol_settle S3]` on `PumpMigrating` and on `None` (2 + 2 + 2); the latch duty
 /// (§7.1 duty 10): the three pump programs flagged in one transaction (2 + 3·2).
 #[test]
 fn worst_case_keeper_transactions() {
     for coin in VARIANTS {
         let (mut env, pm, b, nonce, keeper) = liquidatable(coin);
-        let creator = usize::from(has_creator(&env, &pm));
         let ixs = with_cb(vec![
             crank_price_ix(&pm),
             liquidate_ix(&pm, &keeper.pubkey(), &b.key(), nonce),
@@ -1201,7 +1191,7 @@ fn worst_case_keeper_transactions() {
             &[&keeper],
             3,
         );
-        assert_eq!(n, 2 + 2 + 12 + creator);
+        assert_eq!(n, 2 + 2 + 9);
 
         let (mut env, pm, b, nonce, keeper) = expired(coin);
         env.warp(1);
@@ -1216,7 +1206,7 @@ fn worst_case_keeper_transactions() {
             &[&keeper],
             3,
         );
-        assert_eq!(n, 2 + 2 + 12 + creator);
+        assert_eq!(n, 2 + 2 + 9);
     }
 
     let (mut env, pm, b, nonce, keeper) = s3_migrating();

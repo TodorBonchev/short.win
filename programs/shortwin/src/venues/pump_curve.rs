@@ -1,63 +1,76 @@
 //! Pump.fun bonding-curve adapter (ARCH §2.4.1 PumpCurve row, §2.5, §3.2, §3.12 "PumpCurve account
-//! sets", §4.1–§4.3, §5.4; R-PUMP §2–§4, §6, §7 and its Update 2026-09-29). Program `6EF8rr…`; the
-//! v2 trade instructions `sell_v2` (open, exact tokens in) and `buy_v2` (exits, exact tokens out),
+//! sets", §4.1–§4.3, §5.4; R-PUMP §2–§4, §6, §7 and its Update 2026-09-29; pump-final §6).
+//! Program `6EF8rr…`; pump's **v3** trade instructions `sell_v3` (open, exact tokens in) and
+//! `buy_v3` (every exit, exact tokens out; past the curve's `rT` by pump's synthetic migration),
 //! with the market's `trader` PDA as pump's `user`.
 //!
 //! **Account sets** (order binding; W = writable in trades; every slot mandatory and key-checked
-//! against a compile-time constant, the market's curve cache, the live `Global` lists or an
-//! on-chain re-derivation, C0-2):
+//! against a compile-time constant, the market's curve cache or the live `Global` list, C0-2):
 //!
 //! - ReadSet ([`read_keys`]): C0 `bonding_curve` (W), C1 pump `Global`, C2 pump `FeeConfig`
-//!   (pump-fees), C3 the canonical PumpSwap pool (derived; may not exist; detection only), C4
-//!   `curve_base_ata` (W; `B̂_str`'s live `X_p`), C5 PumpSwap `FeeConfig` and C6 PumpSwap
-//!   `GlobalConfig` (the post-migration pool's fees: `B̂_str` is always defined, C0-2; and its
-//!   `disable_flags`: bit 0 halts `create_pool`, hence `migrate_v2`, so curve opens refuse
-//!   `GraduationHalted` while it is set — M6-SEC-3, owner decision of 2026-09-30). A
-//!   `PumpMigrating` market reads the same set.
-//! - TradeExtras ([`check_trade`]): T0 pump, T1 pump `event_authority`, T2 pump-fees, T3 WSOL,
-//!   T4 Tokenkeg, T5 the ATA program, T6 `fee_recipient` (W; one of the live `Global`'s 8 normal
-//!   recipients, checked here as well as by pump, C0-14), T7 its WSOL ATA (W), T8
-//!   `buyback_fee_recipient` (W; the live buyback list), T9 its WSOL ATA (W), T10
-//!   `curve_quote_ata` (W), T11 `ATA(trader, WSOL)` (W; SOL coins never touch it), T12
-//!   `creator_vault` (W; **re-derived from the live `curve.creator`** when it is not the cached
-//!   creator, R-PUMP §8), T13 its WSOL ATA (W), T14 `sharing_config`, T15 pump's global volume
-//!   accumulator, T16 the trader's pump UVA (W; **must exist**, created at listing), T17 its WSOL
-//!   ATA (W), T18 `trader_base_ata` (W; must exist), T19 System. The WSOL ATAs are checked here
-//!   (pump only seed-checks them for a SOL coin) without a derivation on the trade (M5-SEC-6):
-//!   T11 is the market's `trader_wsol_ata` (derived at listing), T7 / T9 come from
-//!   [`RECIPIENT_WSOL_ATAS`], T13 from the creator cache unless the creator changed.
-//! - CPI: exactly the IDL's `buy_v2` (27 accounts) / `sell_v2` (26: no global volume
-//!   accumulator) order (R-PUMP §3.5), `trader` the only signer, then the extras (A41; pump
-//!   accepts trailing accounts, R-PUMP Update U4). Data: discriminator ‖ amount ‖ bound, **exactly
-//!   24 bytes**: no trailing byte, so pump's undocumented cap flag (Update U7: a trailing `1` fills
-//!   exactly `rT` instead of reverting 6021) is never set, and a buy above `rT` reverts.
+//!   (`8Wf5Ti…`, which v3 reads itself), C3 the canonical PumpSwap pool (derived; may not exist;
+//!   detection only), C4 `curve_base_ata` (W; the live `X_s` of `B̂_v3`'s pool part), C5 PumpSwap
+//!   `FeeConfig` and C6 PumpSwap `GlobalConfig` (the post-migration pool's fees, which a
+//!   `PumpMigrating` market's quotes and FV price; and its `disable_flags`: bit 0 halts
+//!   `create_pool`, hence `migrate_v2`, so curve opens refuse `GraduationHalted` while it is set —
+//!   M6-SEC-3, owner decision of 2026-09-30). A `PumpMigrating` market reads the same set.
+//! - TradeExtras ([`check_trade`], pump-final §6.1.1; 10 slots): T0 pump (executable), T1 pump
+//!   `event_authority`, T2 WSOL (`quote_mint`), T3 Tokenkeg (`quote_token_program`), T4
+//!   `curve_quote_ata` (W; cached; a SOL coin never touches it), T5 `ATA(trader, WSOL)` (W; the
+//!   market's cached `trader_wsol_ata`), T6 the trader's pump UVA (W; **must exist**, created at
+//!   listing; [`check_uva`]), T7 `buyback_fee_recipient` (W; one of the live `Global`'s buyback
+//!   recipients @741, checked here as well as by pump, C0-14), T8 `trader_base_ata` (W; must
+//!   exist), T9 System. No fee recipient, creator vault, `sharing_config`, pump-fees or ATA
+//!   program: v3 keeps the protocol and creator fees in the curve's buckets (@125 / @133,
+//!   outside `rQ`) and reads `FeeConfig` itself, so nothing is derived on a trade (M5-SEC-6).
+//! - CPI ([`trade_accounts`]): exactly the IDL's 17-account list, one for `buy_v3` and `sell_v3`
+//!   (pump-public-docs `2293f9a6`), `trader` the only signer, then the extras (A41; pump accepts
+//!   trailing accounts, R-PUMP Update U4). Data: discriminator ‖ amount ‖ bound, **exactly 24
+//!   bytes**: the optional `partial_fill` byte is never sent (pump ignores it on non-mayhem
+//!   coins, and short.win lists no mayhem coin).
 //!
 //! **Legs** (ARCH §2.4.1, §2.4 rules 2–3):
 //!
 //! - [`sell`] (open): `transfer_checked(pool_vault → trader_base_ata, Q)` (the market signs); a
-//!   System transfer of `ert` from the borrower to the trader; `sell_v2(Q, min_out)`, which
-//!   credits the proceeds straight to the trader's lamports (a creator-vault top-up of
-//!   `Rent.minimum_balance(0)` may be taken from the trader **before** the proceeds, Update U6);
-//!   then `S = trader.lamports − ert` (`VenueRentOnSell` if the venue took more than it
-//!   credited), `S` to the position and exactly `ert` back to the borrower (System transfers the
-//!   trader signs). `trader_base_ata` must be empty again and the pool vault down by exactly `Q`.
+//!   System transfer of `ert` from the borrower to the trader; `sell_v3(Q, min_out)`, which
+//!   credits the proceeds straight to the trader's lamports (pump may first take the rent of a
+//!   curve or UVA growth from the trader; v3 never tops up a creator vault); then
+//!   `S = trader.lamports − ert` (`VenueRentOnSell` if the venue took more than it credited), `S`
+//!   to the position and exactly `ert` back to the borrower (System transfers the trader signs).
+//!   `trader_base_ata` must be empty again and the pool vault down by exactly `Q`.
 //! - [`buy`] (exits): `max_in + ert` from the position to the trader (a direct debit; a zero
 //!   System transfer from the trader to the position then shows both balances to the runtime's
-//!   per-CPI check), `buy_v2(Q, max_sol_cost = max_in)` (System transfers **from the trader
+//!   per-CPI check), `buy_v3(Q, max_sol_cost = max_in)` (System transfers **from the trader
 //!   PDA**, T-PDA-USER), everything left back to the position, then every token of
-//!   `trader_base_ata` (`≥ Q`, else `VenueResultMismatch`; a surplus is a donation, A62) to the
-//!   pool vault. `B = position before − after ≤ max_in + ert`.
+//!   `trader_base_ata` (`≥ Q`, else `VenueResultMismatch`: a short delivery reverts the whole
+//!   instruction; a surplus is a donation, A62) to the pool vault. `B = position before − after
+//!   ≤ max_in + ert`. For `Q > rT` the same `buy_v3` buys `rT` on the curve, which completes,
+//!   and `Q − rT` from the would-be PumpSwap pool (synthetic migration), atomically: one
+//!   `TransferChecked` of `Q` and one System transfer of the whole charge, then
+//!   [`sync_after_leg`] moves the market to `PumpMigrating` in the same instruction.
 //!
-//! **Pricing** ([`read_state`]; ARCH §4.1–§4.3): `X = vT`, `Y = vQ`, `R = rQ`; the fee
-//! `fees::pump_curve` on the live `(vT, vQ)` (the pump `FeeConfig` tiers, `Global.
+//! **Pricing** ([`read_state`]; ARCH §4.1–§4.3; pump-final §5): `X = vT`, `Y = vQ`, `R = rQ`;
+//! the fee `fees::pump_curve` on the live `(vT, vQ)` (the pump `FeeConfig` tiers, `Global.
 //! creator_fee_configurable`, the curve's own `creator_fee_bps` and creator), resolved on every
-//! read and never cached; quotes `quote::CurvePricing` (`B̂_str` above `rT`: the post-migration
-//! pool at the PumpSwap tier of its own market cap).
+//! read and never cached; quotes `quote::CurvePricing`: above `rT` a live curve prices what
+//! executes, `B̂_v3` (the curve leg plus the synthetic pool leg, both at the curve's fee on the
+//! mint's live supply, `CurvePricingInputs::synthetic_fees`; owner D3), while a `PumpMigrating`
+//! market's EMA-leg states keep `B̂_str` (the real pool at its PumpSwap tier) and its FV the pool
+//! `migrate_v2` will create, ρ-scaled after a synthetic pool part (`Quoter::fv_repriced`).
+//!
+//! **Guards** ([`pricing_inputs`], pump-final §6.1.5): a live curve that carries post-complete
+//! fields (`pcB` / `pcQ` @150 / @158, which pump writes only in the buy that completes the curve)
+//! has no pricing — not executable, A63's cap-only risk view (G-3); a migrating curve whose
+//! post-complete fields are not known (one of `pcB`, `pcQ` zero, or pump's own `vQ − rQ = ivqr`
+//! broken) keeps its curve quoter but has **no FV**, so an S3 gives the lenders the whole take
+//! (the documented exception to A63's cap-only rule, `venues::risk_quoter`).
 //!
 //! **Venue predicate** (`venue_executable`, ARCH §5.3): every ReadSet account parses (A63), the
-//! curve is at least 115 bytes, SOL-quoted, not mayhem, and **not complete**. A complete curve with
-//! `vT > 0` is migrating: not executable, still observed (ARCH §3.0 step 7), and the prologue's
-//! [`sync`] moves the market to `PumpMigrating`.
+//! curve is at least 115 bytes, SOL-quoted (`depth` 0), not mayhem, **not a cashback coin** (v3
+//! refuses one with 6094: owner D1 (a), `CurveCashbackCoin` at listing) and **not complete**. A
+//! complete curve with `vT > 0` is migrating: not executable, still observed (ARCH §3.0 step 7;
+//! a complete cashback curve too), and the prologue's [`sync`] moves the market to
+//! `PumpMigrating`.
 
 use std::rc::Rc;
 
@@ -73,11 +86,10 @@ use shortwin_math::quote::{CurveOffsets, CurveState};
 use shortwin_venue_state::{pump, pump_amm};
 
 use super::detect::CanonicalPool;
-use super::{raydium, BuyOut, CurvePricingInputs, CurveVenue, Leg, VenueState};
+use super::{raydium, BuyOut, CurvePricingInputs, CurveStage, CurveVenue, Leg, VenueState};
 use crate::constants::{
-    ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_AMM_FEE_CONFIG, PUMP_AMM_GLOBAL_CONFIG, PUMP_EVENT_AUTHORITY,
-    PUMP_FEES_PROGRAM_ID, PUMP_FEE_CONFIG, PUMP_GLOBAL, PUMP_GLOBAL_VOLUME_ACCUMULATOR,
-    PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
+    PUMP_AMM_FEE_CONFIG, PUMP_AMM_GLOBAL_CONFIG, PUMP_EVENT_AUTHORITY, PUMP_FEES_PROGRAM_ID,
+    PUMP_FEE_CONFIG, PUMP_GLOBAL, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
 };
 use crate::engine::trader::{base_ata_state, token_state};
 use crate::errors::{CheckedExt, ShortwinError};
@@ -86,8 +98,8 @@ use crate::state::{Market, VenueKind, MARKET_FLAG_GRADUATED_ELSEWHERE};
 
 /// ReadSet length.
 pub const READ_LEN: usize = 7;
-/// TradeExtras length.
-pub const TRADE_LEN: usize = 20;
+/// TradeExtras length (pump-final §6.1.1).
+pub const TRADE_LEN: usize = 10;
 
 /// ReadSet slots.
 pub const C_CURVE: usize = 0;
@@ -98,38 +110,40 @@ pub const C_CURVE_BASE_ATA: usize = 4;
 pub const C_PAMM_FEE_CONFIG: usize = 5;
 pub const C_PAMM_GLOBAL_CONFIG: usize = 6;
 
-/// TradeExtras slots.
+/// TradeExtras slots (module docs).
+/// pump `6EF8rr…` (key + executable).
 pub const T_PROGRAM: usize = 0;
+/// pump `__event_authority`.
 pub const T_EVENT_AUTHORITY: usize = 1;
-pub const T_FEE_PROGRAM: usize = 2;
-pub const T_WSOL_MINT: usize = 3;
-pub const T_TOKEN_PROGRAM: usize = 4;
-pub const T_ATA_PROGRAM: usize = 5;
-pub const T_FEE_RECIPIENT: usize = 6;
-pub const T_FEE_RECIPIENT_ATA: usize = 7;
-pub const T_BUYBACK_RECIPIENT: usize = 8;
-pub const T_BUYBACK_RECIPIENT_ATA: usize = 9;
-pub const T_CURVE_QUOTE_ATA: usize = 10;
-pub const T_TRADER_WSOL_ATA: usize = 11;
-pub const T_CREATOR_VAULT: usize = 12;
-pub const T_CREATOR_VAULT_ATA: usize = 13;
-pub const T_SHARING_CONFIG: usize = 14;
-pub const T_GLOBAL_VOLUME_ACCUMULATOR: usize = 15;
-pub const T_UVA: usize = 16;
-pub const T_UVA_WSOL_ATA: usize = 17;
-pub const T_TRADER_BASE_ATA: usize = 18;
-pub const T_SYSTEM: usize = 19;
+/// `quote_mint` (WSOL).
+pub const T_WSOL_MINT: usize = 2;
+/// `quote_token_program` (Tokenkeg).
+pub const T_TOKEN_PROGRAM: usize = 3;
+/// W: `market.curve_quote_ata` (cached; unused by pump on a SOL curve).
+pub const T_CURVE_QUOTE_ATA: usize = 4;
+/// W: `trader_wsol_ata(market)` (cached; unused by pump on a SOL curve).
+pub const T_TRADER_WSOL_ATA: usize = 5;
+/// W: `market.pump_uva` ([`check_uva`]: exists, `user == trader`).
+pub const T_UVA: usize = 6;
+/// W: a live `Global.buyback_fee_recipients` entry (@741; C0-14).
+pub const T_BUYBACK_RECIPIENT: usize = 7;
+/// W: `market.trader_base_ata` (must exist).
+pub const T_TRADER_BASE_ATA: usize = 8;
+/// System.
+pub const T_SYSTEM: usize = 9;
 
-/// `sha256("global:buy_v2")[..8]` (R-PUMP §3.5).
-pub const IX_BUY_V2: [u8; 8] = [0xb8, 0x17, 0xee, 0x61, 0x67, 0xc5, 0xd3, 0x3d];
-/// `sha256("global:sell_v2")[..8]`.
-pub const IX_SELL_V2: [u8; 8] = [0x5d, 0xf6, 0x82, 0x3c, 0xe7, 0xe9, 0x40, 0xb2];
+/// `sha256("global:buy_v3")[..8]` (pump-public-docs `2293f9a6`).
+pub const IX_BUY_V3: [u8; 8] = [0x07, 0x05, 0x1d, 0xc4, 0xf5, 0x17, 0x65, 0x50];
+/// `sha256("global:sell_v3")[..8]`.
+pub const IX_SELL_V3: [u8; 8] = [0x1c, 0x92, 0xde, 0x77, 0x26, 0xc4, 0x69, 0xd5];
 /// `sha256("global:init_user_volume_accumulator")[..8]` (R-PUMP §3.6).
 pub const IX_INIT_USER_VOLUME_ACCUMULATOR: [u8; 8] =
     [0x5e, 0x06, 0xca, 0x73, 0xff, 0x60, 0xe8, 0xb7];
-/// The length of a v2 trade's data: discriminator, amount, bound — no trailing cap byte (module
-/// docs; R-PUMP Update U7).
+/// The length of a v3 trade's data: discriminator, amount, bound — never the optional
+/// `partial_fill` byte (module docs).
 pub const TRADE_DATA_LEN: usize = 24;
+/// The number of accounts of a v3 trade CPI (the IDL's list, before the extras).
+pub const TRADE_CPI_ACCOUNTS: usize = 17;
 
 // ---- keys --------------------------------------------------------------------------------
 
@@ -141,9 +155,11 @@ pub fn wsol_ata(owner: &Pubkey) -> Pubkey {
 
 /// `(recipient, ATA(recipient, WSOL))` for pump's 8 normal fee recipients and 8 buyback fee
 /// recipients as the live `Global` lists them (the M5 dump at slot 451,675,432; R-PUMP §2.2), so
-/// a trade does not derive T7 / T9 (M5-SEC-6: `find_program_address` costs 1,500 CU per bump
-/// tried, on every trade). A recipient pump adds later is derived instead
-/// ([`recipient_wsol_ata`]); `tests::the_recipient_table_re_derives` re-derives every entry.
+/// a trade does not derive their WSOL ATAs (M5-SEC-6: `find_program_address` costs 1,500 CU per
+/// bump tried, on every trade). The curve's v3 trades name no recipient ATA; PumpSwap's
+/// recipients are the same keys, and `pump_amm::recipient_wsol_ata` reads this table. A
+/// recipient added later is derived instead ([`recipient_wsol_ata`]);
+/// `tests::the_recipient_table_re_derives` re-derives every entry.
 pub const RECIPIENT_WSOL_ATAS: [(Pubkey, Pubkey); 16] = [
     (
         pubkey!("62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"),
@@ -309,38 +325,29 @@ pub fn check_read(market: &Market, read: &[AccountInfo]) -> Result<()> {
 }
 
 /// The TradeExtras slots whose keys are fixed by a constant or the market's cache, with their
-/// keys (the rest — recipients, the WSOL ATAs, the creator vault — are checked against the live
-/// state by [`check_trade`]).
-fn fixed_trade_keys(market: &Market) -> [(usize, Pubkey); 13] {
+/// keys (pump-final §6.1.2: T0–T6, T8, T9; T7, the buyback recipient, is checked against the live
+/// `Global` by [`check_trade`]). T5 is the market's cached `ATA(trader, WSOL)`
+/// ([`trader_wsol_ata`]; derived only for a market listed before the cache existed).
+pub fn fixed_trade_keys(market: &Market) -> [(usize, Pubkey); 9] {
     [
         (T_PROGRAM, PUMP_PROGRAM_ID),
         (T_EVENT_AUTHORITY, PUMP_EVENT_AUTHORITY),
-        (T_FEE_PROGRAM, PUMP_FEES_PROGRAM_ID),
         (T_WSOL_MINT, WSOL_MINT),
         (T_TOKEN_PROGRAM, TOKEN_PROGRAM_ID),
-        (T_ATA_PROGRAM, ASSOCIATED_TOKEN_PROGRAM_ID),
         (T_CURVE_QUOTE_ATA, market.curve_quote_ata),
-        (T_SHARING_CONFIG, market.sharing_config),
-        (T_GLOBAL_VOLUME_ACCUMULATOR, PUMP_GLOBAL_VOLUME_ACCUMULATOR),
+        (T_TRADER_WSOL_ATA, trader_wsol_ata(market)),
         (T_UVA, market.pump_uva),
-        (T_UVA_WSOL_ATA, market.pump_uva_quote_ata),
         (T_TRADER_BASE_ATA, market.trader_base_ata),
         (T_SYSTEM, anchor_lang::system_program::ID),
     ]
 }
 
-/// Key-checks the TradeExtras (module docs; `BadRemainingAccounts` for a wrong count,
-/// `VenueAccountMismatch` for a wrong key): the fixed and cached slots; T6 / T8 against the
-/// live `Global`'s normal and buyback lists; T7, T9, T11, T13 as the WSOL ATAs of T6, T8, the
-/// trader and T12; T12 as `creator_vault` of the live `curve.creator`. A `Global` or curve that no
-/// longer parses (a venue upgrade, A63) leaves its dependent slots unchecked here: the venue is
-/// then not executable and no leg runs.
-///
-/// **No derivation on the hot path** (M5-SEC-6; `state` module docs): T11 is the market's
-/// cached `ATA(trader, WSOL)`, T7 / T9 come from [`RECIPIENT_WSOL_ATAS`] (derived only for a
-/// recipient pump added since), T13 from the market's cache unless the creator changed (R-PUMP
-/// §8; a pump admin action, rare). A mint whose market's trader ATA has a low bump therefore no
-/// longer adds `1,500·(255 − bump)` CU to every open, close, liquidation and expiry.
+/// Key-checks the TradeExtras (module docs; pump-final §6.1.2): `BadRemainingAccounts` for a
+/// wrong count, `VenueAccountMismatch` for a wrong key — the fixed and cached slots
+/// ([`fixed_trade_keys`]), T0 executable, and T7 in the live `Global`'s buyback list (C0-14). A
+/// v2-era list of 20 reaches this check as its first ten keys and fails at T2 (pump-fees where
+/// WSOL belongs). A `Global` that no longer parses (a venue upgrade, A63) leaves T7
+/// unchecked here: the venue is then not executable and no leg runs. Nothing is derived (M5-SEC-6).
 pub fn check_trade(market: &Market, read: &[AccountInfo], trade: &[AccountInfo]) -> Result<()> {
     require!(
         trade.len() == TRADE_LEN,
@@ -357,15 +364,10 @@ pub fn check_trade(market: &Market, read: &[AccountInfo], trade: &[AccountInfo])
         raydium::at(trade, T_PROGRAM)?.executable,
         ShortwinError::VenueAccountMismatch
     );
-    let fee_recipient = raydium::at(trade, T_FEE_RECIPIENT)?.key();
     let buyback = raydium::at(trade, T_BUYBACK_RECIPIENT)?.key();
     if let Some(global) = read.get(C_GLOBAL) {
         if let Ok(data) = global.try_borrow_data() {
             if let Ok(g) = pump::read_global(&global.owner.to_bytes(), &data) {
-                require!(
-                    g.is_fee_recipient(&fee_recipient.to_bytes()),
-                    ShortwinError::VenueAccountMismatch
-                );
                 require!(
                     g.is_buyback_fee_recipient(&buyback.to_bytes()),
                     ShortwinError::VenueAccountMismatch
@@ -373,42 +375,7 @@ pub fn check_trade(market: &Market, read: &[AccountInfo], trade: &[AccountInfo])
             }
         }
     }
-    for (slot, key) in [
-        (T_FEE_RECIPIENT_ATA, recipient_wsol_ata(&fee_recipient)),
-        (T_BUYBACK_RECIPIENT_ATA, recipient_wsol_ata(&buyback)),
-        (T_TRADER_WSOL_ATA, trader_wsol_ata(market)),
-    ] {
-        require_keys_eq!(
-            raydium::at(trade, slot)?.key(),
-            key,
-            ShortwinError::VenueAccountMismatch
-        );
-    }
-    if let Some(curve) = read.get(C_CURVE).and_then(parse_curve) {
-        let (vault, vault_ata) = creator_accounts(market, &Pubkey::new_from_array(curve.creator));
-        require_keys_eq!(
-            raydium::at(trade, T_CREATOR_VAULT)?.key(),
-            vault,
-            ShortwinError::VenueAccountMismatch
-        );
-        require_keys_eq!(
-            raydium::at(trade, T_CREATOR_VAULT_ATA)?.key(),
-            vault_ata,
-            ShortwinError::VenueAccountMismatch
-        );
-    }
     Ok(())
-}
-
-/// The creator vault and its WSOL ATA of `creator`: the market's cache when it is the cached
-/// creator, else re-derived (ARCH §2.3.4, §5.4 case 4; R-PUMP §8).
-fn creator_accounts(market: &Market, creator: &Pubkey) -> (Pubkey, Pubkey) {
-    if *creator == market.cached_creator {
-        (market.cached_creator_vault, market.cached_creator_vault_ata)
-    } else {
-        let v = creator_vault(creator);
-        (v, wsol_ata(&v))
-    }
 }
 
 // ---- state -------------------------------------------------------------------------------
@@ -444,10 +411,17 @@ fn math_tiers(tiers: pump::FeeTiers<'_>) -> Vec<FeeTier> {
         .collect()
 }
 
-/// The curve's pricing inputs from the ReadSet (ARCH §4.2, §4.3), `None` when an account does
-/// not parse, the curve has migrated (`vT = 0`) or its base ATA holds fewer tokens than `rT`.
-/// `supply` (the named mint's, when the caller has it) resolves the synthetic exit's fee of a
-/// live curve (`CurvePricingInputs::synthetic_fees`).
+/// The curve's pricing inputs from the ReadSet (ARCH §4.2, §4.3; pump-final §6.1.5), `None`
+/// when an account does not parse, the curve has migrated (`vT = 0`), its base ATA holds fewer
+/// tokens than `rT`, or a **live** curve carries post-complete fields (G-3: pump writes `pcB` /
+/// `pcQ` only in the buy that completes the curve, so on a live curve they are unknown; not
+/// executable, A63's cap-only risk view). `supply` (the named mint's, when the caller has it)
+/// resolves the synthetic exit's fee of a live curve (`CurvePricingInputs::synthetic_fees`); a
+/// cashback or mayhem curve has no synthetic route (v3 refuses the one; short.win does not list
+/// the other). A complete curve records `pcQ` and whether the post-complete fields are known:
+/// `pcB` and `pcQ` written together, and pump's own invariant `vQ − rQ = ivqr`, on which the
+/// migrating rule's `rQ` (excluding the pool part, pump-final V5) relies. There is no
+/// `pcB ≥ 206.9e12` guard: nothing subtracts `pcB` (§5.4 prices the live `curve_base_ata`).
 fn pricing_inputs(
     market: &Market,
     read: &[AccountInfo],
@@ -456,6 +430,13 @@ fn pricing_inputs(
     supply: Option<u64>,
     ema_fee: bool,
 ) -> Option<CurvePricingInputs> {
+    let (pcb, pcq) = (curve.post_complete_base_out, curve.post_complete_quote_in);
+    let post_complete = pcb != 0 || pcq != 0;
+    // G-3: pump writes pc* only in the buy that completes the curve; on a live curve they are
+    // unknown.
+    if !curve.complete && post_complete {
+        return None;
+    }
     let global_info = read.get(C_GLOBAL)?;
     let global_data = global_info.try_borrow_data().ok()?;
     let global = pump::read_global(&global_info.owner.to_bytes(), &global_data).ok()?;
@@ -471,11 +452,26 @@ fn pricing_inputs(
         cap_bps: None,
     };
     let fees = fees::pump_curve(live.vt, live.vq, &schedule).ok()?;
-    // pump-final §5.2 (P1 correction (a)): pump charges both parts of a buy past `rT` at the
-    // curve's pre-trade market cap on the mint's live supply.
-    let synthetic_fees = supply
-        .filter(|_| !live.complete)
-        .and_then(|s| fees::pump_curve_at_supply(live.vt, live.vq, s, &schedule).ok());
+    let stage = if curve.complete {
+        // The migrating rule relies on `rQ` excluding the pool part (V5), which pump's invariant
+        // `vQ − rQ == ivqr` checks, and on pcB and pcQ being written together.
+        CurveStage::Complete {
+            post_complete_quote_in: pcq,
+            post_complete,
+            post_complete_known: !post_complete
+                || ((pcb != 0) == (pcq != 0) && curve.quote_offset_consistent()),
+        }
+    } else {
+        // pump-final §5.2 (P1 correction (a)): pump charges both parts of a buy past `rT` at the
+        // curve's pre-trade market cap on the mint's live supply. v3 refuses a cashback coin
+        // (6094; D1 (a)) and short.win does not list mayhem: no synthetic route for either.
+        let route = !curve.is_cashback_coin && !curve.is_mayhem_mode;
+        CurveStage::Live {
+            synthetic_fees: supply
+                .filter(|_| route)
+                .and_then(|s| fees::pump_curve_at_supply(live.vt, live.vq, s, &schedule).ok()),
+        }
+    };
     // M7-SEC-5: the fee at the stored `P_ema`'s market cap (`⌊vQ·10¹⁵/vT⌋` is the price times
     // the supply).
     let p_ema = market.ema_price.get();
@@ -485,7 +481,8 @@ fn pricing_inputs(
         .and_then(|vq| fees::pump_curve(live.vt, vq, &schedule).ok())
         .map_or(u32::MAX, |f| f.oneway_ppm());
     let offsets = CurveOffsets::of(live)?;
-    // C4: the curve's base ATA (the tokens `migrate_v2` seeds the pool with, ARCH §4.3).
+    // C4: the curve's base ATA (the tokens `migrate_v2` seeds the pool with, ARCH §4.3; the live
+    // `X_s` of a synthetic exit's pool part, and `X₁` after a pool part, pump-final §5.4).
     let ata = read.get(C_CURVE_BASE_ATA)?;
     if *ata.owner != market.token_program {
         return None;
@@ -511,11 +508,10 @@ fn pricing_inputs(
         pool_disable_flags: gc.disable_flags(),
         coin_creator_is_default: curve.creator_is_default(),
         fee_ppm_at_ema,
-        synthetic_protocol_bps: 0,
-        synthetic_creator_bps: 0,
-        synthetic_known: false,
+        stage_word: 0,
+        stage_flags: 0,
     };
-    inputs.set_synthetic_fees(synthetic_fees);
+    inputs.set_stage(stage);
     Some(inputs)
 }
 
@@ -557,10 +553,12 @@ pub fn read_state(
     } else {
         None
     };
-    // What short.win lists (ARCH §2.5; ADOPTED Q6): a SOL curve, not mayhem, ≥ 115 bytes.
+    // What short.win lists and observes (ARCH §2.5; ADOPTED Q6): a SOL curve, not mayhem,
+    // ≥ 115 bytes; `depth` 0 is defence in depth (a SOL curve has depth 0).
     let listable = curve_info.data_len() >= pump::CURVE_MIN_LEN
         && curve.is_sol_quote()
-        && !curve.is_mayhem_mode;
+        && !curve.is_mayhem_mode
+        && curve.depth == 0;
     let reserves = live.vt > 0 && live.vq > 0;
     let venue = CurveVenue {
         live,
@@ -568,7 +566,14 @@ pub fn read_state(
         pool,
         pricing,
     };
-    st.executable = listable && reserves && !live.complete && venue.pricing.is_some();
+    // D1 (a): v3 refuses a cashback coin (6094), so a live cashback curve never executes. The
+    // term sits here and not on `listable` (pump-final §6.1.6, R-4): a complete cashback curve
+    // is still observed and priced as `PumpMigrating` (C2: graduated cashback coins list).
+    st.executable = listable
+        && !curve.is_cashback_coin
+        && reserves
+        && !live.complete
+        && venue.pricing.is_some();
     if listable && reserves && (st.executable || venue.migrating()) {
         st.x = curve.virtual_token_reserves;
         st.y = curve.virtual_quote_reserves;
@@ -656,22 +661,45 @@ pub fn graduation_anchor(state: &VenueState) -> Option<u128> {
         .and_then(super::pump_amm::graduation_anchor)
 }
 
-/// A curve market's venue checks of an exit after its prologue (ARCH §3.5 step 2, §3.6
-/// precondition 1): a venue sync that just moved the market off the curve refuses the exit
-/// (`VenueMigrating` for `PumpMigrating`, else `NoRoute`); the venue must be executable
-/// (`NoRoute`); on a live curve `q ≤ rT`, else `CurveStraddle` (pump reverts a buy above `rT`
-/// with 6021: the client or keeper uses the bundle of §5.4). The other venues: executable only.
+/// An exit's venue checks after its prologue (ARCH §3.5 step 2, §3.6 precondition 1), every
+/// venue: a venue sync that just moved the market off the curve refuses the exit
+/// (`VenueMigrating` for `PumpMigrating` or `PumpSwap`, else `NoRoute`); the venue must be
+/// executable (`NoRoute`). A keeper exit (`liquidate`, `expire`) checks nothing more here: a
+/// buyback the curve and its would-be pool cannot deliver has no execution quote, so its
+/// "buyback allowed" fails with `UseSolSettle` (pump-final §6.7) and `sol_settle` decides.
 pub fn exit_venue_checks(
     pro: &crate::engine::prologue::Prologue,
     state: &VenueState,
-    q: u64,
 ) -> Result<()> {
     if let Some(t) = pro.transition {
         return transition_refusal(t);
     }
     require!(state.executable, ShortwinError::NoRoute);
+    Ok(())
+}
+
+/// A borrower's close: [`exit_venue_checks`], then on a live curve with `q > rT` the synthetic
+/// route must exist and fit (pump-final §6.1.7): `buy_v3` buys `rT` on the curve and `q − rT`
+/// from the would-be pool, which holds `X_s = curve_base_ata − rT` (`live_pool_tokens`); pump
+/// refuses `q − rT ≥ X_s` (`NotEnoughTokensToBuy`), and a curve without a synthetic route (its
+/// fee not resolved on the mint's supply) cannot buy past `rT` at all. Else `CurveStraddle`. The
+/// `q − rT ≥ X_s` branch is unreachable under the current caps (pump-final C8: the per-market
+/// cap keeps `q ≤ ≈ 4.99e13` while `X_s ≥ 2.069e14`) and stays as a guard.
+pub fn close_venue_checks(
+    pro: &crate::engine::prologue::Prologue,
+    state: &VenueState,
+    q: u64,
+) -> Result<()> {
+    exit_venue_checks(pro, state)?;
     if let (VenueKind::PumpCurve, Some(c)) = (state.kind, state.curve.as_ref()) {
-        require!(u128::from(q) <= c.live.rt, ShortwinError::CurveStraddle);
+        if u128::from(q) > c.live.rt {
+            let fits = c.pricing.as_ref().is_some_and(|p| {
+                p.synthetic_fees().is_some()
+                    && u128::from(q).saturating_sub(c.live.rt) < u128::from(p.live_pool_tokens)
+            });
+            // Beyond what the curve and its post-migration pool hold.
+            require!(fits, ShortwinError::CurveStraddle);
+        }
     }
     Ok(())
 }
@@ -687,10 +715,10 @@ pub fn transition_refusal<T>(t: Transition) -> Result<T> {
     }
 }
 
-/// After a buy leg on the curve (ARCH §3.5 step 7, §5.4 case 1): a buyback of exactly `rT`
-/// completed the curve, so the venue sync moves the market to `PumpMigrating` at once
-/// (`migration_seen_at = now`). Reads only the curve (C0); `None` off the curve or while it is
-/// live.
+/// After a buy leg on the curve (ARCH §3.5 step 7, §5.4 case 1; pump-final §6.1.7): a buyback
+/// of `q ≥ rT` completed the curve (exactly `rT`, or past it by pump's synthetic migration), so
+/// the venue sync moves the market to `PumpMigrating` at once (`migration_seen_at = now`). Reads
+/// only the curve (C0); `None` off the curve or while it is live.
 pub fn sync_after_leg(
     market: &mut Market,
     kind: VenueKind,
@@ -732,8 +760,9 @@ pub fn transition_event(
 
 // ---- legs --------------------------------------------------------------------------------
 
-/// The trader's pump UVA (T16) exists and accumulates for `trader` (ARCH §3.12: pre-created at
-/// listing, so no leg pays its rent; a missing or foreign one is `VenueAccountMismatch`).
+/// The trader's pump UVA (T6) exists and accumulates for `trader` (ARCH §3.12: pre-created at
+/// listing, so no leg pays its rent; a missing or foreign one is `VenueAccountMismatch`, before
+/// the CPI).
 fn check_uva(leg: &Leg) -> Result<()> {
     let uva = raydium::at(leg.trade, T_UVA)?;
     require_keys_eq!(
@@ -759,72 +788,99 @@ fn meta(info: &AccountInfo, writable: bool) -> AccountMeta {
     }
 }
 
-/// The v2 trade's accounts in the IDL's order (R-PUMP §3.5): 27 for `buy_v2`, 26 for `sell_v2`
-/// (no global volume accumulator), `trader` the only signer; with their infos and the program.
-fn trade_accounts<'info>(
-    leg: &Leg<'info>,
-    buy: bool,
-) -> Result<(Vec<AccountMeta>, Vec<AccountInfo<'info>>)> {
-    let r = |i: usize| raydium::at(leg.read, i);
-    let t = |i: usize| raydium::at(leg.trade, i);
-    let trader = &leg.trader.trader;
-    let mut list: Vec<(&AccountInfo<'info>, bool)> = vec![
-        (r(C_GLOBAL)?, false),
-        (&leg.mint, false),
-        (t(T_WSOL_MINT)?, false),
-        (&leg.token_program, false),
-        (t(T_TOKEN_PROGRAM)?, false),
-        (t(T_ATA_PROGRAM)?, false),
-        (t(T_FEE_RECIPIENT)?, true),
-        (t(T_FEE_RECIPIENT_ATA)?, true),
-        (t(T_BUYBACK_RECIPIENT)?, true),
-        (t(T_BUYBACK_RECIPIENT_ATA)?, true),
-        (r(C_CURVE)?, true),
-        (r(C_CURVE_BASE_ATA)?, true),
-        (t(T_CURVE_QUOTE_ATA)?, true),
-    ];
-    let user_at = list.len();
-    list.push((trader, true));
-    list.extend([
-        (t(T_TRADER_BASE_ATA)?, true),
-        (t(T_TRADER_WSOL_ATA)?, true),
-        (t(T_CREATOR_VAULT)?, true),
-        (t(T_CREATOR_VAULT_ATA)?, true),
-        (t(T_SHARING_CONFIG)?, false),
-    ]);
-    if buy {
-        list.push((t(T_GLOBAL_VOLUME_ACCUMULATOR)?, false));
+/// Where an account of the v3 trade CPI comes from ([`TRADE_CPI_ORDER`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CpiSource {
+    /// A ReadSet slot (`C_*`).
+    Read(usize),
+    /// A TradeExtras slot (`T_*`).
+    Trade(usize),
+    /// The instruction's named base mint.
+    Mint,
+    /// The instruction's named base token program.
+    TokenProgram,
+    /// The market's trader PDA: pump's `user`, the only signer.
+    Trader,
+}
+
+/// The v3 trade's accounts in the IDL's order (pump-final §6.1.3; one list for `buy_v3`,
+/// `sell_v3` and `buy_exact_quote_in_v3`, pump-public-docs `2293f9a6`), with their writability:
+///
+/// | # | IDL name | from | W |
+/// |---|---|---|---|
+/// | 1 | `global` | C1 | |
+/// | 2 | `base_mint` | the named mint | |
+/// | 3 | `quote_mint` | T2 | |
+/// | 4 | `base_token_program` | the named token program | |
+/// | 5 | `quote_token_program` | T3 | |
+/// | 6 | `bonding_curve` | C0 | W |
+/// | 7 | `associated_base_bonding_curve` | C4 | W |
+/// | 8 | `associated_quote_bonding_curve` | T4 | W |
+/// | 9 | `user` | the trader PDA (the only signer) | W |
+/// | 10 | `associated_base_user` | T8 | W |
+/// | 11 | `associated_quote_user` | T5 | W |
+/// | 12 | `user_volume_accumulator` | T6 | W |
+/// | 13 | `fee_config` | C2 | |
+/// | 14 | `buyback_fee_recipient` | T7 | W |
+/// | 15 | `system_program` | T9 | |
+/// | 16 | `event_authority` | T1 | |
+/// | 17 | `program` | T0 | |
+pub const TRADE_CPI_ORDER: [(CpiSource, bool); TRADE_CPI_ACCOUNTS] = [
+    (CpiSource::Read(C_GLOBAL), false),
+    (CpiSource::Mint, false),
+    (CpiSource::Trade(T_WSOL_MINT), false),
+    (CpiSource::TokenProgram, false),
+    (CpiSource::Trade(T_TOKEN_PROGRAM), false),
+    (CpiSource::Read(C_CURVE), true),
+    (CpiSource::Read(C_CURVE_BASE_ATA), true),
+    (CpiSource::Trade(T_CURVE_QUOTE_ATA), true),
+    (CpiSource::Trader, true),
+    (CpiSource::Trade(T_TRADER_BASE_ATA), true),
+    (CpiSource::Trade(T_TRADER_WSOL_ATA), true),
+    (CpiSource::Trade(T_UVA), true),
+    (CpiSource::Read(C_FEE_CONFIG), false),
+    (CpiSource::Trade(T_BUYBACK_RECIPIENT), true),
+    (CpiSource::Trade(T_SYSTEM), false),
+    (CpiSource::Trade(T_EVENT_AUTHORITY), false),
+    (CpiSource::Trade(T_PROGRAM), false),
+];
+
+/// [`TRADE_CPI_ORDER`]'s metas and infos for `leg`: `trader` the only signer.
+fn trade_accounts<'info>(leg: &Leg<'info>) -> Result<(Vec<AccountMeta>, Vec<AccountInfo<'info>>)> {
+    let mut metas = Vec::with_capacity(TRADE_CPI_ACCOUNTS);
+    let mut infos = Vec::with_capacity(TRADE_CPI_ACCOUNTS);
+    for (source, writable) in TRADE_CPI_ORDER {
+        let info = match source {
+            CpiSource::Read(i) => raydium::at(leg.read, i)?,
+            CpiSource::Trade(i) => raydium::at(leg.trade, i)?,
+            CpiSource::Mint => &leg.mint,
+            CpiSource::TokenProgram => &leg.token_program,
+            CpiSource::Trader => &leg.trader.trader,
+        };
+        let mut m = meta(info, writable);
+        m.is_signer = source == CpiSource::Trader;
+        metas.push(m);
+        infos.push(info.clone());
     }
-    list.extend([
-        (t(T_UVA)?, true),
-        (t(T_UVA_WSOL_ATA)?, true),
-        (r(C_FEE_CONFIG)?, false),
-        (t(T_FEE_PROGRAM)?, false),
-        (t(T_SYSTEM)?, false),
-        (t(T_EVENT_AUTHORITY)?, false),
-        (t(T_PROGRAM)?, false),
-    ]);
-    let metas = list
-        .iter()
-        .enumerate()
-        .map(|(i, (info, w))| {
-            let mut m = meta(info, *w);
-            m.is_signer = i == user_at;
-            m
-        })
-        .collect();
-    let infos = list.iter().map(|(info, _)| (*info).clone()).collect();
     Ok((metas, infos))
 }
 
-/// `buy_v2(amount, max_sol_cost)` or `sell_v2(amount, min_sol_output)`, `trader` signing, the
-/// extras appended (A41).
-fn trade_cpi(leg: &Leg, buy: bool, amount: u64, bound: u64) -> Result<()> {
-    let (metas, infos) = trade_accounts(leg, buy)?;
+/// The 24 data bytes of a v3 trade: `(buy ? buy_v3 : sell_v3) ‖ amount ‖ bound`, never the
+/// optional `partial_fill` byte. `bound` is `max_sol_cost = max_in` on a buy and
+/// `min_sol_output = min_out` on a sale.
+pub fn trade_data(buy: bool, amount: u64, bound: u64) -> Vec<u8> {
     let mut data = Vec::with_capacity(TRADE_DATA_LEN);
-    data.extend_from_slice(if buy { &IX_BUY_V2 } else { &IX_SELL_V2 });
+    data.extend_from_slice(if buy { &IX_BUY_V3 } else { &IX_SELL_V3 });
     data.extend_from_slice(&amount.to_le_bytes());
     data.extend_from_slice(&bound.to_le_bytes());
+    data
+}
+
+/// `buy_v3(amount, max_sol_cost)` or `sell_v3(amount, min_sol_output)`, `trader` signing, the
+/// extras appended (A41; `raydium::invoke_as_trader`).
+fn trade_cpi(leg: &Leg, buy: bool, amount: u64, bound: u64) -> Result<()> {
+    let (metas, infos) = trade_accounts(leg)?;
+    let data = trade_data(buy, amount, bound);
     raydium::invoke_as_trader(leg, PUMP_PROGRAM_ID, data, metas, infos)
 }
 
@@ -835,9 +891,10 @@ fn base_side<'a, 'info>(leg: &'a Leg<'info>) -> Result<&'a crate::engine::trader
         .ok_or_else(|| error!(ShortwinError::BadRemainingAccounts))
 }
 
-/// The sell leg of an open (module docs; ARCH §2.4.1 PumpCurve row): returns `S`, the proceeds
-/// now on the position, net of any venue-side rent pump took from the trader; the borrower got its
-/// `ert` back.
+/// The sell leg of an open (module docs; ARCH §2.4.1 PumpCurve row): `sell_v3(q, min_out)`;
+/// returns `S`, the proceeds now on the position, net of any venue-side rent pump took from the
+/// trader (a curve or UVA growth; v3 never tops up a creator vault); the borrower got its `ert`
+/// back.
 pub fn sell<'info>(
     leg: &Leg<'info>,
     borrower: &AccountInfo<'info>,
@@ -865,8 +922,8 @@ pub fn sell<'info>(
         q,
         leg.decimals,
     )?;
-    // 2. The rent buffer `ert` from the borrower (ARCH §2.4 rule 3: `sell_v2` may take venue-side
-    //    rent from `user` before crediting the proceeds, R-PUMP Update U6).
+    // 2. The rent buffer `ert` from the borrower (ARCH §2.4 rule 3: `sell_v3` may take venue-side
+    //    rent — a curve or UVA growth — from `user` before crediting the proceeds).
     if leg.ert > 0 {
         system_program::transfer(
             CpiContext::new(
@@ -879,7 +936,7 @@ pub fn sell<'info>(
             leg.ert,
         )?;
     }
-    // 3. sell_v2(Q, min_out): the proceeds are credited to the trader's lamports.
+    // 3. sell_v3(Q, min_out): the proceeds are credited to the trader's lamports.
     trade_cpi(leg, false, q, min_out)?;
     // 4. Pump took exactly Q, and the pool vault gave exactly Q.
     require!(
@@ -901,8 +958,11 @@ pub fn sell<'info>(
     Ok(s)
 }
 
-/// The buy leg of an exit (module docs; ARCH §2.4.1 PumpCurve row): `buy_v2(q, max_in)` paid by
+/// The buy leg of an exit (module docs; ARCH §2.4.1 PumpCurve row): `buy_v3(q, max_in)` paid by
 /// the trader PDA from `max_in + ert` of the position; every token bought goes to the pool vault.
+/// For `q > rT` pump completes the curve and buys `q − rT` from the would-be pool in the same
+/// CPI (synthetic migration): one delivery of `q`, one charge, all or nothing — a short delivery
+/// reverts the instruction (`bought ≥ q`).
 pub fn buy<'info>(
     leg: &Leg<'info>,
     position: &AccountInfo<'info>,
@@ -918,7 +978,7 @@ pub fn buy<'info>(
     //    transfer between them so the runtime's per-CPI balance check sees both.
     lamports::move_lamports_in_leg(position, trader, fund)?;
     leg.trader.pay_from_trader(position, 0)?;
-    // 2. buy_v2(q, max_sol_cost = max_in): System transfers from the trader PDA (T-PDA-USER).
+    // 2. buy_v3(q, max_sol_cost = max_in): System transfers from the trader PDA (T-PDA-USER).
     trade_cpi(leg, true, q, max_in)?;
     // 3. Every lamport left goes back to the position.
     leg.trader.pay_from_trader(position, trader.lamports())?;
@@ -1035,15 +1095,16 @@ pub fn spot(c: &pump::BondingCurve) -> Option<(u128, u128)> {
 mod tests {
     use super::*;
 
-    /// ARCH §3.12's discriminators, and the v2 data length without the cap byte (Update U7).
+    /// pump-final §6.1.9: the v3 discriminators re-derive, the data is 24 bytes (no
+    /// `partial_fill` byte, ever), and the TradeExtras are 10 slots.
     #[test]
     fn discriminators_and_data_length() {
         let disc = |name: &str| {
             let h = solana_sha256_hasher::hash(format!("global:{name}").as_bytes());
             <[u8; 8]>::try_from(&h.to_bytes()[..8]).unwrap()
         };
-        assert_eq!(disc("buy_v2"), IX_BUY_V2);
-        assert_eq!(disc("sell_v2"), IX_SELL_V2);
+        assert_eq!(disc("buy_v3"), IX_BUY_V3);
+        assert_eq!(disc("sell_v3"), IX_SELL_V3);
         assert_eq!(
             disc("init_user_volume_accumulator"),
             IX_INIT_USER_VOLUME_ACCUMULATOR
@@ -1051,6 +1112,84 @@ mod tests {
         assert_eq!(TRADE_DATA_LEN, 8 + 8 + 8);
         assert_eq!(READ_LEN, 7);
         assert_eq!(TRADE_LEN, T_SYSTEM + 1);
+        assert_eq!(TRADE_LEN, 10);
+        let d = trade_data(true, 7, 9);
+        assert_eq!(d.len(), TRADE_DATA_LEN);
+        assert_eq!(d[..8], IX_BUY_V3);
+        assert_eq!(d[8..16], 7u64.to_le_bytes());
+        assert_eq!(d[16..], 9u64.to_le_bytes());
+        assert_eq!(trade_data(false, 1, 2)[..8], IX_SELL_V3);
+        // Every slot is named once: the nine fixed ones and the live-checked buyback recipient.
+        let mut m = <Market as bytemuck::Zeroable>::zeroed();
+        m.trader = Pubkey::new_unique();
+        let mut slots: Vec<usize> = fixed_trade_keys(&m).iter().map(|(i, _)| *i).collect();
+        slots.push(T_BUYBACK_RECIPIENT);
+        slots.sort_unstable();
+        assert_eq!(slots, (0..TRADE_LEN).collect::<Vec<_>>());
+    }
+
+    /// pump-final §6.1.3 (`trade_accounts_v3_order`): the CPI's 17 accounts in the IDL's order
+    /// for `buy_v3` / `sell_v3` (pump-public-docs `2293f9a6`), with their sources, writability and
+    /// the trader PDA as the single signer; every TradeExtras slot and the ReadSet's `Global`,
+    /// curve, base ATA and `FeeConfig` reach the CPI, nothing else does.
+    #[test]
+    fn trade_accounts_v3_order() {
+        use CpiSource::{Mint, Read, TokenProgram, Trade, Trader};
+        let idl: [(&str, CpiSource, bool); TRADE_CPI_ACCOUNTS] = [
+            ("global", Read(C_GLOBAL), false),
+            ("base_mint", Mint, false),
+            ("quote_mint", Trade(T_WSOL_MINT), false),
+            ("base_token_program", TokenProgram, false),
+            ("quote_token_program", Trade(T_TOKEN_PROGRAM), false),
+            ("bonding_curve", Read(C_CURVE), true),
+            (
+                "associated_base_bonding_curve",
+                Read(C_CURVE_BASE_ATA),
+                true,
+            ),
+            (
+                "associated_quote_bonding_curve",
+                Trade(T_CURVE_QUOTE_ATA),
+                true,
+            ),
+            ("user", Trader, true),
+            ("associated_base_user", Trade(T_TRADER_BASE_ATA), true),
+            ("associated_quote_user", Trade(T_TRADER_WSOL_ATA), true),
+            ("user_volume_accumulator", Trade(T_UVA), true),
+            ("fee_config", Read(C_FEE_CONFIG), false),
+            ("buyback_fee_recipient", Trade(T_BUYBACK_RECIPIENT), true),
+            ("system_program", Trade(T_SYSTEM), false),
+            ("event_authority", Trade(T_EVENT_AUTHORITY), false),
+            ("program", Trade(T_PROGRAM), false),
+        ];
+        for (i, ((name, source, writable), got)) in idl.iter().zip(TRADE_CPI_ORDER).enumerate() {
+            assert_eq!((*source, *writable), got, "#{} {name}", i + 1);
+        }
+        let signers: Vec<usize> = TRADE_CPI_ORDER
+            .iter()
+            .enumerate()
+            .filter(|(_, (s, _))| *s == Trader)
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(signers, [8]);
+        let mut trade: Vec<usize> = TRADE_CPI_ORDER
+            .iter()
+            .filter_map(|(s, _)| match s {
+                Trade(i) => Some(*i),
+                _ => None,
+            })
+            .collect();
+        trade.sort_unstable();
+        assert_eq!(trade, (0..TRADE_LEN).collect::<Vec<_>>());
+        let mut read: Vec<usize> = TRADE_CPI_ORDER
+            .iter()
+            .filter_map(|(s, _)| match s {
+                Read(i) => Some(*i),
+                _ => None,
+            })
+            .collect();
+        read.sort_unstable();
+        assert_eq!(read, [C_CURVE, C_GLOBAL, C_FEE_CONFIG, C_CURVE_BASE_ATA]);
     }
 
     /// M5-SEC-6: every entry of the recipient table is the WSOL ATA of its recipient, and an

@@ -940,3 +940,41 @@ fn spoofed_owners_at_the_detection_pdas_list_only() {
         ShortwinError::BadRemainingAccounts,
     );
 }
+
+/// T-LISTING (pump-final §6.3, owner decision D1 (a)): the dumped live cashback curve
+/// (`cashback166`, `8oe1sfhK…`) is refused at listing with `CurveCashbackCoin` = 6109 — pump's v3
+/// trades refuse a cashback coin (6094) and every curve leg trades v3 — with and without the pump
+/// init set (the class decides first); a live curve of quote-chain depth 1 is not a SOL curve
+/// (`CurveQuoteNotSol`); mayhem stays `CurveMayhemUnsupported`. The control: the same curve with
+/// the flag cleared lists as `PumpCurve`.
+#[test]
+fn cashback_curve_is_refused() {
+    use shortwin_litesvm_tests::fork::{self, PumpCoin};
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Cashback166);
+    let st = c.state(&env.svm);
+    assert!(st.is_cashback_coin && !st.complete && st.is_sol_quote());
+    assert_err(&env.list_pump(&c), ShortwinError::CurveCashbackCoin);
+    assert_eq!(u32::from(ShortwinError::CurveCashbackCoin), 6_109);
+    let creator = env.funded_keypair();
+    assert_err(
+        &create(&mut env, &creator, &c.mint, &c.token_program.id()),
+        ShortwinError::CurveCashbackCoin,
+    );
+    fork::patch(&mut env.svm, &c.curve, |d| {
+        d[shortwin_venue_state::pump::OFF_IS_CASHBACK_COIN] = 0
+    });
+    ok(env.list_pump(&c));
+    assert_eq!(
+        env.market(&pda::market(&c.mint).0).venue_kind(),
+        Some(VenueKind::PumpCurve)
+    );
+
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Near166);
+    fork::patch(&mut env.svm, &c.curve, |d| {
+        d[shortwin_venue_state::pump::OFF_DEPTH] = 1
+    });
+    assert_err(&env.list_pump(&c), ShortwinError::CurveQuoteNotSol);
+
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Mayhem166);
+    assert_err(&env.list_pump(&c), ShortwinError::CurveMayhemUnsupported);
+}

@@ -228,6 +228,31 @@ fn refusals() {
     assert_err(&env.send(&[hinted], &[&creator]), E::PumpVenuePrecedence);
 }
 
+/// T-LISTING-CASHBACK (pump-final §6.3, owner decision D1 (a)): `create_market(Auto)` on the live
+/// cashback curve `cashback166` refuses `CurveCashbackCoin` (6109): pump's v3 trades refuse a
+/// cashback coin (6094), and every curve leg trades v3. The coin graduates for real — a third
+/// party's `buy_v2` of the whole `rT` (v2 still trades a cashback coin), anyone's `migrate_v2` on
+/// the ELF — and the same coin then lists on its canonical PumpSwap pool (the refusal sits on the
+/// live branch only, C2).
+#[test]
+fn a_live_cashback_curve_is_refused_and_lists_after_graduation() {
+    let (mut env, c) = Env::fork_pump_coin(PumpCoin::Cashback166);
+    assert!(c.state(&env.svm).is_cashback_coin);
+    assert_err(&env.list_pump(&c), E::CurveCashbackCoin);
+    assert_eq!(code(E::CurveCashbackCoin), 6_109);
+    let u = CurveUser::new(&mut env, &c);
+    env.fund(&u.kp.pubkey(), 1_000_000_000_000);
+    let rt = c.state(&env.svm).real_token_reserves;
+    ok(u.buy(&mut env, &c, rt, u64::MAX));
+    assert!(c.state(&env.svm).complete);
+    let migrator = env.funded_keypair();
+    let mig = pump::migrate_v2_ix(&env.svm, &migrator.pubkey(), &c);
+    ok(env.send(&[pump::cu_limit_ix(600_000), mig], &[&migrator]));
+    assert!(c.state(&env.svm).is_migrated());
+    ok(env.list_pamm(&c.mint, &c.token_program.id()));
+    assert_eq!(listed(&env, &c).venue, VenueKind::PumpSwap as u8);
+}
+
 /// The init set is mandatory and key-checked: missing (`BadRemainingAccounts`), the UVA of another
 /// user, another program or event authority (`VenueAccountMismatch`); a wrong detection key too.
 #[test]

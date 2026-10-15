@@ -100,6 +100,9 @@ describe('program error messages', () => {
         // AIR-07: a drained pool takes deposits again once repayments or settlements free tokens.
         expect(programError(6108)?.name).toBe('PoolDrained');
         expect(programError(6108)?.action).toBe('wait');
+        // pump-final §6.3 (owner D1 (a)): a live cashback curve is refused at listing.
+        expect(programError(6109)?.name).toBe('CurveCashbackCoin');
+        expect(programError(6109)?.action).toBe('blocked');
         expect(programError(5999)).toBeUndefined();
     });
 });

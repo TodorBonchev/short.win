@@ -47,9 +47,10 @@
 //! pump detection (`classify_pump`, D1 precedence).
 //!
 //! **Quotes** ([`Quoter`]): the constant-product venues price on `(X, Y)` with a resolved
-//! [`Pricing`]; the curve on a [`CurveState`] with `shortwin_math::quote::CurvePricing` (the
-//! straddle `B̂_str` above `rT`, whose post-migration pool fee tier needs the PumpSwap tier list:
-//! [`CurveVenue`] carries it, which is why [`VenueState`] is `Clone` but not `Copy`).
+//! [`Pricing`]; the curve on a [`CurveState`] with `shortwin_math::quote::CurvePricing` (above
+//! `rT` a live curve's synthetic exit `B̂_v3`, pump-final §5.2; a `PumpMigrating` market's
+//! post-migration pool `B̂_str`, whose fee tier needs the PumpSwap tier list: [`CurveVenue`]
+//! carries it, which is why [`VenueState`] is `Clone` but not `Copy`).
 
 use std::rc::Rc;
 
@@ -378,8 +379,10 @@ pub struct VenueState {
     pub pool: Option<pump_amm::PoolVenue>,
 }
 
-/// `migrate_v2`'s token seed on a standard curve: 206.9 M tokens (R-PUMP §7.4; the EMA leg's
-/// deterministic `X_p`, ARCH §4.3; `shortwin_sim.PUMP_POOL_TOKENS`).
+/// `migrate_v2`'s token seed on a standard curve completed without a pool part: 206.9 M tokens
+/// (R-PUMP §7.4; the EMA leg's deterministic `X_p`, ARCH §4.3; `shortwin_sim.PUMP_POOL_TOKENS`;
+/// `shortwin_math::quote::STANDARD_POOL_TOKENS`). After a synthetic pool part the live
+/// `curve_base_ata` replaces it (pump-final §5.4).
 pub const STANDARD_POOL_TOKENS: u128 = 206_900_000_000_000;
 
 /// A pump curve as a venue (ARCH §3.12 PumpCurve ReadSet, §4.1–§4.3).
@@ -412,9 +415,45 @@ impl CurveVenue {
     }
 }
 
-/// What the curve's quotes read (ARCH §4.2, §4.3): the live curve fees, the constant offsets, the
-/// live leg's `X_p`, `Global.pool_migration_fee`, and the PumpSwap fee schedule of the
-/// post-migration pool (`B̂_str`; the tier resolved at that pool's own market cap).
+/// What a curve's completion state adds to its pricing (pump-final §5.2–§5.4, §6.1.5): the
+/// synthetic route of a live curve, the post-complete fields of a complete one. The two never
+/// coexist — pump writes `pcB` / `pcQ` only in the buy that completes the curve, and a live curve
+/// that carries them has no pricing at all (G-3) — so [`CurvePricingInputs`] keeps them in one
+/// word ([`CurvePricingInputs::stage`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CurveStage {
+    /// A live curve: `synthetic_fees` is the fee of pump's synthetic route past `rT` (`buy_v3`;
+    /// [`CurvePricingInputs::synthetic_fees`]), `None` when there is no such route — a cashback
+    /// or mayhem curve (which v3 refuses or short.win does not list), a fee that does not resolve,
+    /// or a read without the mint's supply.
+    Live { synthetic_fees: Option<FeeBps> },
+    /// A complete curve (`PumpMigrating`, or a just-completed `PumpCurve` market):
+    /// `post_complete_quote_in` is `pcQ` @158 (`migrate_v2` adds it to the pool), `post_complete`
+    /// that the completing buy had a pool part (`pcB` @150 or `pcQ` non-zero), and
+    /// `post_complete_known` that both were written together and pump's own invariant
+    /// `vQ − rQ = ivqr` holds, so `rQ` excludes the pool part (pump-final V5). Without a pool part
+    /// the fields are trivially known.
+    Complete {
+        post_complete_quote_in: u64,
+        post_complete: bool,
+        post_complete_known: bool,
+    },
+}
+
+/// [`CurvePricingInputs::stage_flags`]: the curve is complete ([`CurveStage::Complete`]).
+const STAGE_COMPLETE: u8 = 1;
+/// Live: the synthetic route's fee is known (`stage_word` holds it).
+const STAGE_SYNTHETIC: u8 = 1 << 1;
+/// Complete: the completing buy had a pool part.
+const STAGE_POST_COMPLETE: u8 = 1 << 2;
+/// Complete: the post-complete fields are known.
+const STAGE_POST_COMPLETE_KNOWN: u8 = 1 << 3;
+
+/// What the curve's quotes read (ARCH §4.2, §4.3; pump-final §6.2): the live curve fees, the
+/// constant offsets, the live leg's `X_p`, `Global.pool_migration_fee`, the PumpSwap fee schedule
+/// of the post-migration pool (`B̂_str`; the tier resolved at that pool's own market cap), and the
+/// completion state ([`CurveStage`]: the synthetic route of a live curve, the post-complete
+/// fields of a complete one).
 #[derive(Clone, Debug)]
 pub struct CurvePricingInputs {
     /// `fees::pump_curve` on the live `(vT, vQ)` with the pump `FeeConfig` tiers,
@@ -443,66 +482,132 @@ pub struct CurvePricingInputs {
     /// curve's fee at the stored EMA price's market cap; `u32::MAX` without a price
     /// ([`VenueState::cap_fee_ppm`]).
     pub fee_ppm_at_ema: u32,
-    /// [`CurvePricingInputs::synthetic_fees`]'s protocol component (bps).
-    synthetic_protocol_bps: u32,
-    /// [`CurvePricingInputs::synthetic_fees`]'s creator component (bps).
-    synthetic_creator_bps: u32,
-    /// [`CurvePricingInputs::synthetic_fees`] is known.
-    synthetic_known: bool,
+    /// [`CurvePricingInputs::stage`]'s word: on a live curve the synthetic route's fee (protocol
+    /// bps in the low 32 bits, creator bps in the high 32; the curve charges no LP fee), on a
+    /// complete one `pcQ`.
+    stage_word: u64,
+    /// [`CurvePricingInputs::stage`]'s `STAGE_*` bits.
+    stage_flags: u8,
 }
 
 impl CurvePricingInputs {
+    /// The completion state (pump-final §5.2–§5.4, §6.1.5; [`CurveStage`]).
+    ///
+    /// Stored packed in one word and a flag byte (the synthetic fee and `pcQ` never coexist):
+    /// `VenueState` keeps its size (G-6, T-SIZEOF), because `execute_pool_switch` keeps venue
+    /// states on its 4 KiB stack frame (an `Option<FeeBps>` field here pushed its handler 128
+    /// bytes over in P1) and the pool-selection instructions box several on the 32 KiB heap (a
+    /// 48-byte growth overflowed it in M7-SEC-5).
+    pub fn stage(&self) -> CurveStage {
+        let flag = |bit: u8| self.stage_flags & bit != 0;
+        if flag(STAGE_COMPLETE) {
+            CurveStage::Complete {
+                post_complete_quote_in: self.stage_word,
+                post_complete: flag(STAGE_POST_COMPLETE),
+                post_complete_known: flag(STAGE_POST_COMPLETE_KNOWN),
+            }
+        } else {
+            let lo = self.stage_word & u64::from(u32::MAX);
+            CurveStage::Live {
+                synthetic_fees: flag(STAGE_SYNTHETIC)
+                    .then(|| FeeBps::new(0, lo, self.stage_word >> 32)),
+            }
+        }
+    }
+
+    /// Stores [`CurvePricingInputs::stage`]. A live curve's synthetic fee with a component above
+    /// `u32::MAX` bps, or a non-zero LP component (which the curve never charges), is stored as
+    /// unknown: no synthetic route then.
+    fn set_stage(&mut self, stage: CurveStage) {
+        let (word, flags) = match stage {
+            CurveStage::Live { synthetic_fees } => {
+                let packed = synthetic_fees.filter(|f| f.lp == 0).and_then(|f| {
+                    let protocol = u64::from(u32::try_from(f.protocol).ok()?);
+                    let creator = u64::from(u32::try_from(f.creator).ok()?);
+                    Some(protocol | (creator << 32))
+                });
+                match packed {
+                    Some(w) => (w, STAGE_SYNTHETIC),
+                    None => (0, 0),
+                }
+            }
+            CurveStage::Complete {
+                post_complete_quote_in,
+                post_complete,
+                post_complete_known,
+            } => {
+                let mut flags = STAGE_COMPLETE;
+                if post_complete {
+                    flags |= STAGE_POST_COMPLETE;
+                }
+                if post_complete_known {
+                    flags |= STAGE_POST_COMPLETE_KNOWN;
+                }
+                (post_complete_quote_in, flags)
+            }
+        };
+        self.stage_word = word;
+        self.stage_flags = flags;
+    }
+
     /// The fee pump charges on both parts of a buy past `rT` by synthetic migration (pump-final
     /// §5.2, P1 correction (a)): `fees::pump_curve_at_supply` on the live `(vT, vQ)` with the
     /// mint's **live** supply — pump's tier rule (R-PUMP Update U10), where [`fees`](Self::fees)
-    /// keeps the fixed 10¹⁵ of ARCH §4.2 for every existing path. `None` on a complete curve,
-    /// without the mint's supply ([`read_state`]) and for a component above `u32::MAX` bps: no
-    /// synthetic route then. For `CurvePricing::synthetic` once the curve adapter trades v3
-    /// (pump-final §6.2).
-    ///
-    /// Stored packed (two `u32` and a flag in the `live_pool_tokens` narrowing and the struct's
-    /// padding; the curve charges no LP fee): `VenueState` keeps its size, because
-    /// `execute_pool_switch` keeps venue states on its 4 KiB stack frame (an `Option<FeeBps>`
-    /// field here pushed its handler 128 bytes over) and the pool-selection instructions box
-    /// several on the 32 KiB heap (a 48-byte growth overflowed it in M7-SEC-5).
+    /// keeps the fixed 10¹⁵ of ARCH §4.2 for every existing path. `Some` only on a live curve
+    /// with a synthetic route ([`CurveStage::Live`]): `None` on a complete curve, a cashback or
+    /// mayhem curve, without the mint's supply (`read_state` without one) and for a component
+    /// above `u32::MAX` bps. It is `CurvePricing::synthetic`: `q > rT` prices `B̂_v3` at it.
     pub fn synthetic_fees(&self) -> Option<FeeBps> {
-        self.synthetic_known.then(|| {
-            FeeBps::new(
-                0,
-                u64::from(self.synthetic_protocol_bps),
-                u64::from(self.synthetic_creator_bps),
-            )
-        })
+        match self.stage() {
+            CurveStage::Live { synthetic_fees } => synthetic_fees,
+            CurveStage::Complete { .. } => None,
+        }
     }
 
-    /// Stores [`CurvePricingInputs::synthetic_fees`] (`None` for a component above `u32::MAX`
-    /// bps, or a non-zero LP component, which the curve never charges).
-    fn set_synthetic_fees(&mut self, fees: Option<FeeBps>) {
-        let packed = fees.filter(|f| f.lp == 0).and_then(|f| {
-            Some((
-                u32::try_from(f.protocol).ok()?,
-                u32::try_from(f.creator).ok()?,
-            ))
-        });
-        let (protocol, creator) = packed.unwrap_or_default();
-        self.synthetic_protocol_bps = protocol;
-        self.synthetic_creator_bps = creator;
-        self.synthetic_known = packed.is_some();
+    /// The post-complete fields are known (pump-final §6.1.5): always on a live curve (it carries
+    /// none, G-3) and on a complete curve without a pool part; on one with a pool part, `pcB` and
+    /// `pcQ` were written together and `vQ − rQ = ivqr` holds. When false, FV is undefined
+    /// (`Quoter::fv_repriced`).
+    pub fn post_complete_known(&self) -> bool {
+        match self.stage() {
+            CurveStage::Live { .. } => true,
+            CurveStage::Complete {
+                post_complete_known,
+                ..
+            } => post_complete_known,
+        }
     }
 
-    /// `CurvePricing` at the live fee, with the deterministic migration of the EMA leg (the
-    /// standard `X_p`, ARCH §4.3; no post-complete quote) and the post-migration pool's schedule:
-    /// `base_supply` 10¹⁵ (`fees::PammFeeSchedule`: a coin that has not graduated yet;
-    /// `shortwin_sim.CPPool.graduate`), a new pool's own `creator_fee_bps` 0. Above `rT` it prices
-    /// `B̂_str` (`synthetic: None`) until the adapter trades v3 (pump-final §6).
+    /// `CurvePricing` at the live fee (pump-final §6.2), with the post-migration pool's schedule
+    /// (`base_supply` 10¹⁵, `fees::PammFeeSchedule`: a coin that has not graduated yet;
+    /// `shortwin_sim.CPPool.graduate`; a new pool's own `creator_fee_bps` 0) and the migration of
+    /// the EMA leg, the box, `B̂_ref`, D4 and FV:
+    ///
+    /// - `pool_tokens` the standard 206.9e12 (ARCH §4.3), or, on a complete curve whose
+    ///   completing buy had a pool part, the live `curve_base_ata` (`live_pool_tokens`, `rT = 0`):
+    ///   the tokens pump priced the pool part on and `migrate_v2` seeds, donations included
+    ///   (pump-final §5.4). A live curve carries no pool part (G-3), so its EMA leg keeps 206.9e12;
+    /// - `post_complete_quote_in` `pcQ` (0 without a pool part);
+    /// - `synthetic` the live curve's synthetic fee ([`synthetic_fees`](Self::synthetic_fees)):
+    ///   above `rT` a live curve prices `B̂_v3`, while a `PumpMigrating` market's EMA-leg ring
+    ///   states (`curve_at`, `complete = false`) keep `B̂_str` on the real pool at the PumpSwap
+    ///   tier (G-2).
     pub fn curve_pricing(&self) -> CurvePricing<'_> {
+        let (pool_tokens, post_complete_quote_in) = match self.stage() {
+            CurveStage::Complete {
+                post_complete: true,
+                post_complete_quote_in,
+                ..
+            } => (u128::from(self.live_pool_tokens), post_complete_quote_in),
+            _ => (STANDARD_POOL_TOKENS, 0),
+        };
         CurvePricing {
             fees: self.fees,
             offsets: self.offsets,
             migration: MigrationParams {
                 migration_fee: self.migration_fee,
-                pool_tokens: STANDARD_POOL_TOKENS,
-                post_complete_quote_in: 0,
+                pool_tokens,
+                post_complete_quote_in,
             },
             pool: PammFeeSchedule {
                 tiers: &self.pool_tiers,
@@ -512,7 +617,7 @@ impl CurvePricingInputs {
                 coin_creator_is_default: self.coin_creator_is_default,
                 cap_bps: None,
             },
-            synthetic: None,
+            synthetic: self.synthetic_fees(),
         }
     }
 }
@@ -533,14 +638,19 @@ pub fn curve_at(x: u128, y: u128, offsets: CurveOffsets) -> CurveState {
 /// The curve's quotes at one fee view (the live fee, or capped for risk quotes).
 #[derive(Clone, Copy, Debug)]
 pub struct CurveQuoter<'a> {
-    /// The fees, offsets, the deterministic (EMA-leg) migration and the pool schedule.
+    /// The fees, offsets, the EMA-leg migration (`CurvePricingInputs::curve_pricing`), the pool
+    /// schedule and the live curve's synthetic route.
     pub pricing: CurvePricing<'a>,
     /// The live curve.
     pub live: CurveState,
-    /// The live leg's `X_p` (`curve_base_ata.amount − rT`).
+    /// The live leg's `X_s` (`curve_base_ata.amount − rT`, donations included as pump prices it).
     pub live_pool_tokens: u128,
-    /// A `PumpMigrating` market: FV prices the deterministic post-migration pool (ARCH §4.5).
+    /// A `PumpMigrating` market: FV prices the post-migration pool `migrate_v2` will create
+    /// (ARCH §4.5; ρ-scaled after a synthetic pool part, pump-final §5.4).
     pub migrating: bool,
+    /// The curve's post-complete fields are known (`CurvePricingInputs::post_complete_known`):
+    /// when false on a migrating curve FV is undefined (pump-final §6.1.5).
+    pub post_complete_known: bool,
 }
 
 /// A venue's quotes at one fee view (ARCH §4.3 "two fee views"): the live fee for execution
@@ -553,7 +663,8 @@ pub struct CurveQuoter<'a> {
 pub enum Quoter<'a> {
     /// A constant-product pool on `(X, Y)`.
     Pool(Pricing),
-    /// The pump curve (the straddle above `rT`).
+    /// The pump curve (above `rT`: a live curve's synthetic exit `B̂_v3`, a migrating market's
+    /// post-migration pool `B̂_str`).
     Curve(CurveQuoter<'a>),
 }
 
@@ -578,7 +689,11 @@ impl Quoter<'_> {
     }
 
     /// `B̂(q)` on the **live** state: a pool on `(x, y)`; the curve on its live state with the live
-    /// leg's `X_p = curve_base_ata.amount − rT` (ARCH §4.3; `None` on a complete curve).
+    /// leg's `X_s = curve_base_ata.amount − rT` (ARCH §4.3; pump-final §5.2: `B̂_v3` above `rT`, the
+    /// pool part priced on the donation-inclusive balance as pump prices it; `None` on a complete
+    /// curve). A live curve buys past `rT` only by pump's synthetic migration: without that route
+    /// (`CurvePricing::synthetic` unset — no fee resolved on the mint's supply) nothing executes
+    /// there, so the quote is `None` (`+∞`) rather than `B̂_str`, which no instruction executes.
     pub fn buy_live(&self, q: u64, x: u128, y: u128) -> Option<BuyQuote> {
         match self {
             Self::Pool(p) => {
@@ -588,6 +703,9 @@ impl Quoter<'_> {
                 p.buy(q, x, y)
             }
             Self::Curve(c) => {
+                if !c.live.complete && c.pricing.synthetic.is_none() && u128::from(q) > c.live.rt {
+                    return None;
+                }
                 let mut pricing = c.pricing;
                 pricing.migration.pool_tokens = c.live_pool_tokens;
                 pricing.buy(q, &c.live)
@@ -597,7 +715,8 @@ impl Quoter<'_> {
 
     /// `B̂(q; x, y)` on a hypothetical state — a ring entry's cached reprojection (the EMA leg, the
     /// D4 margin): a pool on `(x, y)`; the curve at `(vT, vQ) = (x, y)` with the live offsets and
-    /// the deterministic migration (the straddle above that state's `rT`). `None` for `x = 0`.
+    /// the EMA leg's migration (above that state's `rT`: `B̂_v3` on a live curve with the
+    /// standard 206.9e12, `B̂_str` on a migrating market's pool). `None` for `x = 0`.
     pub fn buy_xy(&self, q: u64, x: u128, y: u128) -> Option<BuyQuote> {
         if x == 0 {
             return None;
@@ -618,16 +737,24 @@ impl Quoter<'_> {
     }
 
     /// `B̂_FV(P, L)` (ARCH §4.5): [`Quoter::buy_repriced`], except on a stuck migration (a
-    /// `PumpMigrating` market), where it prices the deterministic post-migration pool at `P` —
-    /// `reprice(√(X_p·Y_p), P)` at the pool's own PumpSwap tier (`shortwin_sim.Market.fv_parts`).
+    /// `PumpMigrating` market), where it prices the pool `migrate_v2` will create at `P`
+    /// (pump-final §5.4, `math_quote::migrating_fv`): `(X₁, Y₁)` = `migrated_pool` with the
+    /// standard 206.9e12 tokens, or the live `curve_base_ata` and `+ pcQ` after a synthetic pool
+    /// part (`CurvePricingInputs::curve_pricing`), repriced to `reprice(√(X₁·Y₁), p')` at the
+    /// pool's own PumpSwap tier (`shortwin_sim.Market.fv_parts`), with `p' = p` without a pool
+    /// part (bit-identical to the FV before pump's v3) and `p' = ⌈⌈p·Y₁/Y₀⌉·X₀/X₁⌉` (ρ, lender
+    /// side) after one.
+    ///
+    /// `None` (FV undefined) on a migrating curve whose post-complete fields are not known
+    /// (pump-final §6.1.5): `settle::amount_at` then gives the lenders the whole take, the
+    /// documented exception to A63's cap-only rule ([`risk_quoter`]).
     pub fn fv_repriced(&self, q: u64, l: u128, p: u128) -> Option<BuyQuote> {
         match self {
             Self::Curve(c) if c.migrating => {
-                let (xp, yp) = math_quote::migrated_pool(&c.live, &c.pricing.migration)?;
-                let fees = math_fees::pump_amm(yp, xp, &c.pricing.pool).ok()?;
-                let l_pool = math_quote::liquidity(xp, yp).ok()?;
-                let (x, y) = math_quote::reprice(l_pool, p)?;
-                math_quote::sol_leg::buy_exact_out(q, x, y, false, &fees)
+                if !c.post_complete_known {
+                    return None;
+                }
+                math_quote::migrating_fv(q, p, &c.live, &c.pricing.migration, &c.pricing.pool)
             }
             _ => self.buy_repriced(q, l, p),
         }
@@ -740,11 +867,13 @@ impl VenueState {
             live: c.live,
             live_pool_tokens: u128::from(inputs.live_pool_tokens),
             migrating: c.migrating(),
+            post_complete_known: inputs.post_complete_known(),
         }))
     }
 
     /// Execution quote `B̂_live(q)` at the live fee (ARCH §4.3 "two fee views"); `None` (`+∞`)
-    /// when undefined or the venue is not executable. On the curve `B̂_str` above `rT`.
+    /// when undefined or the venue is not executable. On the curve `B̂_v3` above `rT` (pump's
+    /// synthetic migration, pump-final §5.2).
     pub fn buy(&self, q: u64) -> Option<BuyQuote> {
         if !self.executable {
             return None;
@@ -980,10 +1109,21 @@ pub fn mint_supply(mint: &AccountInfo) -> Option<u64> {
 ///   `φ_live`, so the cap itself is used (`min(unknown, cap) = cap`, FV's ceiling): an S3 on
 ///   such a venue still has a fair value (ARCH §5.3 "FV is priced at the last pre-halt
 ///   `P_ema`") instead of an uncapped take. **PROPOSED (M5):** the same cap-only
-///   constant-product view prices a pump market whose curve no longer parses or has migrated
-///   (`vT = 0`, no curve fee tier) and a list-only market (`None`: a curve that graduated
+///   constant-product view prices a pump market whose pricing accounts do not parse, whose
+///   curve has migrated (`vT = 0`, no curve fee tier) or whose **live** curve carries
+///   post-complete fields (pump-final G-3: pump writes them only in the buy that completes the
+///   curve, so they are unknown there), and a list-only market (`None`: a curve that graduated
 ///   elsewhere with positions open, M2-SEC-5): `B̂ = n + ⌈n·cap/10⁴⌉` on `reprice(L, P)`, the
 ///   curve's own reserves without its real-reserve bound (ARCH names no FV for these).
+/// - **The documented exception (pump-final §6.1.5).** A **migrating** curve whose post-complete
+///   fields are not known (one of `pcB` / `pcQ` zero, or `vQ − rQ ≠ ivqr`) keeps its curve
+///   quoter, so this cap-only view is never reached for it, and its FV is undefined
+///   ([`Quoter::fv_repriced`] `None`): an S3 there gives the lenders the whole take. The cap-only
+///   view is a fair-value ceiling only when the venue's reserves are known and just its fee is
+///   not; here the reserves of the pool that will open are what is unknown, and the curve's
+///   virtual liquidity at ρ = 1 would settle a real pool part far below its value (≈ 85 % on an
+///   E1bY-like completion). The EMA leg and the box keep the fields as read (`Y_s` includes
+///   `pcQ`, the larger reading of `rQ`), so liquidatability errs toward the lenders too.
 ///
 /// - PumpSwap (M6): a halted pool (the `disable_flags` buy bit) keeps its resolved fee, capped;
 ///   a pool whose fee no longer resolves takes the cap (`pump_amm::fee_view`).
@@ -1201,7 +1341,7 @@ pub struct Named<'info> {
 
 /// The trader-side accounts of a trading instruction on `kind`: the named `trader` and
 /// `market_vault`; on the WSOL venues the WSOL mint, SPL Token and `trader_wsol` from the venue's
-/// TradeExtras; on the curve `trader_base_ata` (TradeExtras T18) with the named pool vault, mint
+/// TradeExtras; on the curve `trader_base_ata` (TradeExtras T8) with the named pool vault, mint
 /// and token program (ARCH §2.4 rule 2).
 pub fn trader_accounts<'info>(
     kind: VenueKind,
@@ -1409,34 +1549,52 @@ mod tests {
         );
     }
 
-    /// pump-final §5.2 (P1 correction (a)): the synthetic exit's fee round-trips through its packed
-    /// form; a component above `u32::MAX` bps or an LP part leaves it unknown (no synthetic
-    /// route); and the packing costs `CurvePricingInputs` no size (`VenueState` keeps its own: the
-    /// pool-selection instructions hold several on a 4 KiB frame and a 32 KiB heap).
-    #[test]
-    fn synthetic_fees_pack_without_growing_the_venue_state() {
-        let mut c = CurvePricingInputs {
+    fn inputs() -> CurvePricingInputs {
+        CurvePricingInputs {
             fees: FeeBps::new(0, 95, 30),
             offsets: CurveOffsets { token: 1, quote: 1 },
-            live_pool_tokens: u64::MAX,
+            live_pool_tokens: 200_661_149_081_575,
             migration_fee: 15_000_001,
             pool_tiers: Rc::from(Vec::new()),
             pool_creator_fee_configurable: true,
             pool_disable_flags: 0,
             coin_creator_is_default: false,
             fee_ppm_at_ema: u32::MAX,
-            synthetic_protocol_bps: 0,
-            synthetic_creator_bps: 0,
-            synthetic_known: false,
-        };
-        assert_eq!(c.synthetic_fees(), None);
+            stage_word: 0,
+            stage_flags: 0,
+        }
+    }
+
+    /// pump-final §5.2 / §6.1.5 / §6.2: the completion state round-trips through its packed form.
+    /// A live curve's synthetic fee (P1 correction (a)) — a component above `u32::MAX` bps or an
+    /// LP part leaves it unknown (no synthetic route); a complete curve's `pcQ` and its two flags;
+    /// and what `curve_pricing` makes of each (the synthetic route only live, the live
+    /// `curve_base_ata` and `pcQ` only after a pool part).
+    #[test]
+    fn the_curve_stage_round_trips_and_prices() {
+        // The literal the web's constants test reads is shortwin-math's.
+        assert_eq!(STANDARD_POOL_TOKENS, math_quote::STANDARD_POOL_TOKENS);
+        let mut c = inputs();
+        assert_eq!(
+            c.stage(),
+            CurveStage::Live {
+                synthetic_fees: None
+            }
+        );
         for f in [
             FeeBps::new(0, 80, 25),
             FeeBps::ZERO,
             FeeBps::new(0, u64::from(u32::MAX), u64::from(u32::MAX)),
         ] {
-            c.set_synthetic_fees(Some(f));
+            c.set_stage(CurveStage::Live {
+                synthetic_fees: Some(f),
+            });
             assert_eq!(c.synthetic_fees(), Some(f));
+            assert!(c.post_complete_known());
+            let p = c.curve_pricing();
+            assert_eq!(p.synthetic, Some(f));
+            assert_eq!(p.migration.pool_tokens, STANDARD_POOL_TOKENS);
+            assert_eq!(p.migration.post_complete_quote_in, 0);
         }
         for f in [
             Some(FeeBps::new(0, u64::from(u32::MAX) + 1, 30)),
@@ -1444,32 +1602,197 @@ mod tests {
             Some(FeeBps::new(1, 95, 30)),
             None,
         ] {
-            c.set_synthetic_fees(f);
+            c.set_stage(CurveStage::Live { synthetic_fees: f });
             assert_eq!(c.synthetic_fees(), None, "{f:?}");
+            assert_eq!(c.curve_pricing().synthetic, None);
         }
-        // The fields P1 added fill the `u128 → u64` narrowing of `live_pool_tokens` and padding:
-        // the size before P1 (a `u128` `live_pool_tokens`, no synthetic fee) is this layout's.
+        for (pcq, post_complete, known) in [
+            (2_642_475_552, true, true),
+            (u64::MAX, true, false),
+            (0, true, false),
+            (0, false, true),
+        ] {
+            let stage = CurveStage::Complete {
+                post_complete_quote_in: pcq,
+                post_complete,
+                post_complete_known: known,
+            };
+            c.set_stage(stage);
+            assert_eq!(c.stage(), stage);
+            assert_eq!(c.synthetic_fees(), None);
+            assert_eq!(c.post_complete_known(), known);
+            let p = c.curve_pricing();
+            assert_eq!(p.synthetic, None);
+            let want = if post_complete {
+                (u128::from(c.live_pool_tokens), pcq)
+            } else {
+                (STANDARD_POOL_TOKENS, 0)
+            };
+            assert_eq!(
+                (p.migration.pool_tokens, p.migration.post_complete_quote_in),
+                want
+            );
+        }
+    }
+
+    /// T-SIZEOF (pump-final G-6): `CurvePricingInputs` and `VenueState` keep the sizes they had at
+    /// the start of P2 (the spec allows 16 bytes more; the completion state's packing adds none).
+    /// `execute_pool_switch` keeps venue states on its 4 KiB SBF stack frame (an `Option<FeeBps>`
+    /// field pushed its handler 128 bytes over in P1) and the pool-selection instructions box
+    /// several on the 32 KiB heap (a 48-byte growth overflowed it in M7-SEC-5), so any growth
+    /// has to be re-measured there (`m3_cu`) before this pin moves.
+    #[test]
+    fn venue_state_size() {
+        // The layout at the start of P2 (P1's: the synthetic fee as two `u32` and a flag).
         #[allow(dead_code)]
-        struct BeforeP1 {
+        struct AtP2Start {
             fees: FeeBps,
             offsets: CurveOffsets,
-            live_pool_tokens: u128,
+            live_pool_tokens: u64,
             migration_fee: u64,
             pool_tiers: Rc<[FeeTier]>,
             pool_creator_fee_configurable: bool,
             pool_disable_flags: u8,
             coin_creator_is_default: bool,
             fee_ppm_at_ema: u32,
+            synthetic_protocol_bps: u32,
+            synthetic_creator_bps: u32,
+            synthetic_known: bool,
         }
+        use core::mem::size_of;
+        assert_eq!(size_of::<CurvePricingInputs>(), size_of::<AtP2Start>());
         assert_eq!(
-            core::mem::size_of::<CurvePricingInputs>(),
-            core::mem::size_of::<BeforeP1>()
+            size_of::<Option<CurvePricingInputs>>(),
+            size_of::<Option<AtP2Start>>()
         );
-        assert_eq!(
-            core::mem::size_of::<Option<CurvePricingInputs>>(),
-            core::mem::size_of::<Option<BeforeP1>>()
-        );
+        // Measured at the start of P2 on the host (x86-64).
+        #[cfg(target_arch = "x86_64")]
+        {
+            assert_eq!(
+                size_of::<CurvePricingInputs>(),
+                CURVE_PRICING_INPUTS_SIZE_AT_P2
+            );
+            assert_eq!(size_of::<VenueState>(), VENUE_STATE_SIZE_AT_P2);
+        }
     }
+
+    /// A `PumpMigrating` state of 98u8RJ's curve (pump-final V4) as read before `migrate_v2`:
+    /// complete (`rT = 0`), `rQ` 85,005,359,190, `curve_base_ata` 206.9e12 − pcB with
+    /// `(pcB, pcQ)` = `pc`, `vQ − rQ` = `offset_quote`.
+    fn migrating_98u8rj(pc: (u64, u64), offset_quote: u128) -> VenueState {
+        let rq: u128 = 85_005_359_190;
+        let live = CurveState {
+            vt: 279_900_000_000_000,
+            vq: rq + offset_quote,
+            rt: 0,
+            rq,
+            complete: true,
+        };
+        let mut inputs = inputs();
+        inputs.offsets = CurveOffsets::of(&live).unwrap();
+        inputs.live_pool_tokens = 206_900_000_000_000 - pc.0;
+        inputs.pool_tiers = Rc::from(vec![FeeTier {
+            threshold: 0,
+            fees: FeeBps::new(20, 5, 0),
+        }]);
+        let post_complete = pc != (0, 0);
+        let known =
+            !post_complete || ((pc.0 != 0) == (pc.1 != 0) && offset_quote == 30_000_000_000);
+        inputs.set_stage(CurveStage::Complete {
+            post_complete_quote_in: pc.1,
+            post_complete,
+            post_complete_known: known,
+        });
+        let mut st = VenueState::not_executable(VenueKind::PumpMigrating);
+        st.curve = Some(CurveVenue {
+            live,
+            canonical_pool: detect::CanonicalPool::Absent,
+            pool: None,
+            pricing: Some(inputs),
+        });
+        st
+    }
+
+    /// T-MATH-4, the program half (pump-final §6.1.5, §6.2): on a migrating curve FV is
+    /// `migrating_fv` — bit-identical to the pre-v3 FV without a pool part, ρ-scaled on the live
+    /// `(X₁, Y₁)` after one — and **undefined** when the post-complete fields are not known (one of
+    /// `pcB` / `pcQ` zero, or `vQ − rQ ≠ ivqr`), while the other quotes stay defined and
+    /// `risk_quoter` keeps the curve quoter (never `cap_only`: the documented A63 exception).
+    #[test]
+    fn fv_on_unknown_post_complete_fields_is_undefined() {
+        use bytemuck::Zeroable;
+        let market = Market::zeroed();
+        let (q, cap) = (40_000_000_000_000u64, 500u64);
+        let p = price_wad(279_900_000_000_000, 115_005_359_190).unwrap();
+        let l = math_quote::liquidity(279_900_000_000_000, 115_005_359_190).unwrap();
+        let (pcb, pcq) = (6_238_850_918_425u64, 2_642_475_552u64);
+        let fv = |st: &VenueState| {
+            let r = risk_quoter(&market, st, &[], cap).unwrap();
+            assert!(matches!(r, Quoter::Curve(_)), "never cap_only");
+            (
+                r.fv_repriced(q, l, p),
+                r.buy_xy(q, 279_900_000_000_000, 115_005_359_190),
+            )
+        };
+        // No pool part: the pre-v3 FV on the standard pool, to the lamport.
+        let plain = migrating_98u8rj((0, 0), 30_000_000_000);
+        let (got, xy) = fv(&plain);
+        let Quoter::Curve(c) = risk_quoter(&market, &plain, &[], cap).unwrap() else {
+            unreachable!()
+        };
+        let (xp, yp) = math_quote::migrated_pool(
+            &c.live,
+            &MigrationParams {
+                migration_fee: 15_000_001,
+                pool_tokens: STANDARD_POOL_TOKENS,
+                post_complete_quote_in: 0,
+            },
+        )
+        .unwrap();
+        let old = {
+            let fees = math_fees::pump_amm(yp, xp, &c.pricing.pool).unwrap();
+            let (x, y) = math_quote::reprice(math_quote::liquidity(xp, yp).unwrap(), p).unwrap();
+            math_quote::sol_leg::buy_exact_out(q, x, y, false, &fees).unwrap()
+        };
+        assert_eq!(got, Some(old));
+        // The EMA leg's ring state of the completed curve (`rT = 0`): `B̂_str` on the pool (G-2).
+        assert!(xy.is_some_and(|b| b.cost > 0));
+        // A known pool part: ρ-scaled on (X₁, Y₁) = (206.9e12 − pcB, Y₀ + pcQ), above the plain FV.
+        let synth = migrating_98u8rj((pcb, pcq), 30_000_000_000);
+        let Quoter::Curve(c1) = risk_quoter(&market, &synth, &[], cap).unwrap() else {
+            unreachable!()
+        };
+        assert_eq!(
+            math_quote::migrated_pool(&c1.live, &c1.pricing.migration),
+            Some((200_661_149_081_575, 87_632_834_741))
+        );
+        let fv1 = fv(&synth).0.unwrap();
+        assert_eq!(
+            Some(fv1),
+            math_quote::migrating_fv(q, p, &c1.live, &c1.pricing.migration, &c1.pricing.pool)
+        );
+        assert!(fv1.cost > old.cost);
+        // Not known: FV undefined, every other quote defined.
+        for (pc, offset) in [
+            ((pcb, pcq), 30_000_000_001),
+            ((pcb, 0), 30_000_000_000),
+            ((0, pcq), 30_000_000_000),
+        ] {
+            let st = migrating_98u8rj(pc, offset);
+            assert_eq!(fv(&st).0, None, "{pc:?} {offset}");
+            let r = risk_quoter(&market, &st, &[], cap).unwrap();
+            assert!(r.buy_repriced(q, l, p).is_some());
+            assert!(fv(&st).1.is_some());
+            assert!(r.buy_xy(q, 300_000_000_000_000, 100_000_000_000).is_some());
+        }
+    }
+
+    /// `size_of::<CurvePricingInputs>()` at the start of P2 (host, x86-64).
+    #[cfg(target_arch = "x86_64")]
+    const CURVE_PRICING_INPUTS_SIZE_AT_P2: usize = 112;
+    /// `size_of::<VenueState>()` at the start of P2 (host, x86-64).
+    #[cfg(target_arch = "x86_64")]
+    const VENUE_STATE_SIZE_AT_P2: usize = 688;
 
     /// `["extra", mint]` under `program`.
     fn per_mint(program: Pubkey) -> ExtraEntry {

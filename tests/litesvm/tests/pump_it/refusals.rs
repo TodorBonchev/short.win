@@ -17,7 +17,7 @@
 //! | 6 | `CapMarketOi` | wallets at their cap until `ΣQ + q` passes the per-market cap on `X₁` |
 //! | 6 | `CapUtilization` | `q` above 90 % of the lent tokens |
 //! | 6 | `CapCurveGamma` | `ΣQ + q > γ·(rT + q)` with the curve's `rT` lowered |
-//! | 8 | pump 6003 | `min_proceeds` above the sale: pump's own `min_sol_output` binds first (short.win's net check is `rent::a_small_sale_into_an_empty_vault_is_refused`) |
+//! | 8 | pump 6003 | `min_proceeds` above the sale: pump's own `min_sol_output` binds first (short.win's net check is `rent::a_small_sale_on_a_short_curve_is_refused`) |
 //! | 9 | `BelowMinNotional`, `MarginAboveMax`, `OpenFeeAboveMax` | a dust `q`; `max_margin`, `max_open_fee` 0 |
 //!
 //! The venue's key checks (`VenueAccountMismatch` / `BadRemainingAccounts`) are `structure`'s.

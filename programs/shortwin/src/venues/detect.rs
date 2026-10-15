@@ -12,7 +12,10 @@
 //!   if bc.owner == pump && bc.disc == BondingCurve:
 //!       require !curve.is_mayhem_mode && curve.quote_mint == default   (ADOPTED Q6)
 //!       require bc.data_len ≥ 115                                        (else CurveNeedsExtend)
-//!       if !curve.complete                 -> PumpCurve
+//!       if !curve.complete:
+//!           require !curve.is_cashback_coin    (else CurveCashbackCoin; pump-final §6.3, D1 (a))
+//!           require curve.depth == 0           (else CurveQuoteNotSol)
+//!                                          -> PumpCurve
 //!       elif canonical_pool_valid(cp)      -> PumpSwap
 //!       elif curve.virtual_token_reserves > 0 -> PumpMigrating
 //!       else                               -> GraduatedElsewhere
@@ -173,9 +176,15 @@ pub fn classify_pump(bc: &AccountInfo, cp: &AccountInfo, mint: &Pubkey) -> Resul
 /// `classify_pump(bc, cp)` for `mint` (module docs), `authority` = `pool_authority(mint)`. `bc`
 /// and `cp` must already be key-checked against the mint's curve and canonical-pool PDAs.
 ///
-/// Errors: `CurveMayhemUnsupported`, `CurveQuoteNotSol` (ADOPTED Q6), `CurveNeedsExtend` (a
-/// curve shorter than 115 bytes), `PumpVenuePrecedence` (a pump-owned curve account that does
-/// not parse).
+/// Errors: `CurveMayhemUnsupported`, `CurveQuoteNotSol` (ADOPTED Q6; on a live curve also a
+/// `depth` other than 0, pump's quote-chain depth — defence in depth: a SOL curve has depth 0),
+/// `CurveNeedsExtend` (a curve shorter than 115 bytes), `PumpVenuePrecedence` (a pump-owned
+/// curve account that does not parse), and `CurveCashbackCoin` for a **live** cashback curve
+/// (pump-final §6.3, owner decision D1 (a)): pump's v3 trades refuse a cashback coin (6094) and
+/// every curve leg trades v3. The refusal sits on the live branch only (pump-final C2), so a
+/// complete cashback curve classifies as any other — `PumpMigrating` during the pause,
+/// `PumpSwap` once its canonical pool exists — and the graduated coin lists on PumpSwap, where
+/// `crank_price`'s re-detection and the pool selection keep working.
 pub fn classify_pump_with(
     bc: &AccountInfo,
     cp: &AccountInfo,
@@ -198,6 +207,8 @@ pub fn classify_pump_with(
         ShortwinError::CurveNeedsExtend
     );
     if !curve.complete {
+        require!(!curve.is_cashback_coin, ShortwinError::CurveCashbackCoin);
+        require!(curve.depth == 0, ShortwinError::CurveQuoteNotSol);
         return Ok(PumpClass::PumpCurve);
     }
     Ok(match canonical_pool(cp, mint, authority) {
@@ -297,6 +308,50 @@ mod tests {
             code(classify(PUMP_PROGRAM_ID, bad)),
             Some(u32::from(ShortwinError::PumpVenuePrecedence))
         );
+    }
+
+    /// pump-final §6.3 (owner D1 (a), C2): a **live** cashback curve is refused
+    /// (`CurveCashbackCoin` = 6109: pump's v3 trades refuse it with 6094), a live curve of
+    /// depth ≠ 0 is not a SOL curve, and both refusals sit on the live branch only — a complete
+    /// cashback curve still classifies as `PumpMigrating` (no pool yet) or `PumpSwap` (its
+    /// canonical pool is valid), so a graduated cashback coin lists on PumpSwap.
+    #[test]
+    fn a_live_cashback_curve_is_refused_and_a_graduated_one_is_not() {
+        let none = [0u8; 32];
+        let with = |complete: bool, vt: u64, cashback: bool, depth: u8| {
+            let mut d = curve(complete, vt, false, none, pump::CURVE_LEN_2026_10_08);
+            d[pump::OFF_IS_CASHBACK_COIN] = u8::from(cashback);
+            d[pump::OFF_DEPTH] = depth;
+            d
+        };
+        assert_eq!(
+            code(classify(PUMP_PROGRAM_ID, with(false, 1, true, 0))),
+            Some(u32::from(ShortwinError::CurveCashbackCoin))
+        );
+        assert_eq!(u32::from(ShortwinError::CurveCashbackCoin), 6_109);
+        assert_eq!(
+            code(classify(PUMP_PROGRAM_ID, with(false, 1, false, 1))),
+            Some(u32::from(ShortwinError::CurveQuoteNotSol))
+        );
+        assert_eq!(
+            classify(PUMP_PROGRAM_ID, with(false, 1, false, 0)).unwrap(),
+            PumpClass::PumpCurve
+        );
+        // Complete and unmigrated: the pause, observed and priced as any migrating curve.
+        assert_eq!(
+            classify(PUMP_PROGRAM_ID, with(true, 279_900_000_000_000, true, 0)).unwrap(),
+            PumpClass::PumpMigrating
+        );
+        // Complete with a valid canonical pool: the graduated cashback coin lists on PumpSwap.
+        let mint = Pubkey::new_unique();
+        let (bk, ck) = (Pubkey::new_unique(), Pubkey::new_unique());
+        let (mut bl, mut cl) = (1u64, 1u64);
+        let mut bd = with(true, 0, true, 0);
+        let mut cd = pool(&mint);
+        let pamm = PUMP_AMM_PROGRAM_ID;
+        let b = AccountInfo::new(&bk, false, false, &mut bl, &mut bd, &PUMP_PROGRAM_ID, false);
+        let c = AccountInfo::new(&ck, false, false, &mut cl, &mut cd, &pamm, false);
+        assert_eq!(classify_pump(&b, &c, &mint).unwrap(), PumpClass::PumpSwap);
     }
 
     /// A valid canonical pool of `mint` (index 0, created by the pool authority, base `mint`,

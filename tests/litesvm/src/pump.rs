@@ -182,32 +182,16 @@ impl VenueMarket for PumpMarket {
         ]
     }
 
-    /// T0–T19 (ARCH §3.12).
+    /// T0–T9 (pump-final §6.1.1; ARCH §3.12 for pump's v3 trades): pump, its event authority,
+    /// WSOL, Tokenkeg, the curve's WSOL ATA (W), the trader's WSOL ATA (W), the trader's pump UVA
+    /// (W), the buyback recipient (W), the trader's base ATA (W), System.
     fn trade_extras(&self) -> Vec<AccountMeta> {
-        let trader = self.keys.trader;
-        let uva = fork::pump_user_volume_accumulator(&trader);
-        vec![
-            m(PUMP_PROGRAM_ID, false),
-            m(PUMP_EVENT_AUTHORITY, false),
-            m(PUMP_FEES_PROGRAM_ID, false),
-            m(WSOL_MINT, false),
-            m(TOKEN_PROGRAM_ID, false),
-            m(ASSOCIATED_TOKEN_PROGRAM_ID, false),
-            m(self.fee_recipient, true),
-            m(wsol_ata(&self.fee_recipient), true),
-            m(self.buyback_recipient, true),
-            m(wsol_ata(&self.buyback_recipient), true),
-            m(wsol_ata(&self.curve.curve), true),
-            m(wsol_ata(&trader), true),
-            m(self.creator_vault, true),
-            m(wsol_ata(&self.creator_vault), true),
-            m(sharing_config(&self.keys.mint), false),
-            m(PUMP_GLOBAL_VOLUME_ACCUMULATOR, false),
-            m(uva, true),
-            m(wsol_ata(&uva), true),
-            m(self.trader_base_ata, true),
-            m(anchor_lang::system_program::ID, false),
-        ]
+        v3_trade_extras(
+            &self.keys,
+            &self.curve,
+            &self.trader_base_ata,
+            &self.buyback_recipient,
+        )
     }
 
     /// ARCH §6.1's PROPOSED limit for curve opens and closes: measured opens run 178–202 k CU
@@ -215,6 +199,63 @@ impl VenueMarket for PumpMarket {
     fn cu_limit(&self) -> Option<u32> {
         Some(CURVE_TRADE_CU)
     }
+}
+
+/// A curve market's TradeExtras for pump's v3 trades (pump-final §6.1.1), from the harness's own
+/// derivations: T0 pump, T1 its event authority, T2 WSOL, T3 Tokenkeg, T4 `ATA(curve, WSOL)` (W),
+/// T5 `ATA(trader, WSOL)` (W), T6 the trader's pump UVA (W), T7 `buyback` (W), T8 the trader's
+/// base ATA (W), T9 System.
+pub fn v3_trade_extras(
+    keys: &MarketKeys,
+    curve: &PumpCurve,
+    trader_base_ata: &Pubkey,
+    buyback: &Pubkey,
+) -> Vec<AccountMeta> {
+    let trader = keys.trader;
+    vec![
+        m(PUMP_PROGRAM_ID, false),
+        m(PUMP_EVENT_AUTHORITY, false),
+        m(WSOL_MINT, false),
+        m(TOKEN_PROGRAM_ID, false),
+        m(wsol_ata(&curve.curve), true),
+        m(wsol_ata(&trader), true),
+        m(fork::pump_user_volume_accumulator(&trader), true),
+        m(*buyback, true),
+        m(*trader_base_ata, true),
+        m(anchor_lang::system_program::ID, false),
+    ]
+}
+
+/// The v2-era TradeExtras T0–T19 of a curve market (shortwin 1.0.0's adapter, before pump-final
+/// §6): the 20 keys a client or keeper built for the v2 trades, for the tests that the v3 adapter
+/// refuses them (`BadRemainingAccounts`) and that a shortwin 1.0.0 build still takes them.
+pub fn v2_trade_extras(env: &Env, pm: &PumpMarket) -> Vec<AccountMeta> {
+    let trader = pm.keys.trader;
+    let uva = fork::pump_user_volume_accumulator(&trader);
+    let fee_recipient = fork::pump_fee_recipient(&env.svm, 0);
+    let creator_vault = pm.curve.creator_vault(&env.svm);
+    vec![
+        m(PUMP_PROGRAM_ID, false),
+        m(PUMP_EVENT_AUTHORITY, false),
+        m(PUMP_FEES_PROGRAM_ID, false),
+        m(WSOL_MINT, false),
+        m(TOKEN_PROGRAM_ID, false),
+        m(ASSOCIATED_TOKEN_PROGRAM_ID, false),
+        m(fee_recipient, true),
+        m(wsol_ata(&fee_recipient), true),
+        m(pm.buyback_recipient, true),
+        m(wsol_ata(&pm.buyback_recipient), true),
+        m(wsol_ata(&pm.curve.curve), true),
+        m(wsol_ata(&trader), true),
+        m(creator_vault, true),
+        m(wsol_ata(&creator_vault), true),
+        m(sharing_config(&pm.keys.mint), false),
+        m(PUMP_GLOBAL_VOLUME_ACCUMULATOR, false),
+        m(uva, true),
+        m(wsol_ata(&uva), true),
+        m(pm.trader_base_ata, true),
+        m(anchor_lang::system_program::ID, false),
+    ]
 }
 
 /// A pump market's parameters.

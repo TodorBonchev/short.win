@@ -180,28 +180,48 @@ fn m5_sec_1_a_full_wipe_on_a_live_curve_reopens_after_the_sweep() {
     assert_eq!(open.q, q);
 }
 
-/// M5-SEC-1 on a legacy cashback coin (pump routes the creator fee of the trader's own trades to
-/// its UVA as cashback): after the full wipe the sweep alone leaves the venue-reward bit clear —
-/// the UVA still holds the pre-wipe cashback — so the deposit waits; `[pump claim_cashback(user =
-/// trader), sweep_trader]`, signed by neither the trader nor anyone short.win knows (T-CASHBACK,
-/// pump part, on the dumped ELF: `user` is not a signer), pays the cashback to the trader, the
-/// sweep credits it to the wiped epoch's record (R4A-7) and sets both bits, and the deposit lands.
+/// T-WIPE-GATE (pump-final §14, C6): the lamports seeded into the trader's pump UVA where a cashback
+/// coin's trades used to pay its cashback. pump's v3 trades refuse a live cashback coin and
+/// short.win no longer lists one (owner D1 (a)), but `claim_cashback` pays any balance above the
+/// UVA's rent, donated lamports included, so the wipe gate stays needed and reachable. Above a
+/// 0-byte account's rent-exempt minimum.
+const SEEDED_CASHBACK: u64 = 1_000_000;
+
+/// Seeds [`SEEDED_CASHBACK`] into the trader's pump UVA of `s`'s non-cashback curve (a System
+/// transfer anyone can make); returns what `claim_cashback` pays now.
+fn seed_uva(s: &mut Sim) -> u64 {
+    assert!(
+        !s.pm.curve.state(&s.env.svm).is_cashback_coin,
+        "a non-cashback curve (D1 (a))"
+    );
+    let trader = s.pm.trader();
+    let before = claimable_cashback(&s.env, &trader);
+    s.env.fund(
+        &fork::pump_user_volume_accumulator(&trader),
+        SEEDED_CASHBACK,
+    );
+    let after = claimable_cashback(&s.env, &trader);
+    assert_eq!(after - before, SEEDED_CASHBACK);
+    after
+}
+
+/// M5-SEC-1 with cashback outstanding (as on a legacy cashback coin, where pump routes the creator
+/// fee of the trader's own trades to its UVA): after the full wipe the sweep alone leaves the
+/// venue-reward bit clear — the UVA still holds the pre-wipe cashback — so the deposit waits;
+/// `[pump claim_cashback(user = trader), sweep_trader]`, signed by neither the trader nor anyone
+/// short.win knows (T-CASHBACK, pump part, on the dumped ELF: `user` is not a signer), pays the
+/// cashback to the trader, the sweep credits it to the wiped epoch's record (R4A-7) and sets both
+/// bits, and the deposit lands. T-WIPE-GATE: since D1 (a) on a non-cashback curve, the claimable
+/// balance seeded into the trader's pump UVA after the open ([`seed_uva`]) — every wipe-gate
+/// assertion kept.
 #[test]
 fn m5_sec_1_pre_wipe_cashback_reaches_the_wiped_lenders() {
     let mut s = Sim::d_market(SOLD_D50, lend_for_80(D50_Q));
-    // The fixture curve made a legacy cashback coin (pump's `is_cashback_coin` @82).
-    fork::patch(&mut s.env.svm, &s.pm.curve.curve, |d| {
-        d[vpump_off_is_cashback()] = 1
-    });
-    assert!(s.pm.curve.state(&s.env.svm).is_cashback_coin);
     full_wipe_on_a_live_curve(&mut s);
     let market = s.pm.market();
     let trader = s.pm.trader();
-    let cashback = claimable_cashback(&s.env, &trader);
-    assert!(
-        cashback > 0,
-        "the open's sale paid cashback into the trader's UVA"
-    );
+    let cashback = seed_uva(&mut s);
+    assert!(cashback > 0, "a claimable balance in the trader's pump UVA");
 
     // The sweep alone: the trader bit, not the venue-reward bit; the deposit waits.
     let meta = ok(s
@@ -249,7 +269,7 @@ fn m5_sec_1_pre_wipe_cashback_reaches_the_wiped_lenders() {
     assert!(!s.env.market(&market).has_flag(MARKET_FLAG_WIPE_LIVE));
 }
 
-/// AIR-08 (I-08) on a live legacy cashback coin: the trader's own trades (the open's sale and
+/// AIR-08 (I-08), as on a live legacy cashback coin: the trader's own trades (the open's sale and
 /// the close's buy) paid cashback into its pump UVA; the position closes and the only lender
 /// withdraws everything (`S = 0`, no wipe record). Before the fix a deposit landed at once, so
 /// `[deposit(dust), pump claim_cashback(user = trader), sweep_trader, withdraw]` vested the
@@ -257,18 +277,17 @@ fn m5_sec_1_pre_wipe_cashback_reaches_the_wiped_lenders() {
 /// give the protocol. Now a deposit into a pool every lender left waits for both bits, as after
 /// a full wipe: the sweep alone sets only the trader bit while cashback is outstanding, and
 /// `[claim_cashback, sweep_trader]` books the cashback to `protocol_fees` and sets both.
+/// T-WIPE-GATE: since D1 (a) on a non-cashback curve, the claimable balance seeded into the
+/// trader's pump UVA after the close ([`seed_uva`]) — every wipe-gate assertion kept.
 #[test]
 fn air_08_after_the_last_exit_the_cashback_goes_to_the_protocol() {
     let mut s = Sim::d_market(SOLD_D50, lend_for_80(D50_Q));
-    fork::patch(&mut s.env.svm, &s.pm.curve.curve, |d| {
-        d[vpump_off_is_cashback()] = 1
-    });
     let p = s.open(D50_Q);
     assert!(s.borrower_close(&p).is_some(), "the borrower closes");
     let market = s.pm.market();
     let trader = s.pm.trader();
-    let cashback = claimable_cashback(&s.env, &trader);
-    assert!(cashback > 0, "the trader's trades paid cashback");
+    let cashback = seed_uva(&mut s);
+    assert!(cashback > 0, "a claimable balance in the trader's pump UVA");
     let shares = s
         .env
         .lender(&market, &s.pm.lender.pubkey())
@@ -330,11 +349,6 @@ fn air_08_after_the_last_exit_the_cashback_goes_to_the_protocol() {
     ok(s.env.send(std::slice::from_ref(&d1), &[&whale.kp]));
     assert_eq!(claimable_cashback(&s.env, &trader), 0);
     assert_eq!(s.env.market(&market).vest_bal, 0);
-}
-
-/// `is_cashback_coin`'s offset in a `BondingCurve`.
-fn vpump_off_is_cashback() -> usize {
-    shortwin_venue_state::pump::OFF_IS_CASHBACK_COIN
 }
 
 // ---- M5-SEC-3: the Tier D graduation guard and X₀ against a same-transaction sale ----------

@@ -80,7 +80,8 @@
 //!
 //! **Errors:** `AccountMismatch`, `BadRemainingAccounts`, `VenueAccountMismatch`,
 //! `NoSupportedVenue`, `PumpVenuePrecedence` (and `classify_pump`'s `CurveMayhemUnsupported`,
-//! `CurveQuoteNotSol`, `CurveNeedsExtend`), `VenueUpgraded`, `PoolIneligible`, `PoolTooThin`,
+//! `CurveQuoteNotSol`, `CurveNeedsExtend`, `CurveCashbackCoin` — a live cashback curve on a
+//! list-only market), `VenueUpgraded`, `PoolIneligible`, `PoolTooThin`,
 //! `PoolNotDominant`, `PositionsOpen`, `PoolWindowClosed`, `CarriedPositionsTooLarge`.
 
 use anchor_lang::prelude::*;

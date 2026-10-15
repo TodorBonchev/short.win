@@ -18,10 +18,12 @@
 //! canonical_pool] ++ [pump program, the trader's pump UVA, pump event authority]` (the init set
 //! of `init_user_volume_accumulator`, key-checked). `classify_pump` refuses a mayhem curve
 //! (`CurveMayhemUnsupported`) and a non-SOL quote (`CurveQuoteNotSol`; ADOPTED Q6), a curve under
-//! 115 bytes (`CurveNeedsExtend`: the client prepends pump's `extend_account`), and a pump-owned
-//! curve account that does not parse (`PumpVenuePrecedence`: fail closed). A live curve lists as
-//! `PumpCurve`, a completed one that has not migrated as `PumpMigrating` (`migration_seen_at =
-//! now`). Effects on top of a list-only listing: `trader_base_ata = ATA(trader, mint)` created
+//! 115 bytes (`CurveNeedsExtend`: the client prepends pump's `extend_account`), a pump-owned
+//! curve account that does not parse (`PumpVenuePrecedence`: fail closed), and on a live curve
+//! a cashback coin (`CurveCashbackCoin`: pump's v3 trades refuse it; pump-final §6.3, D1 (a))
+//! and a quote depth other than 0 (`CurveQuoteNotSol`). A live curve lists as `PumpCurve`, a
+//! completed one that has not migrated (cashback or not) as `PumpMigrating` (`migration_seen_at
+//! = now`). Effects on top of a list-only listing: `trader_base_ata = ATA(trader, mint)` created
 //! (`create_idempotent`, payer the creator) and validated (mint, owner `trader`, program); the
 //! trader's pump UVA created (`init_user_volume_accumulator`, payer the creator, user `trader`;
 //! skipped if it exists — a griefer's is harmless, it is keyed to `trader`); the curve venue
@@ -45,7 +47,8 @@
 //! `remaining_accounts = [bonding_curve, canonical_pool] ++ ReadSet(candidate)` (AMM v4: pool,
 //! coin vault, pc vault, LP mint; CPMM: pool, config, token 0 vault, token 1 vault, LP mint —
 //! `venues::raydium_v4::verify`, `venues::raydium_cpmm::verify`). First `classify_pump`
-//! (`venues::detect`): a live curve, a migrating curve or a valid canonical PumpSwap pool takes
+//! (`venues::detect`; its refusals above come first, so a live cashback curve is
+//! `CurveCashbackCoin`): a live curve, a migrating curve or a valid canonical PumpSwap pool takes
 //! precedence (`PumpVenuePrecedence`, D1); a curve that graduated elsewhere (zeroed reserves, no
 //! canonical pool) or no pump curve at all proceeds, and the first sets the market's
 //! `graduated_elsewhere` flag. The venue-upgrade latch then must not block the Raydium mask

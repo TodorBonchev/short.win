@@ -1,17 +1,20 @@
-//! `open_short` → `close_short` on the real pump program (ARCH §2.4.1 PumpCurve row, §3.4, §3.5):
-//! every lamport and token accounted for on Token-2022 curves of 125, 115 and 151 bytes and a
-//! legacy SPL-Token curve of 115 bytes without a creator (creator fee 0).
+//! `open_short` → `close_short` on the real pump program (ARCH §2.4.1 PumpCurve row, §3.4, §3.5;
+//! T-OPEN-V3, pump-final §6.1.4): every lamport and token accounted for on Token-2022 curves of 125,
+//! 115 and 151 bytes, a legacy SPL-Token curve of 115 bytes without a creator (creator fee 0), and
+//! the 166-byte curves of pump's 2026-10-08 layout (`fresh166`, `near166`, `buckets166`, the last
+//! carrying fee buckets).
 //!
-//! Each round trip asserts: `S` = `quote_sell(q)` on the pre-trade state exactly (the creator
-//! vaults of the dumped coins are funded, so pump takes no venue-side rent but a short curve's
-//! growth: `S` is net of it, `PumpCurve::growth_top_up`); the lending vault loses exactly `q`,
-//! the curve's base ATA gains it, and the curve's lamports fall by the gross `g` (less that
-//! growth); the borrower pays the position's and the exposure record's rent, `M` and the open fee, and
-//! gets its `ert` back (it funds the trader for the leg); `trader` and `trader_base_ata` hold
-//! nothing; `N_open` = `B̂` on the post-open state. At close: the venue charges exactly pump's
-//! `curve_charge_exact_out(q)` (≤ short.win's quote `B̂_live(q)`, by at most `1 + #fees`), the
-//! lending vault receives exactly `q` through the trader's base ATA, the curve gains the pre-fee
-//! `n`, the waterfall pays `B + R` and the borrower the rest.
+//! Each round trip asserts: `S` = the `sell_v3` proceeds, `quote_sell(q)` on the pre-trade state
+//! exactly (no creator-vault top-up: v3 keeps the creator fee in the curve's bucket and names no
+//! vault; only a short curve's growth: `S` is net of it, `PumpCurve::growth_top_up`); the lending
+//! vault loses exactly `q`, the curve's base ATA gains it, and the curve's lamports fall by the
+//! gross `g` less the fees it keeps in its buckets (and plus that growth); the borrower pays the
+//! position's and the exposure record's rent, `M` and the open fee, and gets its `ert` back (it
+//! funds the trader for the leg); `trader` and `trader_base_ata` hold nothing (I7); `N_open` = `B̂`
+//! on the post-open state. At close: the venue charges exactly pump's `curve_charge_exact_out(q)`
+//! (≤ short.win's quote `B̂_live(q)`, by at most `1 + #fees`), the lending vault receives exactly
+//! `q` through the trader's base ATA, the curve gains the pre-fee `n` and the fees it keeps, the
+//! waterfall pays `B + R` and the borrower the rest; the creator vault never moves.
 
 use shortwin::state::WalletExposure;
 
@@ -23,17 +26,25 @@ struct Snap {
     pool_vault: u64,
     curve_tokens: u64,
     curve: u64,
+    /// The curve's fee buckets (`creator_fee` @125 + `protocol_fees` @133; v3 keeps its fees
+    /// there, outside `rQ`).
+    buckets: u64,
     borrower: u64,
     market_vault: u64,
+    creator_vault: u64,
 }
 
 fn snap(env: &Env, pm: &PumpMarket, borrower: &Pubkey) -> Snap {
+    let data = env.svm.get_account(&pm.curve.curve).unwrap().data;
+    let (creator_fee, protocol_fees) = fork::curve_fee_buckets(&data);
     Snap {
         pool_vault: tokens(env, &pm.keys.pool_vault),
         curve_tokens: tokens(env, &pm.curve.curve_base_ata),
         curve: lamports(env, &pm.curve.curve),
+        buckets: creator_fee + protocol_fees,
         borrower: lamports(env, borrower),
         market_vault: lamports(env, &pm.keys.market_vault),
+        creator_vault: lamports(env, &pm.creator_vault),
     }
 }
 
@@ -61,9 +72,13 @@ pub fn round_trip(env: &mut Env, pm: &PumpMarket, q: u64) -> (u64, u64) {
     );
     assert_eq!(s1.curve_tokens - s0.curve_tokens, q, "the curve received q");
     assert_eq!(
-        s0.curve + growth - s1.curve,
+        s0.curve + growth + (s1.buckets - s0.buckets) - s1.curve,
         gross,
-        "the curve paid the gross g (and took the growth)"
+        "the curve paid the gross g, kept its fees in the buckets (and took the growth)"
+    );
+    assert_eq!(
+        s1.creator_vault, s0.creator_vault,
+        "no creator-vault top-up"
     );
     assert_trader_clean(env, pm);
     let n_open = pm
@@ -125,7 +140,15 @@ pub fn round_trip(env: &mut Env, pm: &PumpMarket, q: u64) -> (u64, u64) {
         "the lending vault got q back"
     );
     assert_eq!(s1.curve_tokens - s2.curve_tokens, q, "the curve sold q");
-    assert_eq!(s2.curve - s1.curve, charge.net, "the curve gained n");
+    assert_eq!(
+        s2.curve - s1.curve - (s2.buckets - s1.buckets),
+        charge.net,
+        "the curve gained n (and the fees it keeps)"
+    );
+    assert_eq!(
+        s2.creator_vault, s1.creator_vault,
+        "no creator-vault top-up"
+    );
     assert_eq!(close.token_surplus, 0);
     assert_trader_clean(env, pm);
     assert!(
@@ -169,6 +192,19 @@ fn round_trip_fresh_125() {
         fork::PumpDeploy::CURRENT.curve_len()
     );
     round_trip(&mut env, &pm, q);
+}
+
+/// T-OPEN-V3 on the 166-byte layout of pump's 2026-10-08 redeploy (no growth): a `create_v2`
+/// curve minutes old (after a crowd's buys, so it can pay a sale), the near-complete `near166`, and
+/// `buckets166`, which carries large fee buckets the trades add to.
+#[test]
+fn round_trip_on_166_byte_curves() {
+    for coin in [PumpCoin::Fresh166, PumpCoin::Near166, PumpCoin::Buckets166] {
+        let (mut env, pm, q) = setup(coin);
+        assert_eq!(pm.curve.data_len(&env.svm), 166, "{coin:?}");
+        assert_eq!(pm.curve.growth_top_up(&env.svm), 0);
+        round_trip(&mut env, &pm, q);
+    }
 }
 
 /// The near-complete 151-byte curve, twice (the second open reuses the exposure record... after

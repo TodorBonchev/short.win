@@ -8,9 +8,10 @@
 //!   `BondingCurve.creator_fee` @125 and `protocol_fees` @133 and **outside** `rQ`; each costs or
 //!   pays the v2 quote (a buy one lamport less: v3 credits `n(q)` without v2's ε₁); the 2026-09
 //!   build has no such instruction;
-//! - **short.win's curve trades are unchanged:** it reads `rQ` from the curve data, never the
+//! - **short.win's curve trades price on `rQ`:** it reads `rQ` from the curve data, never the
 //!   curve's lamports, so an open and a close on a curve carrying buckets execute to the lamport
-//!   of `quote::sol_leg` (`flows::round_trip`, the hooks run);
+//!   of `quote::sol_leg` (`flows::round_trip`, the hooks run); since pump-final §6.1 they are
+//!   `sell_v3` / `buy_v3` themselves, so their fees add to the buckets;
 //! - **graduation moves `rQ`, not the buckets:** after v3 fees, the completing buy and
 //!   `migrate_v2` seed the canonical pool with the `X_p` and at most the `Y_p` `B̂_str` prices (ARCH
 //!   §4.3), and the migrated curve keeps its rent plus the buckets for a later sweep; the redeploy's
@@ -170,7 +171,8 @@ fn v3_trades_keep_their_fees_in_the_curve() {
 }
 
 /// short.win's open and close on a curve carrying buckets (a third party's `buy_v3` after the
-/// listing) execute to the lamport of the readers' `rQ`-based quotes, and leave the buckets.
+/// listing) execute to the lamport of the readers' `rQ`-based quotes (`flows::round_trip`
+/// accounts for the buckets), and its own v3 trades add their fees to both buckets.
 #[test]
 fn short_win_trades_a_curve_carrying_buckets() {
     let (mut env, pm, q) = setup(PumpCoin::Near);
@@ -182,10 +184,10 @@ fn short_win_trades_a_curve_carrying_buckets() {
     env.warp(1);
     crank(&mut env, &pm);
     round_trip(&mut env, &pm, q);
-    assert_eq!(
-        curve_buckets(&env, &pm.curve),
-        buckets,
-        "v2 pays its fees out"
+    let after = curve_buckets(&env, &pm.curve);
+    assert!(
+        after.0 > buckets.0 && after.1 > buckets.1,
+        "v3 keeps short.win's fees in the buckets: {buckets:?} → {after:?}"
     );
 }
 
@@ -227,7 +229,7 @@ fn migrate_v2_moves_rq_and_leaves_the_buckets() {
     let r = np.reserves(&env.svm).expect("the canonical pool");
     assert_eq!(u128::from(r.base), xp, "X_p");
     // Without v3 trades the pool is `Y_p − 1` (`straddle`); a v3 buy's missing ε₁ lifts it to
-    // `Y_p` exactly — never above, so `B̂_str` (priced on `Y_p`) still covers the bundle.
+    // `Y_p` exactly — never above, so `B̂_str` (priced on `Y_p`) still covers a PumpSwap buy on it.
     assert!(
         r.effective_quote <= yp && yp - r.effective_quote <= 1,
         "the pool is Y_p or Y_p − 1: {} vs {yp}",

@@ -13,7 +13,8 @@
 //! keeps the slot so no later code moves, and nothing returns it; the owner's M6-SEC-3 decision
 //! of 2026-09-30 appended `GraduationHalted` = 6104, and M10's SQ-G8 (owner decision of
 //! 2026-10-02) `AuthoritiesNotDistinct` = 6105; M10's KI-65 work `EpochRecordReadOnly` = 6106
-//! and `RebaseNeedsOwner` = 6107; AIR-07's residual `PoolDrained` = 6108).
+//! and `RebaseNeedsOwner` = 6107; AIR-07's residual `PoolDrained` = 6108; pump's v3 adapter,
+//! owner decision D1 of 2026-10-13, `CurveCashbackCoin` = 6109).
 //! `tests::codes_are_stable` pins every code.
 
 use anchor_lang::prelude::*;
@@ -92,7 +93,7 @@ pub enum ShortwinError {
     NoRoute,
     #[msg("Route is flagged broken")]
     RouteBroken,
-    #[msg("Buyback exceeds the curve's real token reserves; use the straddle bundle")]
+    #[msg("Buyback exceeds what the curve and its post-migration pool can deliver")]
     CurveStraddle,
     #[msg("Venue is disabled for opens")]
     VenueDisabled,
@@ -358,6 +359,17 @@ pub enum ShortwinError {
         "The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more"
     )]
     PoolDrained,
+
+    // ---- Appended for pump's v3 adapter (6109; group in brackets) ----
+    /// [Venue] A **live** pump curve of a cashback coin (`is_cashback_coin` @82): pump's v3
+    /// trades refuse it (pump 6094 `CashbackCoinNotSupported`), and every curve leg trades v3,
+    /// so short.win neither lists nor executes one (owner decision D1 (a) of 2026-10-13;
+    /// pump-final §6.3). A complete cashback curve classifies as before, so the coin lists on
+    /// PumpSwap once it graduates.
+    #[msg(
+        "pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap."
+    )]
+    CurveCashbackCoin,
 }
 
 impl From<MathError> for ShortwinError {
@@ -457,6 +469,8 @@ mod tests {
             (ShortwinError::EpochRecordReadOnly, 6106),
             (ShortwinError::RebaseNeedsOwner, 6107),
             (ShortwinError::PoolDrained, 6108),
+            (ShortwinError::CurveCashbackCoin, 6109),
+            (ShortwinError::CurveStraddle, 6031),
         ];
         for (e, c) in pins {
             assert_eq!(code(e), c, "{e:?}");

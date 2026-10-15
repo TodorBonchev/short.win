@@ -4567,7 +4567,7 @@
     {
       "code": 6031,
       "name": "CurveStraddle",
-      "msg": "Buyback exceeds the curve's real token reserves; use the straddle bundle"
+      "msg": "Buyback exceeds what the curve and its post-migration pool can deliver"
     },
     {
       "code": 6032,
@@ -4953,6 +4953,11 @@
       "code": 6108,
       "name": "PoolDrained",
       "msg": "The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more"
+    },
+    {
+      "code": 6109,
+      "name": "CurveCashbackCoin",
+      "msg": "pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap."
     }
   ],
   "types": [

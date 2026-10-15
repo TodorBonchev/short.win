@@ -335,17 +335,17 @@ fn a_full_wipe_on_a_non_cashback_pumpswap_market_needs_only_the_sweep() {
     h.with_env(|env| ok(deposit(env, &market, &kp, &k, amount)));
 }
 
-/// Duty 6 on a legacy cashback **curve** (pump pays the creator fee of the trader's own trades to
-/// its pump UVA as cashback; the fixture curve's `is_cashback_coin` set): after the keeper's S1 the
-/// pump UVA holds the cashback above its rent, a deposit waits; the keeper's post-wipe transaction
-/// is `[pump claim_cashback(user = trader), sweep_trader]` — the cashback reaches the wiped epoch's
-/// record, both bits are set, and the deposit lands.
+/// Duty 6 with cashback outstanding on a **curve** market: after the keeper's S1 the trader's pump
+/// UVA holds lamports above its rent, a deposit waits; the keeper's post-wipe transaction is `[pump
+/// claim_cashback(user = trader), sweep_trader]` — the cashback reaches the wiped epoch's record,
+/// both bits are set, and the deposit lands. T-WIPE-GATE (pump-final §14, C6): pump's v3 trades
+/// refuse a live cashback coin and short.win no longer lists one (owner D1 (a)), so the balance is
+/// seeded into the UVA of a non-cashback curve after the open, where a legacy cashback coin's
+/// trades paid it; pump's `claim_cashback` pays any balance above the rent, donated lamports
+/// included, and the wipe gate stays needed. The name is the audit tables'.
 #[test]
 fn a_full_wipe_on_a_cashback_curve_is_unlocked_by_the_pump_claim() {
     let (mut env, c) = Env::fork_pump_coin(PumpCoin::Fresh);
-    fork::patch(&mut env.svm, &c.curve, |d| {
-        d[shortwin_venue_state::pump::OFF_IS_CASHBACK_COIN] = 1
-    });
     // The crowd buys 30 % of the curve first: a fresh curve holds no real SOL to pay a sale.
     let crowd = pump::CurveUser::new(&mut env, &c);
     let vt0 = c.state(&env.svm).virtual_token_reserves;
@@ -354,10 +354,7 @@ fn a_full_wipe_on_a_cashback_curve_is_unlocked_by_the_pump_claim() {
     let q = c.state(&env.svm).virtual_token_reserves / 400;
     let pm = env.pump_market_listed(PumpSpec::new(PumpCoin::Fresh, q * 40), c);
     let market = pm.market();
-    // The creator vault above its rent-exempt minimum, so pump takes no top-up from the small
-    // open's sale (R-PUMP Update U6: the 650,240 top-up would exceed its tolerance).
-    let vault = c.creator_vault(&env.svm);
-    env.fund(&vault, 1_000_000);
+    assert!(!c.state(&env.svm).is_cashback_coin, "a non-cashback curve");
     env.crank(&pm);
     env.warp(1);
     let mut b = env.borrower();
@@ -368,13 +365,15 @@ fn a_full_wipe_on_a_cashback_curve_is_unlocked_by_the_pump_claim() {
         let a = env.svm.get_account(&uva).expect("the trader's pump UVA");
         a.lamports - env.svm.minimum_balance_for_rent_exemption(a.data.len())
     };
-    assert!(claimable(&env) > 0, "the open's sale paid cashback");
-    // More cashback (a donation to the UVA, which pump's claim pays out like cashback): a claim
-    // below a 0-byte account's rent-exempt minimum leaves the trader PDA rent-paying until the
-    // sweep in the same transaction drains it — valid as the keeper sends it, but the harness's
-    // per-instruction replay (each prefix as a transaction of its own) cannot run the claim alone.
+    assert_eq!(claimable(&env), 0, "a v3 sale pays no cashback");
+    // The claimable balance (a donation to the UVA, which pump's claim pays out like cashback):
+    // at least a 0-byte account's rent-exempt minimum — a claim below it leaves the trader PDA
+    // rent-paying until the sweep in the same transaction drains it, valid as the keeper sends it,
+    // but the harness's per-instruction replay (each prefix as a transaction of its own) cannot
+    // run the claim alone.
     env.fund(&uva, 1_000_000);
     let cashback = claimable(&env);
+    assert_eq!(cashback, 1_000_000);
     let lender = pm.lender.insecure_clone();
     withdraw_all_free(&mut env, &market, &lender, &pm.lender_keys());
     // The curve pumped ×5 (its real tokens allow it): the crowd buys on.

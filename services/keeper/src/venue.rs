@@ -440,42 +440,26 @@ fn pamm_trade_extras(
         .collect())
 }
 
-/// A `PumpCurve` trade's TradeExtras T0–T19 (ARCH §3.12; module docs): W at T6–T13, T16–T18.
+/// A `PumpCurve` trade's TradeExtras T0–T9 for pump's v3 trades (pump-final §6.1.1, ARCH §3.12;
+/// module docs): W at T4–T8. T7 is a buyback recipient of the live `Global` (the selection rule
+/// of [`pump_recipients`]); v3 names no fee recipient, creator vault or pump-fees account.
+/// (The 20-key list of the v2 adapter, for a shortwin 1.0.0 deployment, and the per-deploy-slot
+/// choice between the two are pump-final §7's upgrade window.)
 fn pump_trade_extras(
     market: &Market,
     read: &[Option<AccountData>],
 ) -> anyhow::Result<Vec<AccountMeta>> {
-    use shortwin::constants::{
-        ASSOCIATED_TOKEN_PROGRAM_ID, PUMP_EVENT_AUTHORITY, PUMP_FEES_PROGRAM_ID,
-        PUMP_GLOBAL_VOLUME_ACCUMULATOR, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT,
-    };
-    let (fee_recipient, buyback) = pump_recipients(market, read)?;
-    let (_, curve) = live_curve_accounts(read)?;
-    let creator = Pubkey::new_from_array(curve.creator);
-    let vault = if creator == market.cached_creator {
-        market.cached_creator_vault
-    } else {
-        pump_curve::creator_vault(&creator)
-    };
+    use shortwin::constants::{PUMP_EVENT_AUTHORITY, PUMP_PROGRAM_ID, TOKEN_PROGRAM_ID, WSOL_MINT};
+    let (_, buyback) = pump_recipients(market, read)?;
     let keys: [(Pubkey, bool); pump_curve::TRADE_LEN] = [
         (PUMP_PROGRAM_ID, false),
         (PUMP_EVENT_AUTHORITY, false),
-        (PUMP_FEES_PROGRAM_ID, false),
         (WSOL_MINT, false),
         (TOKEN_PROGRAM_ID, false),
-        (ASSOCIATED_TOKEN_PROGRAM_ID, false),
-        (fee_recipient, true),
-        (pump_curve::wsol_ata(&fee_recipient), true),
-        (buyback, true),
-        (pump_curve::wsol_ata(&buyback), true),
         (market.curve_quote_ata, true),
-        (pump_curve::wsol_ata(&market.trader), true),
-        (vault, true),
-        (pump_curve::wsol_ata(&vault), true),
-        (market.sharing_config, false),
-        (PUMP_GLOBAL_VOLUME_ACCUMULATOR, false),
+        (pump_curve::trader_wsol_ata(market), true),
         (market.pump_uva, true),
-        (market.pump_uva_quote_ata, true),
+        (buyback, true),
         (market.trader_base_ata, true),
         (anchor_lang::system_program::ID, false),
     ];
@@ -912,10 +896,10 @@ mod tests {
         }
     }
 
-    /// ARCH §3.12 PumpCurve: the ReadSet is the adapter's, C0 and C4 writable in trades; the
-    /// TradeExtras are T0–T19 with the live `Global`'s recipients, the live creator's vault
-    /// (the cache's when it is the cached creator) and the cached curve keys, writable at
-    /// T6–T13 and T16–T18.
+    /// ARCH §3.12 PumpCurve (pump-final §6.1.1): the ReadSet is the adapter's, C0 and C4
+    /// writable in trades; the TradeExtras are the v3 list T0–T9 with the live `Global`'s
+    /// buyback recipient and the cached curve keys, writable at T4–T8, the same whoever the
+    /// curve's creator is (v3 names no creator vault).
     #[test]
     fn pump_curve_lists_are_the_adapters_with_the_live_recipients() {
         use shortwin::constants::PUMP_PROGRAM_ID;
@@ -940,48 +924,39 @@ mod tests {
         }
         let fee: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
         let bb: [Pubkey; 8] = core::array::from_fn(|_| Pubkey::new_unique());
-        for (creator, vault) in [
-            (cached, m.cached_creator_vault),
-            (Pubkey::new_unique(), Pubkey::default()),
-        ] {
+        let mut lists = Vec::new();
+        for creator in [cached, Pubkey::new_unique()] {
             let mut read: Vec<Option<AccountData>> = vec![None; pump_curve::READ_LEN];
             read[pump_curve::C_CURVE] = Some(curve(creator));
             read[pump_curve::C_GLOBAL] = Some(global(fee, bb));
             let x = trade_extras(VenueKind::PumpCurve, &m, &read).unwrap();
             assert_eq!(x.len(), pump_curve::TRADE_LEN);
+            assert_eq!(x.len(), 10);
             assert_eq!(x[pump_curve::T_PROGRAM].pubkey, PUMP_PROGRAM_ID);
-            // The mint's first byte (3) picks entry 3 of each list.
-            assert_eq!(x[pump_curve::T_FEE_RECIPIENT].pubkey, fee[3]);
+            // The mint's first byte (3) picks entry 3 of the buyback list.
             assert_eq!(x[pump_curve::T_BUYBACK_RECIPIENT].pubkey, bb[3]);
-            assert_eq!(
-                x[pump_curve::T_FEE_RECIPIENT_ATA].pubkey,
-                pump_curve::wsol_ata(&fee[3])
-            );
-            let want = if vault == Pubkey::default() {
-                pump_curve::creator_vault(&creator)
-            } else {
-                vault
-            };
-            assert_eq!(x[pump_curve::T_CREATOR_VAULT].pubkey, want);
-            assert_eq!(
-                x[pump_curve::T_CREATOR_VAULT_ATA].pubkey,
-                pump_curve::wsol_ata(&want)
-            );
+            assert_eq!(x[pump_curve::T_CURVE_QUOTE_ATA].pubkey, m.curve_quote_ata);
             assert_eq!(x[pump_curve::T_UVA].pubkey, m.pump_uva);
             assert_eq!(x[pump_curve::T_TRADER_BASE_ATA].pubkey, m.trader_base_ata);
             assert_eq!(
                 x[pump_curve::T_TRADER_WSOL_ATA].pubkey,
                 pump_curve::wsol_ata(&m.trader)
             );
+            // The program's own fixed slots, key for key.
+            for (i, key) in pump_curve::fixed_trade_keys(&m) {
+                assert_eq!(x[i].pubkey, key, "T{i}");
+            }
             let w: Vec<usize> = x
                 .iter()
                 .enumerate()
                 .filter(|(_, a)| a.is_writable)
                 .map(|(i, _)| i)
                 .collect();
-            assert_eq!(w, [6, 7, 8, 9, 10, 11, 12, 13, 16, 17, 18]);
+            assert_eq!(w, [4, 5, 6, 7, 8]);
             assert!(x.iter().all(|a| !a.is_signer));
+            lists.push(x);
         }
+        assert_eq!(lists[0], lists[1], "v3 names no creator vault");
         // No Global read: no trade.
         assert!(trade_extras(VenueKind::PumpCurve, &m, &[]).is_err());
     }

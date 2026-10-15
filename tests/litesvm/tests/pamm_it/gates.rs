@@ -276,7 +276,8 @@ fn t_rent_no_venue_rent_on_a_full_size_pool() {
 /// `minimum_balance(287) − minimum_balance(211)` = 386,080 (304,800 to 271 bytes before) — which
 /// the leg nets out of `S` (`S = sol_leg − 386,080`), reports in `Open.venue_rent`, and refunds to
 /// the borrower (the venue took it out of the borrower's `ert`). As on the curve (T-RENT's curve
-/// part), an open whose `S_exp` tolerance (`exec_tol_bps`) cannot cover the growth fails
+/// part, `pump_it::rent::a_small_sale_on_a_short_curve_is_refused`), an open whose `S_exp`
+/// tolerance (`exec_tol_bps`) cannot cover the growth fails
 /// `ProceedsBelowMin`, the pool untouched; the growth is paid once. Since the redeploy no size
 /// inside the default wallet cap has a tolerance that covers 386,080 on this pool (2.1 % of its
 /// tokens does; 1.8 % covered the 2026-09 build's 304,800). That is checked first with the

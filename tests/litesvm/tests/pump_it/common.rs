@@ -36,7 +36,7 @@ pub fn q_for(env: &Env, pm: &PumpMarket) -> u64 {
 /// normal user, so it can pay for a sale.
 pub fn setup(coin: PumpCoin) -> (Env, PumpMarket, u64) {
     let (mut env, c) = Env::fork_pump_coin(coin);
-    if coin == PumpCoin::Fresh {
+    if matches!(coin, PumpCoin::Fresh | PumpCoin::Fresh166) {
         let u = CurveUser::new(&mut env, &c);
         let s = c.curve_state(&env.svm);
         let q = u64::try_from(s.vt / 7).unwrap();
