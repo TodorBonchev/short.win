@@ -67,6 +67,19 @@ const pool0 = done.migratedPool(15_000_001n, 206_900_000_000_000n, 0n);
 assert.equal(m.migratingFvPrice(WAD, pool0.x, pool0.y, pool1.x, pool1.y) / 10n ** 12n, 1_063_149n); // ρ
 assert.equal(m.migratingFvPrice(1n, 1n, 1n, 0n, 1n), undefined);
 assert.equal(m.migrationBoost(pool1.x, pool1.y), 17_584_505_316n);
+// P5 (pump-final §5.4, §8): migratingFv, the program's FV on a stuck migration. At the frozen
+// curve's pool price, ρ reprices it onto the pool migrate_v2 created: within a basis point of that
+// pool's own buy; without the pool part it is the plain pool's FV at p itself.
+const doneSyn = m.Venue.pumpCurve(new m.Fees(0, 95, 30), 279_900_000_000_000n, 30_000_000_000n, 15_000_001n, 200_661_149_081_575n, 2_642_475_552n, pamm);
+const donePlain = m.Venue.pumpCurve(new m.Fees(0, 95, 30), 279_900_000_000_000n, 30_000_000_000n, 15_000_001n, 206_900_000_000_000n, 0n, pamm);
+const p0 = m.priceWad(pool0.x, pool0.y);
+const fv = doneSyn.migratingFv(q, p0, done).cost;
+const onPool1 = m.Venue.pumpSwap(pamm.resolve(pool1.y, pool1.x)).buy(q, pool1.x, pool1.y).cost;
+assert.ok((fv > onPool1 ? fv - onPool1 : onPool1 - fv) * 10_000n < onPool1);
+const plainFv = donePlain.migratingFv(q, p0, done).cost;
+assert.equal(plainFv, m.Venue.pumpSwap(pamm.resolve(pool0.y, pool0.x)).buyRepriced(q, m.liquidity(pool0.x, pool0.y), p0).cost);
+assert.ok(plainFv < fv);
+assert.throws(() => m.Venue.rayV4(25n, 10_000n).migratingFv(q, p0, done), /invalid input/);
 
 // Raydium AMM v4 (R-RAY §3.5 (A)); u128 reserves round-trip through BigInt.
 const v4 = m.Venue.rayV4(25n, 10_000n);

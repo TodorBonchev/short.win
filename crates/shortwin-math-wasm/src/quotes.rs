@@ -603,6 +603,24 @@ impl Venue {
         self.repriced(q, l, p).map(BuyQuote)
     }
 
+    /// `B̂_FV(q)` of a stuck migration (`Quoter::fv_repriced` on a `PumpMigrating` market,
+    /// `quote::migrating_fv`, pump-final §5.4): the pool `migrate_v2` will create from the
+    /// complete curve `state` with this curve's migration (206.9e12 tokens, or the live
+    /// `curve_base_ata` and `pcQ` after a synthetic pool part), at that pool's own PumpSwap tier
+    /// (capped in the risk view), repriced to `p` — ρ-scaled, `⌈⌈p·Y₁/Y₀⌉·X₀/X₁⌉`, after a pool
+    /// part. Return no FV at all when the program defines none (`postCompleteKnown` false,
+    /// pump-final §6.1.5). Throws `invalid input` on a pool venue.
+    #[wasm_bindgen(js_name = migratingFv)]
+    pub fn migrating_fv(
+        &self,
+        q: u64,
+        p: u128,
+        state: &CurveState,
+    ) -> Result<Option<BuyQuote>, JsError> {
+        let c = self.curve()?;
+        Ok(quote::migrating_fv(q, p, &state.0, &c.migration, &c.pool.schedule()).map(BuyQuote))
+    }
+
     /// Liquidation price (ECON §3.3; `risk::liquidation_price`, on a curve
     /// `CurvePricing::liquidation_price`): the smallest `P ≥ pFrom` at which
     /// `CR(vEff, B̂(q; reprice(L, P))) < crLiqBps`. Use the capped venue and `L_live` for
@@ -807,6 +825,72 @@ mod tests {
         assert_eq!(rho / 1_000_000_000_000, 1_063_149);
         assert_eq!(migrating_fv_price(1, 1, 1, 0, 1), None);
         assert_eq!(migration_boost(p.x(), p.y()), Some(17_584_505_316));
+    }
+
+    /// `migratingFv` is the program's FV on a stuck migration (`quote::migrating_fv`, pump-final
+    /// §5.4) on 98u8RJ's completion: at the frozen curve's pool price `P(X₀, Y₀)`, ρ reprices it
+    /// onto the pool `migrate_v2` created, `(X₁, Y₁)`, so FV is that pool's buy (within the
+    /// reprice's rounding); without the pool part it is today's FV at `p` itself. The risk view
+    /// caps the pool's tier.
+    #[test]
+    fn migrating_fv_follows_the_post_complete_pool() {
+        let mut pamm = PammSchedule::new(1_000_000_000_000_000, true, 0, false);
+        pamm.add_tier(0, 2, 93, 30);
+        let curve = |pool_tokens: u128, pcq: u64| {
+            Venue::pump_curve(
+                &Fees::new(0, 95, 30),
+                279_900_000_000_000,
+                30_000_000_000,
+                15_000_001,
+                pool_tokens,
+                pcq,
+                &pamm,
+            )
+        };
+        let done = CurveState::new(
+            279_900_000_000_000,
+            115_005_359_190,
+            0,
+            85_005_359_190,
+            true,
+        );
+        let synthetic = curve(200_661_149_081_575, 2_642_475_552);
+        let plain = curve(206_900_000_000_000, 0);
+        let p0 = done
+            .migrated_pool(15_000_001, 206_900_000_000_000, 0)
+            .unwrap();
+        let p = price_wad(p0.x(), p0.y()).unwrap();
+        let q = 10_000_000_000_000;
+        let fv = synthetic.migrating_fv(q, p, &done).unwrap().unwrap();
+        let mig = MigrationParams {
+            migration_fee: 15_000_001,
+            pool_tokens: 200_661_149_081_575,
+            post_complete_quote_in: 2_642_475_552,
+        };
+        let sched = pamm.schedule();
+        assert_eq!(Some(fv.0), quote::migrating_fv(q, p, &done.0, &mig, &sched));
+        // The pool migrate_v2 created, at its own tier: FV is its buy within the reprice's
+        // rounding.
+        let created = Venue::pump_swap(&pamm.resolve(87_632_834_741, 200_661_149_081_575).unwrap());
+        let on_pool = created
+            .buy(q, 200_661_149_081_575, 87_632_834_741)
+            .unwrap()
+            .unwrap();
+        assert!(fv.cost().abs_diff(on_pool.cost()) * 10_000 < on_pool.cost());
+        // Without ρ the same p prices the deeper-looking pool: low by about 1 − 1/ρ.
+        let unscaled = plain.migrating_fv(q, p, &done).unwrap().unwrap();
+        assert!(unscaled.cost() < fv.cost());
+        let plain_pool = Venue::pump_swap(&pamm.resolve(p0.y(), p0.x()).unwrap());
+        let reprices = plain_pool
+            .buy_repriced(q, liquidity(p0.x(), p0.y()), p)
+            .unwrap();
+        assert_eq!(unscaled, reprices, "no pool part: FV at p itself");
+        let capped = synthetic
+            .capped(20)
+            .migrating_fv(q, p, &done)
+            .unwrap()
+            .unwrap();
+        assert!(capped.cost() < fv.cost());
     }
 
     #[test]
