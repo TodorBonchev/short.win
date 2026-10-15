@@ -59,6 +59,7 @@ use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve, PumpProgram, PumpV
 use shortwin_litesvm_tests::pamm;
 use shortwin_litesvm_tests::pump::{self, CurveUser, PumpMarket, PumpSpec};
 use shortwin_litesvm_tests::{Env, TxResult, events, ix, pda};
+use shortwin_math::consts::RING_LEN;
 use shortwin_venue_state::{pump as vpump, pump_amm as vamm};
 use solana_account::Account;
 use solana_keypair::Keypair;
@@ -779,6 +780,181 @@ fn s3_loop(p: &mut Positioned, keeper: &Keypair, none: bool) {
     panic!("S3 never due");
 }
 
+// ---- synthetic exits (pump-final §5.2, §6.6, §12) ----------------------------------------------
+
+/// pump `Global`'s initial reserves (`vT`, `vQ`, `rT`: ECON's `PumpCurve.at_progress(0)`).
+pub const PUMP_VT0: u64 = 1_073_000_000_000_000;
+pub const PUMP_VS0: u64 = 30_000_000_000;
+pub const PUMP_RT0: u64 = 793_100_000_000_000;
+/// ECON's `D@80%` market: the tokens a fresh curve sold (`int(PUMP_RT0·0.8)`;
+/// `tests/litesvm/tests/synthetic_exit_it.rs`'s T-SYNTH-2).
+pub const D80_SOLD: u64 = 634_480_000_000_000;
+
+/// The ring entries of `pm`'s market whose curve state held less than `q` (`rT_i = x_i − (vT −
+/// rT)` on the live offsets, `venues::curve_at`): every quote on such an entry (the EMA leg, the
+/// box corners, `B̂_ref`) takes the synthetic path `B̂_v3`. Returns `(past rT, entries)`.
+pub fn ring_past_rt(env: &Env, pm: &PumpMarket, q: u64) -> (usize, usize) {
+    let m = env.market(&pm.market());
+    let c = pm.curve.state(&env.svm);
+    let offset = u128::from(c.virtual_token_reserves - c.real_token_reserves);
+    let n = usize::from(m.ring_count);
+    let past = m
+        .ring
+        .iter()
+        .take(n)
+        .filter(|e| e.x.get().saturating_sub(offset) < u128::from(q))
+        .count();
+    (past, n)
+}
+
+/// pump-final §6.6's worst ring: every ring entry past `rT` (the ring holds the EMA's cached
+/// reprojection, which follows the crowd's buy-down over a few `τ`, so this takes the keeper's
+/// cranks of ≈ 20 s after it, not [`RING_LEN`] alone).
+fn worst_ring_reached(env: &Env, pm: &PumpMarket, q: u64) -> bool {
+    ring_past_rt(env, pm, q) == (RING_LEN, RING_LEN)
+}
+
+fn assert_worst_ring(env: &Env, pm: &PumpMarket, q: u64) {
+    assert_eq!(
+        ring_past_rt(env, pm, q),
+        (RING_LEN, RING_LEN),
+        "every ring entry past rT"
+    );
+}
+
+/// A straddled position (pump-final §5.2): a position of `q` on the near-complete curve, two
+/// cranked seconds old; the crowd leaves `rT = q/2`, so its buyback takes `rT` on the curve and
+/// `q − rT` from the would-be pool, completing the curve in the exit. `worst`: the keeper then
+/// cranks second by second until every ring entry is past `rT` ([`worst_ring_reached`]).
+pub fn straddled_position(worst: bool) -> Positioned {
+    let mut p = with_position(NEAR);
+    buy_down_to(&mut p.env, &p.pm.curve, p.q / 2);
+    if worst {
+        for _ in 0..600 {
+            if worst_ring_reached(&p.env, &p.pm, p.q) {
+                return p;
+            }
+            p.env.tick(&p.pm, 1);
+        }
+        panic!("the ring never passed rT");
+    }
+    p
+}
+
+/// ECON's `D@80%` market (as T-SYNTH-2): the fresh fixture curve set to pump's initial reserves
+/// (the fixture's 1-lamport creation buy undone in the reserves), the crowd's real `buy_v2` of
+/// [`D80_SOLD`], the listing with the init set, `40·Q` lent (`Q` = [`q_of`]: T-SYNTH-2's
+/// ECON-sized position needs the sim's lifted wallet cap), the warm-up and a crank. Returns `Q`.
+pub fn d80_market() -> (Env, PumpMarket, u64) {
+    let (mut env, c) = Env::fork_pump_coin(FRESH);
+    fork::set_curve_reserves(&mut env.svm, &c.curve, PUMP_VT0, PUMP_VS0, PUMP_RT0, 0);
+    let crowd = CurveUser::new(&mut env, &c);
+    env.fund(&crowd.kp.pubkey(), 2_000_000_000_000);
+    ok(crowd.buy(&mut env, &c, D80_SOLD, u64::MAX));
+    ok(env.list_pump(&c));
+    let q = q_of(&env, &c);
+    let pm = env.pump_market_listed(PumpSpec::new(FRESH, q * 40), c);
+    env.crank(&pm);
+    (env, pm, q)
+}
+
+/// A straddled position the keeper liquidates (T-SYNTH-2's path): a position of `Q` on ECON's
+/// `D@80%` market, 30 cranked seconds old; the crowd leaves `rT = Q/2` (the price × 2.4, past Tier
+/// D's `CR_liq`); the keeper cranks second by second until its simulated `[crank_price,
+/// liquidate]` of the next second succeeds — `worst`: and every ring entry is past `rT`
+/// ([`worst_ring_reached`]). The clock is at that second, **not cranked**.
+pub fn liquidatable_synthetic(worst: bool) -> (Positioned, Keypair) {
+    let (mut env, pm, q) = d80_market();
+    let mut b = borrower(&mut env, BORROWER);
+    env.tick(&pm, 1);
+    let (res, nonce) = env.open(&pm, &mut b, q);
+    ok(res);
+    env.tick(&pm, 30);
+    buy_down_to(&mut env, &pm.curve, q / 2);
+    let keeper = fixed(&mut env, KEEPER);
+    let mut p = Positioned {
+        env,
+        pm,
+        b,
+        nonce,
+        q,
+    };
+    for _ in 0..900 {
+        p.env.warp(1);
+        let ixs = [
+            pump::cu_limit_ix(CROSS_CHECK_LIMIT),
+            crank_price_ix(&p.pm),
+            liquidate_ix(&p.pm, &keeper.pubkey(), &p.b.key(), p.nonce),
+        ];
+        if (!worst || worst_ring_reached(&p.env, &p.pm, p.q))
+            && simulate(&p.env, &ixs, &[&keeper]).is_some()
+        {
+            return (p, keeper);
+        }
+        p.env.crank(&p.pm);
+    }
+    panic!("the straddled position was never liquidatable");
+}
+
+/// An expired straddled position: three cranked seconds past its deadline on the near-complete
+/// curve, then the crowd leaves `rT = q/2`; the keeper cranks second by second until its simulated
+/// `[crank_price, expire]` succeeds (the EMA has followed the crowd's buy-down) — `worst`: and
+/// every ring entry is past `rT`. The clock is at that second, **not cranked**.
+pub fn expired_synthetic(worst: bool) -> (Positioned, Keypair) {
+    let (mut p, keeper) = expired(NEAR);
+    buy_down_to(&mut p.env, &p.pm.curve, p.q / 2);
+    for _ in 0..600 {
+        p.env.warp(1);
+        let ixs = [
+            pump::cu_limit_ix(CROSS_CHECK_LIMIT),
+            crank_price_ix(&p.pm),
+            expire_ix(&p.pm, &keeper.pubkey(), &p.b.key(), p.nonce),
+        ];
+        if (!worst || worst_ring_reached(&p.env, &p.pm, p.q))
+            && simulate(&p.env, &ixs, &[&keeper]).is_some()
+        {
+            return (p, keeper);
+        }
+        p.env.crank(&p.pm);
+    }
+    panic!("the straddled expiry never met its bound");
+}
+
+/// A third party completes `c` by synthetic migration: its `buy_v3` of `rT + extra` (`extra` from
+/// the would-be pool: `pcB = extra`, `pcQ` its quote).
+pub fn complete_synthetically(env: &mut Env, c: &PumpCurve, extra: u64) {
+    let u = CurveUser::new(env, c);
+    env.fund(&u.kp.pubkey(), 2_000_000_000_000);
+    let rt = c.state(&env.svm).real_token_reserves;
+    let ix = u.buy_v3_ix(&env.svm, c, rt + extra, u64::MAX);
+    ok(u.send(env, ix));
+    let s = c.state(&env.svm);
+    assert!(s.complete && s.post_complete_base_out == extra, "pcB");
+}
+
+/// A stuck synthetic migration (pump-final §5.4, §12's "S3 on `PumpMigrating` with `pc ≠ 0`"):
+/// as [`s3_migrating`], but the third party completes the curve with a `buy_v3` past `rT` (a pool
+/// part of `q`): the next crank moves the market to `PumpMigrating` with the post-complete fields
+/// set, and S3's FV prices the pool `migrate_v2` will create (`X₁` the live `curve_base_ata`, `Y₁`
+/// with `pcQ`, ρ-scaled). The clock is at the second S3 settles, **not cranked**.
+pub fn s3_migrating_synthetic() -> (Positioned, Keypair) {
+    let mut p = with_position(NEAR);
+    let keeper = fixed(&mut p.env, KEEPER);
+    let deadline = p.env.position(&p.pm, &p.b.key(), p.nonce).deadline;
+    let now = p.env.now();
+    p.env.warp(deadline - 1_800 - now);
+    p.env.crank(&p.pm);
+    p.env.warp(1);
+    let q = p.q;
+    complete_synthetically(&mut p.env, &p.pm.curve, q);
+    p.env.warp(1);
+    let meta = ok(p.env.send(&[crank_price_ix(&p.pm)], &[]));
+    let ev: VenueStateChanged = events::one(&meta);
+    assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
+    s3_loop(&mut p, &keeper, false);
+    (p, keeper)
+}
+
 /// The pump program behind a `VenueGuard` index.
 pub fn pump_program(venue: u8) -> PumpProgram {
     match venue {
@@ -987,6 +1163,44 @@ fn expire_completing() -> Prepared {
     panic!("the completing expiry never met its bound");
 }
 
+/// A synthetic close: [`straddled_position`], then the borrower's close one second later
+/// (`buy_v3(q)`: `rT` on the curve, `q − rT` from the would-be pool; `PumpCurve → PumpMigrating`
+/// in the same instruction).
+fn close_synthetic(worst: bool) -> Prepared {
+    let Positioned {
+        mut env,
+        pm,
+        b,
+        nonce,
+        ..
+    } = straddled_position(worst);
+    env.warp(1);
+    let ix = close_ix(&pm, &b.key(), nonce);
+    prepared(env, ix, &[&b.kp])
+}
+
+/// A synthetic liquidation ([`liquidatable_synthetic`]), cranked in its second.
+fn liquidate_synthetic(worst: bool) -> Prepared {
+    let (mut p, keeper) = liquidatable_synthetic(worst);
+    p.env.crank(&p.pm);
+    if worst {
+        assert_worst_ring(&p.env, &p.pm, p.q);
+    }
+    let ix = liquidate_ix(&p.pm, &keeper.pubkey(), &p.b.key(), p.nonce);
+    prepared(p.env, ix, &[&keeper])
+}
+
+/// A synthetic expiry ([`expired_synthetic`]), cranked in its second.
+fn expire_synthetic(worst: bool) -> Prepared {
+    let (mut p, keeper) = expired_synthetic(worst);
+    p.env.crank(&p.pm);
+    if worst {
+        assert_worst_ring(&p.env, &p.pm, p.q);
+    }
+    let ix = expire_ix(&p.pm, &keeper.pubkey(), &p.b.key(), p.nonce);
+    prepared(p.env, ix, &[&keeper])
+}
+
 fn settle_noop(coin: PumpCoin) -> Prepared {
     let Positioned {
         mut env,
@@ -1002,6 +1216,13 @@ fn settle_noop(coin: PumpCoin) -> Prepared {
 
 fn settle_s3_migrating() -> Prepared {
     let (mut p, keeper) = s3_migrating();
+    p.env.crank(&p.pm);
+    let ix = sol_settle_ix(&p.env, &p.pm, &keeper.pubkey(), &p.b.key(), p.nonce);
+    prepared(p.env, ix, &[&keeper])
+}
+
+fn settle_s3_migrating_synthetic() -> Prepared {
+    let (mut p, keeper) = s3_migrating_synthetic();
     p.env.crank(&p.pm);
     let ix = sol_settle_ix(&p.env, &p.pm, &keeper.pubkey(), &p.b.key(), p.nonce);
     prepared(p.env, ix, &[&keeper])
@@ -1038,6 +1259,43 @@ fn crank_same_second(coin: PumpCoin) -> Prepared {
 fn crank_to_migrating() -> Prepared {
     let Positioned { mut env, pm, .. } = with_position(NEAR);
     buy_down_to(&mut env, &pm.curve, 0);
+    env.warp(1);
+    let ix = crank_price_ix(&pm);
+    prepared(env, ix, &[])
+}
+
+/// The crank that sees a curve a third party completed by synthetic migration (its `buy_v3` past
+/// `rT`, a pool part of `q`): `PumpCurve → PumpMigrating` with the post-complete fields set
+/// (pump-final §12), a position open.
+fn crank_to_migrating_synthetic() -> Prepared {
+    let Positioned { mut env, pm, q, .. } = with_position(NEAR);
+    complete_synthetically(&mut env, &pm.curve, q);
+    env.warp(1);
+    let ix = crank_price_ix(&pm);
+    prepared(env, ix, &[])
+}
+
+/// A crank of the market short.win's own synthetic close moved to `PumpMigrating` (`pc ≠ 0`; a
+/// second position open): roll + record on the post-complete fields, one second after the close.
+fn crank_migrating_after_synthetic_exit() -> Prepared {
+    let Positioned {
+        mut env,
+        pm,
+        b,
+        nonce,
+        q,
+    } = with_position(NEAR);
+    // The other position opens before the crowd's buy-down (Tier D's γ guard refuses an open
+    // against a curve with `rT` this low, `CapCurveGamma`).
+    let mut other = borrower(&mut env, BORROWER + 1);
+    let (res, _) = env.open(&pm, &mut other, q / 4);
+    ok(res);
+    env.tick(&pm, 1);
+    buy_down_to(&mut env, &pm.curve, q / 2);
+    env.warp(1);
+    let meta = ok(env.close(&pm, &b, nonce));
+    let ev: VenueStateChanged = events::one(&meta);
+    assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
     env.warp(1);
     let ix = crank_price_ix(&pm);
     prepared(env, ix, &[])
@@ -1119,6 +1377,15 @@ fn revalidate_pump(venue: u8) -> Prepared {
     let ea = env.pause_authority.insecure_clone();
     let ix = ix::revalidate_venue(&ea.pubkey(), venue, dumped + 1);
     prepared(env, ix, &[&ea])
+}
+
+/// The label suffix of pump-final §6.6's worst-ring cases ([`assert_worst_ring`]).
+fn worst_ring(worst: bool) -> &'static str {
+    if worst {
+        ", worst ring (every ring entry past rT)"
+    } else {
+        ""
+    }
 }
 
 /// Every curve-path instruction (ARCH §9 M5) on SPL Token and Token-2022 curves, the three
@@ -1262,6 +1529,19 @@ pub fn cases() -> Vec<Case> {
         EXIT_ROW,
         Box::new(close_completing),
     );
+    for worst in [false, true] {
+        add(
+            "close_short",
+            format!(
+                "{}: synthetic past rT (the crowd left rT = q/2: `buy_v3(q)` takes rT on the curve and q − rT from the would-be pool; `PumpCurve → PumpMigrating`){}",
+                label(NEAR),
+                worst_ring(worst)
+            ),
+            CLOSE,
+            EXIT_ROW,
+            Box::new(move || close_synthetic(worst)),
+        );
+    }
     for c in [SPL, T22, FRESH] {
         add(
             "liquidate",
@@ -1284,6 +1564,18 @@ pub fn cases() -> Vec<Case> {
         EXIT_ROW,
         Box::new(|| liquidate_costliest(T22)),
     );
+    for worst in [false, true] {
+        add(
+            "liquidate",
+            format!(
+                "ECON's D@80 % (fresh, Token-2022): synthetic past rT (the crowd left rT = q/2, the price × 2.4), both legs{}",
+                worst_ring(worst)
+            ),
+            EXIT,
+            EXIT_ROW,
+            Box::new(move || liquidate_synthetic(worst)),
+        );
+    }
     for c in CURVES {
         add(
             "expire",
@@ -1313,6 +1605,19 @@ pub fn cases() -> Vec<Case> {
         EXIT_ROW,
         Box::new(expire_completing),
     );
+    for worst in [false, true] {
+        add(
+            "expire",
+            format!(
+                "{}: synthetic past rT (the crowd left rT = q/2 after the deadline; `PumpCurve → PumpMigrating`){}",
+                label(NEAR),
+                worst_ring(worst)
+            ),
+            EXIT,
+            EXIT_ROW,
+            Box::new(move || expire_synthetic(worst)),
+        );
+    }
     for c in VARIANTS {
         add(
             "sol_settle",
@@ -1328,6 +1633,13 @@ pub fn cases() -> Vec<Case> {
         SETTLE,
         SETTLE_ROW,
         Box::new(settle_s3_migrating),
+    );
+    add(
+        "sol_settle",
+        "`PumpMigrating` after a third party's synthetic completion (`pc ≠ 0`): S3 at migration_seen_at + 70 min, FV ρ-scaled on the pool migrate_v2 will create".into(),
+        SETTLE,
+        SETTLE_ROW,
+        Box::new(settle_s3_migrating_synthetic),
     );
     add(
         "sol_settle",
@@ -1362,6 +1674,26 @@ pub fn cases() -> Vec<Case> {
         CRANK,
         TWO_ROW,
         Box::new(crank_to_migrating),
+    );
+    add(
+        "crank_price",
+        format!(
+            "{}: `PumpCurve → PumpMigrating` after a third party's synthetic completion (`buy_v3` past rT, `pc ≠ 0`), chains start",
+            label(NEAR)
+        ),
+        CRANK,
+        TWO_ROW,
+        Box::new(crank_to_migrating_synthetic),
+    );
+    add(
+        "crank_price",
+        format!(
+            "{}: `PumpMigrating` after short.win's own synthetic close (`pc ≠ 0`), roll + record",
+            label(NEAR)
+        ),
+        CRANK,
+        TWO_ROW,
+        Box::new(crank_migrating_after_synthetic_exit),
     );
     add(
         "crank_price",
@@ -1719,6 +2051,66 @@ fn tx_keeper_s3_migrating() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     (p.env, with_cb(ixs), vec![keeper])
 }
 
+/// The keeper's `[crank_price, liquidate]` of a synthetic exit ([`liquidatable_synthetic`]).
+fn tx_keeper_liquidation_synthetic(worst: bool) -> (Env, Vec<Instruction>, Vec<Keypair>) {
+    let (p, keeper) = liquidatable_synthetic(worst);
+    let ixs = vec![
+        crank_price_ix(&p.pm),
+        liquidate_ix(&p.pm, &keeper.pubkey(), &p.b.key(), p.nonce),
+    ];
+    (p.env, with_cb(ixs), vec![keeper])
+}
+
+/// The keeper's `[crank_price, expire]` of a synthetic exit ([`expired_synthetic`]).
+fn tx_keeper_expiry_synthetic(worst: bool) -> (Env, Vec<Instruction>, Vec<Keypair>) {
+    let (p, keeper) = expired_synthetic(worst);
+    let ixs = vec![
+        crank_price_ix(&p.pm),
+        expire_ix(&p.pm, &keeper.pubkey(), &p.b.key(), p.nonce),
+    ];
+    (p.env, with_cb(ixs), vec![keeper])
+}
+
+fn tx_keeper_s3_migrating_synthetic() -> (Env, Vec<Instruction>, Vec<Keypair>) {
+    let (p, keeper) = s3_migrating_synthetic();
+    let ixs = vec![
+        crank_price_ix(&p.pm),
+        sol_settle_ix(&p.env, &p.pm, &keeper.pubkey(), &p.b.key(), p.nonce),
+    ];
+    (p.env, with_cb(ixs), vec![keeper])
+}
+
+/// The keeper's top-level `migrate_v2` after a **synthetic** completion (`pc ≠ 0`; pump-final
+/// §6.6's `migrate_v2` row on the v3 path, which D2 makes the keeper's only migration case past
+/// `rT`): `own` — short.win's own synthetic close completed the curve (the keeper migrates after
+/// an exit's `→ PumpMigrating`, `src/keeper.rs`), otherwise a third party's `buy_v3` of `rT + q`
+/// ([`complete_synthetically`]). The pool it creates holds the live `curve_base_ata` and
+/// `rQ + pcQ − fee` (T-SYNTH-3).
+fn tx_migrate_after_synthetic(own: bool) -> (Env, Vec<Instruction>, Vec<Keypair>) {
+    let mut p = if own {
+        let mut p = straddled_position(false);
+        p.env.warp(1);
+        let meta = ok(p.env.close(&p.pm, &p.b, p.nonce));
+        let ev: VenueStateChanged = events::one(&meta);
+        assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
+        p
+    } else {
+        let mut p = with_position(NEAR);
+        let q = p.q;
+        complete_synthetically(&mut p.env, &p.pm.curve, q);
+        p
+    };
+    let s = p.pm.curve.state(&p.env.svm);
+    assert!(
+        s.complete && s.post_complete_base_out > 0,
+        "a synthetic completion (pcB {})",
+        s.post_complete_base_out
+    );
+    let keeper = fixed(&mut p.env, KEEPER);
+    let ix = pump::migrate_v2_ix(&p.env.svm, &keeper.pubkey(), &p.pm.curve);
+    (p.env, with_cb(vec![ix]), vec![keeper])
+}
+
 fn tx_keeper_s3_none() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     let (p, keeper) = s3_none();
     let n = AsNone(&p.pm);
@@ -1749,6 +2141,9 @@ fn tx_flag_three() -> (Env, Vec<Instruction>, Vec<Keypair>) {
 pub const CURVE_TRADE: u64 = 250_000;
 /// ARCH §6.1's limit for a curve liquidation or expiry (and the keeper's `[crank, exit]`).
 pub const CURVE_KEEPER: u64 = 300_000;
+/// The keeper's limit for its top-level `migrate_v2` (`services/keeper/src/graduation.rs`
+/// `MIGRATE_CU`; pump-final §6.6's row).
+pub const MIGRATE_CU: u64 = 400_000;
 
 /// The worst-case curve transactions (T-TRACE): each must stay ≤ 64 entries, reach its exact
 /// expected count, fit its ARCH §6.1 CU limit, and fit a v0 transaction through the protocol
@@ -1813,6 +2208,18 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         v1: false,
         cu_limit: CURVE_TRADE,
         setup: Box::new(|| single_with_cb(close_completing())),
+    });
+    v.push(TraceTx {
+        name: format!(
+            "{}: ComputeBudget ×2 + synthetic close past rT (rT = q/2; `→ PumpMigrating` in the instruction)",
+            label(NEAR)
+        ),
+        arch: "2 + ≤ 15 (§6.2 curve exit max; pump-final §6.6: a synthetic buy + 2)",
+        expected: 2 + 12,
+        peak: 3,
+        v1: false,
+        cu_limit: CURVE_TRADE,
+        setup: Box::new(|| single_with_cb(close_synthetic(false))),
     });
     for c in VARIANTS {
         v.push(TraceTx {
@@ -1889,6 +2296,33 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         cu_limit: CURVE_KEEPER,
         setup: Box::new(|| tx_keeper_liquidation(T22, true)),
     });
+    for worst in [false, true] {
+        v.push(TraceTx {
+            name: format!(
+                "ECON's D@80 %: ComputeBudget ×2 + crank_price + synthetic liquidate past rT (keeper){}",
+                worst_ring(worst)
+            ),
+            arch: "2 + 2 + ≤ 15 on the curve (§6.2); pump-final §6.6: ≤ 245 k CU",
+            expected: 2 + 2 + 12,
+            peak: 3,
+            v1: false,
+            cu_limit: CURVE_KEEPER,
+            setup: Box::new(move || tx_keeper_liquidation_synthetic(worst)),
+        });
+        v.push(TraceTx {
+            name: format!(
+                "{}: ComputeBudget ×2 + crank_price + synthetic expire past rT (keeper){}",
+                label(NEAR),
+                worst_ring(worst)
+            ),
+            arch: "2 + 2 + ≤ 15 on the curve (§6.2)",
+            expected: 2 + 2 + 12,
+            peak: 3,
+            v1: false,
+            cu_limit: CURVE_KEEPER,
+            setup: Box::new(move || tx_keeper_expiry_synthetic(worst)),
+        });
+    }
     v.push(TraceTx {
         name: "ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating`, 70 min)"
             .into(),
@@ -1900,6 +2334,16 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         setup: Box::new(tx_keeper_s3_migrating),
     });
     v.push(TraceTx {
+        name: "ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `PumpMigrating` after a synthetic completion, `pc ≠ 0`, 70 min)"
+            .into(),
+        arch: "2 + 2 + 2 (§6.2)",
+        expected: 2 + 2 + 2,
+        peak: 2,
+        v1: false,
+        cu_limit: 150_000,
+        setup: Box::new(tx_keeper_s3_migrating_synthetic),
+    });
+    v.push(TraceTx {
         name: "ComputeBudget ×2 + crank_price + sol_settle S3 (keeper; `None`, detection set)"
             .into(),
         arch: "2 + 2 + 2 (§6.2)",
@@ -1909,6 +2353,25 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         cu_limit: 150_000,
         setup: Box::new(tx_keeper_s3_none),
     });
+    for own in [false, true] {
+        v.push(TraceTx {
+            name: format!(
+                "{}: ComputeBudget ×2 + migrate_v2 (keeper, top level, with the boost accounts) after {} (`pc ≠ 0`)",
+                label(NEAR),
+                if own {
+                    "short.win's own synthetic close"
+                } else {
+                    "a third party's synthetic completion"
+                }
+            ),
+            arch: "51 + 2 = 53 (§5.4 tx2; peak 4, A15); the keeper's `MIGRATE_CU` (pump-final §6.6)",
+            expected: 53,
+            peak: 4,
+            v1: false,
+            cu_limit: MIGRATE_CU,
+            setup: Box::new(move || tx_migrate_after_synthetic(own)),
+        });
+    }
     v.push(TraceTx {
         name: "ComputeBudget ×2 + flag_venue_upgraded ×3 (pump, pump-fees, PumpSwap; the dumped ProgramData)"
             .into(),
@@ -2003,11 +2466,11 @@ pub fn straddle_transactions() -> Vec<TraceTx> {
                 "{}: straddle tx2 — ComputeBudget ×2 + migrate_v2 (top level, with the boost accounts)",
                 label(NEAR)
             ),
-            arch: "51 + 2 = 53 (§5.4 tx2; peak 4, A15)",
+            arch: "51 + 2 = 53 (§5.4 tx2; peak 4, A15); the keeper's `MIGRATE_CU` (pump-final §6.6)",
             expected: 53,
             peak: 4,
             v1: false,
-            cu_limit: 1_400_000,
+            cu_limit: MIGRATE_CU,
             setup: Box::new(tx_straddle_2),
         },
     ]
@@ -2196,10 +2659,37 @@ pub fn depth_cases() -> Vec<DepthCase> {
         setup: Box::new(close_completing),
     });
     v.push(DepthCase {
+        handler: "close_short",
+        case: format!(
+            "{}: synthetic past rT (`buy_v3(q)`, `→ PumpMigrating`)",
+            label(NEAR)
+        ),
+        direct_peak: 3,
+        setup: Box::new(|| close_synthetic(false)),
+    });
+    v.push(DepthCase {
+        handler: "liquidate",
+        case: "ECON's D@80 %: synthetic past rT, worst ring".into(),
+        direct_peak: 3,
+        setup: Box::new(|| liquidate_synthetic(true)),
+    });
+    v.push(DepthCase {
+        handler: "expire",
+        case: format!("{}: synthetic past rT, worst ring", label(NEAR)),
+        direct_peak: 3,
+        setup: Box::new(|| expire_synthetic(true)),
+    });
+    v.push(DepthCase {
         handler: "sol_settle",
         case: "`PumpMigrating`: S3 at 70 min".into(),
         direct_peak: 2,
         setup: Box::new(settle_s3_migrating),
+    });
+    v.push(DepthCase {
+        handler: "sol_settle",
+        case: "`PumpMigrating` after a synthetic completion (`pc ≠ 0`): S3 at 70 min".into(),
+        direct_peak: 2,
+        setup: Box::new(settle_s3_migrating_synthetic),
     });
     v.push(DepthCase {
         handler: "sol_settle",
@@ -2212,6 +2702,15 @@ pub fn depth_cases() -> Vec<DepthCase> {
         case: format!("{}: `PumpCurve → PumpMigrating`", label(NEAR)),
         direct_peak: 2,
         setup: Box::new(crank_to_migrating),
+    });
+    v.push(DepthCase {
+        handler: "crank_price",
+        case: format!(
+            "{}: `PumpCurve → PumpMigrating` after a synthetic completion (`pc ≠ 0`)",
+            label(NEAR)
+        ),
+        direct_peak: 2,
+        setup: Box::new(crank_to_migrating_synthetic),
     });
     v.push(DepthCase {
         handler: "crank_price",
