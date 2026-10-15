@@ -127,11 +127,7 @@ async fn every_session_ingests_without_quarantine_and_matches_the_chain() {
         .filter(|n| *n != "VenueRewardsClaimed" && *n != "CoverageGap")
         .filter(|n| !seen.contains(*n))
         .collect();
-    for log_kind in [
-        "CoverageGap[L]",
-        "MintSafetyTripped[L]",
-        "CurveCompleted[L]",
-    ] {
+    for log_kind in ["CoverageGap[L]", "MintSafetyTripped[L]"] {
         if !seen.contains(log_kind) {
             missing.push(log_kind);
         }
@@ -478,38 +474,123 @@ async fn one_writer_per_database_and_the_events_notification() {
     pool.close().await;
 }
 
+/// One short.win venue leg with its event's figure: signature, `ix_index`, venue,
+/// `shortwin_invocation`, side, the trade rows' SOL, their count, the event's SOL (`s +
+/// venue_rent` or `buyback_cost`), the trade's user, its pool, the number of distinct pools.
+type Leg = (
+    String,
+    i16,
+    String,
+    String,
+    String,
+    String,
+    i64,
+    Option<String>,
+    String,
+    String,
+    i64,
+);
+
+/// The lamports that System `Transfer`s from `from` to `to` moved inside top-level instruction
+/// `ix` of `tx`, at any CPI depth (pump's rent top-up of a curve it grows is one, from the
+/// trader to the bonding curve).
+fn system_transfers(tx: &RawTx, ix: usize, from: &str, to: &str) -> u128 {
+    const SYSTEM_PROGRAM: &str = "11111111111111111111111111111111";
+    tx.instructions
+        .get(ix)
+        .expect("the leg's instruction")
+        .inner
+        .iter()
+        .filter(|i| {
+            i.program_id.to_string() == SYSTEM_PROGRAM
+                && i.data.len() == 12
+                && i.data[..4] == [2, 0, 0, 0]
+                && i.accounts.len() >= 2
+                && i.accounts[0].to_string() == from
+                && i.accounts[1].to_string() == to
+        })
+        .map(|i| {
+            let lamports: [u8; 8] = i.data[4..].try_into().expect("8 bytes");
+            u128::from(u64::from_le_bytes(lamports))
+        })
+        .sum()
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn short_win_venue_legs_match_their_own_events() {
-    // §7.2: an open's sale = the trade's net SOL; an exit's buyback = the buy's SOL in.
+    // §7.2: an open's sale plus the venue rent its leg reports (PumpSwap's `r`, `Open.venue_rent`)
+    // = the trade's net SOL; an exit's buyback = the buy's SOL in. A pump exit past the curve's
+    // `rT` (pump v3's synthetic migration, pump-final §9) is two rows of one instruction, the
+    // curve part and the would-be pool's: their sum is the buyback. A pump v3 sale that grows the
+    // curve to 166 bytes takes the top-up from the trader after crediting the proceeds, and the
+    // curve leg cannot separate it from `S` (`Open.venue_rent` is 0 on the curve, T-RENT-166):
+    // there `S` is the trade's SOL less exactly that top-up, which the transaction itself shows
+    // as a System transfer from the trade's user (the trader) to its pool (the bonding curve)
+    // inside the leg's instruction. Every other leg has no such transfer and is exact.
     let pg = pg().await;
     let mut venues: BTreeSet<String> = BTreeSet::new();
+    let mut synthetic = 0;
+    let mut grown = 0;
     for (name, s) in all_sessions() {
+        let txs: BTreeMap<String, RawTx> = raws(&s, Commitment::Finalized)
+            .into_iter()
+            .map(|t| (t.signature.to_string(), t))
+            .collect();
         let pool = pg.fresh_db().await.expect("db");
         ingest::ingest_session(&pool, &s, 0..s.txs.len())
             .await
             .expect("ingest");
-        let rows: Vec<(String, String, String, String, Option<String>)> = sqlx::query_as(
-            "SELECT t.venue, t.shortwin_invocation, t.side, t.sol_amount::text, \
-               CASE e.kind WHEN 'Open' THEN e.data->>'s' ELSE e.data->>'buyback_cost' END \
+        let rows: Vec<Leg> = sqlx::query_as(
+            "SELECT t.signature::text, t.ix_index, t.venue, t.shortwin_invocation, t.side, \
+               sum(t.sol_amount)::text, count(*), \
+               min(CASE e.kind \
+                 WHEN 'Open' THEN ((e.data->>'s')::numeric \
+                   + COALESCE((e.data->>'venue_rent')::numeric, 0))::text \
+                 ELSE e.data->>'buyback_cost' END), \
+               min(t.user_key::text), min(t.pool::text), count(DISTINCT t.pool) \
              FROM venue_trades t JOIN events e ON e.signature = t.signature \
                AND e.ix_index = t.ix_index AND e.kind IN ('Open', 'Close', 'Liquidate', 'Expire') \
-             WHERE t.is_shortwin",
+             WHERE t.is_shortwin \
+             GROUP BY t.signature, t.ix_index, t.venue, t.shortwin_invocation, t.side",
         )
         .fetch_all(&pool)
         .await
         .expect("legs");
-        for (venue, inv, side, sol, leg) in rows {
+        for (sig, ix, venue, inv, side, sol, rows, leg, user, curve, pools) in rows {
             let want_side = if inv == "open_short" { "sell" } else { "buy" };
             assert_eq!(side, want_side, "{name}: {venue} {inv}");
+            assert_eq!(pools, 1, "{name}: {venue} {inv}: one pool per leg");
+            let what = format!("{name}: {venue} {inv} SOL {sol} ({rows} rows) vs the event's");
+            let traded: u128 = sol.parse().expect("SOL");
+            let reported: u128 = leg.as_deref().expect("leg").parse().expect("leg");
+            // A curve sale pays the trader; the only System transfer from the trader to the
+            // curve in it is pump's growth top-up. (A buy pays the curve that way, so exits are
+            // not searched.)
+            let top_up = if venue == "pump_curve" && inv == "open_short" {
+                let tx = txs.get(&sig).expect("the leg's transaction");
+                system_transfers(tx, usize::try_from(ix).expect("ix"), &user, &curve)
+            } else {
+                0
+            };
+            if top_up > 0 {
+                grown += 1;
+            }
             assert_eq!(
-                Some(sol.clone()),
-                leg,
-                "{name}: {venue} {inv} SOL {sol} vs the event's"
+                traded,
+                reported + top_up,
+                "{what} + a growth top-up of {top_up}"
             );
+            match rows {
+                1 => {}
+                2 if venue == "pump_curve" && side == "buy" => synthetic += 1,
+                n => panic!("{name}: {venue} {inv}: {n} trade rows in one leg"),
+            }
             venues.insert(venue);
         }
         pool.close().await;
     }
+    assert!(synthetic > 0, "no synthetic curve exit checked");
+    assert!(grown > 0, "no curve growth on an open checked");
     let all: BTreeSet<String> = ["pump_curve", "pump_swap", "raydium_cpmm", "raydium_v4"]
         .into_iter()
         .map(str::to_string)
@@ -518,4 +599,152 @@ async fn short_win_venue_legs_match_their_own_events() {
         venues, all,
         "every venue's leg is checked against its short.win event"
     );
+}
+
+/// INGEST's capture of short.win's own exit past the curve's `rT` (recorded by
+/// `indexer-litesvm`'s `pump_synthetic_exit`; it replaces the retired straddle bundle's
+/// `pump_straddle_graduation.jsonl`, pump-final §9).
+const SYNTHETIC_EXIT: &str = "pump_synthetic_exit.jsonl";
+
+/// A `venue_trades` row as the synthetic-exit test reads it: venue, side, token and SOL amounts,
+/// `is_shortwin`, `shortwin_invocation`, market.
+type TradeRow = (
+    String,
+    String,
+    String,
+    String,
+    bool,
+    Option<String>,
+    Option<String>,
+);
+
+/// pump-final §9: the borrower's close past `rT` is one `close_short` whose `buy_v3` completes the
+/// curve synthetically. The index holds two short.win venue trades of that instruction — the curve
+/// part (pump's `TradeEvent`, `rT` tokens) and the would-be pool's (`PostCompleteBuyEvent`,
+/// `q − rT`) — pump's `CompleteEvent` lifecycle row, and the position closed from short.win's
+/// `Close`; the market is `PumpMigrating` from its `VenueStateChanged`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_synthetic_exit_is_two_trades_a_complete_event_and_a_closed_position() {
+    let pg = pg().await;
+    let s = load(SYNTHETIC_EXIT);
+    let pool = pg.fresh_db().await.expect("db");
+    ingest::ingest_session(&pool, &s, 0..s.txs.len())
+        .await
+        .expect("ingest");
+    let (sig, ix, q, market, position): (String, i16, String, String, String) = sqlx::query_as(
+        "SELECT signature, ix_index, data->>'q', market::text, position::text FROM events \
+         WHERE kind = 'Close'",
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("one Close");
+    let q: u64 = q.parse().expect("q");
+    let trades: Vec<TradeRow> = sqlx::query_as(
+        "SELECT venue, side, token_amount::text, sol_amount::text, is_shortwin, \
+               shortwin_invocation, market::text \
+             FROM venue_trades WHERE signature = $1 AND ix_index = $2 \
+             ORDER BY ev_source, ev_seq",
+    )
+    .bind(&sig)
+    .bind(ix)
+    .fetch_all(&pool)
+    .await
+    .expect("trades");
+    assert_eq!(
+        trades.len(),
+        2,
+        "the curve part and the pool part: {trades:?}"
+    );
+    let mut tokens: Vec<u64> = Vec::new();
+    for (venue, side, token, sol, is_sw, inv, m) in &trades {
+        assert_eq!((venue.as_str(), side.as_str()), ("pump_curve", "buy"));
+        assert!(
+            *is_sw && inv.as_deref() == Some("close_short"),
+            "{trades:?}"
+        );
+        assert_eq!(m.as_deref(), Some(market.as_str()));
+        assert!(sol.parse::<u64>().expect("sol") > 0);
+        tokens.push(token.parse().expect("tokens"));
+    }
+    // The crowd left `rT = q/2`: `rT` on the curve, `q − rT` from the would-be pool.
+    assert_eq!(tokens, vec![q / 2, q - q / 2], "{trades:?}");
+    let lifecycle: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT kind, market::text FROM venue_events WHERE signature = $1 ORDER BY ev_seq",
+    )
+    .bind(&sig)
+    .fetch_all(&pool)
+    .await
+    .expect("venue events");
+    assert_eq!(
+        lifecycle,
+        vec![("CompleteEvent".to_string(), Some(market.clone()))]
+    );
+    let status: String = sqlx::query_scalar("SELECT status FROM positions WHERE position = $1")
+        .bind(&position)
+        .fetch_one(&pool)
+        .await
+        .expect("position");
+    assert_eq!(status, "closed");
+    let to: String = sqlx::query_scalar(
+        "SELECT data->>'to' FROM events WHERE signature = $1 AND kind = 'VenueStateChanged'",
+    )
+    .bind(&sig)
+    .fetch_one(&pool)
+    .await
+    .expect("VenueStateChanged");
+    assert_eq!(to, "2", "PumpCurve -> PumpMigrating in the exit");
+    // The open was the 151-byte `near` curve's first v3 trade: pump grew it to 166 bytes and took
+    // the top-up from the trader, out of the proceeds — `S` is the trade's SOL less 15 bytes at
+    // 5,080 lamports (`PumpCurve::growth_top_up` on the fork, T-RENT-166).
+    let (s_open, traded): (String, String) = sqlx::query_as(
+        "SELECT e.data->>'s', t.sol_amount::text FROM events e JOIN venue_trades t \
+           ON t.signature = e.signature AND t.ix_index = e.ix_index \
+         WHERE e.kind = 'Open'",
+    )
+    .fetch_one(&pool)
+    .await
+    .expect("the open and its sale");
+    let s_open: u64 = s_open.parse().expect("S");
+    let traded: u64 = traded.parse().expect("SOL");
+    assert_eq!(traded - s_open, 15 * 5_080, "the curve growth 151 -> 166 B");
+    pool.close().await;
+}
+
+/// The retired straddle helper `complete_curve` (pump-final §9, owner decision D2) is no longer
+/// ingested: the bundle's helper transaction in an older capture is written like any other and
+/// decodes no event (its pump trade stays a third-party trade), and nothing is quarantined.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_retired_helper_transaction_decodes_no_event() {
+    const HELPER: &str = "4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ";
+    let pg = pg().await;
+    let s = load("keeper_straddle_graduation_v1_v0.jsonl");
+    let helper_txs: Vec<String> = raws(&s, Commitment::Finalized)
+        .iter()
+        .filter(|t| {
+            t.logs
+                .iter()
+                .any(|l| l == &format!("Program {HELPER} invoke [1]"))
+        })
+        .map(|t| t.signature.to_string())
+        .collect();
+    assert_eq!(helper_txs.len(), 1, "the capture's bundle tx1");
+    let pool = pg.fresh_db().await.expect("db");
+    let report = ingest::ingest_session(&pool, &s, 0..s.txs.len())
+        .await
+        .expect("ingest");
+    assert_eq!(report.quarantined, 0);
+    for sig in &helper_txs {
+        let (written, events, programs): (i64, i64, i64) = sqlx::query_as(
+            "SELECT (SELECT count(*) FROM ingest_txs WHERE signature = $1), \
+               (SELECT count(*) FROM events WHERE signature = $1), \
+               (SELECT count(*) FROM events WHERE program = $2)",
+        )
+        .bind(sig)
+        .bind(HELPER)
+        .fetch_one(&pool)
+        .await
+        .expect("counts");
+        assert_eq!((written, events, programs), (1, 0, 0), "{sig}");
+    }
+    pool.close().await;
 }

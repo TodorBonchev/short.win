@@ -86,6 +86,20 @@ mod tests {
         );
     }
 
+    /// The straddle helper's ingestion is retired (design pump-final §9, owner decision D2): a
+    /// configuration that still names `complete_curve_id` fails to load instead of being ignored.
+    #[test]
+    fn a_config_naming_the_retired_helper_is_refused() {
+        let e = toml::from_str::<IndexerConfig>(
+            "[ingest]\ncomplete_curve_id = \"4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ\"\n",
+        )
+        .expect_err("refused");
+        assert!(
+            e.to_string().contains("unknown field `complete_curve_id`"),
+            "{e}"
+        );
+    }
+
     #[test]
     fn the_reference_deployment_config_parses() {
         let text = include_str!("../deploy/indexer.toml");

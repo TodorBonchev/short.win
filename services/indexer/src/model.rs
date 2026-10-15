@@ -90,16 +90,6 @@ pub const SHORTWIN_EVENTS: [EventSpec; 36] = {
     ]
 };
 
-/// The straddle helper's `emit!` events (`programs/complete_curve`).
-pub const COMPLETE_CURVE_EVENTS: [EventSpec; 2] = [
-    spec!(complete_curve::CurveCompleted, "CurveCompleted", Log),
-    spec!(
-        complete_curve::CurveAlreadyComplete,
-        "CurveAlreadyComplete",
-        Log
-    ),
-];
-
 /// `Market.venue` / `VenueKind` names (API and `venue_*` tables).
 pub fn venue_name(kind: u8) -> &'static str {
     match kind {
@@ -211,16 +201,9 @@ mod tests {
 
     #[test]
     fn discriminators_are_distinct() {
-        let mut all: Vec<&[u8]> = SHORTWIN_EVENTS
-            .iter()
-            .chain(COMPLETE_CURVE_EVENTS.iter())
-            .map(|s| s.discriminator)
-            .collect();
+        let mut all: Vec<&[u8]> = SHORTWIN_EVENTS.iter().map(|s| s.discriminator).collect();
         all.sort();
         all.dedup();
-        assert_eq!(
-            all.len(),
-            SHORTWIN_EVENTS.len() + COMPLETE_CURVE_EVENTS.len()
-        );
+        assert_eq!(all.len(), SHORTWIN_EVENTS.len());
     }
 }

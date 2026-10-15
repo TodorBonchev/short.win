@@ -606,7 +606,6 @@ fn cfg_for(s: &ingest::session::Session, addr: SocketAddr) -> IndexerConfig {
     let mut cfg = IndexerConfig::default();
     cfg.ingest.rpc_url = format!("http://{addr}/");
     cfg.ingest.program_id = s.header.program_id.clone();
-    cfg.ingest.complete_curve_id = s.header.complete_curve_id.clone();
     cfg.ingest.backfill.max_rps = 1_000_000;
     cfg
 }
@@ -623,7 +622,6 @@ fn lifecycle() -> ingest::session::Session {
 fn a_deposit(s: &ingest::session::Session) -> (String, u64) {
     let ids = ProgramIds {
         shortwin: s.header.program_id.parse().expect("id"),
-        complete_curve: s.header.complete_curve_id.parse().expect("id"),
     };
     s.txs
         .iter()
@@ -751,7 +749,6 @@ async fn short_pages_never_end_the_history_early() {
     let mut cfg = IndexerConfig::default();
     cfg.ingest.rpc_url = format!("http://{addr}/");
     cfg.ingest.program_id = program.to_string();
-    cfg.ingest.complete_curve_id = Pubkey::new_unique().to_string();
     cfg.ingest.backfill.max_rps = 1_000_000;
     cfg.ingest.backfill.page_limit = 2_000;
     let db = pg.fresh_db().await.expect("db");
@@ -1221,7 +1218,6 @@ async fn missing_notified_signatures_are_ingested_or_proven_abandoned() {
     let rpc = ingest::rpc::Rpc::new(&format!("http://{addr}/"), 1_000_000);
     let ids = ProgramIds {
         shortwin: s.header.program_id.parse().expect("id"),
-        complete_curve: s.header.complete_curve_id.parse().expect("id"),
     };
     let streams = vec![ingest::rpc::Stream {
         name: format!("program:{}", ids.shortwin),

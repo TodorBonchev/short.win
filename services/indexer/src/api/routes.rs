@@ -172,12 +172,10 @@ pub const COVERAGE_KINDS: [&str; 2] = ["CoverageGap", "CoveragePauseSet"];
 /// At most this many buckets per series response (§10.2).
 pub const MAX_BUCKETS: i64 = 1_000;
 
-/// Every `EventKind` (the program's events and complete_curve's).
+/// Every `EventKind`: the program's events (the retired straddle helper's two are no longer
+/// ingested, design pump-final §9).
 pub fn event_kinds() -> impl Iterator<Item = &'static str> {
-    crate::model::SHORTWIN_EVENTS
-        .iter()
-        .chain(crate::model::COMPLETE_CURVE_EVENTS.iter())
-        .map(|s| s.name)
+    crate::model::SHORTWIN_EVENTS.iter().map(|s| s.name)
 }
 
 // ---- responses -------------------------------------------------------------------------------

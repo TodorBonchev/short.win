@@ -924,7 +924,7 @@ components:
              PoolProposed, PoolSwitched, PoolSwitchCancelled, TraderSwept, VenueRewardsClaimed,
              MintSafetyTripped, VenueUpgradeFlagged, VenueRevalidated, CoverageGap,
              CoveragePauseSet, ConfigProposed, ConfigApplied, ConfigCancelled, PauseSet,
-             VenueDisabled, RouteBrokenSet, VenueExtrasSet, CurveCompleted, CurveAlreadyComplete]
+             VenueDisabled, RouteBrokenSet, VenueExtrasSet]
     FeeType:
       type: string
       enum: [creation_fee, open_fee, venue_rent, rent_lender, rent_protocol, liq_penalty_lender,
@@ -984,7 +984,7 @@ components:
               newest_slot: { type: [integer, 'null'] }
               backfill_complete: { type: boolean }
         rollups_complete_before: { type: integer }
-        quarantined: { type: integer, description: 'short.win and complete_curve event payloads the indexer could not decode, not applied to the projections (an alert: the program and the indexer disagree on a layout).' }
+        quarantined: { type: integer, description: 'short.win event payloads the indexer could not decode, not applied to the projections (an alert: the program and the indexer disagree on a layout).' }
         layout_warnings: { type: integer, description: 'short.win events longer than the indexer''s layout (a newer program version appended fields), applied on their known prefix (an alert: upgrade the indexer).' }
         missing: { type: integer, description: 'Notified signatures the RPC node has not served yet; asked for again until ingested or proven abandoned (an alert while above 0).' }
         logs_truncated: { type: integer, description: 'Transactions of the last 24 h of chain time whose log stream was cut or absent: their log events (CoverageGap, exit-path MintSafetyTripped) may be missing.' }

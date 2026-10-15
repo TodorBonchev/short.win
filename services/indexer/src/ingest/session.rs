@@ -40,10 +40,10 @@ pub enum SessionLine {
 pub struct SessionHeader {
     /// [`SESSION_VERSION`].
     pub version: u32,
-    /// short.win's program id in the recorded run (base58).
+    /// short.win's program id in the recorded run (base58). (Sessions recorded before the
+    /// straddle helper's retirement also carry a `complete_curve_id`; it is ignored: design
+    /// pump-final §9, owner decision D2.)
     pub program_id: String,
-    /// The `complete_curve` helper's program id (base58).
-    pub complete_curve_id: String,
     /// What recorded it (`"litesvm"`, `"surfpool"`).
     pub recorder: String,
     /// The scenario's name (e.g. `"keeper-litesvm/liquidate::cr_liquidation"`).
@@ -198,7 +198,6 @@ mod tests {
         let header = SessionHeader {
             version: SESSION_VERSION,
             program_id: shortwin::ID.to_string(),
-            complete_curve_id: complete_curve::ID.to_string(),
             recorder: "unit-test".into(),
             scenario: "round-trip".into(),
             build: "none".into(),

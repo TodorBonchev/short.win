@@ -1193,9 +1193,9 @@ pub async fn quarantined(pool: &PgPool) -> anyhow::Result<Vec<String>> {
         .collect())
 }
 
-/// Event kinds of the catalog (`model::SHORTWIN_EVENTS` + `COMPLETE_CURVE_EVENTS`) no model of
-/// `models` saw, except those in `never` (never emitted by the program as built, or not
-/// reachable in the session set — each with its reason).
+/// Event kinds of the catalog (`model::SHORTWIN_EVENTS`) no model of `models` saw, except those
+/// in `never` (never emitted by the program as built, or not reachable in the session set — each
+/// with its reason).
 pub fn catalog_gaps(models: &[&Model], never: &[(&str, &str)]) -> Vec<String> {
     let seen: BTreeSet<&str> = models
         .iter()
@@ -1203,7 +1203,6 @@ pub fn catalog_gaps(models: &[&Model], never: &[(&str, &str)]) -> Vec<String> {
         .collect();
     shortwin_indexer::model::SHORTWIN_EVENTS
         .iter()
-        .chain(shortwin_indexer::model::COMPLETE_CURVE_EVENTS.iter())
         .map(|s| s.name)
         .filter(|n| !seen.contains(n) && !never.iter().any(|(k, _)| k == n))
         .map(|n| format!("event kind {n}: in no session"))

@@ -17,13 +17,11 @@ use super::source::{SourceItem, TxSource};
 use super::writer::Writer;
 use super::{IngestReport, ProgramIds};
 
-/// The session header's program ids.
+/// The session header's program id.
 pub fn program_ids(session: &Session) -> anyhow::Result<ProgramIds> {
     Ok(ProgramIds {
         shortwin: crate::numeric::parse_key(&session.header.program_id)
             .context("header program_id")?,
-        complete_curve: crate::numeric::parse_key(&session.header.complete_curve_id)
-            .context("header complete_curve_id")?,
     })
 }
 

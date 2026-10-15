@@ -407,9 +407,7 @@ export type EventKind =
     | 'PauseSet'
     | 'VenueDisabled'
     | 'RouteBrokenSet'
-    | 'VenueExtrasSet'
-    | 'CurveCompleted'
-    | 'CurveAlreadyComplete';
+    | 'VenueExtrasSet';
 
 export interface IndexerEvent extends ChainRef {
     readonly id: number;

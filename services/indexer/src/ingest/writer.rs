@@ -208,7 +208,7 @@ impl Writer {
         insert_invocations(&mut tx, raw, &decoded).await?;
         let market_of_mint = mint_markets(&mut tx, &decoded).await?;
         let market_of_pool = pool_markets(&mut tx, &decoded).await?;
-        let (event_rows, max_id) = insert_events(&mut tx, raw, &decoded, &market_of_mint).await?;
+        let (event_rows, max_id) = insert_events(&mut tx, raw, &decoded).await?;
         insert_quarantine(&mut tx, raw, &decoded).await?;
         let trades =
             insert_venue_rows(&mut tx, raw, &decoded, &market_of_mint, &market_of_pool).await?;
@@ -402,22 +402,16 @@ async fn insert_invocations(tx: &mut PgConnection, raw: &RawTx, d: &Decoded) -> 
     Ok(())
 }
 
-/// Markets of the mints that complete_curve events and pool-less venue events name.
+/// Markets of the mints that pool-less venue events name.
 async fn mint_markets(
     tx: &mut PgConnection,
     d: &Decoded,
 ) -> anyhow::Result<HashMap<Pubkey, Pubkey>> {
     let mut mints: Vec<String> = d
-        .events
+        .venue_events
         .iter()
-        .filter(|e| e.market.is_none())
-        .filter_map(|e| super::decode::shortwin_events::key_field(&e.data, "mint"))
-        .chain(
-            d.venue_events
-                .iter()
-                .filter(|v| v.market.is_none() && v.event.pool.is_none())
-                .filter_map(|v| v.event.mint),
-        )
+        .filter(|v| v.market.is_none() && v.event.pool.is_none())
+        .filter_map(|v| v.event.mint)
         .map(|m| m.to_string())
         .collect();
     mints.sort();
@@ -496,18 +490,12 @@ async fn insert_events(
     tx: &mut PgConnection,
     raw: &RawTx,
     d: &Decoded,
-    market_of_mint: &HashMap<Pubkey, Pubkey>,
 ) -> anyhow::Result<(Vec<EventIn>, Option<i64>)> {
     let mut out = Vec::with_capacity(d.events.len());
     let mut max_id = None;
     let sig = raw.signature.to_string();
     for e in &d.events {
-        let market = e.market.or_else(|| {
-            (e.kind == "CurveCompleted" || e.kind == "CurveAlreadyComplete")
-                .then(|| super::decode::shortwin_events::key_field(&e.data, "mint"))
-                .flatten()
-                .and_then(|m| market_of_mint.get(&m).copied())
-        });
+        let market = e.market;
         let key = ChainKey {
             slot: slot_i64(raw.slot),
             tx_index: i32::try_from(raw.tx_index).unwrap_or(i32::MAX),

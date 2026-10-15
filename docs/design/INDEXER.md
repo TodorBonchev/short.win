@@ -49,7 +49,7 @@ sessions **recorded from the LiteSVM harness** (§11.3); a Surfpool session is a
             └───────────────┬─────────────────────────────────┘
                             │ RawTx (§2.1), chain order per source
                             ▼
-   decode (§5, §7): invocation tree → short.win / complete_curve events (emit_cpi! inner
+   decode (§5, §7): invocation tree → short.win events (emit_cpi! inner
           instructions, emit! logs through the invocation stack), short.win instruction args,
           venue trades and lifecycle events
                             │
@@ -71,7 +71,7 @@ source + gap-fill + finality tracker + refresher), `backfill` (history; never co
 frozen); `ingest::{rpc, live, replay, decode::*, writer, project, finality, refresher}` (INGEST);
 `analytics::{formulas, rollups}` (ANALYTICS); `api::{routes, ws, error, pagination, ratelimit}`
 (API); `testing::pg` (FOUNDATION, feature `embedded-pg`). The program's own crates are linked for
-exact layouts: `shortwin` (`events`, `instruction`, `state`), `complete-curve`, `shortwin-math`
+exact layouts: `shortwin` (`events`, `instruction`, `state`), `shortwin-math`
 (`mul_div`, `utilization_bps`), `shortwin-venue-state` (venue account readers).
 
 **ARCH §7.2 → this document.** ARCH's table list maps as: `markets` → `markets`;
@@ -97,7 +97,8 @@ The decoder sees nothing else, so every source decodes identically. A source tha
 
 ### 2.2 RPC backfill (`ingest::rpc`)
 
-- **Streams** (each with a cursor, §3.5): `program:<short.win>`, `program:<complete_curve>`,
+- **Streams** (each with a cursor, §3.5): `program:<short.win>` (the retired straddle helper's
+  `program:<complete_curve>` is gone with its ingestion, pump-final §9, owner decision D2),
   `programdata:<venue>` for the six venue ProgramData accounts (`VENUE_PROGRAM_DATA`; the latch's
   upgrades, §7.3), and `pool:<pubkey>` for tracked pools (§7.1).
 - **Paging:** `getSignaturesForAddress(address, {limit: page_limit (1–1,000, checked at start),
@@ -380,8 +381,9 @@ pruned by an operator policy (they are re-fetchable); short.win's own legs never
   the `__event_authority` PDA to sign, which only the program can do, so such an inner instruction in
   a **successful** transaction was emitted by short.win. Complete (inner instructions are never
   truncated).
-- **`emit!` log events** (`CoverageGap`; `MintSafetyTripped` on exit paths; complete_curve's
-  `CurveCompleted` / `CurveAlreadyComplete`): `Program data: <base64(discriminator ‖ Borsh)>` lines,
+- **`emit!` log events** (`CoverageGap`; `MintSafetyTripped` on exit paths; until pump-final
+  P6 also the retired helper complete_curve's `CurveCompleted` / `CurveAlreadyComplete`, no
+  longer decoded): `Program data: <base64(discriminator ‖ Borsh)>` lines,
   accepted **only while the emitting program is on top of the invocation stack** (§5.2) — any program
   can print "Program data:", so a line printed by another program is never taken for a short.win
   event. Log events are **advisory**: the runtime may truncate logs ("Log truncated" →
@@ -433,7 +435,7 @@ by" is the program as built (grep of `emit_cpi!` / `emit!`). [L] = log event.
 | `ProtocolFeesSwept` | `sweep_protocol_fees` | `protocol_sweeps` | `protocol_fees −= amount` |
 | `MarginAdded` | `add_margin` | — | position `margin_added += amount`, `v += amount`; `open_vault += amount` |
 | `PriceCranked` | `crank_price` | `market_snapshots` (cranker = fee payer) | price columns (`spot_wad`, `ema_price`, `ema_liq`, `liq_slow`, `ema_count`, `lb_lo/hi`, `util_bps`, `rent_basis`, `vest_bal`), `tier` |
-| `VenueStateChanged` | `crank_price`, `sol_settle`, a completing `close_short` / `liquidate` / `expire` | — | `venue := to`, `venue_pool := pool`, `graduated_at` (non-zero); refresher: `venue_pools`. On the straddle-bundle path one event takes the market from the curve straight to PumpSwap (no `pump_migrating` step) |
+| `VenueStateChanged` | `crank_price`, `sol_settle`, a completing `close_short` / `liquidate` / `expire` | — | `venue := to`, `venue_pool := pool`, `graduated_at` (non-zero); refresher: `venue_pools`. Since pump v3 a close, liquidation or expiry past the curve's `rT` completes the curve in the exit (`→ pump_migrating`, pump-final §9); the retired straddle bundle took the market from the curve straight to PumpSwap |
 | `RouteChainChanged` | `crank_price` | — | route-chain columns |
 | `PoolProposed` | `propose_pool` | `pool_events` (`candidate_venue` = the invocation's `candidate_kind`, kept in `events.derived`) | `fp_candidate`, `fp_venue`, `fp_d`, `fp_window_ends`; `pool_d := d_inc`; `pools` upsert (`proposals += 1`, `last_d`) |
 | `PoolSwitched` | `propose_pool`, `execute_pool_switch` | `pool_events` | `ray_pool := candidate`; `venue :=` the candidate's kind (`propose_pool`'s `candidate_kind`; for `execute_pool_switch` the `fp_venue` the window recorded); `pool_d := d_cand`; route chains and `fp_*` cleared; `pools`: candidate adopted (`is_current`), the previous one retired |
@@ -452,8 +454,6 @@ by" is the program as built (grep of `emit_cpi!` / `emit!`). [L] = log event.
 | `VenueDisabled` | `disable_venue` | — | `protocol_state.venue_enabled := venue_enabled` |
 | `RouteBrokenSet` | `set_route_broken` | — | scope MARKET: `markets.route_broken`; GLOBAL: bit `venue_bit` of `protocol_state.route_broken_bits` |
 | `VenueExtrasSet` | `set_venue_extras` | — | `venue_extras[(venue, ix)]` := version, keys, stable_version |
-| `CurveCompleted` [L] | complete_curve (the straddle's tx1) | — | none (graduation timeline in `events`) |
-| `CurveAlreadyComplete` [L] | complete_curve | — | none |
 
 **`vest_bal` and the lender events** (AIR-07; `project::vest_after`): a `Deposit`, `Withdraw`,
 `ClaimSol`, `DeficitCovered` or `LenderSynced` with `s_after = 0` sets `vest_bal := 0` (R3B-2: the
@@ -615,8 +615,8 @@ them; the transparency they give is the point (SPEC §11's powers are visible as
 ### 7.1 Scope
 
 - **short.win's own legs** — always: every venue trade nested under a short.win invocation (opens
-  sell, closes / liquidations / expiries buy) and the straddle's `complete_curve` buy; they are in
-  short.win's transactions already. `is_shortwin = true`, `shortwin_invocation` = the short.win frame
+  sell, closes / liquidations / expiries buy; an exit past a pump curve's `rT` is two rows, below);
+  they are in short.win's transactions already. `is_shortwin = true`, `shortwin_invocation` = the short.win frame
   below the venue frame (§5.2).
 - **Everyone's trades of listed pools** — when `venue_trades.third_party = true`: one signature
   stream per tracked pool (§2.2), at most `max_pools`, chosen by OI then TVL. For charts (candles,
@@ -644,12 +644,30 @@ them; the transparency they give is the point (SPEC §11's powers are visible as
 |---|---|---|---|---|
 | pump curve | `TradeEvent` | `emit_cpi!` of the pump program (`6EF8…`), Anchor event tag | mint, sol_amount, token_amount, is_buy, user, post-trade virtual/real reserves, fee, creator, creator_fee (later fields when present) | token = mint; side = is_buy ? buy : sell |
 | pump curve | `CompleteEvent` | `emit_cpi!` of pump | mint, bonding_curve, user | → `venue_events` |
+| pump curve | `PostCompleteBuyEvent` (pump's 2026-10-08 redeploy) | `emit_cpi!` of pump, after the `TradeEvent` and the `CompleteEvent` of a buy past `rT` (pump v3's synthetic migration) | user, mint, bonding_curve, quote_mint, base_out, quote_in, fee, creator_fee, the would-be pool's reserves after | a **second trade row of the same instruction** (`ev_seq` keeps the two apart): buy `base_out` for `quote_in + fee + creator_fee` lamports, reserves = the would-be pool's after; only on a SOL-quoted curve (`quote_mint` zero or WSOL) |
 | PumpSwap | `BuyEvent` / `SellEvent` | `emit_cpi!` of pAMM (`pAMM…`) | base/quote amounts, lp_fee, protocol_fee, pool, user, coin_creator, coin_creator_fee, pool reserves; *M10:* `virtual_quote_reserves` (the 2026-09 event tail, after the cashback / buyback fields, an i128) | base = token, quote = WSOL (canonical pools) |
 | PumpSwap | `CreatePoolEvent`, `DisableEvent`, … | `emit_cpi!` of pAMM | as declared | → `venue_events` |
 | pump curve, PumpSwap | ★`SweepBondingCurveFeeEvent` (pump), `SweepPoolFeeEvent` (pAMM): the only events the 2026-10-02 redeploys add | `emit_cpi!` | the curve or pool, mint, recipient, `amount`, `bucket` (`pump-rust-client` 0.2.0's IDLs; no recorded sweep yet, a unit test on the IDL layout and on each discriminator being in the dumped redeploy only) | → `venue_events` (a sweep moves the vault and the VQR oppositely: no reserve row) |
 | Raydium CPMM | `SwapEvent` (`40c6cde8260871e2`) | `emit!` "Program data:" **only while CPMM (`CPMMoo8…`) is on top** — CLMM and others emit an event with the same name and discriminator | pool_id, input/output vault before, input/output amounts, input/output mint, trade_fee, creator_fee, creator_fee_on_input | from the mints |
 | Raydium AMM v4 | `ray_log` | "Program log: ray_log: <base64 bincode>" while AMM v4 (`675k…`) is on top | `SwapBaseInLog` (log_type 3: amount_in, minimum_out, direction, user_source, pool_coin, pool_pc, out_amount) / `SwapBaseOutLog` (4: max_in, amount_out, direction, …, deduct_in) | `venue_pools.sol_is_first` (SOL is the coin side or not) |
 | mock | — | the TEST-ONLY venue emits nothing | — | — |
+
+**A buy past the curve's `rT` (pump-final §9).** pump v3 buys `rT` on the curve (`TradeEvent`,
+which completes it: `CompleteEvent`) and `q − rT` from the pool `migrate_v2` will create
+(`PostCompleteBuyEvent`) in one instruction: two `venue_trades` rows on the curve and one
+`venue_events` row. For short.win's own exit past `rT` (a close, liquidation or expiry) both rows
+are `is_shortwin`, and their `sol_amount`s sum to the exit's `buyback_cost`
+(`tests/ingest_sessions.rs` on `tests/data/ingest/pump_synthetic_exit.jsonl`). The `TradeEvent`'s
+`ix_name` is a label only: v3 trades emit `buy` / `sell` / `buy_exact_quote_in`, a multi-hop trade
+`multi_hop_swap`; a PumpSwap event of a `multi_hop_swap` takes its pool's mints from the event
+pool's hop group of the instruction's accounts.
+
+**An open that grows the curve.** pump v3 grows a curve shorter than 166 bytes on its first v3
+trade and takes the rent top-up from the trade's user after crediting the sale: a System
+transfer from the trader to the bonding curve inside the same instruction. short.win's curve leg
+cannot separate it (`Open.venue_rent` is PumpSwap's only, 0 on the curve), so such an open's `s`
+is the `TradeEvent`'s `sol_amount` less that transfer; every other leg matches its event exactly
+(`tests/ingest_sessions.rs`, on every recorded session).
 
 Normalised row (`venue_trades`): `side` from the trader's view (buy = tokens out of the pool),
 `token_amount`, `sol_amount` (lamports paid or received), fees, `fee_creator_lamports` (a CPMM
@@ -1123,9 +1141,10 @@ takes a query permit. Unknown routes are rate-limited.
   `getTransaction` JSON (wincode wire bytes — v1 as the message, then the header's signatures, as
   `to_raw_tx` reads it —, compiled inner instructions with `stackHeight`, logs, `err`, fee,
   balances, `loadedAddresses`), keeping only the transactions that mention short.win or
-  complete_curve (what `getSignaturesForAddress(program)` returns; block positions keep their gaps).
-- **Sessions as built.** REPLAY's eight, recorded at test time from the current builds (so they never
-  go stale; `services/indexer-litesvm/src/scenarios.rs`), and INGEST's fourteen committed fixtures:
+  (until pump-final P6) complete_curve (what `getSignaturesForAddress(program)` returns; block
+  positions keep their gaps).
+- **Sessions as built.** REPLAY's nine, recorded at test time from the current builds (so they never
+  go stale; `services/indexer-litesvm/src/scenarios.rs`), and INGEST's thirteen committed fixtures:
 
 | Session | From | Covers |
 |---|---|---|
@@ -1133,15 +1152,18 @@ takes a query permit. Unknown routes are rate-limited.
 | `mock_admin` (committed, thinned) | `Env` on the mock | every `ConfigChange` kind through the timelock, a cancel, locked terms across a `Params` change, the coverage pause and the Emergency's clear, extras, an arm then a disarm |
 | `keeper_liquidation`, `keeper_coverage_pause` | `services/keeper-litesvm` (`Harness`) | the keeper's v1 / v0 batches; the O17 drill with the coverage key installed through the real timelock |
 | `raydium_lifecycle`, `pool_switch` | the Raydium fork | AMM v4 and CPMM, a close, keeper liquidations on both, S3 on an admin-halted pool; `PoolProposed`, `PoolSwitchCancelled`, `PoolSwitched` |
-| `pump_graduation`, `pump_graduation_raced` | the pump fork + the keeper's straddle bundle | curve open and close, `CurveCompleted`, `VenueStateChanged`, an expiry and a SOL settlement on PumpSwap; `CurveAlreadyComplete` |
-| `tests/data/ingest/*.jsonl` (14, INGEST's) | LiteSVM scenarios of `tests/litesvm` and `keeper-litesvm` | governance and pauses, the curve helper, the prefunded `ShareEpoch` record (7,000,000 lamports), expiries / flags / latch, the keeper's degraded mode (v1) and straddle graduation (v1 + v0), lender sync and the unsafe mint, margin top-ups, Raydium's fast path and venue review, a pool switch then a liquidation, settle arming, trader sweeps, venue extras |
+| `pump_synthetic_exit` | the pump fork | the borrower's own close past `rT` (pump v3's synthetic migration: two trade rows, `CompleteEvent`, `VenueStateChanged → pump_migrating`); its thinned copy is INGEST's `pump_synthetic_exit.jsonl` (`SHORTWIN_RECORD_SESSIONS=<dir>` writes it to `<dir>/ingest/`) |
+| `pump_graduation`, `pump_graduation_raced` | the pump fork + the keeper (since pump-final P4 without the straddle bundle) | curve open and close, the keeper's synthetic expiry past `rT` (`VenueStateChanged`), `migrate_v2` and the transition, an exit on PumpSwap; raced, a third party's synthetic completion fails the keeper's expiry |
+| `tests/data/ingest/*.jsonl` (13, INGEST's) | LiteSVM scenarios of `tests/litesvm` and `keeper-litesvm`; since pump-final P6 `pump_synthetic_exit` is `indexer-litesvm`'s (it replaces `pump_straddle_graduation`, and `curve_completed_and_already_complete` left with the helper's ingestion) | governance and pauses, the borrower's synthetic exit past `rT`, the prefunded `ShareEpoch` record (7,000,000 lamports), expiries / flags / latch, the keeper's degraded mode (v1) and straddle graduation (v1 + v0), lender sync and the unsafe mint, margin top-ups, Raydium's fast path and venue review, a pool switch then a liquidation, settle arming, trader sweeps, venue extras |
 
   Across the set every event kind of §5.3 appears except `VenueRewardsClaimed`, which the program
   never emits. Regenerate REPLAY's with `SHORTWIN_RECORD_SESSIONS=<dir> cargo test -p
   shortwin-indexer-litesvm`, then copy `<dir>/committed/*.jsonl` (not byte-reproducible: random
-  keypairs). Two of INGEST's fixtures hold a resent duplicate transaction (a test artifact; ingested
-  once, idempotently). INGEST's fourteen fixtures have no recording procedure; a layout change
-  migrates them in place: `SolSettle.vest_flushed` (`cb756ca`), and AIR-01's `revalidate_venue`
+  keypairs). One of INGEST's fixtures, `expiries_flags_and_latch.jsonl`, holds a resent duplicate
+  transaction (a test artifact; ingested once, idempotently; until pump-final P6 the deleted
+  `pump_straddle_graduation.jsonl` held two). INGEST's fixtures other than `pump_synthetic_exit`
+  have no recording procedure (sessions recorded before pump-final P6 also carry a
+  `complete_curve_id` header field, which is ignored); a layout change migrates them in place: `SolSettle.vest_flushed` (`cb756ca`), and AIR-01's `revalidate_venue`
   `expected_elf_hash` (`caa5852`: an all-zero hash, the old exact-slot check, appended to the one
   call in `raydium_fast_path_venue_review.jsonl`, whose recorded signature therefore no longer
   signs its message; nothing verifies it).
@@ -1330,7 +1352,7 @@ crate asks the integrator.
 
 | Track | Builds |
 |---|---|
-| **INGEST** | `rpc::to_raw_tx`, the RPC backfill, the live PubSub source (+ Yellowstone if it resolves), the session replay source, the decoders (short.win, complete_curve, instruction args, venues, the log stack), the writer, the projections and rebuild, finality and rollback, the refresher and venue watch, the CLI dispatcher; decoder unit tests (§11.5) |
+| **INGEST** | `rpc::to_raw_tx`, the RPC backfill, the live PubSub source (+ Yellowstone if it resolves), the session replay source, the decoders (short.win, instruction args, venues, the log stack), the writer, the projections and rebuild, finality and rollback, the refresher and venue watch, the CLI dispatcher; decoder unit tests (§11.5) |
 | **API** | axum REST per `openapi.yaml`, the WebSocket (§9.3), errors, pagination, rate and abuse limits (§10), the contract tests (§11.2) with its SQL seed |
 | **ANALYTICS + REPLAY** | the views (verification and fixes), the rollup job and retention (§8.6, §4.4), `analytics::formulas`, the recorder hook and recorder, the session set, the DB-vs-chain assertions (§11.3, §11.4) |
 
@@ -1403,7 +1425,7 @@ track reads (§9.2's read model, §6's projections) needs that track's agreement
   and catalog coverage (8 tests; *AIR-07, `590e724`:* `mock_lifecycle` gained M5–M7, so these
   totals change; they stay as measured at M8 until CI's PostgreSQL run, which has not run on
   the AI review's follow-ups, re-measures them);
-  `cargo test -p shortwin-indexer --test ingest_sessions` — INGEST's fourteen fixtures and
+  `cargo test -p shortwin-indexer --test ingest_sessions` — INGEST's thirteen fixtures and
   REPLAY's committed two, each matching the chain, with ordering, rebuild, rollback and
   single-writer tests (6).
 - *"API contract tests":* `api_contract` (6), `api_limits` (6), `api_ws` (6) on the seed and

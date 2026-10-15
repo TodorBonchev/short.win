@@ -12,9 +12,10 @@
 //!    the self-CPI, which only short.win can do; the event belongs to that parent (§5.2);
 //! 3. log events ([`logs`]): "Program data:" lines attributed through the
 //!    "invoke [n]" / "success" / "failed" stack to the program executing — accepted only from
-//!    short.win (`CoverageGap`, an exit's `MintSafetyTripped`) and complete_curve, and from the
-//!    venue programs for their own events (§7.2), so another program's forged log line is never
-//!    taken for a short.win event;
+//!    short.win (`CoverageGap`, an exit's `MintSafetyTripped`) and from the venue programs for
+//!    their own events (§7.2), so another program's forged log line is never taken for a
+//!    short.win event (the retired straddle helper `complete_curve`'s events are no longer
+//!    ingested: design pump-final §9, owner decision D2);
 //! 4. venue trades and lifecycle events ([`venue`]); upgrades of venue programs.
 //!
 //! A payload that does not decode is quarantined (`ingest_quarantine`), never dropped (§10.3).
@@ -57,7 +58,7 @@ pub struct Invocation {
     pub args: Option<Value>,
 }
 
-/// One decoded short.win / complete_curve event (`events`).
+/// One decoded short.win event (`events`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Event {
     pub ix_index: usize,
@@ -202,8 +203,7 @@ pub fn instruction_error(err: &Value) -> (Option<i16>, Option<i64>) {
 
 /// Decodes `raw` (module docs). `pools`: what `venue_pools` knows (AMM v4 orientation, pool
 /// mints) and the CPMM config rates the venue admin watch observed; `market_of_mint`: the
-/// indexed markets by mint (complete_curve events and third-party trades name a mint, not a
-/// market).
+/// indexed markets by mint (third-party trades name a mint, not a market).
 pub fn decode(
     raw: &RawTx,
     ids: &ProgramIds,
@@ -411,7 +411,7 @@ pub fn decode(
         }
     }
 
-    // ---- 3. log events: short.win / complete_curve "Program data:", CPMM SwapEvent, ray_log ----
+    // ---- 3. log events: short.win "Program data:", CPMM SwapEvent, ray_log ----
     for entry in &parsed.entries {
         let k = entry.ix_index;
         match &entry.payload {
@@ -451,36 +451,6 @@ pub fn decode(
                         raw: bytes.clone(),
                         applied: false,
                         market: sw::payload_market(bytes),
-                    }),
-                }
-            }
-            LogPayload::Data(bytes) if entry.program == ids.complete_curve => {
-                match sw::decode_complete_curve_event(bytes) {
-                    Ok(ev) => {
-                        let mut e = make_event(
-                            raw,
-                            k,
-                            EvSource::Log,
-                            entry.line,
-                            ids.complete_curve,
-                            "complete_curve".to_string(),
-                            ev,
-                            None,
-                        );
-                        e.market = sw::key_field(&e.data, "mint")
-                            .as_ref()
-                            .and_then(market_of_mint);
-                        out.events.push(e);
-                    }
-                    Err(e) => out.quarantine.push(Quarantined {
-                        ix_index: k,
-                        ev_source: EvSource::Log,
-                        ev_seq: entry.line,
-                        program: ids.complete_curve,
-                        reason: format!("{e:#}"),
-                        raw: bytes.clone(),
-                        applied: false,
-                        market: None,
                     }),
                 }
             }

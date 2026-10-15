@@ -1,7 +1,7 @@
 [package]
 name = "shortwin-indexer"
 version = "0.1.0"
-description = "short.win indexer and API (ARCHITECTURE §7.2, M8; docs/design/INDEXER.md): RPC backfill and live ingest of short.win, complete_curve and venue events, Postgres projections and analytics, axum REST + WebSocket"
+description = "short.win indexer and API (ARCHITECTURE §7.2, M8; docs/design/INDEXER.md): RPC backfill and live ingest of short.win and venue events, Postgres projections and analytics, axum REST + WebSocket"
 edition.workspace = true
 # sqlx 0.9 and postgresql_embedded 0.21 declare Rust 1.94 (the repository toolchain is 1.98.1);
 # the other services crates keep the workspace's 1.89.
@@ -21,8 +21,6 @@ embedded-pg = ["dep:postgresql_embedded"]
 shortwin.workspace = true
 # `mul_div` on a 256-bit intermediate (q·P/WAD overflows u128 for pumped prices; §8.4).
 shortwin-math.workspace = true
-# The straddle helper's `emit!` events (`CurveCompleted`, `CurveAlreadyComplete`).
-complete-curve.workspace = true
 # The venue account readers the program and the keeper use (the venue admin watch, §6.3).
 shortwin-venue-state.workspace = true
 # `RpcChain::accounts` for the account refresher (§2.6).

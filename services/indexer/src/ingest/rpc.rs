@@ -1,8 +1,8 @@
 //! The RPC backfill source and the `getTransaction` → [`RawTx`](super::raw::RawTx) conversion
 //! (INDEXER.md §2.2). Owner: INGEST.
 //!
-//! - Streams (§3.5): `program:<short.win>`, `program:<complete_curve>`, `programdata:<venue>` for
-//!   the six venue ProgramData accounts (the latch's raw cause, §7.3), and `pool:<pubkey>` for
+//! - Streams (§3.5): `program:<short.win>`, `programdata:<venue>` for the six venue ProgramData
+//!   accounts (the latch's raw cause, §7.3), and `pool:<pubkey>` for
 //!   tracked pools when third-party trades are ingested (§7.1).
 //! - Per stream: `getSignaturesForAddress(address, {before, until, limit: page_limit,
 //!   commitment})` pages from the newest back to the cursor (the forward gap), and — while the
@@ -608,23 +608,19 @@ pub struct Stream {
     pub address: Pubkey,
 }
 
-/// The streams the indexer follows: both programs, the six venue ProgramData accounts and, with
+/// The streams the indexer follows: short.win, the six venue ProgramData accounts and, with
 /// third-party trades on, the tracked pools (by open interest, then TVL; at most `max_pools`).
+/// (The retired straddle helper's `program:<complete_curve>` stream is gone with its ingestion,
+/// design pump-final §9; a cursor row a database kept for it is never read again.)
 pub async fn streams(
     cfg: &IndexerConfig,
     pool: &PgPool,
     ids: &super::ProgramIds,
 ) -> anyhow::Result<Vec<Stream>> {
-    let mut out = vec![
-        Stream {
-            name: format!("program:{}", ids.shortwin),
-            address: ids.shortwin,
-        },
-        Stream {
-            name: format!("program:{}", ids.complete_curve),
-            address: ids.complete_curve,
-        },
-    ];
+    let mut out = vec![Stream {
+        name: format!("program:{}", ids.shortwin),
+        address: ids.shortwin,
+    }];
     for pd in shortwin::constants::VENUE_PROGRAM_DATA {
         out.push(Stream {
             name: format!("programdata:{pd}"),
@@ -1135,12 +1131,10 @@ pub async fn backfill_streams(
     src.finish().await
 }
 
-/// The configured program ids.
+/// The configured program id.
 pub fn program_ids(cfg: &IndexerConfig) -> anyhow::Result<super::ProgramIds> {
     Ok(super::ProgramIds {
         shortwin: crate::numeric::parse_key(&cfg.ingest.program_id).context("ingest.program_id")?,
-        complete_curve: crate::numeric::parse_key(&cfg.ingest.complete_curve_id)
-            .context("ingest.complete_curve_id")?,
     })
 }
 

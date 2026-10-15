@@ -8,9 +8,9 @@ migrate_on_start = false
 [ingest]
 rpc_url = "http://127.0.0.1:8899"
 ws_url = "ws://127.0.0.1:8900"
-# short.win and the complete_curve helper (their declare_id!).
+# short.win (its declare_id!). The straddle helper's `complete_curve_id` is gone with its
+# ingestion (design pump-final §9, owner decision D2): a file that still sets it fails to load.
 program_id = "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK"
-complete_curve_id = "4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ"
 # "logs_subscribe" (JSON-RPC PubSub). "yellowstone" (§2.4) is deferred to v1.1 (INDEXER.md §14
 # IX-4) and refused at start-up.
 live_source = "logs_subscribe"

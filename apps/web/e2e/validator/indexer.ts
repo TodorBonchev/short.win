@@ -82,7 +82,6 @@ export async function startIndexer(): Promise<void> {
             `rpc_url = "${URLS.rpc}"`,
             `ws_url = "${URLS.ws}"`,
             `program_id = "${PROGRAMS.shortwin}"`,
-            `complete_curve_id = "${PROGRAMS.completeCurve}"`,
             'live_source = "logs_subscribe"',
             '[api]',
             `listen = "127.0.0.1:${PORTS.indexer}"`,

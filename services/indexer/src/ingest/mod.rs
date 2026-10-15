@@ -27,18 +27,18 @@ pub mod writer;
 
 pub use config::IngestConfig;
 
-/// The programs whose events are decoded (configured; the session header's for a replay).
+/// The program whose events are decoded (configured; the session header's for a replay). The
+/// retired straddle helper `complete_curve` is no longer ingested (design pump-final §9, owner
+/// decision D2): its transactions, if any, are written like any other and decode no event.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProgramIds {
     pub shortwin: Pubkey,
-    pub complete_curve: Pubkey,
 }
 
 impl Default for ProgramIds {
     fn default() -> Self {
         Self {
             shortwin: shortwin::ID,
-            complete_curve: complete_curve::ID,
         }
     }
 }

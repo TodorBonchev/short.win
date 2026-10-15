@@ -22,6 +22,7 @@
 //! | [`keeper_coverage_pause`] | test-venue, mock | O17's drill: an outage, the keeper's pause, a liquidation under it, the automatic unpause |
 //! | [`raydium_lifecycle`] | release, AMM v4 + CPMM fork | listings, a close, keeper liquidations on both venues, S3 on an admin-halted pool |
 //! | [`pool_switch`] | release, AMM v4 fork | the fast path: `PoolProposed`, `PoolSwitchCancelled`, `PoolSwitched` |
+//! | [`pump_synthetic_exit`] | release, pump fork | the borrower's own close past `rT`: one `buy_v3` completes the curve (pump's `TradeEvent`, `CompleteEvent`, `PostCompleteBuyEvent`; `VenueStateChanged → PumpMigrating`); its thinned copy is INGEST's fixture |
 //! | [`pump_graduation`] | release, pump + PumpSwap fork | curve open / close, the keeper's synthetic expiry past `rT` (pump v3 completes the curve in the exit: `VenueStateChanged`), `migrate_v2` and the transition, an exit on PumpSwap |
 //! | [`pump_graduation_raced`] | release, pump + PumpSwap fork | the keeper's expiry raced by a third party's synthetic completion (the expiry fails on chain), then the graduation and the expiry on the pool |
 
@@ -1160,6 +1161,45 @@ pub fn pool_switch() -> Session {
     });
     h.seconds(3);
     h.with_env(|env| finish(env, "pool_switch", RELEASE, None))
+}
+
+/// The `pump_synthetic_exit` session (pump-final §9; the release build on the mainnet fork with
+/// the dumped pump, pump-fees and PumpSwap ELFs; no keeper): a pump-curve market on the
+/// near-complete curve and a position of `q`; an outside buyer takes the curve down to
+/// `rT = q/2`; the borrower's own close past `rT` buys `rT` on the curve and `q − rT` from the
+/// would-be pool in one `buy_v3` (pump v3's synthetic migration: pump's `TradeEvent`,
+/// `CompleteEvent` and `PostCompleteBuyEvent` under short.win's `close_short`) and moves the
+/// market to `PumpMigrating`; a crank of the migrating market follows. Its thinned copy is
+/// INGEST's fixture `pump_synthetic_exit.jsonl` ([`recorder::INGEST_FIXTURES`]), which replaces
+/// the retired straddle bundle's capture.
+pub fn pump_synthetic_exit() -> Session {
+    use shortwin_litesvm_tests::pump::{CurveUser, PumpSpec};
+    let mut env = release_env(CheckpointPolicy::AfterEvents);
+    env.load_pump_programs();
+    env.load_pump_statics();
+    let c = env.load_pump_coin(PumpCoin::Near);
+    env.set_pump_rent();
+    env.set_pump_clock();
+    ok(env.list_pump(&c));
+    let q = c.state(&env.svm).virtual_token_reserves / 200;
+    let pm = env.pump_market_listed(PumpSpec::new(PumpCoin::Near, q * 40), c);
+    let (b, nb) = open_on(&mut env, &pm, q);
+    env.warp(2);
+    let u = CurveUser::new(&mut env, &pm.curve);
+    let rt = pm.curve.state(&env.svm).real_token_reserves;
+    ok(u.buy(&mut env, &pm.curve, rt - q / 2, u64::MAX));
+    env.warp(1);
+    ok(env.close(&pm, &b, nb));
+    let s = pm.curve.state(&env.svm);
+    assert!(
+        s.complete && s.post_complete_base_out == q - q / 2,
+        "the close completed the curve synthetically (pcB {})",
+        s.post_complete_base_out
+    );
+    assert!(!is_open(&env, &pm, &b.key(), nb));
+    env.warp(1);
+    env.crank(&pm);
+    finish(&mut env, "pump_synthetic_exit", RELEASE, None)
 }
 
 /// The `pump_graduation` session (the release build on the mainnet fork with the dumped pump,

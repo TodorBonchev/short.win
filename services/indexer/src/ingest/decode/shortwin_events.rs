@@ -1,8 +1,9 @@
-//! short.win and complete_curve events and short.win instruction arguments (INDEXER.md §5.3,
-//! §5.4). Owner: INGEST.
+//! short.win events and instruction arguments (INDEXER.md §5.3, §5.4). Owner: INGEST. (The
+//! retired straddle helper `complete_curve`'s two events are no longer decoded: design
+//! pump-final §9, owner decision D2.)
 //!
 //! Every payload is checked twice: with the program's own type (`shortwin::events::*`,
-//! `complete_curve::*`, `shortwin::state::ConfigChange`) and with the IDL walker
+//! `shortwin::state::ConfigChange`) and with the IDL walker
 //! ([`super::idl`]), which renders the `events.data` / `invocations.args` JSON (§4.2); both must
 //! read the same number of bytes. A payload either check refuses (or a short one) is quarantined
 //! (§3.6): a short.win event the indexer cannot read means the program and the indexer disagree
@@ -17,11 +18,11 @@
 
 use anchor_lang::AnchorDeserialize;
 use anyhow::{Context, anyhow, bail};
-use serde_json::{Value, json};
+use serde_json::Value;
 use solana_pubkey::Pubkey;
 
-use super::idl::{self, key_json};
-use crate::model::{COMPLETE_CURVE_EVENTS, EventSpec, SHORTWIN_EVENTS};
+use super::idl;
+use crate::model::{EventSpec, SHORTWIN_EVENTS};
 use crate::numeric::hex;
 
 /// A decoded event payload.
@@ -39,13 +40,6 @@ pub struct EventPayload {
 /// The short.win event whose discriminator prefixes `payload` (discriminator ‖ Borsh).
 pub fn shortwin_spec(payload: &[u8]) -> Option<&'static EventSpec> {
     SHORTWIN_EVENTS
-        .iter()
-        .find(|s| payload.starts_with(s.discriminator))
-}
-
-/// The complete_curve event whose discriminator prefixes `payload`.
-pub fn complete_curve_spec(payload: &[u8]) -> Option<&'static EventSpec> {
-    COMPLETE_CURVE_EVENTS
         .iter()
         .find(|s| payload.starts_with(s.discriminator))
 }
@@ -139,38 +133,6 @@ pub fn payload_market(payload: &[u8]) -> Option<Pubkey> {
     (k != Pubkey::default()).then_some(k)
 }
 
-/// Decodes a complete_curve event payload (discriminator ‖ Borsh).
-pub fn decode_complete_curve_event(payload: &[u8]) -> anyhow::Result<EventPayload> {
-    let spec = complete_curve_spec(payload).context("unknown complete_curve event")?;
-    let body = &payload[spec.discriminator.len()..];
-    let data = match spec.name {
-        "CurveCompleted" => {
-            let e = complete_curve::CurveCompleted::try_from_slice(body)?;
-            json!({
-                "mint": key_json(&e.mint),
-                "bonding_curve": key_json(&e.bonding_curve),
-                "user": key_json(&e.user),
-                "tokens": e.tokens.to_string(),
-                "lamports_spent": e.lamports_spent.to_string(),
-            })
-        }
-        "CurveAlreadyComplete" => {
-            let e = complete_curve::CurveAlreadyComplete::try_from_slice(body)?;
-            json!({
-                "mint": key_json(&e.mint),
-                "bonding_curve": key_json(&e.bonding_curve),
-                "virtual_token_reserves": e.virtual_token_reserves.to_string(),
-            })
-        }
-        other => bail!("{other}: not a complete_curve event"),
-    };
-    Ok(EventPayload {
-        kind: spec.name,
-        data,
-        trailing: 0,
-    })
-}
-
 // ---- field access on the §4.2 JSON ---------------------------------------------------------
 
 /// A key field (`null` = `Pubkey::default()`).
@@ -249,7 +211,6 @@ pub fn actor_of(kind: &str, data: &Value, fee_payer: &Pubkey) -> Option<Pubkey> 
         "Liquidate" | "Expire" | "SolSettle" => key_field(data, "keeper"),
         "CoveragePauseSet" | "PauseSet" | "ConfigCancelled" => key_field(data, "by"),
         "PriceCranked" => Some(*fee_payer),
-        "CurveCompleted" => key_field(data, "user"),
         _ => None,
     }
 }
@@ -865,23 +826,6 @@ pub(crate) mod tests {
         assert_eq!(ev.data["tier"], 3);
         assert_eq!(actor_of("Open", &ev.data, &k(99)), Some(k(9)));
         assert_eq!(position_of(&ev.data), Some(k(8)));
-    }
-
-    #[test]
-    fn complete_curve_events_decode() {
-        let ev = complete_curve::CurveCompleted {
-            mint: k(1),
-            bonding_curve: k(2),
-            user: k(3),
-            tokens: 4,
-            lamports_spent: 5,
-        };
-        let mut p = <complete_curve::CurveCompleted as Discriminator>::DISCRIMINATOR.to_vec();
-        p.extend(crate::ingest::decode::borsh_bytes(&ev));
-        let d = decode_complete_curve_event(&p).expect("decode");
-        assert_eq!(d.kind, "CurveCompleted");
-        assert_eq!(d.data["tokens"], "4");
-        assert!(decode_shortwin_event(&p).is_err());
     }
 
     #[test]

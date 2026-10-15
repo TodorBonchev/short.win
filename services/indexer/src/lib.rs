@@ -6,7 +6,7 @@
 //!   sources (RPC backfill · logsSubscribe live · Yellowstone · recorded session)
 //!      │  RawTx (ingest::raw), in chain order per source
 //!      ▼
-//!   decode (ingest::decode): short.win / complete_curve events, short.win invocations,
+//!   decode (ingest::decode): short.win events and invocations,
 //!          venue trades and lifecycle events — attributed through the invocation stack
 //!      ▼
 //!   writer (ingest::writer): one Postgres transaction per Solana transaction, idempotent on

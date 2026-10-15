@@ -1,5 +1,5 @@
 # shortwin-indexer image (docs/design/INDEXER.md §12.1). Build context: the repository root
-# (the indexer links programs/shortwin, programs/complete_curve and crates/* by path).
+# (the indexer links programs/shortwin and crates/* by path).
 FROM rust:1.98.1-bookworm AS build
 WORKDIR /src
 COPY . .

@@ -130,7 +130,6 @@ async fn backfill_live_and_finality_against_a_local_validator() {
     cfg.ingest.rpc_url = v.rpc.clone();
     cfg.ingest.ws_url = v.ws.clone();
     cfg.ingest.program_id = tracked.to_string();
-    cfg.ingest.complete_curve_id = Pubkey::new_unique().to_string();
     cfg.ingest.backfill.page_limit = 2; // force paging
     cfg.ingest.finality.poll_ms = 500;
     // The backfill reads at finalized: wait until the airdrops are rooted.
@@ -275,10 +274,7 @@ async fn finalized_history_outlives_the_status_cache() {
     let client = RpcClient::new_with_commitment(v.rpc.clone(), CommitmentConfig::confirmed());
     let tracked = Pubkey::new_unique();
     let rpc = Rpc::new(&v.rpc, 1_000);
-    let ids = ProgramIds {
-        shortwin: tracked,
-        complete_curve: Pubkey::new_unique(),
-    };
+    let ids = ProgramIds { shortwin: tracked };
     let streams = vec![Stream {
         name: format!("program:{tracked}"),
         address: tracked,
@@ -380,10 +376,7 @@ async fn a_rolled_back_newest_signature_does_not_halt_live_ingest() {
         airdrop_sig(&client, &tracked, 1_000_000 + i).await;
     }
     let rpc = Rpc::new(&v.rpc, 1_000);
-    let ids = ProgramIds {
-        shortwin: tracked,
-        complete_curve: Pubkey::new_unique(),
-    };
+    let ids = ProgramIds { shortwin: tracked };
     let streams = vec![Stream {
         name: format!("program:{tracked}"),
         address: tracked,
@@ -459,7 +452,6 @@ async fn a_rolled_back_newest_signature_does_not_halt_live_ingest() {
     cfg.ingest.rpc_url = v.rpc.clone();
     cfg.ingest.ws_url = v.ws.clone();
     cfg.ingest.program_id = tracked.to_string();
-    cfg.ingest.complete_curve_id = ids.complete_curve.to_string();
     cfg.ingest.refresher.enabled = false;
     cfg.ingest.finality.poll_ms = 500;
     let live_pool = pool.clone();

@@ -16,7 +16,6 @@ shortwin-services-common.workspace = true
 # in-process chain and scenario driver: the sessions are recorded from them.
 shortwin-litesvm-tests = { path = "../../tests/litesvm" }
 shortwin-keeper-litesvm = { path = "../keeper-litesvm" }
-complete-curve.workspace = true
 anchor-lang.workspace = true
 anyhow.workspace = true
 base64.workspace = true

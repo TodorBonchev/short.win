@@ -12,10 +12,10 @@ pub struct IngestConfig {
     pub rpc_url: String,
     /// PubSub WebSocket endpoint (`SHORTWIN_WS_URL` overrides).
     pub ws_url: String,
-    /// short.win's program id (base58); the crate's `declare_id!` by default.
+    /// short.win's program id (base58); the crate's `declare_id!` by default. (The straddle
+    /// helper's `complete_curve_id` is gone with its ingestion, design pump-final §9, owner
+    /// decision D2: a configuration that still sets it fails to load as an unknown field.)
     pub program_id: String,
-    /// The `complete_curve` helper's program id (base58).
-    pub complete_curve_id: String,
     /// `"logs_subscribe"` (JSON-RPC PubSub, the default) or `"yellowstone"` (§2.4).
     pub live_source: String,
     pub yellowstone: YellowstoneConfig,
@@ -31,7 +31,6 @@ impl Default for IngestConfig {
             rpc_url: "http://127.0.0.1:8899".to_string(),
             ws_url: "ws://127.0.0.1:8900".to_string(),
             program_id: shortwin::ID.to_string(),
-            complete_curve_id: complete_curve::ID.to_string(),
             live_source: "logs_subscribe".to_string(),
             yellowstone: YellowstoneConfig::default(),
             backfill: BackfillConfig::default(),

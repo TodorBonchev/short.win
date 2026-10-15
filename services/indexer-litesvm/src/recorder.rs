@@ -48,12 +48,11 @@ pub const RECORDER: &str = "litesvm";
 pub const RECORD_SESSIONS_ENV: &str = "SHORTWIN_RECORD_SESSIONS";
 
 /// A session header for `scenario` on the program build `build` (`"test-venue"` or
-/// `"release"`), with the program ids this repository builds.
+/// `"release"`), with the program id this repository builds.
 pub fn header(scenario: &str, build: &str, notes: Option<&str>) -> SessionHeader {
     SessionHeader {
         version: SESSION_VERSION,
         program_id: shortwin::ID.to_string(),
-        complete_curve_id: complete_curve::ID.to_string(),
         recorder: RECORDER.to_string(),
         scenario: scenario.to_string(),
         build: build.to_string(),
@@ -168,14 +167,12 @@ pub fn session_checkpoint(c: &AccountCheckpoint, after: Option<String>) -> Accou
     }
 }
 
-/// Whether `r` mentions short.win or the `complete_curve` helper: what the indexer's program
-/// signature streams return (`getSignaturesForAddress(program)`, INDEXER.md §2.2). A venue
-/// swap or an LP action of the scenario's own actors does not, and is left out of the session
-/// (its block position stays: `tx_index` keeps the gap a real block would show).
+/// Whether `r` mentions short.win: what the indexer's program signature stream returns
+/// (`getSignaturesForAddress(program)`, INDEXER.md §2.2). A venue swap or an LP action of the
+/// scenario's own actors does not, and is left out of the session (its block position stays:
+/// `tx_index` keeps the gap a real block would show).
 pub fn mentions_programs(r: &RecordedTx) -> bool {
-    r.account_keys()
-        .iter()
-        .any(|k| *k == shortwin::ID || *k == complete_curve::ID)
+    r.account_keys().contains(&shortwin::ID)
 }
 
 /// A whole recording as a session (module docs): the transactions [`mentions_programs`]
@@ -300,3 +297,16 @@ pub fn committed_dir() -> PathBuf {
 
 /// The sessions committed to [`committed_dir`] (thinned with [`thinned`]).
 pub const COMMITTED: [&str; 2] = ["mock_lifecycle", "mock_admin"];
+
+/// INGEST's fixture sessions (`services/indexer/tests/data/ingest/`) that this crate records
+/// (thinned with [`thinned`]; `SHORTWIN_RECORD_SESSIONS=<dir>` writes them into `<dir>/ingest/`).
+/// The other fixtures there have no recording procedure (INDEXER.md §11.3).
+pub const INGEST_FIXTURES: [&str; 1] = ["pump_synthetic_exit"];
+
+/// INGEST's fixture directory: `services/indexer/tests/data/ingest/`.
+pub fn ingest_fixtures_dir() -> PathBuf {
+    PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../indexer/tests/data/ingest"
+    ))
+}

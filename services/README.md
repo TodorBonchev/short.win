@@ -9,7 +9,7 @@ workspace's lockfile.
 | `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts — also by exact size, a `dataSize` filter on JSON-RPC —, blockhash, simulate, send, recent priority fees, Jito bundles: send and pre-flight), its JSON-RPC backend (`RpcChain`; bundles through a Jito block engine's `sendBundle`, **UNVERIFIED** against a live engine), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
 | `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–14 on every venue, with duty 5's Raydium fast path and M7's O17 degraded mode through the `coverage_authority`) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) and M7's per-market tables |
 | `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks, and across short.win's own upgrade from 1.0.0 (`upgrade_window`) |
-| `indexer/` (`shortwin-indexer`) | The indexer and API (ARCH §7.2, M8; contract [`docs/design/INDEXER.md`](../docs/design/INDEXER.md)): RPC backfill and live ingest of short.win, complete_curve and venue events into Postgres (`migrations/`), projections and analytics, axum REST + WebSocket (`openapi.yaml`), one binary `shortwin-indexer` (`migrate`, `backfill`, `live`, `serve`, `rollups`, `run`, `replay`, `rebuild`); its TEST-ONLY `embedded-pg` feature runs PostgreSQL 17 from the user cache (no Docker, no root); the reference deployment is `indexer/deploy/` |
+| `indexer/` (`shortwin-indexer`) | The indexer and API (ARCH §7.2, M8; contract [`docs/design/INDEXER.md`](../docs/design/INDEXER.md)): RPC backfill and live ingest of short.win and venue events into Postgres (`migrations/`), projections and analytics, axum REST + WebSocket (`openapi.yaml`), one binary `shortwin-indexer` (`migrate`, `backfill`, `live`, `serve`, `rollups`, `run`, `replay`, `rebuild`); its TEST-ONLY `embedded-pg` feature runs PostgreSQL 17 from the user cache (no Docker, no root); the reference deployment is `indexer/deploy/` |
 | `ops/` (`shortwin-ops`) | `shortwin-gov`, the Squads v4 governance tool (M10 WP-7; [below](#governance-shortwin-gov-m10)): creates the Governance and Emergency multisigs, initializes the config with their vaults, stages / approves / executes / cancels vault transactions (the checked upgrade-authority transfer, `Authorities` changes, upgrades, every admin instruction; the transaction-buffer path for large messages), applies timelocked changes, verifies the whole layout |
 | `indexer-litesvm/` (`shortwin-indexer-litesvm`) | TEST-ONLY: records LiteSVM sessions (the program-test harness, the keeper scenarios) in the indexer's session format and replays them into an embedded Postgres, asserting the indexed state against the chain (INDEXER.md §11.3, §11.4) |
 
@@ -173,7 +173,7 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
     instruction; `buyback_allowed` and σ are judged on `B̂_v3`, so above `σ_max` the position goes
     to `sol_settle` (S2) at once. The keeper then sends `migrate_v2` and the transition in the same
     tick (metric `synthetic_exits`). The 3-transaction Jito straddle bundle, the `complete-curve`
-    helper, `Plan::Straddle` and `Alert::StraddleWaiting` are retired; `[graduation] straddle`,
+    helper (gone from the workspace, Governance and the indexer since pump-final P6), `Plan::Straddle` and `Alert::StraddleWaiting` are retired; `[graduation] straddle`,
     `send_without_exit`, `complete_slippage_bps`, `max_complete_lamports`, `tip_lamports`,
     `tip_accounts`, `block_engine` and the binary's `--block-engine` are refused ("removed: pump
     v3 exits need no bundle (design pump-final)").
@@ -578,7 +578,8 @@ keeper's `coverage_authority` — and the launch values `initialize_config` take
 venues, Pyth feed, the venue programs' deploy slots). Everything else is derived and never typed:
 Governance (autonomous 3-of-5, Squads time lock 172,800 s) and Emergency (autonomous 2-of-4, time
 lock 0) are the Squads PDAs of their create keys; `governance` and the upgrade authority of
-short.win and complete_curve = Governance vault 0, `fee_recipient` = Governance vault 1,
+short.win (Governance's whole upgrade set: the straddle helper `complete_curve` was retired
+before it was deployed, pump-final D2, and a layout naming it is refused) = Governance vault 0, `fee_recipient` = Governance vault 1,
 `pause_authority` = Emergency vault 0; each multisig's rent collector is its own vault 0. The
 four authorities must be pairwise distinct (SQ-G8). The example's keys are placeholders and the
 tool refuses to send with it (`example = true`).
@@ -740,10 +741,10 @@ Anyone can send the loader's `ExtendProgram` for a program whose ProgramData is 
 cap: at least 10 KiB, once per program per slot. It redeploys the program, which is unusable for
 the rest of that slot: every invoke or CPI of it fails with `UnsupportedProgramId` ("Program is
 not deployed"). The owner accepted this bounded griefing (known-issues KI-73: ≈ 0.052 SOL of the
-attacker's rent per blocked slot until the program reaches the cap, ≈ 45 SOL for short.win and
-≈ 53 SOL for complete_curve if deployed at their v1.0.0 ELF sizes), so short.win's and
-complete_curve's ProgramData are **not** pre-extended to 10 MiB at deployment. What operators
-see:
+attacker's rent per blocked slot until the program reaches the cap, ≈ 45 SOL for short.win at
+its v1.0.0 ELF size), so short.win's ProgramData is **not** pre-extended to 10 MiB at
+deployment (the retired `complete_curve` helper is not deployed at all, pump-final D2). What
+operators see:
 
 - **A venue extended** (pump-fees, which pump and PumpSwap call; AMM v4; CPMM; Token-2022; pump
   and PumpSwap themselves are at the cap): every exit that buys on it fails for the rest of that
@@ -754,14 +755,12 @@ see:
   back-off. `crank_price` and `sol_settle` make no venue CPI and keep landing.
 - **short.win extended:** every short.win instruction fails for the rest of the slot (the
   keeper's cranks and exits, users' transactions), and the keeper treats its refusals the same
-  way. (complete_curve, until it leaves the release with P6, has no caller: the keeper's
-  straddle bundle is retired, pump-final §7.)
+  way.
 - **No action is needed** unless `Alert::ProgramNotDeployed` pages. The keeper ticks every
   400 ms by default (`--tick-ms 400`, about one slot), so its next tick is always in a later
   slot; each further blocked slot costs the attacker another extension, and the griefing ends
   for good when the program reaches the cap (≈ 867 slots for short.win, ≈ 887–947 for the
-  venues, ≈ 1,013 for complete_curve at their current sizes: ≈ 5.8–6.8 min of slots at
-  400 ms).
+  venues at their current sizes: ≈ 5.8–6.3 min of slots at 400 ms).
 - **`Alert::ProgramNotDeployed`:** such refusals of one program, at most 5 s apart, have lasted
   30 s (paged once per run). Someone is extending that program every slot or nearly: check its
   ProgramData's growth toward the 10 MiB cap and whether exits land in between.
@@ -1100,8 +1099,9 @@ cargo test --manifest-path $M -p shortwin-indexer --test ingest_rpc_validator --
 - **Ingest (INGEST):** decoder unit tests (`src/ingest/decode/tests.rs`: every catalog event in both
   layouts, attribution at stack heights 2–4, forged log lines, quarantine, v0 / v1 conversion, the
   venue decoders); `ingest_writer` (quarantine, upgrades, failed and truncated transactions,
-  metadata and admin rows); `ingest_sessions` on the committed sessions (`tests/data/ingest/`, 14
-  fixtures, and REPLAY's `tests/data/sessions/`): no quarantine, every session matches the chain,
+  metadata and admin rows); `ingest_sessions` on the committed sessions (`tests/data/ingest/`, 13
+  fixtures, among them the borrower's synthetic exit past `rT` (pump-final §9: two trade rows, the
+  `CompleteEvent`, the closed position) and a retired helper transaction that decodes nothing, and REPLAY's `tests/data/sessions/`): no quarantine, every session matches the chain,
   catalog coverage, idempotent re-ingest, rebuild, out-of-order delivery, the finality tracker's
   rollback, the single writer, NOTIFY. `ingest_rpc_validator` (opt-in) runs the RPC backfill, the
   live source and finality promotion against a local `solana-test-validator` (~40 s).
@@ -1134,8 +1134,8 @@ cargo test --manifest-path $M -p shortwin-indexer --test ingest_rpc_validator --
   Views are in `migrations/0006_analytics.sql`; the hourly rollups are `shortwin-indexer rollups`
   (`analytics::run_jobs`: a pass every `rollup_interval_s`, then the invocations retention prune,
   which keeps `initialize_config` and the admin instructions forever).
-- **Replay harness (REPLAY, `indexer-litesvm/`, TEST-ONLY):** records eight LiteSVM sessions from the
-  current builds (it needs `target/deploy/{shortwin,mock_cpamm,complete_curve}.so` and
+- **Replay harness (REPLAY, `indexer-litesvm/`, TEST-ONLY):** records nine LiteSVM sessions from the
+  current builds (it needs `target/deploy/{shortwin,mock_cpamm}.so` and
   `target/test-venue/deploy/shortwin.so`, as the keeper scenarios do), checks the contract's
   projection rules against the chain at every checkpoint, then runs INDEXER.md §11.4 through the
   real `ingest::ingest_session`: projections vs the chain, the SOL ledgers, the analytics and

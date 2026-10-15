@@ -44,6 +44,7 @@ session!(mock_admin);
 session!(keeper_coverage_pause);
 session!(raydium_lifecycle);
 session!(pool_switch);
+session!(pump_synthetic_exit);
 session!(pump_graduation);
 session!(pump_graduation_raced);
 
@@ -56,6 +57,7 @@ fn all() -> Vec<(&'static str, &'static Session)> {
         ("keeper_coverage_pause", keeper_coverage_pause()),
         ("raydium_lifecycle", raydium_lifecycle()),
         ("pool_switch", pool_switch()),
+        ("pump_synthetic_exit", pump_synthetic_exit()),
         ("pump_graduation", pump_graduation()),
         ("pump_graduation_raced", pump_graduation_raced()),
     ]
@@ -128,12 +130,29 @@ fn sessions_round_trip_through_their_files() {
 #[test]
 fn the_committed_sessions_are_readable_and_consistent() {
     if let Some(dir) = std::env::var_os(recorder::RECORD_SESSIONS_ENV) {
-        let dir = PathBuf::from(dir).join("committed");
+        let dir = PathBuf::from(dir);
         for (name, s) in all() {
             if recorder::COMMITTED.contains(&name) {
-                recorder::write_to_dir(&dir, name, &recorder::thinned(s)).expect("write");
+                recorder::write_to_dir(&dir.join("committed"), name, &recorder::thinned(s))
+                    .expect("write");
+            }
+            if recorder::INGEST_FIXTURES.contains(&name) {
+                recorder::write_to_dir(&dir.join("ingest"), name, &recorder::thinned(s))
+                    .expect("write");
             }
         }
+    }
+    // INGEST's recorded fixtures (`<dir>/ingest/*.jsonl`, copied to
+    // `services/indexer/tests/data/ingest/`): readable, decoded and consistent with their own
+    // checkpoints on the current program types.
+    for name in recorder::INGEST_FIXTURES {
+        let path = recorder::ingest_fixtures_dir().join(format!("{name}.jsonl"));
+        let s = session::read(&path).unwrap_or_else(|e| panic!("{}: {e:?}", path.display()));
+        assert_eq!(s.header.recorder, recorder::RECORDER);
+        assert_eq!(s.header.scenario, name);
+        assert!(s.checkpoints.len() >= 2 && !s.txs.is_empty());
+        let (_, problems) = chain::check_session(&s).expect("check");
+        fails(name, &problems);
     }
     for name in recorder::COMMITTED {
         let path = recorder::committed_dir().join(format!("{name}.jsonl"));
@@ -569,22 +588,10 @@ fn every_session_replays_into_the_chain_state() {
 // ---- the catalog --------------------------------------------------------------------------------
 
 /// Kinds no session reaches, with the reason.
-const NEVER_EMITTED: [(&str, &str); 3] = [
-    (
-        "VenueRewardsClaimed",
-        "claim_venue_rewards is not built: the program never emits it",
-    ),
-    (
-        "CurveCompleted",
-        "complete_curve has no caller since the keeper's straddle bundle was retired (pump-final \
-         §7, owner D2); its ingestion leaves with the helper (P6)",
-    ),
-    (
-        "CurveAlreadyComplete",
-        "complete_curve has no caller since the keeper's straddle bundle was retired (pump-final \
-         §7, owner D2); its ingestion leaves with the helper (P6)",
-    ),
-];
+const NEVER_EMITTED: [(&str, &str); 1] = [(
+    "VenueRewardsClaimed",
+    "claim_venue_rewards is not built: the program never emits it",
+)];
 
 #[test]
 fn the_sessions_cover_the_event_catalog() {

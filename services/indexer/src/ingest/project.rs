@@ -604,10 +604,9 @@ async fn global_is_late(
     Ok(late)
 }
 
-/// Kinds that never change a projection (log-only advisories and complete_curve's events).
+/// Kinds that never change a projection (log-only advisories).
 fn no_effect(ev: &EventIn) -> bool {
-    matches!(ev.kind.as_str(), "CurveCompleted" | "CurveAlreadyComplete")
-        || (ev.kind == "MintSafetyTripped" && ev.key.ev_source == 1)
+    ev.kind == "MintSafetyTripped" && ev.key.ev_source == 1
 }
 
 async fn apply_market_event(
@@ -687,9 +686,9 @@ async fn apply_market_event(
 
 /// Rows that name a mint but not a market take the market once it exists, so their `market`
 /// does not depend on the order of ingestion (§3.3): venue trades and venue events only on one
-/// of the market's pools (`sw_is_market_pool`; any pool can name a listed mint, M8-SEC-6), a
-/// pool-less venue event and complete_curve's events by the mint. Run after the projection is
-/// flushed, at the listing and whenever the market's pools grow; a rebuild runs it the same way.
+/// of the market's pools (`sw_is_market_pool`; any pool can name a listed mint, M8-SEC-6) and a
+/// pool-less venue event by the mint. Run after the projection is flushed, at the listing and
+/// whenever the market's pools grow; a rebuild runs it the same way.
 async fn fill_market_pools(conn: &mut PgConnection, market: &Pubkey) -> anyhow::Result<()> {
     let m = market.to_string();
     for sql in [
@@ -699,9 +698,6 @@ async fn fill_market_pools(conn: &mut PgConnection, market: &Pubkey) -> anyhow::
         "UPDATE venue_events ve SET market = mk.market FROM markets mk \
          WHERE mk.market = $1 AND ve.market IS NULL AND ve.mint = mk.mint \
            AND (ve.pool IS NULL OR sw_is_market_pool(mk.market, ve.pool))",
-        "UPDATE events e SET market = mk.market FROM markets mk \
-         WHERE mk.market = $1 AND e.market IS NULL \
-           AND e.kind IN ('CurveCompleted', 'CurveAlreadyComplete') AND e.data->>'mint' = mk.mint",
     ] {
         sqlx::query(sql).bind(&m).execute(&mut *conn).await?;
     }
@@ -2456,8 +2452,6 @@ pub async fn rebuild_market(pool: &PgPool, market: &Pubkey) -> anyhow::Result<()
         // Markets resolved by mint are re-resolved by the MarketCreated re-applied below.
         "UPDATE venue_trades SET market = NULL WHERE market = $1 AND NOT is_shortwin",
         "UPDATE venue_events SET market = NULL WHERE market = $1",
-        "UPDATE events SET market = NULL WHERE market = $1 \
-           AND kind IN ('CurveCompleted', 'CurveAlreadyComplete')",
         "DELETE FROM fees WHERE market = $1",
         "DELETE FROM settlements WHERE market = $1",
         "DELETE FROM pool_events WHERE market = $1",

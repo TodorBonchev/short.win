@@ -9,7 +9,7 @@
 //!   alone — short.win invocations at any stack height (names from the IDL), `emit_cpi!` events
 //!   (inner instructions of short.win carrying `EVENT_IX_TAG_LE`, attributed to the nearest
 //!   short.win invocation below them), `emit!` log events attributed through the log's invocation
-//!   stack (short.win's and `complete_curve`'s), and the System transfers inside short.win
+//!   stack (short.win's), and the System transfers inside short.win
 //!   invocations (the `ShareEpoch` record donation of INDEXER.md §6.4). A second, deliberately
 //!   independent implementation: the harness compares the indexer's rows with it.
 //! - [`Model`]: the contract's projection rules (INDEXER.md §5.3, §6) applied to those events in
@@ -146,7 +146,7 @@ impl ChainState {
 
 // ---- events ------------------------------------------------------------------------------------
 
-/// A decoded short.win or `complete_curve` event.
+/// A decoded short.win event.
 #[allow(clippy::large_enum_variant)]
 pub enum Ev {
     MarketCreated(e::MarketCreated),
@@ -185,8 +185,6 @@ pub enum Ev {
     VenueDisabled(e::VenueDisabled),
     RouteBrokenSet(e::RouteBrokenSet),
     VenueExtrasSet(e::VenueExtrasSet),
-    CurveCompleted(complete_curve::CurveCompleted),
-    CurveAlreadyComplete(complete_curve::CurveAlreadyComplete),
 }
 
 macro_rules! decode_one {
@@ -253,8 +251,6 @@ impl Ev {
         VenueDisabled,
         RouteBrokenSet,
         VenueExtrasSet,
-        CurveCompleted,
-        CurveAlreadyComplete,
     );
 
     /// Decodes a short.win event payload (`discriminator ‖ Borsh`): `None` for an unknown
@@ -282,21 +278,12 @@ impl Ev {
         )
     }
 
-    /// Decodes a `complete_curve` event payload.
-    pub fn decode_complete_curve(payload: &[u8]) -> Option<anyhow::Result<Self>> {
-        decode_one!(payload,
-            CurveCompleted => complete_curve::CurveCompleted,
-            CurveAlreadyComplete => complete_curve::CurveAlreadyComplete,
-        )
-    }
-
-    /// The event's `market` field (`None` for `Pubkey::default()` and the curve events).
+    /// The event's `market` field (`None` for `Pubkey::default()`).
     pub fn market(&self) -> Option<Pubkey> {
         macro_rules! m {
             ($($v:ident),*) => {
                 match self {
                     $( Self::$v(x) => x.market, )*
-                    Self::CurveCompleted(_) | Self::CurveAlreadyComplete(_) => return None,
                 }
             };
         }
@@ -341,13 +328,12 @@ impl Ev {
         (k != Pubkey::default()).then_some(k)
     }
 
-    /// The event's own `ts` (the program clock; the block time for the curve events).
+    /// The event's own `ts` (the program clock).
     pub fn ts(&self) -> Option<i64> {
         macro_rules! t {
             ($($v:ident),*) => {
                 match self {
                     $( Self::$v(x) => Some(x.ts), )*
-                    Self::CurveCompleted(_) | Self::CurveAlreadyComplete(_) => None,
                 }
             };
         }
@@ -529,12 +515,7 @@ fn keys_of(
 type InnerIx = (Pubkey, Vec<Pubkey>, Vec<u8>, u32);
 
 /// Decodes one session transaction (module docs).
-pub fn decode_tx(
-    cat: &InstructionCatalog,
-    index: usize,
-    t: &SessionTx,
-    complete_curve_id: &Pubkey,
-) -> anyhow::Result<ChainTx> {
+pub fn decode_tx(cat: &InstructionCatalog, index: usize, t: &SessionTx) -> anyhow::Result<ChainTx> {
     let (tx, keys) = keys_of(t)?;
     let meta = t
         .transaction
@@ -721,8 +702,6 @@ pub fn decode_tx(
                     let ix_index = u16::try_from(top_ix.max(0))?;
                     let decoded = if top == shortwin::ID {
                         Ev::decode_shortwin(&payload)
-                    } else if top == *complete_curve_id {
-                        Ev::decode_complete_curve(&payload)
                     } else {
                         None
                     };
@@ -731,16 +710,7 @@ pub fn decode_tx(
                         .iter()
                         .rev()
                         .find(|v| v.ix_index == ix_index)
-                        .map_or_else(
-                            || {
-                                if top == *complete_curve_id {
-                                    "complete_curve".to_string()
-                                } else {
-                                    "unknown".to_string()
-                                }
-                            },
-                            |v| v.name.clone(),
-                        );
+                        .map_or_else(|| "unknown".to_string(), |v| v.name.clone());
                     match decoded {
                         Some(Ok(ev)) => out.events.push(EvRec {
                             ix_index,
@@ -769,16 +739,11 @@ pub fn decode_tx(
 /// Every transaction of `session`, decoded (module docs).
 pub fn decode_session(session: &Session) -> anyhow::Result<Vec<ChainTx>> {
     let cat = InstructionCatalog::load()?;
-    let cc: Pubkey = session
-        .header
-        .complete_curve_id
-        .parse()
-        .map_err(|e| anyhow!("{e:?}"))?;
     session
         .txs
         .iter()
         .enumerate()
-        .map(|(i, t)| decode_tx(&cat, i, t, &cc).with_context(|| format!("session tx {i}")))
+        .map(|(i, t)| decode_tx(&cat, i, t).with_context(|| format!("session tx {i}")))
         .collect()
 }
 
@@ -2434,7 +2399,6 @@ fn event_slot(ev: &Ev) -> Option<u64> {
         ($($v:ident),*) => {
             match ev {
                 $( Ev::$v(x) => Some(x.slot), )*
-                Ev::CurveCompleted(_) | Ev::CurveAlreadyComplete(_) => None,
             }
         };
     }

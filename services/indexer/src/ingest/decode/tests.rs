@@ -450,8 +450,10 @@ fn the_committed_sessions_decode_with_the_current_layouts() {
             files += 1;
         }
     }
+    // 13 INGEST fixtures (pump-final P6: the synthetic-exit capture replaced the straddle
+    // bundle's two) and REPLAY's 2.
     assert!(
-        files >= 16 && events > 1_000,
+        files >= 15 && events > 1_000,
         "{files} sessions, {events} events"
     );
 }
