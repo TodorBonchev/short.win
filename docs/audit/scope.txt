@@ -79,10 +79,6 @@ programs/shortwin/src/venues/raydium.rs
 programs/shortwin/src/venues/raydium_cpmm.rs
 programs/shortwin/src/venues/raydium_v4.rs
 
-# [core] complete_curve: the stateless straddle helper program (ARCH §5.4, A66)
-programs/complete_curve/Cargo.toml
-programs/complete_curve/src/lib.rs
-
 # [core] shortwin-math: no_std protocol math, linked into the program and the keeper
 crates/shortwin-math/Cargo.toml
 crates/shortwin-math/src/bounds.rs
@@ -124,7 +120,7 @@ crates/shortwin-venue-state/src/raydium_cpmm.rs
 crates/shortwin-venue-state/src/raydium_v4.rs
 crates/shortwin-venue-state/src/token_account.rs
 
-# [core] build: workspace manifests, lockfile and toolchain pins the release ELFs build from
+# [core] build: workspace manifests, lockfile and toolchain pins the release ELF builds from
 Anchor.toml
 Cargo.lock
 Cargo.toml
@@ -186,7 +182,7 @@ services/ops/src/send.rs
 services/ops/src/squads.rs
 services/ops/src/verify.rs
 
-# [out] test-only: TEST-ONLY mock venue code: compiled only with feature `test-venue`, never in a release ELF (A49; CI checks that neither release ELF embeds the mock id and that the release shortwin.so lacks the test-venue marker)
+# [out] test-only: TEST-ONLY mock venue code: compiled only with feature `test-venue`, never in the release ELF (A49; CI checks that the release shortwin.so embeds neither the mock id nor the test-venue marker)
 crates/shortwin-venue-state/src/mock_cpamm.rs
 programs/shortwin/src/venues/mock.rs
 tests/mock_cpamm/Cargo.toml

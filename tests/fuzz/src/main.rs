@@ -13,8 +13,8 @@
 //! derived from the seed, [`runner::run_length`]), `--length` an exact count instead.
 //!
 //! Needs the program builds (`anchor build --tools-version v1.57 --arch v3` and
-//! `scripts/build-test-venue.sh`, or `SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`,
-//! `COMPLETE_CURVE_SO`). Exit status 1 if any run failed.
+//! `scripts/build-test-venue.sh`, or `SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`).
+//! Exit status 1 if any run failed.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;

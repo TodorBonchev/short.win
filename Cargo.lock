@@ -904,16 +904,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "complete-curve"
-version = "1.0.0"
-dependencies = [
- "anchor-lang",
- "shortwin-venue-state",
- "solana-security-txt",
- "solana-sha256-hasher",
-]
-
-[[package]]
 name = "const-crypto"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

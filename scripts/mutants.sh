@@ -13,7 +13,7 @@
 #
 #   scripts/mutants.sh [--fuzz 3m] [--work DIR] [--keep] [mutant ...]     (default: every mutant)
 #
-# Environment: SHORTWIN_SO / SHORTWIN_TEST_VENUE_SO / MOCK_CPAMM_SO / COMPLETE_CURVE_SO for the
+# Environment: SHORTWIN_SO / SHORTWIN_TEST_VENUE_SO / MOCK_CPAMM_SO for the
 # unmutated builds the fork tests also load (default: target/deploy, target/test-venue/deploy);
 # MUTANTS_JOBS (4), MUTANTS_SEED (20261001).
 # Exit status: 0 when every selected mutant is killed by its tests and (profile not `-`) by the
@@ -115,7 +115,6 @@ mkdir -p "$work"
 clean_so=${SHORTWIN_SO:-$root/target/deploy/shortwin.so}
 clean_tv=${SHORTWIN_TEST_VENUE_SO:-$root/target/test-venue/deploy/shortwin.so}
 mock_so=${MOCK_CPAMM_SO:-$root/target/deploy/mock_cpamm.so}
-curve_so=${COMPLETE_CURVE_SO:-$root/target/deploy/complete_curve.so}
 
 # The oracle, once: every test binary the mutants name, and the fuzzer.
 oracle="$work/oracle"
@@ -174,7 +173,7 @@ for i in "${!names[@]}"; do
   args=()
   for x in $tests; do args+=(--test "$x"); done
   (cd "$root" && env "${host_env[@]}" SHORTWIN_SO="$so_rel" SHORTWIN_TEST_VENUE_SO="$so_tv" \
-    MOCK_CPAMM_SO="$mock_so" COMPLETE_CURVE_SO="$curve_so" \
+    MOCK_CPAMM_SO="$mock_so" \
     cargo test --release --locked -p shortwin-litesvm-tests "${args[@]}" >"$dir/tests.log" 2>&1)
   tests_rc=$?
   if [ $tests_rc -ne 0 ]; then t_state=killed; else t_state=SURVIVED; fi
@@ -184,7 +183,7 @@ for i in "${!names[@]}"; do
     summary+=("$name: tests $t_state, fuzz $f_state")
   else
     (cd "$root" && SHORTWIN_SO="$so_rel" SHORTWIN_TEST_VENUE_SO="$so_tv" MOCK_CPAMM_SO="$mock_so" \
-      COMPLETE_CURVE_SO="$curve_so" "$oracle/release/shortwin-fuzz" run --profile "$profile" \
+      "$oracle/release/shortwin-fuzz" run --profile "$profile" \
       --duration "$fuzz" --jobs "${MUTANTS_JOBS:-4}" --seed "${MUTANTS_SEED:-20261001}" \
       --out "$dir/fuzz" >"$dir/fuzz.log" 2>&1)
     fuzz_rc=$?

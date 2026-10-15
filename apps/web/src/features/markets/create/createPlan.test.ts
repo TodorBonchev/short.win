@@ -26,7 +26,7 @@ import {
 const MINT = address('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU');
 const WALLET = createNoopSigner(address('9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'));
 const BC = address('BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7');
-const CP = address('4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ');
+const CP = address('11111111111111111111111111111112');
 const POOL = address('So11111111111111111111111111111111111111112');
 
 const detection = (kind: VenueDetection['kind'], pre: Instruction[] = []): VenueDetection => ({

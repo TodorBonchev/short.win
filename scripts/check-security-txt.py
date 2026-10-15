@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Check the security.txt V1 blob of a release program ELF (ARCHITECTURE §8.5, M10 SECTXT-1).
 
-Both deployed programs embed `solana_security_txt::security_txt!` (neodyme-labs/solana-security-txt
-=1.1.3; `programs/{shortwin,complete_curve}/src/lib.rs`), which Solana Explorer and
+The deployed program embeds `solana_security_txt::security_txt!` (neodyme-labs/solana-security-txt
+=1.1.3; `programs/shortwin/src/lib.rs`; the straddle helper `complete_curve` that also carried one
+is retired, design pump-final §11, owner decision D2), which Solana Explorer and
 `query-security-txt` read. This mirrors the crate's own parser (`find_and_parse`, parser.rs) and the
 Explorer's: the first BEGIN marker, the first END marker after it, NUL-separated key/value pairs, the
 four required keys, no unknown or duplicate key, typed contacts. It also requires exactly one BEGIN
@@ -11,7 +12,7 @@ else").
 
     python3 scripts/check-security-txt.py target/deploy/shortwin.so "short.win"
     python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.0 \
-        target/deploy/complete_curve.so "short.win complete_curve"
+        target/deploy/shortwin.so "short.win"
 
 The owner fields held `OWNER-FILL` placeholders until the public identity was decided (M10 owner
 question Q3, answered 2026-10-02): without `--forbid-placeholders` a placeholder is reported, not

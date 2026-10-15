@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Verifiable build of the two deployed programs, shortwin and complete_curve (ARCHITECTURE §1.1
-# "Verifiable build", C1-5; §9 M10), with solana-verify 0.5.2 in its pinned Agave 4.1.2 image.
+# Verifiable build of the deployed program, shortwin (ARCHITECTURE §1.1 "Verifiable build", C1-5;
+# §9 M10), with solana-verify 0.5.2 in its pinned Agave 4.1.2 image. (The straddle helper
+# complete_curve, built here until 1.0.0, is retired: design pump-final §11, owner decision D2.)
 #
 #   scripts/verifiable-build.sh [--local] [--out DIR] [--compare DIR]
 #
@@ -48,7 +49,7 @@ SVB_REPO=solanafoundation/solana-verifiable-build
 SVB_IMAGE_DIGEST=${SVB_IMAGE_DIGEST:-sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f}
 PLATFORM_TOOLS=${PLATFORM_TOOLS:-v1.57}
 SBPF_ARCH=${SBPF_ARCH:-v3}
-PROGRAMS=(shortwin complete_curve)
+PROGRAMS=(shortwin)
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 local_mode=0; out=""; compare=""

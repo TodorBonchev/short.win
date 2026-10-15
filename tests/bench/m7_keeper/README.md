@@ -30,7 +30,7 @@ M7_COST_WRITE=1 cargo test --manifest-path services/Cargo.toml --release --locke
 
 `M7_COST_FULL=1` runs the quiet cadence for an hour instead of 15 minutes (it is periodic: the
 day's figure is the same). The same env overrides as the scenario suite apply (`SHORTWIN_SO`,
-`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`).
+`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`).
 
 ## What it gates
 

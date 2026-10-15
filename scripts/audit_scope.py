@@ -35,14 +35,15 @@ UNITS = [
     ("shortwin", "core", "the program (release build; the test-venue mock adapter is below)",
      ["programs/shortwin/Cargo.toml", "programs/shortwin/src",
       ":(exclude)programs/shortwin/src/venues/mock.rs"]),
-    ("complete_curve", "core", "the stateless straddle helper program (ARCH §5.4, A66)",
-     ["programs/complete_curve/Cargo.toml", "programs/complete_curve/src"]),
+    # The stateless straddle helper `complete_curve` (ARCH §5.4, A66) was a core unit of the
+    # audited 1.0.0 scope; retired with pump's v3 exits and removed from the tree (design
+    # pump-final §11, owner decision D2; AUDIT.md §0).
     ("shortwin-math", "core", "no_std protocol math, linked into the program and the keeper",
      ["crates/shortwin-math/Cargo.toml", "crates/shortwin-math/src"]),
     ("shortwin-venue-state", "core", "no_std venue, mint, Pyth and ProgramData readers",
      ["crates/shortwin-venue-state/Cargo.toml", "crates/shortwin-venue-state/src",
       ":(exclude)crates/shortwin-venue-state/src/mock_cpamm.rs"]),
-    ("build", "core", "workspace manifests, lockfile and toolchain pins the release ELFs build from",
+    ("build", "core", "workspace manifests, lockfile and toolchain pins the release ELF builds from",
      ["Cargo.toml", "Cargo.lock", "Anchor.toml", "rust-toolchain.toml"]),
     ("keeper-core", "keeper", "exit and crank decisions, coverage and budget, the instructions and "
      "account lists the keeper sends (in scope: the owner's decision of 2026-10-02)",
@@ -73,8 +74,8 @@ UNITS = [
      ["crates/squads-v4-ix/Cargo.toml", "crates/squads-v4-ix/src",
       "services/ops/Cargo.toml", "services/ops/governance.example.toml", "services/ops/src"]),
     ("test-only", "out", "TEST-ONLY mock venue code: compiled only with feature `test-venue`, "
-     "never in a release ELF (A49; CI checks that neither release ELF embeds the mock id and that "
-     "the release shortwin.so lacks the test-venue marker)",
+     "never in the release ELF (A49; CI checks that the release shortwin.so embeds neither the "
+     "mock id nor the test-venue marker)",
      ["programs/shortwin/src/venues/mock.rs", "crates/shortwin-venue-state/src/mock_cpamm.rs",
       "tests/mock_cpamm"]),
 ]

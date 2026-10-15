@@ -70,8 +70,9 @@ defaults to v1.57 / v3 already; we pass the flags anyway so every command line s
 
 Check an artifact: `od -An -t x4 -j 48 -N 4 target/deploy/shortwin.so` prints `00000003`
 (ELF `e_flags` = SBPF v3). Outputs: `target/deploy/shortwin.so`, `target/idl/shortwin.json`,
-`target/types/shortwin.ts`; since M5 also the straddle helper's `target/deploy/complete_curve.so`
-and `target/idl/complete_curve.json`.
+`target/types/shortwin.ts` (from M5 to 1.0.0 also the straddle helper's
+`target/deploy/complete_curve.so` and its IDL; the helper was retired with pump's v3 exits,
+design pump-final §11, owner decision D2).
 
 Verifiable builds (M10) use solana-verify 0.5.2 with the same pins; the `=` form of the
 option is required (clap 2 `require_equals` on `build`, `verify-from-repo` and `export-pda-tx`):
@@ -79,14 +80,14 @@ option is required (clap 2 `require_equals` on `build`, `verify-from-repo` and `
 solana-verify picks its image from `[workspace.metadata.cli] solana = "4.1.2"` (root `Cargo.toml`):
 `solanafoundation/solana-verifiable-build@sha256:2e0b78f4…` (rust 1.95.0, `cargo-build-sbf` 4.1.0;
 the `--tools-version v1.57` argument makes it fetch v1.57 inside the container).
-`scripts/verifiable-build.sh` builds both deployed programs that way and must be byte-identical to
-`anchor build`:
+`scripts/verifiable-build.sh` builds the deployed program, `shortwin`, that way (until 1.0.0 also
+the retired `complete_curve` helper) and must be byte-identical to `anchor build`:
 
 ```sh
 cargo install solana-verify --version =0.5.2 --locked
 scripts/verifiable-build.sh --compare target/deploy          # Docker (CI's verifiable-build job)
 scripts/verifiable-build.sh --local --compare target/deploy  # no Docker daemon: bubblewrap shim
-# --out DIR (default target/verifiable): the two .so files, the build logs and verifiable-hashes.txt
+# --out DIR (default target/verifiable): shortwin.so, the build logs and verifiable-hashes.txt
 ```
 
 - `verifiable-hashes.txt` holds, per program, the file's sha256 and solana-verify's
@@ -120,13 +121,13 @@ public source: M11.
 origins embed source line numbers (`error!`, `require!`), so a comment that adds or removes a line
 changes the ELF. Check by hash (`sha256sum target/deploy/*.so` before and after).
 
-`anchor build` builds the three programs of the Anchor workspace: `shortwin`, the stateless
-straddle helper `programs/complete_curve` (M5; ARCH §5.4, A66: `complete_curve(max_sol_cost)`
-reads the curve's `rT` at execution and buys it through pump `buy_v2` with its own signer as
-`user`; deployed next to short.win) and the TEST-ONLY mock venue `tests/mock_cpamm`
-(`target/deploy/mock_cpamm.so`, below). **Deploy by name** (`anchor deploy -p shortwin`,
-`anchor deploy -p complete_curve`, or the verified-build path): a bare `anchor deploy` would also
-deploy the mock.
+`anchor build` builds the two programs of the Anchor workspace: `shortwin`, the one deployed
+program, and the TEST-ONLY mock venue `tests/mock_cpamm` (`target/deploy/mock_cpamm.so`,
+below). The stateless straddle helper `programs/complete_curve` (M5; ARCH §5.4, A66) left the
+workspace with pump-final P6 (owner decision D2: pump's v3 exits complete the curve themselves,
+and the helper was never deployed); `git show v1.0.0:programs/complete_curve` keeps its audited
+source. **Deploy by name** (`anchor deploy -p shortwin`, or the verified-build path): a bare
+`anchor deploy` would also deploy the mock.
 
 ### The test-venue build (M2; A49)
 
@@ -169,8 +170,8 @@ cargo check -p shortwin --target wasm32-unknown-unknown   # T-LAYOUT wasm32 leg
 cargo test -p squads-v4-ix                           # M10: the Squads v4 encoders against the vendored IDL
 anchor build --tools-version v1.57 --arch v3
 python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.0 \
-  target/deploy/shortwin.so "short.win"              # M10 SECTXT-1: the release gate (also complete_curve.so,
-python3 scripts/test_check_security_txt.py           #   "short.win complete_curve"); the checker's own tests
+  target/deploy/shortwin.so "short.win"              # M10 SECTXT-1: the release gate
+python3 scripts/test_check_security_txt.py           # the checker's own tests
 cargo deny check
 cargo audit --deny warnings --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 \
   --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
@@ -181,16 +182,16 @@ whole workspace at that count.) The ignored advisories are the ones in `deny.tom
 "unmaintained", none a vulnerability;
 bincode comes with anchor-lang 1.2.0, the other four only with the LiteSVM test harness.
 
-**security.txt (M10, ARCH §8.5).** Both deployed programs embed a
+**security.txt (M10, ARCH §8.5).** The deployed program embeds a
 neodyme security.txt (`solana-security-txt =1.1.3`, `security_txt!` in
-`programs/{shortwin,complete_curve}/src/lib.rs`): the owner's values of 2026-10-02 (contact
-`security@short.win`, policy `https://short.win/security`) and `source_release` = `v` + the
-package version (both crates are 1.0.0). It is compiled out of `no-entrypoint` builds (the keeper,
+`programs/shortwin/src/lib.rs`; the retired `complete_curve` carried one too until 1.0.0): the
+owner's values of 2026-10-02 (contact `security@short.win`, policy `https://short.win/security`)
+and `source_release` = `v` + the package version. It is compiled out of `no-entrypoint` builds (the keeper,
 the harness and the fuzzer link the programs as libraries) and out of the TEST-ONLY `test-venue`
 build. `scripts/check-security-txt.py` mirrors the crate's and the Explorer's parser and requires
 exactly one marker; without `--forbid-placeholders` an `OWNER-FILL` placeholder is reported, not
-refused. CI runs it with `--forbid-placeholders --source-release v<Cargo version>` on both release
-ELFs and checks that the test-venue build carries no marker. Read a deployed program's with
+refused. CI runs it with `--forbid-placeholders --source-release v<Cargo version>` on the release
+ELF and checks that the test-venue build carries no marker. Read a deployed program's with
 `query-security-txt <program id>`.
 
 Test vectors from the normative sims: `python3 crates/shortwin-math/tests/vectors/<track>/gen_<topic>.py`.
@@ -214,8 +215,8 @@ cargo test -p shortwin -p shortwin-venue-state        # host unit tests of the p
 
 Other builds: `SHORTWIN_SO` (the release program: the M1 binaries and every Raydium and pump
 binary), `SHORTWIN_TEST_VENUE_SO` (the test-venue program, M2 binaries), `MOCK_CPAMM_SO` (the mock
-venue), `COMPLETE_CURVE_SO` (the straddle helper: `straddle_it`, the `m5_cu` bench and the
-keeper's graduation scenarios); `SHORTWIN_PRE_M4R_SO` and `SHORTWIN_PRE_M4R_TEST_VENUE_SO` name a
+venue) (`COMPLETE_CURVE_SO`, the straddle helper's, is gone with it, pump-final D2);
+`SHORTWIN_PRE_M4R_SO` and `SHORTWIN_PRE_M4R_TEST_VENUE_SO` name a
 release and a test-venue build of the tree before M4R, for `switch_confirm_it`'s ignored lockstep
 differentials only. `Env::test_venue()` loads the test-venue program and the mock; `Env::new()` the release
 program only; `Env::ray_fork()` the release program and the dumped Raydium programs (below);
@@ -289,7 +290,7 @@ the venue as M6 will enable it; `Env::initialize_config_as_sent` sends the argum
 | `--test tx_size_raydium` | M3, T-SIZE: every Raydium transaction in its worst case (both ComputeBudget instructions, a separate fee payer, a first-time borrower, the largest extras set) fits 1,232 B and 64 accounts as v0 through the protocol ALT (A28 as enumerated, and the table `scripts/build-alt.sh` builds) and executes that way; crank batches (4 per v0 transaction); the keeper's composite and a Jito tip; M4's `propose_pool` / `execute_pool_switch` in their largest shapes (CPMM incumbent + CPMM candidate, a list-only market's detection set), executed through the table (`-- --nocapture` prints the table) |
 | `--test pump_math_it` | M5, T-PUMP-MATH (execution half) on the pump fork: a normal user's `buy_v2` / `sell_v2` / `buy_exact_quote_in_v2` on every live SOL curve of the dump (125-, 151-, 115- and 49-byte layouts, SPL Token and Token-2022) over grids and seeded sequences equal `fees::pump_curve` and `quote::sol_leg` on the readers' state to the lamport — every account delta and the `TradeEvent` —, the exact bound passing and one unit tighter failing; the live and synthetic fee tiers, the creator override, a default creator; 6021 above `rT`, the completing buy, 6005 after completion; the undocumented cap byte; the creator-vault top-up; recipient refusals; the tripwire on the live-supply fee tier (R-PUMP Update U10) |
 | `--test pump_it` | M5, the pump-curve adapter on the fork (release build, dumped pump / pump-fees / PumpSwap programs and coins): `listing` (`create_market(Auto)`: curve cache, trader base ATA and pump UVA, the list-only outcomes, every refusal), `flows` (open → close to the lamport on every curve layout), `refusals`, `structure` (I14), `rent` (T-RENT: the creator-vault top-up on sales and buys), `pda` (T-PDA-USER: the trader PDA as pump's `user` under CPI), `straddle` (`CurveStraddle`; `B̂_str` against the executed completion + `migrate_v2` + PumpSwap `buy`), `graduation` (`→ PumpMigrating`, the migration pause and S3 at 70 min, a real `migrate_v2`, `→ None` and S3 on the detection set, `None → PumpCurve` re-detection; M4's carry-overs: a graduated-elsewhere market with a position adopts its Raydium pool through the collection window, and the re-detection clears a running window; since M6 a migrated market moves `→ PumpSwap` and a graduated coin lists on its pool; the M6 security review's `m6_sec_5_*` — a full wipe during the migration pause waits for the curve cashback, without cashback `sweep_trader` alone unlocks the market — and M6-SEC-3 as the owner decided it on 2026-09-30 (ARCH §3.4, SPEC §14): `m6_sec_3_curve_opens_are_refused_exactly_while_create_pool_is_halted` — a curve open fails `GraduationHalted` (6104) exactly while PumpSwap's `disable_flags` bit 0 is set (0x01 / 0x03 / 0x09 / 0x19 / 0xff refused, 0xfe opens, clearing the bit re-enables opens, a close runs under the halt) — and `m6_sec_3_a_position_opened_before_the_create_pool_halt_stalls_until_s3` — a position opened before the halt keeps the stalled-graduation path: `migrate_v2` fails 6017 (`DisabledCreatePool`), the healthy position frozen past the 70-min pause until its deadline, then S3), `exits` (expiry, liquidation, `sweep_trader`'s token leg, the pump latch bits) |
-| `--test straddle_it` | M5, T-STRADDLE (curve part) with the `complete_curve` helper (`COMPLETE_CURVE_SO`): tx1 completes at the `rT` it reads, is a no-op on a completed or migrated curve; ★ a buy, a sale, a third-party completion or migration between the keeper's read and the bundle; v0.3's stale tx1 reverting the bundle; `max_sol_cost`; a straddled short.win position (`CurveStraddle`, `B̂_str` stable); every live SOL curve; the helper's own checks; trace / CU / size per transaction (`-- --nocapture`). **M6:** tx3 as built — the keeper's (the transition plus the pool's first bucket; its exit at T + 8, T + 9 without that bucket; a tx3 carrying the exit reverts the bundle `EmaWarmingUp`), the three-transaction bundle against a curve trade before it, the borrower's own tx3 with `close_short` at `B̂_str`, a borrower's self-made straddle (`rT − q + 1`); M10: `fees` (pump `FeeConfig` between and above the caps with a position open, G-G4; a curve layout change, G-H3; the Emergency flag's S3, the liquidation differential and the O15 race, G-D6), extras on the sell leg checked on the ELF's CPI (A41), and since batch 3 the curve, its ATAs (template aliases included) and the borrower refused as extras |
+| `--test synthetic_exit_it` | pump-final T-SYNTH-1..6, T-SIGMA, T-MIG-HALT (it replaces M5's `straddle_it`, retired with the straddle bundle and the `complete_curve` helper, owner D1 (a) and D2): short.win's own close, liquidation and expiry past the curve's `rT` complete the curve in one `buy_v3` (pump v3's synthetic migration), quoted `B̂_v3`; the keeper's `migrate_v2` and transition after it; trades and third-party completions before the exit; `max_in`; the forged `q − rT ≥ X_s` (`CurveStraddle`); a donated `curve_base_ata`; σ on `B̂_v3`; a synthetic close under PumpSwap's `create_pool` halt |
 | `--test pump_curve_scenarios`, `--test pump_curve_attacks`, `--test pump_curve_e2e` | M5 fork E2E on the curve (shared `pump_curve_support.rs`, no tests of its own; ≈ 2.5 / 1.5 / 1.3 min debug): ECON §11.2 and §10.1 curve rows replayed second by second against `shortwin_sim` to the lamport (D@50 % / D@80 % / D@90 %, stuck migrations with S3 at +4,200 s; D@0 % refused, `ProceedsBelowMin`); ECON §12 on the curve (expiry and liquidation sandwiches, atomic and held pushes, the OI-cap basket); the lifecycle on a live curve (listing, lenders, opens, a close, liquidations, an expiry, the lenders' exit), completion with positions open (`→ PumpMigrating` → `None`, S3), a curve migrated elsewhere between two reads, a real `migrate_v2` moving the market onto the pool (M6), and a fast `migrate_v2` priced on the pool (M6; the M5-only EMA freeze is gone); §10.1's graduation rows are `graduation_scenarios`' (`-- --nocapture` prints the figures) |
 | `--test trace_pump_it` | M5, T-TRACE on the curve: the exact call shape (program and stack height of every CPI) and entries of every curve-path instruction (listing, cranks incl. the venue transitions, opens, closes incl. a completing buyback, liquidate, expire, `sol_settle` on `PumpMigrating` and `None`, `sweep_trader`, the latch), peak height 3; the worst-case transactions ≤ 64 and the runtime's refusal of one open more |
 | `--test tx_size_pump_it` | M5, T-SIZE on the curve: every curve transaction in its worst case (the largest extras set, a separate fee payer, a first-time borrower) as v0 through both tables (A28 with its pump part, and `scripts/build-alt.sh`'s), executed that way; crank batches (5 per v0 transaction); the keeper's composite; a tipped liquidation with the largest extras set measured as **not** fitting v0 (`-- --nocapture` prints the table) |
@@ -410,8 +411,7 @@ clock. `fork::PumpCurve` gives the readers' state, the live fees, the venue's ow
 short.win's quotes, and the IDL-exact `buy_v2` / `sell_v2` / `buy_exact_quote_in_v2`;
 `tests/litesvm/src/pump.rs` lists markets on it (`Env::pump_market`, `PumpMarket`), trades the
 curve as a normal user (`CurveUser`) and builds the graduation path on the real ELFs
-(`migrate_v2_ix`, `NewPool`, PumpSwap `extend_account` / `buy`) and the straddle helper's
-`complete_curve_ix`. Venue-side scenario builders (`fork::set_curve_reserves`,
+(`migrate_v2_ix`, `NewPool`, PumpSwap `extend_account` / `buy`). Venue-side scenario builders (`fork::set_curve_reserves`,
 `set_curve_complete`, `set_curve_creator`, `set_curve_creator_fee_bps`,
 `set_global_creator_fee_configurable`, `set_fee_config`, `set_pump_deploy_slot`) change only
 pump's accounts.
@@ -475,7 +475,7 @@ record keeping the chain (`ki66full-park-keeps-chain`, the KI-66 full review), a
 `pending` owed and a parked lender closed) — (the test-venue or the release build of a private copy), and requires
 the mutant's named tests and, for the M7 ones, a short fuzz run of its profile to fail against it;
 the M10 mutants are checked by their tests alone (`-`) — a surviving mutant is a missing oracle. It needs the unmutated builds the fork tests load (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`,
-`MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`, default `target/…`); `--work` outside the repository keeps
+`MOCK_CPAMM_SO`, default `target/…`); `--work` outside the repository keeps
 the per-mutant builds out of `target/`.
 
 ## Benches
@@ -509,17 +509,18 @@ cargo test --manifest-path tests/bench/m3_cu/Cargo.toml --locked -- --nocapture
 # M3_CU_WRITE=1 rewrites results.md, M3_TRACE_WRITE=1 trace.md, M3_DEPTH_WRITE=1 depth.md;
 # SHORTWIN_SO / M3_WRAPPER_SO override the ELFs
 
-# M5 CU bench, T-TRACE, the T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump
-# curve: the release build and the complete_curve helper on the dumped pump / pump-fees / PumpSwap
-# programs and coins (Mollusk, cross-checked on LiteSVM), the worst-case curve transactions with
-# their v0 + ALT sizes, the straddle's tx1 (incl. a curve trade between the read and the bundle,
-# and the no-op) and tx2, every path through 0–3 levels of its own TEST-ONLY CPI wrapper
+# M5 CU bench, T-TRACE, the T-SIZE preview and stack depth on the pump curve: the release build
+# on the dumped pump / pump-fees / PumpSwap programs and coins (Mollusk, cross-checked on
+# LiteSVM), the worst-case curve transactions with their v0 + ALT sizes, the synthetic exits past
+# rT and the keeper's migrate_v2 after them and after an exact completion (the straddle bundle's
+# tx1 rows left with the complete_curve helper, D2), every path through 0–3 levels of its own
+# TEST-ONLY CPI wrapper
 anchor build --tools-version v1.57 --arch v3
 cargo-build-sbf --tools-version v1.57 --arch v3 --manifest-path tests/bench/m5_cu/wrapper/Cargo.toml \
   --sbf-out-dir tests/bench/m5_cu/target/deploy -- --locked       # the wrapper (t_depth)
 cargo test --manifest-path tests/bench/m5_cu/Cargo.toml --locked -- --nocapture
 # M5_CU_WRITE=1 rewrites results.md, M5_TRACE_WRITE=1 trace.md, M5_DEPTH_WRITE=1 depth.md;
-# SHORTWIN_SO / COMPLETE_CURVE_SO / M5_WRAPPER_SO override the ELFs
+# SHORTWIN_SO / M5_WRAPPER_SO override the ELFs
 # (since M6 its graduated coin lists on PumpSwap with the pAMM init set; Fartcoin stays list-only)
 
 # M6 CU bench, T-TRACE, T-SIZE, T-DEPTH and the graduation transition on PumpSwap: the release
@@ -596,10 +597,9 @@ since #101 at most 25 bps)
 CPMM and list-only markets; M4-SEC-7: discovered pools ranked by locked SOL, at most
 `rank_keys_per_tick` (200) accounts read a tick and the best `max_candidates` (8) evaluated,
 after the tick's exits and crank batch; config `[pool_select]` in `keeper.example.toml`; since M5
-duty 6 on the pump curve — `migrate_v2` as soon as a covered curve completes, the straddle bundle
-with the `complete_curve` helper through a Jito block engine (`--block-engine`, config
-`[graduation]`; since M6 its tx3 is the move onto the pool, `send_without_exit` and `migrate` default
-to true, and the keeper's exit lands at the warm-up gate) —, since M6 PumpSwap exits and account
+duty 6 on the pump curve — `migrate_v2` as soon as a covered curve completes (since pump-final P4
+a position past `rT` exits in one instruction, and the straddle bundle with its `complete_curve`
+helper and Jito block engine is retired) —, since M6 PumpSwap exits and account
 preparation, the move onto the pool after anyone's migration, the post-wipe claim bundle and duty
 13's `sweep_trader` (config `[sweep]`), `disable_flags` in duty 10 —,
 curve exits with the adapter's own account lists, and list-only markets covered with their
@@ -634,7 +634,7 @@ services/target/release/shortwin-keeper --rpc <url> --keypair keeper.json \
 The scenarios load the same builds as the program tests: the mock scenarios the test-venue
 build and the mock (`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`), the Raydium scenarios
 (`raydium*.rs`, and M4's `pool_select.rs` with its planted sibling pools) and M5's pump-curve
-scenarios (`graduation.rs`, also the helper: `COMPLETE_CURVE_SO`) and M6's PumpSwap and post-wipe
+scenarios (`graduation.rs`) and M6's PumpSwap and post-wipe
 scenarios (`pamm.rs`, `pamm_lp.rs` — M6R-1: the keeper's per-second liquidity-anomaly coverage holds a PumpSwap withdraw drag at one step, one crank per wrap, and never runs on a market without positions —, `wipe.rs` — incl. `m6_sec_2_*`: a donated pAMM cashback ATA without the trader's pAMM UVA is unlocked by the keeper's `[init_user_volume_accumulator, …, sweep_trader]`) the release build
 (`SHORTWIN_SO`) with the committed fork fixtures. The keeper
 knows the Raydium venues through the adapters' own account lists and the TEST-ONLY mock venue
@@ -716,9 +716,9 @@ the keeper scenario `raydium_alt` builds it on chain with the script's own code.
 
 The owner's layout (decisions of 2026-10-02 and 2026-10-03, ARCHITECTURE §1.1 "Admin", §8.5):
 Governance, an autonomous Squads v4 3-of-5 multisig with a 48 h Squads time lock (172,800 s),
-holds short.win's and complete_curve's upgrade authority (its vault 0, which is also
-`governance`) and the fee recipient (its vault 1); Emergency, an autonomous 2-of-4 with time lock
-0, is `pause_authority` (its vault 0). Since SQ-G8 the program refuses a config in which
+holds short.win's upgrade authority (its vault 0, which is also `governance`; the retired
+`complete_curve` is not in the upgrade set, pump-final D2) and the fee recipient (its vault 1);
+Emergency, an autonomous 2-of-4 with time lock 0, is `pause_authority` (its vault 0). Since SQ-G8 the program refuses a config in which
 `governance`, `pause_authority`, `fee_recipient` and an installed `coverage_authority` are not
 pairwise distinct (`AuthoritiesNotDistinct`, 6105). A program change takes 96 h end to end (48 h
 Squads, then the program's 48 h timelock). Members sign in the Squads app; the repository's tool
@@ -759,7 +759,7 @@ ProgramData: re-read the six slots on the day.
 The indexer is two crates of the services workspace (contract and as-built notes:
 [`docs/design/INDEXER.md`](design/INDEXER.md); crate guide:
 [`services/README.md` "Indexer (M8)"](../services/README.md#indexer-m8)): `shortwin-indexer` (RPC
-backfill and `logsSubscribe` live ingest of short.win, complete_curve and venue events into
+backfill and `logsSubscribe` live ingest of short.win and venue events into
 Postgres, projections, analytics views and hourly rollups, axum REST + WebSocket per
 `services/indexer/openapi.yaml`, one binary) and the TEST-ONLY `shortwin-indexer-litesvm` (records
 LiteSVM sessions and replays them into a database, asserting it against the chain).
@@ -807,10 +807,10 @@ could have touched them (`flush_stats` in `tests/security_api.rs`: `pg_stat_forc
 on each connection), not sleep.
 
 **The replay harness (the M8 exit criterion).** `cargo test --manifest-path services/Cargo.toml -p
-shortwin-indexer-litesvm` (~80 s) records eight sessions from the current builds — so build first,
+shortwin-indexer-litesvm` (~80 s) records nine sessions from the current builds — so build first,
 as for the keeper scenarios (`anchor build --tools-version v1.57 --arch v3 &&
-scripts/build-test-venue.sh`; `SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`,
-`COMPLETE_CURVE_SO` override the ELFs) — on the mock venue, the Raydium and pump forks and through
+scripts/build-test-venue.sh`; `SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`
+override the ELFs) — on the mock venue, the Raydium and pump forks and through
 the keeper's scenarios, then ingests each through the real pipeline into a fresh database and
 asserts INDEXER.md §11.4 against the chain at every checkpoint (projections, the SOL ledgers,
 analytics and rollups, idempotence, rebuild, out-of-order delivery, a rollback through the finality
@@ -1184,14 +1184,13 @@ committed. After any change to the program's interface (accounts, args, events, 
 ```sh
 anchor build --tools-version v1.57 --arch v3
 pnpm install --frozen-lockfile
-pnpm --filter @shortwin/client idl:sync     # target/idl/{shortwin,complete_curve}.json -> clients/js/idl/
+pnpm --filter @shortwin/client idl:sync     # target/idl/shortwin.json -> clients/js/idl/
 pnpm --filter @shortwin/client generate     # -> clients/js/src/generated/
 pnpm --filter @shortwin/client check        # tsc + node --test (incl. the T-LAYOUT Codama leg)
 ```
 
-CI fails if the IDL copy or the generated code is stale. `clients/js/idl/complete_curve.json` (the
-straddle helper's IDL) is committed for clients and the audit package; nothing is generated from
-it, and the `codama` job diffs it against the build too. See
+CI fails if the IDL copy or the generated code is stale (the retired straddle helper's
+`complete_curve.json` left `clients/js/idl/` with it, pump-final §10). See
 [`clients/js/README.md`](../clients/js/README.md).
 
 ## Governance config gate (A73)
@@ -1265,9 +1264,8 @@ context only, and `out` is the TEST-ONLY mock venue code.
 
 - **Cargo, on-chain** (root `Cargo.toml`, resolver 3, `Cargo.lock` committed):
   `crates/shortwin-math`, `crates/shortwin-math-wasm`, `crates/shortwin-venue-state`,
-  `programs/shortwin`, the straddle helper `programs/complete_curve` (M5; crate `complete-curve`,
-  also a member of `Anchor.toml [workspace]`; the services workspace links it for its Anchor
-  types) and the program tests `tests/litesvm` (which share this lockfile so the
+  `programs/shortwin` (the straddle helper `programs/complete_curve` of M5 left both workspaces
+  with pump-final P6, owner decision D2) and the program tests `tests/litesvm` (which share this lockfile so the
   Agave line LiteSVM resolves is pinned next to the program's, C1-14), and since M7 the
   invariant fuzzer `tests/fuzz` (it links the program tests, so it shares the lockfile too), and
   since M10 the host-only Squads v4 encoders `crates/squads-v4-ix` (the program tests and
@@ -1292,8 +1290,9 @@ context only, and `out` is the TEST-ONLY mock venue code.
 - **`shortwin-math`** (ARCHITECTURE §2.2): `#![no_std]`, zero runtime dependencies,
   `#![deny(clippy::arithmetic_side_effects, clippy::cast_possible_truncation,
   clippy::cast_sign_loss, clippy::unwrap_used)]` (also on the program and
-  `shortwin-venue-state`). The two programs additionally deny `clippy::expect_used`,
-  `clippy::panic` and `unsafe_code` (AUD-10, M10); `unsafe_code` does not fire inside Anchor's or
+  `shortwin-venue-state`). The program additionally denies `clippy::expect_used`,
+  `clippy::panic` and `unsafe_code` (AUD-10, M10; so did the `complete_curve` helper until
+  1.0.0); `unsafe_code` does not fire inside Anchor's or
   `security_txt!`'s external macro expansions, and a test module that needs `expect` allows it
   as it allows `unwrap_used`. Every fallible function returns `Result<_, MathError>`, or `Option`
   where the API says a value is undefined. Every division takes an explicit `num::Rounding`,
@@ -1316,12 +1315,10 @@ throwaway keypair to `target/deploy/`. The built program is unaffected (the id c
 `declare_id!`); `--ignore-keys` silences the warning, and CI uses it. Do not run
 `anchor keys sync`: it would rewrite `declare_id!` to the throwaway key.
 
-The straddle helper (M5) has its own id, `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ`
-(`programs/complete_curve/src/lib.rs`, `Anchor.toml`); its keypair is in the gitignored
-`programs/complete_curve/keys/complete_curve-keypair.json` (the `*-keypair.json` rule), exists only
-in the owner's working tree and must be backed up like short.win's; copy it to
-`target/deploy/complete_curve-keypair.json` before `anchor deploy -p complete_curve`. At deploy it
-gets the Governance upgrade authority, as the core program (ARCH §8.5).
+The straddle helper of M5 (`4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ`) is retired and never
+deployed (pump-final §11, owner decision D2): its id is in no manifest any more, and its keypair
+(`programs/complete_curve/keys/complete_curve-keypair.json` in the owner's working tree) is no
+longer needed.
 
 **`initialize_config` on mainnet (OWNER-E2E-1, M11 deploy runbook).** As a legacy transaction
 with a separate fee payer `initialize_config` is 1,294 B, over the 1,232-B limit (the Surfpool
@@ -1347,19 +1344,19 @@ opt-in (`gh variable set FUZZ_NIGHTLY --body true`) and long fuzz runs are local
 | `deny` | `cargo deny check` (`deny.toml`) and `cargo audit` on the workspace and the six bench lockfiles |
 | `wasm` | wasm32 release build of `shortwin-math` and `shortwin-math-wasm` |
 | `cu-math` | T-CU-MATH bench (`tests/bench/cu_math`) |
-| `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (shortwin, the `complete_curve` helper and the mock) and `scripts/build-test-venue.sh`; asserts SBPF v3 on all four artifacts; A49: the release `shortwin.so` carries neither the test-venue marker nor the mock id (and `complete_curve.so` not the mock id), the test-venue build and `mock_cpamm.so` do; M10 SECTXT-1: `scripts/test_check_security_txt.py`, then `scripts/check-security-txt.py --forbid-placeholders --source-release v<Cargo version>` on both release ELFs (exactly one valid security.txt with the owner's values), and none in the test-venue build; uploads the `.so` files, both IDLs and the TS types |
-| `verifiable-build` | M10: `scripts/verifiable-build.sh --compare` in Docker — solana-verify 0.5.2 in the pinned image (`SVB_IMAGE_DIGEST`), `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"` — must be byte-identical to the `anchor-build` artifact for `shortwin` and `complete_curve`; only that image used; A49 on the verifiable artifacts; the file and executable hashes in the job summary and the `verifiable-build` artifact |
-| `program-tests` | on the `anchor-build` artifact: fixture checksums (`SHA256SUMS` and `scripts/dump-fixtures.py check`), `cargo check -p shortwin --target wasm32-unknown-unknown` (T-LAYOUT), `cargo test -p shortwin` on the release feature set, `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests` (incl. every Raydium and pump fork binary, `straddle_it` with the helper) |
+| `anchor-build` | Agave 4.1.2 + Anchor CLI 1.2.0, `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (shortwin and the mock; the `complete_curve` helper left with pump-final P6) and `scripts/build-test-venue.sh`; asserts SBPF v3 on the artifacts; A49: the release `shortwin.so` carries neither the test-venue marker nor the mock id, the test-venue build and `mock_cpamm.so` do; M10 SECTXT-1: `scripts/test_check_security_txt.py`, then `scripts/check-security-txt.py --forbid-placeholders --source-release v<Cargo version>` on the release ELF (exactly one valid security.txt with the owner's values), and none in the test-venue build; uploads the `.so` files, the IDL and the TS types |
+| `verifiable-build` | M10: `scripts/verifiable-build.sh --compare` in Docker — solana-verify 0.5.2 in the pinned image (`SVB_IMAGE_DIGEST`), `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"` — must be byte-identical to the `anchor-build` artifact for `shortwin`; only that image used; A49 on the verifiable artifacts; the file and executable hashes in the job summary and the `verifiable-build` artifact |
+| `program-tests` | on the `anchor-build` artifact: fixture checksums (`SHA256SUMS` and `scripts/dump-fixtures.py check`), `cargo check -p shortwin --target wasm32-unknown-unknown` (T-LAYOUT), `cargo test -p shortwin` on the release feature set, `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests` (incl. every Raydium and pump fork binary, `synthetic_exit_it`) |
 | `codama` | IDL copy and generated client are current; `tsc`; `node --test` (T-LAYOUT Codama leg) |
 | `web` | M9: wasm-bindgen 0.2.129, `@shortwin/math-wasm` build, then `apps/web`'s Biome check, type check, Vitest and production build (FRONTEND.md §10.4) |
 | `web-e2e` | M9: Playwright (profile `chain`) on `solana-test-validator` with the `anchor-build` artifact's test-venue `shortwin.so` and mock (since 2026-10-15 not the `complete_curve` helper, pump-final D2) plus the dumped venues, the seeded scenario, the production build and the injected test wallet; every spec (incl. the §10.3 CPI Guard and memo exit tests, axe on every page); the `screens` PNGs uploaded always, report, traces and logs on failure |
 | `m1-cu` | M1 CU baseline bench (`tests/bench/m1_cu`) within budget |
 | `m2-cu` | M2 CU bench and T-TRACE (`tests/bench/m2_cu`) within budget and 64 trace entries |
 | `m3-cu` | M3 CU bench, T-TRACE and stack depth on Raydium (`tests/bench/m3_cu`): builds the TEST-ONLY CPI wrapper (SBPF v3 asserted), every Raydium-path instruction (M4's `propose_pool` / `execute_pool_switch` included) within budget, the worst-case transactions at their exact trace counts, every path through 0–3 wrapper levels |
-| `m5-cu` | M5 CU bench, T-TRACE, the T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump curve (`tests/bench/m5_cu`): builds its TEST-ONLY CPI wrapper (SBPF v3 asserted), every curve-path instruction within ARCH §6.1's PROPOSED limits, the worst-case curve transactions at their exact trace counts and v0 + ALT sizes, the straddle's tx1 (the `complete_curve` helper) and tx2 (`migrate_v2`), every path through 0–3 wrapper levels |
+| `m5-cu` | M5 CU bench, T-TRACE, the T-SIZE preview and stack depth on the pump curve (`tests/bench/m5_cu`): builds its TEST-ONLY CPI wrapper (SBPF v3 asserted), every curve-path instruction within ARCH §6.1's PROPOSED limits, the worst-case curve transactions at their exact trace counts and v0 + ALT sizes, the synthetic exits and the keeper's `migrate_v2` after an exact and after a synthetic completion, every path through 0–3 wrapper levels |
 | `m6-cu` | M6 CU bench, T-TRACE, T-SIZE, T-DEPTH and the graduation transition on PumpSwap (`tests/bench/m6_cu`): its TEST-ONLY CPI wrapper, every PumpSwap-path instruction within budget, the worst-case transactions at their exact trace counts and v0 + ALT sizes |
 | `t-pot` | T-POT: every `pool_model` trace replayed through the program in release (`lender_it traces::`, `SHORTWIN_TRACES=full`) |
-| `services` | the services workspace: fmt, clippy (the indexer crates included; also the keeper without `test-venue`), cargo-deny, cargo-audit, the keeper's and (M10) `shortwin-gov`'s unit tests, T-OPS (`gov_e2e`: the governance sequence through the tool's command line on the mainnet Squads ELF) and the keeper's LiteSVM scenarios (mock, Raydium and pump fork, the helper included; M7's degraded-mode drill, duty 11, the PumpSwap tables) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
+| `services` | the services workspace: fmt, clippy (the indexer crates included; also the keeper without `test-venue`), cargo-deny, cargo-audit, the keeper's and (M10) `shortwin-gov`'s unit tests, T-OPS (`gov_e2e`: the governance sequence through the tool's command line on the mainnet Squads ELF) and the keeper's LiteSVM scenarios (mock, Raydium and pump fork; M7's degraded-mode drill, duty 11, the PumpSwap tables) on the `anchor-build` artifacts, and the A49 check on the release keeper binary |
 | `indexer` | M8: the indexer's tests on an embedded PostgreSQL 17.11 (zonky binaries cached): the fixture gate, `-p shortwin-indexer` (decoders, ingest on the recorded sessions, analytics, the API contract on the seed and on replayed sessions, limits, WebSocket), the replay harness `-p shortwin-indexer-litesvm` on the `anchor-build` artifacts (the M8 exit criterion), the RPC paths against `solana-test-validator`, no `postgresql_embedded` in the production dependencies, and `docker compose config` on the reference deployment |
 | `t-size` | T-SIZE on Raydium (`--test tx_size_raydium`), on the pump curve (`--test tx_size_pump_it`) and on PumpSwap (`--test tx_size_pumpswap_it`), the size tables in the log, and the protocol ALT's static part (`scripts/build-alt.sh print`, uploaded as an artifact) |
 | `fuzz-smoke` | M7: `cargo test --release -p shortwin-fuzz` — the fuzzer's fixed-seed smoke on every profile, the corpus replays (a reproducer marked fixed must pass) and its self-tests; crash files uploaded on failure |

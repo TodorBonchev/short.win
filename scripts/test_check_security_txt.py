@@ -57,13 +57,13 @@ class CheckSecurityTxt(unittest.TestCase):
         try:
             ok = subprocess.run([sys.executable, CHECK, f.name, "short.win"], capture_output=True,
                                 text=True, check=False)
-            bad = subprocess.run([sys.executable, CHECK, f.name, "short.win complete_curve"],
+            bad = subprocess.run([sys.executable, CHECK, f.name, "short.win helper"],
                                  capture_output=True, text=True, check=False)
         finally:
             os.unlink(f.name)
         self.assertEqual(ok.returncode, 0, ok.stdout)
         self.assertEqual(bad.returncode, 1, bad.stdout)
-        self.assertIn("expected 'short.win complete_curve'", bad.stdout)
+        self.assertIn("expected 'short.win helper'", bad.stdout)
 
     def test_no_marker_or_two(self):
         self.expect(1, b"\x7fELF" + b"\0" * 64, says="0 security.txt BEGIN markers")

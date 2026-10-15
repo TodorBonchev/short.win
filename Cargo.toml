@@ -12,8 +12,8 @@ members = [
     # M10 WP-7: Squads v4 encoders for the governance tests (host-only; tests/litesvm links it).
     "crates/squads-v4-ix",
     "programs/shortwin",
-    # The stateless straddle helper (ARCH §5.4, A66).
-    "programs/complete_curve",
+    # (The stateless straddle helper programs/complete_curve, ARCH §5.4 A66, was retired with
+    # pump's v3 exits: design pump-final §11, owner decision D2.)
     "tests/litesvm",
     # M7 invariant fuzz harness (ARCH §8.4): action sequences on LiteSVM through the I1–I18 hooks.
     "tests/fuzz",

@@ -616,8 +616,8 @@ them; the transparency they give is the point (SPEC §11's powers are visible as
 
 - **short.win's own legs** — always: every venue trade nested under a short.win invocation (opens
   sell, closes / liquidations / expiries buy; an exit past a pump curve's `rT` is two rows, below);
-  they are in short.win's transactions already. `is_shortwin = true`, `shortwin_invocation` = the short.win frame
-  below the venue frame (§5.2).
+  they are in short.win's transactions already. `is_shortwin = true`, `shortwin_invocation` = the
+  short.win frame below the venue frame (§5.2).
 - **Everyone's trades of listed pools** — when `venue_trades.third_party = true`: one signature
   stream per tracked pool (§2.2), at most `max_pools`, chosen by OI then TVL. For charts (candles,
   §9.2) and, once markets are listed, the **gap-frequency calibration** of ECON §11.6 / G37. *M10:*
@@ -1427,7 +1427,8 @@ track reads (§9.2's read model, §6's projections) needs that track's agreement
   the AI review's follow-ups, re-measures them);
   `cargo test -p shortwin-indexer --test ingest_sessions` — INGEST's thirteen fixtures and
   REPLAY's committed two, each matching the chain, with ordering, rebuild, rollback and
-  single-writer tests (6).
+  single-writer tests (6; 8 since pump-final P6: the synthetic exit's rows and a retired helper
+  transaction).
 - *"API contract tests":* `api_contract` (6), `api_limits` (6), `api_ws` (6) on the seed and
   `api_replayed` (1, ≈ 1,800 responses on sixteen replayed sessions, 48 accounts compared with the
   chain through the API).

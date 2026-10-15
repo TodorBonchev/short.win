@@ -76,6 +76,18 @@ to build and test the code, what the code relies on, and what we already know ab
 | Verifiable build | solana-verify 0.5.2, image `solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f`, `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"`: `scripts/verifiable-build.sh` (Docker, or `--local`: a bubblewrap shim running the same digest-pinned image) and CI's `verifiable-build` job, which fail unless each output is byte-identical to the `anchor build` artifact (ARCH §1.1) |
 | Contacts | Security reports: `security@short.win`; policy page `https://short.win/security` (`SECURITY.md`; the same values are in both programs' `security.txt` and the web's `/.well-known/security.txt`; owner decision Q3 of 2026-10-02). The auditors' point of contact is named at the engagement (§12) |
 
+**Retired after the tag: `complete_curve`** (design pump-final §11, owner decision D2 of
+2026-10-13; the auditors are to be told of this scope change). Since pump's v3 build a
+short.win exit past the curve's `rT` buys `rT` on the curve and the rest from the would-be pool
+in one instruction, so the straddle bundle and its helper have no caller, and the helper was
+never deployed. Since PUMP-V3 P6 it is out of the workspace (`anchor build` builds `shortwin`
+and the TEST-ONLY `mock_cpamm`), the release scripts and CI (`verifiable-build.sh`,
+SECTXT-1, A49), Governance's upgrade set (`shortwin-gov` refuses a layout that names it), the
+committed IDLs and the indexer; `scripts/audit_scope.py` no longer lists it (`scope.txt`). The
+`complete_curve` rows of this section and §1–§4, §9's reproduce commands (run on the tag) and
+§11's "1.0.0 only" focus item describe the audited 1.0.0 tree and stay as its record
+(`git show v1.0.0:programs/complete_curve`).
+
 **Verified hashes of this tree.** `scripts/verifiable-build.sh --local --compare` on `m10/ki67`
 (2026-10-08, commit `36f43cc`, the batch's head with the web batch; its `verifiable-hashes.txt`
 names the commit; first at `25e95f2`, the same bytes): solana-verify 0.5.2 in the pinned image
@@ -183,9 +195,9 @@ A market moves between venues on graduation and on Raydium pool switches (ARCH �
 - **Keepers.** Anyone can run the exits and the price cranks. The in-house keeper covers
   markets with open positions, within a global daily budget. A market it cannot cover has its
   opens paused through the `coverage_authority` (degraded mode; ARCH §7.1, ECON §5.8).
-- **`complete_curve`.** A stateless helper that completes a pump curve inside a straddle
-  bundle. It has its own signer, because short.win never forwards a user's signature to a
-  venue (ARCH §5.4).
+- **`complete_curve`** (1.0.0; **retired** after the tag, §0). A stateless helper that completed
+  a pump curve inside a straddle bundle. It had its own signer, because short.win never forwards
+  a user's signature to a venue (ARCH §5.4).
 
 ---
 
@@ -212,7 +224,7 @@ available for this batch — its core rows grow by about the nLOC delta):
 | Class | Unit | `.rs` files | tokei 14.0.0 "code" | non-test nLOC |
 |---|---|---|---|---|
 | core | `programs/shortwin` (without the TEST-ONLY `venues/mock.rs`) | 70 | 16,245 | 13,293 |
-| core | `programs/complete_curve` | 1 | 293 | 213 |
+| core | `programs/complete_curve` (1.0.0; retired after the tag, §0: not in `scope.txt` since PUMP-V3 P6) | 1 | 293 | 213 |
 | core | `crates/shortwin-math` (`src/`) | 25 | 10,506 | 6,593 |
 | core | `crates/shortwin-venue-state` (`src/`, without the TEST-ONLY `mock_cpamm.rs`) | 10 | 3,772 | 1,636 |
 | core | build pins: `Cargo.toml`, `Cargo.lock`, `Anchor.toml`, `rust-toolchain.toml` | — | — | — |
@@ -286,10 +298,10 @@ the skeleton; batch 3's `DeniedAccount` fallback is in `keeper.rs` (keeper rest)
 - That feature goes only into a separate build, `scripts/build-test-venue.sh`, written to
   `target/test-venue/`.
 - CI's anchor-build job (A49) checks that:
-  - neither release ELF (`shortwin.so`, `complete_curve.so`) embeds the mock's program id;
+  - the release ELF `shortwin.so` does not embed the mock's program id (at 1.0.0 also
+    `complete_curve.so`, retired since, §0);
   - the release `shortwin.so` lacks the marker `shortwin:test-venue:mock-cpamm`. The marker
-    is a `shortwin` constant (`constants.rs`), and `complete_curve`'s `test-venue` feature is
-    a no-op, so CI does not grep `complete_curve.so` for it;
+    is a `shortwin` constant (`constants.rs`);
   - the test-venue `shortwin.so` contains both, which shows that the checks can see them;
   - the same checks run on the `verifiable-build` job's artifacts.
 - Auditors should still confirm that no `test-venue` path reaches release behaviour.
@@ -320,7 +332,8 @@ the skeleton; batch 3's `DeniedAccount` fallback is in `keeper.rs` (keeper rest)
 4. `crates/shortwin-math` (its README lists the modules; ECON §2 gives the numeric
    conventions, ECON §3–§9 the formulas) and `crates/shortwin-venue-state` (the byte-level
    readers; ARCH §4.1).
-5. `programs/complete_curve/src/lib.rs` together with ARCH §5.4 (the straddle bundle).
+5. (1.0.0 only) `programs/complete_curve/src/lib.rs` together with ARCH §5.4 (the straddle
+   bundle); retired after the tag (§0).
 6. If the keeper is in scope: `services/keeper/src/lib.rs`, then `decide.rs`, `view.rs`,
    `ixs.rs` and `venue.rs`, then `keeper.rs` (ARCH §7.1).
 7. The invariant hooks (`tests/litesvm/src/invariants.rs` and `invariants/`; ARCH §8.3). They
@@ -338,7 +351,7 @@ layout on the dumped mainnet Squads ELF.
 
 | Multisig | Squads v4 config | Its vaults' roles in short.win |
 |---|---|---|
-| **Governance** | 3-of-5, `time_lock` 172,800 s (48 h); autonomous (no config authority), no spending limits, rent collector its own vault 0 | vault 0: the upgrade authority of `shortwin` and `complete_curve`, and `governance`; vault 1: `fee_recipient` |
+| **Governance** | 3-of-5, `time_lock` 172,800 s (48 h); autonomous (no config authority), no spending limits, rent collector its own vault 0 | vault 0: the upgrade authority of `shortwin` (at 1.0.0 also of `complete_curve`, retired since, §0), and `governance`; vault 1: `fee_recipient` |
 | **Emergency** | 2-of-4, `time_lock` 0; autonomous, no spending limits | vault 0: `pause_authority` |
 | (no multisig) | the keeper's hot key | `coverage_authority`, set at `initialize_config` or by a timelocked `Authorities` change |
 
@@ -350,7 +363,7 @@ skipped). It is checked in `initialize_config` and, for an `Authorities` change,
 
 | Role | Key | Can | Cannot |
 |---|---|---|---|
-| Upgrade authority | Governance vault 0, after the deployer moves it with the checked `SetAuthorityChecked` (staged by `shortwin-gov`; the deployer runs `initialize_config` once, before) | upgrade `shortwin` and `complete_curve` after the 48 h Squads time lock | — (the upgrade is the trust assumption; ARCH §8.5, KI-45, KI-62) |
+| Upgrade authority | Governance vault 0, after the deployer moves it with the checked `SetAuthorityChecked` (staged by `shortwin-gov`; the deployer runs `initialize_config` once, before) | upgrade `shortwin` (at 1.0.0 also `complete_curve`, retired since, §0) after the 48 h Squads time lock | — (the upgrade is the trust assumption; ARCH §8.5, KI-45, KI-62) |
 | `governance` | Governance vault 0 | `propose_config` (timelocked, within compiled bounds, `params::validate` + `validate_econ`), `cancel_config`, `set_pause`, `set_route_broken`, `set_venue_extras` (pins `stable`) | move funds; change a venue program id; skip the timelock |
 | `pause_authority` | Emergency vault 0 | `set_pause`, `disable_venue` (which also cancels a pending `EnableVenues` change that would set the venue's bit, AIR-24), `revalidate_venue(venue, expected_slot, expected_elf_hash)` (the hash of the reviewed trimmed ELF lets a later deploy slot from an extension through and records the venue's fingerprint, AIR-01; KI-69), `set_route_broken`, `set_venue_extras`, `cancel_config` (not `Authorities` or `Timelock` changes), clear (never set) `paused_coverage` | move funds; re-enable a venue (timelocked); veto an upgrade (KI-62) |
 | `coverage_authority` | the keeper's hot key | set or clear one market's `paused_coverage` (opens only) | anything else (I4: byte for byte) |
@@ -718,6 +731,11 @@ rustup, Agave 4.1.2, Anchor 1.2.0, mise for Node and pnpm). The target is 30 min
 the toolchain is installed; the times in the comments are this package's gate (§10) on a
 3-job build limit, with a warm `target/`.
 
+They reproduce the audited tree: run them on a checkout of the tag `audit-1` (`v1.0.0`), whose
+hashes are §0's. On a tree after PUMP-V3 P6 the workspace builds `shortwin` alone (the
+`complete_curve` helper is retired, §0): drop `complete_curve.so` from step 2, and compare
+`shortwin.so` with the hashes recorded for that tree, not §0's.
+
 ```sh
 # 1. Build both programs (release) and the TEST-ONLY test-venue build; check SBPF v3.
 #    A clone has no program keypair: --ignore-keys silences Anchor's "Program ID mismatch"
@@ -750,10 +768,11 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
 **CI.** `.github/workflows/ci.yml` has these jobs:
 - fmt, clippy, test (with `squads-v4-ix`), vectors, deny, wasm, cu-math;
 - anchor-build, including A49 (the release-vs-test-venue check) and the release gate
-  `check-security-txt.py --forbid-placeholders` on both ELFs;
+  `check-security-txt.py --forbid-placeholders` on the release ELF (until PUMP-V3 P6 on both,
+  `complete_curve.so` too);
 - verifiable-build (solana-verify 0.5.2 in the pinned image, byte equality with
   anchor-build's artifacts, A49 on its output, the hashes in the job summary);
-- program-tests, t-pot, codama (IDL and client diffs, both IDLs), web, web-e2e;
+- program-tests, t-pot, codama (IDL and client diffs; both IDLs until PUMP-V3 P6), web, web-e2e;
 - the benches m1-cu, m2-cu, m3-cu, m5-cu, m6-cu, m7-keeper-bench, and t-size;
 - services (with `shortwin-gov`) and indexer;
 - fuzz-smoke on every push; fuzz-nightly and mutants are opt-in. A `schedule` run (main only)
@@ -1316,7 +1335,7 @@ These are where we would look first. They are not limits on the scope.
      PumpSwap (`buy` / `sell` with fee ATAs and UVA existence), AMM v4 (`swap_base_in_v2` /
      `swap_base_out_v2`) and CPMM;
    - measuring every leg against the post-normalisation baseline (I13);
-   - `complete_curve`'s single CPI.
+   - (1.0.0 only; retired after the tag, §0) `complete_curve`'s single CPI.
 4. **The observation layer.** Bucket integration, the EMA, the ring and the settlement box
    (`engine/observe.rs`, `shortwin-math` `observe`, `persist`, `settle`). Rounding direction
    at every step (ECON §2).

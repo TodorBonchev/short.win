@@ -8,7 +8,7 @@ and replacement checks) — against the test-venue build and the sha-checked mai
 fixtures.
 
 ```sh
-anchor build --tools-version v1.57 --arch v3 --ignore-keys   # target/deploy/{shortwin,mock_cpamm,complete_curve}.so
+anchor build --tools-version v1.57 --arch v3 --ignore-keys   # target/deploy/{shortwin,mock_cpamm}.so
 scripts/build-test-venue.sh                                  # target/test-venue/deploy/shortwin.so
 cargo run -p shortwin-fuzz --release -- run --profile all --duration 1h --jobs 8 --out fuzz-out --minimize
 cargo run -p shortwin-fuzz --release -- replay fuzz-out/crash-<profile>-<seed>-<sig>.json
@@ -18,8 +18,8 @@ cargo run -p shortwin-fuzz --release -- one --profile curve --seed 42 --length 2
 cargo test -p shortwin-fuzz --release                                                  # smoke, corpus replays, self-tests
 ```
 
-The program paths are the harness's (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`,
-`COMPLETE_CURVE_SO`). The fuzzer needs speed, not the deploy profile's fat LTO:
+The program paths are the harness's (`SHORTWIN_SO`, `SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`).
+The fuzzer needs speed, not the deploy profile's fat LTO:
 `CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16` builds it in ~2 min
 (CI does the same). `run` without `--duration` does one run; `--runs N` caps the count; each job
 (`--jobs`, default: every core) owns one seed stream (`seed + job + k·jobs`: runs at `--seed s` and
