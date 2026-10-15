@@ -12,8 +12,6 @@ shortwin.workspace = true
 shortwin-math.workspace = true
 shortwin-venue-state.workspace = true
 shortwin-services-common.workspace = true
-# The straddle helper's program id: its upgrade authority moves to Governance with short.win's.
-complete-curve.workspace = true
 # Squads v4 encoders, PDAs and decoders (crates/squads-v4-ix; already in this lockfile through
 # the LiteSVM harness).
 squads-v4-ix = { path = "../../crates/squads-v4-ix" }

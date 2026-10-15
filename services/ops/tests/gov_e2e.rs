@@ -9,7 +9,7 @@
 //! | Test | What |
 //! |---|---|
 //! | T-OPS-1 | the example layout is refused for anything that sends (`status` and `verify` still run); `--dry-run` simulates and sends nothing; `verify` on an empty cluster fails on every missing piece |
-//! | T-OPS-2 | the whole sequence: both multisigs; `init-config` with the vault PDAs (a stale guard slot refused first); `stage-upgrade` refused while the deployer still holds the upgrade authority; the checked upgrade-authority transfer of short.win and complete_curve through Governance (the deployer co-signs; `--checked` required; Squads refuses 1 s early); an `Authorities` change through both timelocks (Squads 172,800 s, then short.win's `TimelockNotElapsed` 1 s early); an upgrade through the vault (a buffer the vault does not own, and one whose ELF outgrows the ProgramData, refused by the tool — the first, staged anyway, by the loader after the time lock); a cancelled stale upgrade; `status` decoding a staged transaction; Emergency `set-pause` in two transactions (a rerun refused as a duplicate); the worst-case `set_venue_extras` through the transaction buffer, and three of them in one message through a buffer create and extends; a buffer an interrupted run left resumed with `--force-buffer`, a foreign one refused and closed with `close-buffer`; `verify` passes, and fails on a layout that drifted |
+//! | T-OPS-2 | the whole sequence: both multisigs; `init-config` with the vault PDAs (a stale guard slot refused first); `stage-upgrade` refused while the deployer still holds the upgrade authority; the checked upgrade-authority transfer of short.win through Governance (its whole upgrade set since the straddle helper `complete_curve` was retired, pump-final D2; the deployer co-signs; `--checked` required; Squads refuses 1 s early); an `Authorities` change through both timelocks (Squads 172,800 s, then short.win's `TimelockNotElapsed` 1 s early); an upgrade through the vault (a buffer the vault does not own, and one whose ELF outgrows the ProgramData, refused by the tool — the first, staged anyway, by the loader after the time lock); a cancelled stale upgrade; `status` decoding a staged transaction; Emergency `set-pause` in two transactions (a rerun refused as a duplicate); the worst-case `set_venue_extras` through the transaction buffer, and three of them in one message through a buffer create and extends; a buffer an interrupted run left resumed with `--force-buffer`, a foreign one refused and closed with `close-buffer`; `verify` passes, and fails on a layout that drifted |
 
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
@@ -157,13 +157,12 @@ struct H {
 const MEMBER_FUNDS: u64 = 10_000_000_000;
 
 impl H {
-    /// `Env::with_squads` plus complete_curve deployed upgradeable with the deployer as its
-    /// upgrade authority (as short.win), the keys of the owner's layout written to files, and the
-    /// layout file: the example with the placeholders replaced and `example = true` dropped.
+    /// `Env::with_squads` (short.win deployed upgradeable with the deployer as its upgrade
+    /// authority), the keys of the owner's layout written to files, and the layout file: the
+    /// example with the placeholders replaced and `example = true` dropped.
     fn new(name: &str) -> Self {
-        let mut env = Env::with_squads();
+        let env = Env::with_squads();
         let deployer = env.upgrade_authority.insecure_clone();
-        deploy_complete_curve(&mut env, &deployer.pubkey());
         let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
             .join("gov_e2e")
             .join(name);
@@ -329,27 +328,6 @@ fn placeholder(prefix: &str) -> String {
         .to_string()
 }
 
-/// complete_curve deployed upgradeable (`target/deploy/complete_curve.so`, or
-/// `$COMPLETE_CURVE_SO`) with `authority` written into its ProgramData header.
-fn deploy_complete_curve(env: &mut Env, authority: &Pubkey) {
-    let path = std::env::var_os("COMPLETE_CURVE_SO").map_or_else(
-        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/deploy/complete_curve.so"),
-        PathBuf::from,
-    );
-    let so = std::fs::read(&path)
-        .unwrap_or_else(|e| panic!("{}: {e} (anchor build first)", path.display()));
-    env.svm
-        .add_program(complete_curve::ID, &so)
-        .unwrap_or_else(|e| panic!("add_program: {e:?}"));
-    let key = loader::program_data(&complete_curve::ID);
-    let mut acc = env.svm.get_account(&key).expect("ProgramData");
-    let slot = shortwin_venue_state::bytes::u64_at(&acc.data, 4);
-    let header =
-        shortwin_venue_state::program_data::encode_header(slot, Some(&authority.to_bytes()));
-    acc.data[..header.len()].copy_from_slice(&header);
-    env.svm.set_account(key, acc).unwrap();
-}
-
 /// The Squads message of `ixs` for `vault` (as `stage` compiles it).
 fn sq_compile(
     vault: &Pubkey,
@@ -446,12 +424,10 @@ fn t_ops_1_example_refused_dry_run_sends_nothing() {
     ] {
         assert!(text.contains(&missing), "{missing}\n{text}");
     }
-    // The upgrade authorities are still the deployer's.
+    // The upgrade authority is still the deployer's; short.win is the only program checked
+    // (the straddle helper is retired, pump-final D2).
     assert!(text.contains("FAIL shortwin upgrade authority"), "{text}");
-    assert!(
-        text.contains("FAIL complete_curve upgrade authority"),
-        "{text}"
-    );
+    assert!(!text.contains("complete_curve"), "{text}");
 }
 
 // ---- T-OPS-2 -------------------------------------------------------------------------------
@@ -540,7 +516,11 @@ fn t_ops_2_full_sequence_through_both_timelocks() {
     let (passed, text) = h.verify();
     assert!(!passed);
     let fails: Vec<&str> = text.lines().filter(|l| l.starts_with("FAIL")).collect();
-    assert_eq!(fails.len(), 2, "only the upgrade authorities:\n{text}");
+    assert_eq!(
+        fails.len(),
+        1,
+        "only short.win's upgrade authority:\n{text}"
+    );
     // Before the upgrade authority moves (R4), stage-upgrade is refused even from a buffer the
     // vault owns: the loader would refuse it only at execution, after the 48 h time lock.
     let elf = std::fs::read(shortwin_litesvm_tests::env::program_so_path()).unwrap();
@@ -555,13 +535,18 @@ fn t_ops_2_full_sequence_through_both_timelocks() {
     );
     assert_eq!(h.multisig(&gov).transaction_index, 0, "nothing staged");
 
-    // 3. The checked upgrade-authority transfer of both programs.
+    // 3. The checked upgrade-authority transfer of short.win, Governance's whole upgrade set.
     let e = h.err("stage-upgrade-authority --key @gov0");
     assert!(format!("{e:#}").contains("--checked"));
     let r = h.ok("stage-upgrade-authority --checked --key @gov0");
     let ua = staged_index(&r);
     assert_eq!(ua, 1);
-    assert!(r.contains("loader SetAuthorityChecked") && r.contains("complete_curve"));
+    assert!(
+        r.contains("loader SetAuthorityChecked")
+            && r.contains(&format!("shortwin: {deployer} -> {vault} (checked)"))
+            && !r.contains("complete_curve"),
+        "{r}"
+    );
     // A non-member cannot approve; members 1 and 2 reach the threshold.
     let e = h.err(&format!("approve --ms governance --index {ua} --key @emg0"));
     assert!(format!("{e:#}").contains("is not a member of Governance"));
@@ -589,7 +574,6 @@ fn t_ops_2_full_sequence_through_both_timelocks() {
         "execute --ms governance --index {ua} --key @gov2 --co-signer @deployer"
     ));
     assert_eq!(h.upgrade_authority(&shortwin::ID), Some(vault));
-    assert_eq!(h.upgrade_authority(&complete_curve::ID), Some(vault));
     let (passed, text) = h.verify();
     assert!(passed, "{text}");
     let e = h.err("stage-upgrade-authority --checked --key @gov0");
@@ -1004,10 +988,13 @@ fn t_ops_2_full_sequence_through_both_timelocks() {
         format!("ok   config.fee_recipient: {}", l.fee_recipient()),
         "ok   authorities pairwise distinct (SQ-G8): true".to_string(),
         format!("ok   shortwin upgrade authority: {vault} (Governance vault 0)"),
-        format!("ok   complete_curve upgrade authority: {vault} (Governance vault 0)"),
     ] {
         assert!(text.contains(&line), "{line}\n{text}");
     }
+    assert!(
+        !text.contains("complete_curve"),
+        "the retired helper is not checked:\n{text}"
+    );
     assert!(!text.contains("WARN"), "nothing left pending:\n{text}");
     std::fs::write(h.dir.join("verify.txt"), &text).unwrap();
     // Every transaction the tool sent fit the packet limit; the largest:

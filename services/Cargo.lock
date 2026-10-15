@@ -4466,7 +4466,6 @@ dependencies = [
  "anchor-lang",
  "anyhow",
  "bytemuck",
- "complete-curve",
  "litesvm",
  "serde",
  "sha2 0.10.9",

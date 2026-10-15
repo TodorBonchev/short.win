@@ -33,8 +33,8 @@ shortwin-venue-state = { path = "../crates/shortwin-venue-state" }
 shortwin-services-common = { path = "common" }
 shortwin-keeper = { path = "keeper" }
 shortwin-indexer = { path = "indexer" }
-# The stateless straddle helper (ARCH §5.4, A66): its program id, for the Governance upgrade set
-# (ops) and the indexer's ingestion. The keeper no longer sends `complete_curve` (pump-final §7);
+# The stateless straddle helper (ARCH §5.4, A66): its events, for the indexer's ingestion. The
+# keeper no longer sends `complete_curve` (pump-final §7) and Governance no longer upgrades it;
 # the helper leaves the workspace with P6 (D2).
 complete-curve = { path = "../programs/complete_curve", features = ["no-entrypoint"] }
 anchor-lang = "=1.2.0"

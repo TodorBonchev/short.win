@@ -62,7 +62,7 @@ struct UpgradeFile {
 impl Default for UpgradeFile {
     fn default() -> Self {
         Self {
-            programs: vec!["shortwin".into(), "complete_curve".into()],
+            programs: vec!["shortwin".into()],
         }
     }
 }
@@ -126,14 +126,23 @@ pub const VENUES: [(&str, u32); 5] = [
     ("jupiter", VENUE_BIT_JUPITER),
 ];
 
-/// The programs `[upgrade] programs` may name.
+/// The programs `[upgrade] programs` may name: short.win alone since the straddle helper
+/// `complete_curve` was retired (design pump-final §11, owner decision D2 of 2026-10-13; it was
+/// never deployed).
 pub fn known_program(name: &str) -> Option<Pubkey> {
     match name {
         "shortwin" => Some(shortwin::ID),
-        "complete_curve" => Some(complete_curve::ID),
         _ => None,
     }
 }
+
+/// The programs `[upgrade] programs` named before their retirement, with the reason a layout
+/// that still names one is refused.
+const RETIRED_PROGRAMS: [(&str, &str); 1] = [(
+    "complete_curve",
+    "retired: pump v3 exits need no straddle bundle, and the helper was never deployed \
+     (design pump-final §11, owner decision D2)",
+)];
 
 /// Parses a base58 public key, naming `what` in the error. The rejected input is quoted only
 /// when it could be a mistyped public key (at most 44 base58 characters): a pasted secret key
@@ -248,6 +257,9 @@ impl Layout {
             .programs
             .iter()
             .map(|name| {
+                if let Some((_, why)) = RETIRED_PROGRAMS.iter().find(|(n, _)| n == name) {
+                    bail!("upgrade.programs: {name:?} is {why}");
+                }
                 Ok(UpgradeableProgram {
                     name: name.clone(),
                     id: known_program(name)
@@ -355,7 +367,8 @@ mod tests {
         assert_eq!(l.timelock_s, shortwin::constants::DEFAULT_TIMELOCK_S);
         assert_eq!(
             l.programs.iter().map(|p| p.id).collect::<Vec<_>>(),
-            vec![shortwin::ID, complete_curve::ID]
+            vec![shortwin::ID],
+            "Governance's upgrade set is short.win alone (complete_curve retired, D2)"
         );
         assert_eq!(
             l.pyth_feed_id,
@@ -451,8 +464,15 @@ mod tests {
             ))
             .contains("unknown field")
         );
+        assert!(err(edited("[\"shortwin\"]", "[\"short-win\"]")).contains("unknown program"));
+        // The retired helper is refused by name, with the reason (D2).
+        let e = err(edited(
+            "[\"shortwin\"]",
+            "[\"shortwin\", \"complete_curve\"]",
+        ));
         assert!(
-            err(edited("\"complete_curve\"]", "\"complete-curve\"]")).contains("unknown program")
+            e.contains("\"complete_curve\" is retired") && e.contains("pump-final §11"),
+            "{e}"
         );
     }
 
