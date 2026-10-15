@@ -1,7 +1,7 @@
 [package]
 name = "m5-cpi-wrapper"
 version = "0.1.0"
-description = "TEST-ONLY SBF program that forwards one instruction by CPI (the M5 stack-depth test and the complete_curve stand-in, ARCH §5.4, §6.3); never deployed"
+description = "TEST-ONLY SBF program that forwards one instruction by CPI (the M5 stack-depth test, ARCH §6.3); never deployed"
 edition = "2024"
 # Built by the platform-tools rustc (v1.57 = 1.95) with `cargo-build-sbf --tools-version v1.57
 # --arch v3` (README.md); on the host it is a plain library without an entrypoint.

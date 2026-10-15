@@ -4,9 +4,8 @@
 //! Instruction: accounts `[target program, a₀, a₁, …]`, data `d`. The program invokes `target`
 //! with accounts `[a₀, a₁, …]` (each with the signer and writable flags it was given) and data
 //! `d`, so it adds exactly one stack level under whatever it forwards — the way a Squads vault
-//! transaction or an integrator's program would call short.win (or the `complete-curve` helper,
-//! A66, which the bench runs itself). It may forward to itself (direct recursion is allowed by
-//! the runtime), which stacks a second level.
+//! transaction or an integrator's program would call short.win. It may forward to itself (direct
+//! recursion is allowed by the runtime), which stacks a second level.
 //!
 //! On the host the crate is a plain library ([`forward`] only), so the bench workspace builds
 //! and lints there too.

@@ -16,7 +16,7 @@
 //!   enforce), and logs every size ([`SquadsMs::sizes`]).
 //! - [`Governance`]: the owner's layout (owner decisions 2026-10-02, Q4): **Governance**
 //!   autonomous 3-of-5, time lock 172,800 s, vault 0 = `governance` and the upgrade authority of
-//!   short.win (and `complete_curve`, which this harness does not deploy), vault 1 =
+//!   short.win (the only program since `complete_curve`'s retirement, pump-final D2), vault 1 =
 //!   `fee_recipient` (pre-funded with its rent-exempt minimum, 890,880 lamports);
 //!   **Emergency** autonomous 2-of-4, time lock 0, vault 0 = `pause_authority`;
 //!   `coverage_authority` a separate hot key ([`Env::coverage_authority`]); each multisig's

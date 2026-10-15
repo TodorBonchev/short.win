@@ -25,9 +25,8 @@
 //! - Graduation on the real ELFs: [`migrate_v2_ix`] (27 IDL accounts + the two boost accounts,
 //!   `idl/pump.json` of pump-public-docs), [`NewPool`] (the canonical pool it creates, derived),
 //!   [`pamm_extend_account_ix`] and [`pamm_buy_ix`] (PumpSwap `buy` with its remaining
-//!   accounts, R-VEN §2.2) — the execution path `B̂_str` prices (ARCH §4.3, §5.4).
-//! - The straddle helper (A66): [`COMPLETE_CURVE_ID`], [`load_complete_curve`]
-//!   (`$COMPLETE_CURVE_SO`, else `target/deploy/complete_curve.so`) and [`complete_curve_ix`].
+//!   accounts, R-VEN §2.2) — the execution path `B̂_str` prices (ARCH §4.3, §5.4). (The straddle
+//!   bundle's `complete_curve` helper, A66, is retired with pump's v3 exits: pump-final D2.)
 //! - [`cu_limit_ix`] and ARCH §6.1's PROPOSED limits ([`CURVE_TRADE_CU`],
 //!   [`CURVE_KEEPER_EXIT_CU`]); [`PumpMarket`]'s `VenueMarket::cu_limit` makes `Env::open` /
 //!   `Env::close` request the first.
@@ -708,63 +707,6 @@ pub fn pamm_buy_ix(
     Instruction {
         program_id: PUMP_AMM_PROGRAM_ID,
         accounts,
-        data,
-    }
-}
-
-// ---- the complete-curve helper (A66) ----------------------------------------------------------
-
-/// The straddle helper's program id (`programs/complete_curve`, `declare_id!`; ARCH §5.4, A66).
-/// The harness does not link the helper crate: its SBF build is what runs.
-pub const COMPLETE_CURVE_ID: Pubkey =
-    anchor_lang::prelude::pubkey!("4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ");
-
-/// Path of the helper's SBF build: `$COMPLETE_CURVE_SO`, else `target/deploy/complete_curve.so`
-/// (`anchor build --tools-version v1.57 --arch v3` builds it with short.win).
-pub fn complete_curve_so() -> std::path::PathBuf {
-    std::env::var_os("COMPLETE_CURVE_SO").map_or_else(
-        || {
-            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("../../target/deploy/complete_curve.so")
-        },
-        std::path::PathBuf::from,
-    )
-}
-
-/// Deploys the helper into `env` at [`COMPLETE_CURVE_ID`].
-pub fn load_complete_curve(env: &mut Env) {
-    let path = complete_curve_so();
-    let so = std::fs::read(&path).unwrap_or_else(|e| {
-        panic!(
-            "cannot read {}: {e}. Build it first: `anchor build --tools-version v1.57 --arch v3` \
-             (or set COMPLETE_CURVE_SO)",
-            path.display()
-        )
-    });
-    env.svm
-        .add_program(COMPLETE_CURVE_ID, &so)
-        .unwrap_or_else(|e| panic!("add_program(complete_curve): {e:?}"));
-}
-
-/// `complete_curve(max_sol_cost)` (A66) by `user` receiving into `user_base`: pump `buy_v2`'s 27
-/// accounts in pump's order (`PumpCurve::v2_accounts`, with the live creator vault and the live
-/// `Global`'s normal and buyback recipients at `recipient`), data
-/// `sha256("global:complete_curve")[..8] ‖ max_sol_cost`. The helper reads `rT` at execution.
-pub fn complete_curve_ix(
-    svm: &LiteSVM,
-    c: &PumpCurve,
-    user: &Pubkey,
-    user_base: &Pubkey,
-    recipient: usize,
-    max_sol_cost: u64,
-) -> Instruction {
-    let fr = fork::pump_fee_recipient(svm, recipient);
-    let bb = fork::pump_buyback_fee_recipient(svm, recipient);
-    let mut data = fork::sha256(b"global:complete_curve")[..8].to_vec();
-    data.extend_from_slice(&max_sol_cost.to_le_bytes());
-    Instruction {
-        program_id: COMPLETE_CURVE_ID,
-        accounts: c.v2_accounts(svm, PumpV2::Buy, user, user_base, &fr, &bb),
         data,
     }
 }

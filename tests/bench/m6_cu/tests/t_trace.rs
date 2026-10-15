@@ -4,9 +4,9 @@
 //! `MAX_INSTRUCTION_TRACE_LENGTH = 64`, on LiteSVM with every invariant hook after every
 //! instruction; their peak stack height, CU (within ARCH §6.1's limit for the transaction) and
 //! wire sizes (legacy, and v0 through the protocol ALT of A28 with its pump part). It covers the
-//! `→ PumpSwap` graduation transition, the straddle's tx3 (the transition crank plus the
-//! borrower's close on the pool) and the post-wipe reward claim bundle (claim_venue_rewards was
-//! not built).
+//! `→ PumpSwap` graduation transition, the transition crank plus a borrower's close on the pool
+//! in one transaction (the retired straddle bundle's tx3, pump-final D2) and the post-wipe reward
+//! claim bundle (claim_venue_rewards was not built).
 //!
 //! `M6_TRACE_WRITE=1` rewrites `trace.md`.
 
@@ -42,8 +42,8 @@ set, a separate fee payer, both tables, executed as v0) is \
 `tests/litesvm/tests/tx_size_pumpswap_it.rs`.
 
 The graduation transition (§2.5) is the crank that detects the migration and rewrites the ring; \
-the straddle's tx3 (§5.4) is that transition crank plus the borrower's own close on the pool in \
-one transaction; the post-wipe reward claim (§3.9) is `[create_idempotent ATA(trader, WSOL), \
+a borrower's first close after the migration may carry that transition crank in its own \
+transaction; the post-wipe reward claim (§3.9) is `[create_idempotent ATA(trader, WSOL), \
 pAMM claim_cashback, sweep_trader]` — `claim_venue_rewards` was not built (the UVA-reading \
 pattern).
 

@@ -1,7 +1,7 @@
-//! T-TRACE, the T-SIZE preview and T-STRADDLE's curve part on the pump curve (ARCHITECTURE §5.4,
-//! §6.2, §6.3, §6.4, §8.2; C1-1, C1-8): the instruction-trace entries of the worst-case curve
-//! transactions — every top-level instruction (ComputeBudget included) plus every CPI at any
-//! depth — stay within `MAX_INSTRUCTION_TRACE_LENGTH = 64`, on LiteSVM with every invariant hook
+//! T-TRACE and the T-SIZE preview on the pump curve (ARCHITECTURE §6.2, §6.3, §6.4, §8.2; C1-1,
+//! C1-8; T-STRADDLE's helper rows left with the `complete_curve` helper, pump-final D2): the
+//! instruction-trace entries of the worst-case curve transactions — every top-level instruction
+//! (ComputeBudget included) plus every CPI at any depth — stay within `MAX_INSTRUCTION_TRACE_LENGTH = 64`, on LiteSVM with every invariant hook
 //! after every instruction; their peak stack height, CU (within ARCH §6.1's limit for the
 //! transaction) and wire sizes (legacy, and v0 through the protocol ALT of A28 with its pump
 //! part). Also checks the counting against the runtime (one open more than fits is refused by the
@@ -55,12 +55,11 @@ ALT (≤ 1,232 B, ≤ 64 accounts). Bold: above 1,232 B. The full T-SIZE on the 
 extras set, a separate fee payer, both tables, executed as v0) is \
 `tests/litesvm/tests/tx_size_pump_it.rs`.
 
-T-STRADDLE's curve part (ARCH §5.4): tx1 is the `complete-curve` helper (A66, \
-`programs/complete_curve`; `$COMPLETE_CURVE_SO` or `target/deploy/complete_curve.so`), which \
-reads `rT` at execution and buys it with the keeper as pump's `user` — on the curve as the \
-keeper read it, ★ after a third party's curve buy landed between the read and the bundle, and \
-as a no-op on a curve a third party completed; tx2 is `migrate_v2` top-level with the boost \
-accounts; tx3 (the position's PumpSwap exit) is M6's.
+A position past the curve's `rT` exits in one transaction (pump v3's synthetic migration, the \
+synthetic rows). The keeper's `migrate_v2` is measured after such a completion (`pc ≠ 0`) and \
+after a third party's exact one (`pc = 0`; until pump-final P6 the straddle bundle's tx2). The \
+bundle's helper rows (tx1, the `complete_curve` helper) are retired with the helper \
+(pump-final D2).
 
 | Transaction | Entries | Expected | Peak height | CU | CU limit | Legacy B / accounts | v0 + ALT B / accounts | ARCH §6.2 |
 |---|---|---|---|---|---|---|---|---|

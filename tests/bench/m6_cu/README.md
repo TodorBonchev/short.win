@@ -23,8 +23,9 @@ on the LiteSVM harness's PumpSwap fork (`shortwin_litesvm_tests::pamm` / `fork`)
   PumpSwap's own CU. Budgets are ARCH §6.1's PROPOSED transaction limits.
 - **T-TRACE / T-SIZE** (`tests/t_trace.rs` → `trace.md`): the worst-case PumpSwap transactions —
   the largest client open and close (normalising and costliest), the keeper's `[crank, liquidate |
-  expire | sol_settle S3]`, the **graduation transition crank**, the **straddle's tx3** (the
-  transition crank plus the borrower's own close on the pool, ARCH §5.4), a PumpSwap listing,
+  expire | sol_settle S3]`, the **graduation transition crank**, the **transition with a
+  borrower's first close** (the transition crank plus the borrower's own close on the pool in one
+  transaction; the retired straddle bundle's tx3, pump-final D2), a PumpSwap listing,
   `sweep_trader`, the **post-wipe reward claim bundle** (`[create_idempotent ATA(trader, WSOL),
   pAMM claim_cashback, sweep_trader]` — `claim_venue_rewards` was not built, ARCH §3.9), and the
   two-flag latch batch — each within `MAX_INSTRUCTION_TRACE_LENGTH = 64` and at its exact expected
@@ -85,7 +86,8 @@ cap on `X₀ = 0.93·X`).
 - **The graduation transition** builds a curve market on the near-complete fixture curve with two
   open positions, completes it, runs a real `migrate_v2`, and measures the next `crank_price`, which
   moves the market `PumpCurve → PumpSwap` and rewrites the ring to the pool's `lp_supply` (§2.5,
-  M5-SEC-4). The **graduation-path** liquidation and the **straddle's tx3** run after that.
+  M5-SEC-4). The **graduation-path** liquidation and the **transition with a borrower's first
+  close** run after that.
 - The keeper exits are prepared the way a keeper decides: `liquidate` after a real ×2.8 pump cranked
   second by second until the `[crank, liquidate]` simulates; `expire` two cranked seconds past the
   deadline; `sol_settle` S3 under the buy halt (`disable_flags` bit 3: the venue cannot execute, the
@@ -122,14 +124,14 @@ cap on `X₀ = 0.93·X`).
   the estimate's ≤ 23 is exceeded by the normalising and costliest paths; an exit is 16–17 plain,
   **20 normalising / costliest** (above the ≤ 19 estimate). The keeper's `[crank, liquidate]` is 21
   entries (24 for the costliest). The graduation transition crank is **6** entries in its
-  transaction (the crank plus `VenueStateChanged` and `RouteChainChanged`), peak 2; the straddle's
-  tx3 (that crank plus the borrower's close) is 23, peak 3. A PumpSwap listing is 17 (peak 3);
+  transaction (the crank plus `VenueStateChanged` and `RouteChainChanged`), peak 2; that crank
+  plus a borrower's close in one transaction is 23, peak 3. A PumpSwap listing is 17 (peak 3);
   `sol_settle` S3 is 6 in the keeper transaction; `sweep_trader`'s token leg is 6; the post-wipe
   reward-claim bundle is 14, peak 2.
 - **Sizes** (v0 through A28 with its pump part; the largest-extras worst case is
   `tx_size_pumpswap_it`'s): a client open is 1,040–1,041 B / 40–41 accounts with its two
   ComputeBudget instructions; a close 1,004–1,005 B; the keeper's `[crank, liquidate | expire]`
-  1,053–1,054 B; the straddle's tx3 1,096 B; a PumpSwap listing 685 B; the post-wipe claim 767 B;
+  1,053–1,054 B; the transition crank with a close 1,096 B; a PumpSwap listing 685 B; the post-wipe claim 767 B;
   `sweep_trader`'s token leg 606 B. Every client and keeper transaction fits a v0 transaction
   through the protocol ALT (≤ 1,232 B, ≤ 64 accounts).
 - **Depth:** every PumpSwap leg peaks at height 3 (short.win 1 → pAMM 2 → pump-fees / Token /

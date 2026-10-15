@@ -1,6 +1,9 @@
-//! M5 CU bench, T-TRACE, T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump
-//! bonding curve (ARCHITECTURE §6.1–§6.4, §8.2 T-CU / T-TRACE / T-SIZE / T-DEPTH / T-STRADDLE,
-//! §9 M5).
+//! M5 CU bench, T-TRACE, T-SIZE preview and stack depth on the pump bonding curve
+//! (ARCHITECTURE §6.1–§6.4, §8.2 T-CU / T-TRACE / T-SIZE / T-DEPTH, §9 M5). Since pump-final P6
+//! the straddle bundle's helper rows (T-STRADDLE's tx1: the `complete_curve` helper) are gone
+//! with the helper (owner D2); the curve's exits past `rT` are the synthetic rows, and the
+//! keeper's `migrate_v2` is measured after a third party's exact completion (`pc = 0`, the
+//! bundle's former tx2) and after a synthetic one (`pc ≠ 0`).
 //!
 //! Every [`Case`] builds its pre-state with the LiteSVM harness on the **pump fork**
 //! (`shortwin_litesvm_tests::fork` / `pump`: the **release** short.win build —
@@ -24,9 +27,9 @@
 //! `simulate_transaction` of the keeper's `[crank_price, exit]` succeeds (nothing is committed by
 //! the simulation), so a case measures the executing path, not a refusal.
 //!
-//! The worst-case transactions of T-TRACE (with their legacy and v0 + protocol-ALT sizes, and the
-//! straddle bundle's curve part) are [`worst_case_transactions`]; the stack-depth runs through the
-//! TEST-ONLY wrapper program (`wrapper/`, [`WRAPPER_ID`]) are [`depth_cases`].
+//! The worst-case transactions of T-TRACE (with their legacy and v0 + protocol-ALT sizes) are
+//! [`worst_case_transactions`]; the stack-depth runs through the TEST-ONLY wrapper program
+//! (`wrapper/`, [`WRAPPER_ID`]) are [`depth_cases`].
 //!
 //! **Fixed keys.** The borrowers, the keepers, the sandwich attacker and a changed creator have
 //! fixed keys, so the canonical-bump searches of the position and exposure PDAs, and the
@@ -75,7 +78,7 @@ pub const T22: PumpCoin = PumpCoin::T22_115;
 /// A live Token-2022 curve of 125 bytes minutes old (`fresh`; `vT/7` of buys first).
 pub const FRESH: PumpCoin = PumpCoin::Fresh;
 /// A live Token-2022 curve of 151 bytes near completion (`near`): the completing buyback, the
-/// migration and the straddle.
+/// migration and the synthetic exits past `rT`.
 pub const NEAR: PumpCoin = PumpCoin::Near;
 
 /// The trace entries of pump's growth of [`NEAR`] on its first trade since the dump: its rent
@@ -2080,30 +2083,52 @@ fn tx_keeper_s3_migrating_synthetic() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     (p.env, with_cb(ixs), vec![keeper])
 }
 
-/// The keeper's top-level `migrate_v2` after a **synthetic** completion (`pc ≠ 0`; pump-final
-/// §6.6's `migrate_v2` row on the v3 path, which D2 makes the keeper's only migration case past
-/// `rT`): `own` — short.win's own synthetic close completed the curve (the keeper migrates after
-/// an exit's `→ PumpMigrating`, `src/keeper.rs`), otherwise a third party's `buy_v3` of `rT + q`
-/// ([`complete_synthetically`]). The pool it creates holds the live `curve_base_ata` and
-/// `rQ + pcQ − fee` (T-SYNTH-3).
-fn tx_migrate_after_synthetic(own: bool) -> (Env, Vec<Instruction>, Vec<Keypair>) {
-    let mut p = if own {
-        let mut p = straddled_position(false);
-        p.env.warp(1);
-        let meta = ok(p.env.close(&p.pm, &p.b, p.nonce));
-        let ev: VenueStateChanged = events::one(&meta);
-        assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
-        p
-    } else {
-        let mut p = with_position(NEAR);
-        let q = p.q;
-        complete_synthetically(&mut p.env, &p.pm.curve, q);
-        p
+/// How the curve completed before the keeper's top-level `migrate_v2` (pump-final §6.6's
+/// `migrate_v2` row; T-TRACE's `migrate_v2` rows).
+#[derive(Clone, Copy, Debug)]
+pub enum Completion {
+    /// A third party's `buy_v2` of exactly `rT` ([`buy_down_to`]; `pc = 0`): the crowd's usual
+    /// completion. (Until pump-final P6 this row was the straddle bundle's tx2; it measures no
+    /// helper and stays, as the keeper migrates such a curve.)
+    Exact,
+    /// A third party's `buy_v3` of `rT + q` ([`complete_synthetically`]; `pc ≠ 0`).
+    Synthetic,
+    /// short.win's own synthetic close (`pc ≠ 0`; the keeper migrates after an exit's
+    /// `→ PumpMigrating`, `src/keeper.rs`).
+    OwnClose,
+}
+
+/// The keeper's top-level `migrate_v2` after the curve completed as `how` says. After a
+/// synthetic completion the pool it creates holds the live `curve_base_ata` and `rQ + pcQ − fee`
+/// (T-SYNTH-3).
+fn tx_migrate_after(how: Completion) -> (Env, Vec<Instruction>, Vec<Keypair>) {
+    let mut p = match how {
+        Completion::OwnClose => {
+            let mut p = straddled_position(false);
+            p.env.warp(1);
+            let meta = ok(p.env.close(&p.pm, &p.b, p.nonce));
+            let ev: VenueStateChanged = events::one(&meta);
+            assert_eq!(ev.to, VenueKind::PumpMigrating as u8);
+            p
+        }
+        Completion::Synthetic => {
+            let mut p = with_position(NEAR);
+            let q = p.q;
+            complete_synthetically(&mut p.env, &p.pm.curve, q);
+            p
+        }
+        Completion::Exact => {
+            let mut p = with_position(NEAR);
+            buy_down_to(&mut p.env, &p.pm.curve, 0);
+            p
+        }
     };
     let s = p.pm.curve.state(&p.env.svm);
+    let synthetic = !matches!(how, Completion::Exact);
     assert!(
-        s.complete && s.post_complete_base_out > 0,
-        "a synthetic completion (pcB {})",
+        s.complete && (s.post_complete_base_out > 0) == synthetic,
+        "{how:?}: complete {}, pcB {}",
+        s.complete,
         s.post_complete_base_out
     );
     let keeper = fixed(&mut p.env, KEEPER);
@@ -2353,23 +2378,27 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         cu_limit: 150_000,
         setup: Box::new(tx_keeper_s3_none),
     });
-    for own in [false, true] {
+    for how in [
+        Completion::Exact,
+        Completion::Synthetic,
+        Completion::OwnClose,
+    ] {
         v.push(TraceTx {
             name: format!(
-                "{}: ComputeBudget ×2 + migrate_v2 (keeper, top level, with the boost accounts) after {} (`pc ≠ 0`)",
+                "{}: ComputeBudget ×2 + migrate_v2 (keeper, top level, with the boost accounts) after {}",
                 label(NEAR),
-                if own {
-                    "short.win's own synthetic close"
-                } else {
-                    "a third party's synthetic completion"
+                match how {
+                    Completion::Exact => "a third party's exact completion (`pc = 0`)",
+                    Completion::Synthetic => "a third party's synthetic completion (`pc ≠ 0`)",
+                    Completion::OwnClose => "short.win's own synthetic close (`pc ≠ 0`)",
                 }
             ),
-            arch: "51 + 2 = 53 (§5.4 tx2; peak 4, A15); the keeper's `MIGRATE_CU` (pump-final §6.6)",
+            arch: "51 + 2 = 53 (`migrate_v2` top level; peak 4, A15); the keeper's `MIGRATE_CU` (pump-final §6.6)",
             expected: 53,
             peak: 4,
             v1: false,
             cu_limit: MIGRATE_CU,
-            setup: Box::new(move || tx_migrate_after_synthetic(own)),
+            setup: Box::new(move || tx_migrate_after(how)),
         });
     }
     v.push(TraceTx {
@@ -2408,133 +2437,7 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         cu_limit: 60_000,
         setup: Box::new(|| single_with_cb(sweep(T22, true))),
     });
-    v.extend(straddle_transactions());
     v
-}
-
-// ---- T-STRADDLE, the curve part (ARCH §5.4) -------------------------------------------------
-
-/// The straddle bundle's first two transactions on the real ELFs (ARCH §5.4; T-STRADDLE curve
-/// part): **tx1** `ComputeBudget ×2 + complete_curve(max_sol_cost)` of the `complete-curve`
-/// helper (A66; `programs/complete_curve`, its SBF build `$COMPLETE_CURVE_SO` or
-/// `target/deploy/complete_curve.so`): it reads `rT` **at execution** and buys it with the
-/// keeper as pump's `user` (helper 1 → pump 2 → pump-fees / Token / System / event 3), in the
-/// three cases of §5.4 — the curve as the keeper read it, ★ after a third party's curve buy landed
-/// between the keeper's read and the bundle (the helper completes at the live `rT`), and on a curve
-/// a third party already completed (a no-op: no CPI); **tx2** `ComputeBudget ×2 + migrate_v2`
-/// top-level with its two boost accounts. tx3 (the position's PumpSwap exit) is M6's.
-pub fn straddle_transactions() -> Vec<TraceTx> {
-    vec![
-        TraceTx {
-            name: format!(
-                "{}: straddle tx1 — ComputeBudget ×2 + complete_curve (helper → pump buy_v2(rT at execution))",
-                label(NEAR)
-            ),
-            arch: "≈ 11 (§6.2 `complete_curve`, ComputeBudget ×2 included)",
-            expected: 12,
-            peak: 3,
-            v1: false,
-            cu_limit: 1_400_000,
-            setup: Box::new(|| tx_straddle_1(Tx1Case::AsRead)),
-        },
-        TraceTx {
-            name: format!(
-                "{}: straddle tx1 ★ — a third party's curve buy landed between the keeper's read and the bundle",
-                label(NEAR)
-            ),
-            arch: "≈ 11 (§6.2 `complete_curve`; §5.4: tx1 reads `rT` at execution)",
-            expected: 12,
-            peak: 3,
-            v1: false,
-            cu_limit: 1_400_000,
-            setup: Box::new(|| tx_straddle_1(Tx1Case::TradeBetween)),
-        },
-        TraceTx {
-            name: format!(
-                "{}: straddle tx1 — complete_curve on a curve a third party completed (no-op)",
-                label(NEAR)
-            ),
-            arch: "no row (§5.4: tx1 is a no-op on a complete curve)",
-            expected: 3,
-            peak: 1,
-            v1: false,
-            cu_limit: 1_400_000,
-            setup: Box::new(|| tx_straddle_1(Tx1Case::AlreadyComplete)),
-        },
-        TraceTx {
-            name: format!(
-                "{}: straddle tx2 — ComputeBudget ×2 + migrate_v2 (top level, with the boost accounts)",
-                label(NEAR)
-            ),
-            arch: "51 + 2 = 53 (§5.4 tx2; peak 4, A15); the keeper's `MIGRATE_CU` (pump-final §6.6)",
-            expected: 53,
-            peak: 4,
-            v1: false,
-            cu_limit: MIGRATE_CU,
-            setup: Box::new(tx_straddle_2),
-        },
-    ]
-}
-
-/// A straddle on the near-complete curve (ARCH §5.4 case 2): a position of `q`, a third party
-/// left `rT = q/2` (so the buyback straddles), the keeper cranked. Returns the keeper (fixed key)
-/// with its base ATA and pump UVA created (as a keeper's `complete_curve` needs).
-pub fn straddled() -> (Positioned, Keypair) {
-    let mut p = with_position(NEAR);
-    buy_down_to(&mut p.env, &p.pm.curve, p.q / 2);
-    p.env.warp(1);
-    p.env.crank(&p.pm);
-    let keeper = fixed(&mut p.env, KEEPER);
-    let payer = p.env.payer.pubkey();
-    let program = p.pm.curve.token_program.id();
-    ok(p.env.send(
-        &[
-            fork::create_ata_idempotent_ix(&payer, &keeper.pubkey(), &p.pm.keys.mint, &program),
-            fork::pump_init_uva_ix(&payer, &keeper.pubkey()),
-        ],
-        &[],
-    ));
-    (p, keeper)
-}
-
-/// tx1's instruction: the helper's `complete_curve(max_sol_cost)` by `keeper` into its base ATA
-/// (`pump::complete_curve_ix`: pump `buy_v2`'s 27 accounts; the helper reads `rT` itself). The
-/// bound is not what is measured: `u64::MAX`.
-pub fn complete_curve(env: &Env, c: &PumpCurve, keeper: &Pubkey) -> Instruction {
-    let ata = pda::ata(keeper, &c.mint, &c.token_program.id());
-    pump::complete_curve_ix(&env.svm, c, keeper, &ata, 1, u64::MAX)
-}
-
-/// The three tx1 situations of ARCH §5.4 (see [`straddle_transactions`]).
-#[derive(Clone, Copy, Debug)]
-pub enum Tx1Case {
-    /// The curve as the keeper read it (`rT = q/2`).
-    AsRead,
-    /// ★ A third party bought half the remaining `rT` after the keeper built the bundle.
-    TradeBetween,
-    /// A third party completed the curve first.
-    AlreadyComplete,
-}
-
-fn tx_straddle_1(case: Tx1Case) -> (Env, Vec<Instruction>, Vec<Keypair>) {
-    let (mut p, keeper) = straddled();
-    pump::load_complete_curve(&mut p.env);
-    // The keeper builds the bundle on the curve it reads now.
-    let ix = complete_curve(&p.env, &p.pm.curve, &keeper.pubkey());
-    let rt = p.pm.curve.state(&p.env.svm).real_token_reserves;
-    match case {
-        Tx1Case::AsRead => {}
-        Tx1Case::TradeBetween => buy_down_to(&mut p.env, &p.pm.curve, rt / 2),
-        Tx1Case::AlreadyComplete => buy_down_to(&mut p.env, &p.pm.curve, 0),
-    }
-    (p.env, with_cb(vec![ix]), vec![keeper])
-}
-
-fn tx_straddle_2() -> (Env, Vec<Instruction>, Vec<Keypair>) {
-    let (mut p, keeper) = straddled();
-    buy_down_to(&mut p.env, &p.pm.curve, 0);
-    let ix = pump::migrate_v2_ix(&p.env.svm, &keeper.pubkey(), &p.pm.curve);
-    (p.env, with_cb(vec![ix]), vec![keeper])
 }
 
 // ---- stack depth ----------------------------------------------------------------------------
@@ -2723,20 +2626,6 @@ pub fn depth_cases() -> Vec<DepthCase> {
         case: "pump, the dumped ProgramData".into(),
         direct_peak: 2,
         setup: Box::new(|| flag_pump(GUARD_PUMP)),
-    });
-    v.push(DepthCase {
-        handler: "complete_curve",
-        case: format!(
-            "{}: the helper → pump buy_v2(rT at execution) (A66)",
-            label(NEAR)
-        ),
-        direct_peak: 3,
-        setup: Box::new(|| {
-            let (mut p, keeper) = straddled();
-            pump::load_complete_curve(&mut p.env);
-            let ix = complete_curve(&p.env, &p.pm.curve, &keeper.pubkey());
-            prepared(p.env, ix, &[&keeper])
-        }),
     });
     v
 }

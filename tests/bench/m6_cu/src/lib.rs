@@ -24,7 +24,8 @@
 //! executes, so a case measures the executing path, not a refusal.
 //!
 //! The worst-case transactions of T-TRACE (with their legacy and v0 + protocol-ALT sizes, the
-//! `→ PumpSwap` graduation transition, the straddle's tx3 and the post-wipe reward claim) are
+//! `→ PumpSwap` graduation transition, the transition with a borrower's first close on the pool
+//! and the post-wipe reward claim) are
 //! [`worst_case_transactions`]; the stack-depth runs through the TEST-ONLY wrapper program
 //! (`wrapper/`, [`WRAPPER_ID`]) are [`depth_cases`].
 //!
@@ -1576,7 +1577,9 @@ fn tx_transition_only() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     (env, with_cb(vec![crank_price_ix(&pm)]), vec![])
 }
 
-fn tx_straddle_3() -> (Env, Vec<Instruction>, Vec<Keypair>) {
+/// The transition crank and a borrower's close on the pool in one transaction: the first close
+/// after a migration (it was the straddle bundle's tx3 until pump-final D2 retired the bundle).
+fn tx_transition_and_close() -> (Env, Vec<Instruction>, Vec<Keypair>) {
     let (mut env, pm, positions) = graduated_pending(true);
     let (b, nonce) = positions.into_iter().next().expect("a position");
     let pam = PammMarket::graduated(&env.svm, &pm);
@@ -1744,14 +1747,14 @@ pub fn worst_case_transactions() -> Vec<TraceTx> {
         setup: Box::new(tx_transition_only),
     });
     v.push(TraceTx {
-        name: "ComputeBudget ×2 + crank_price (→ PumpSwap) + close_short (straddle tx3, borrower)"
+        name: "ComputeBudget ×2 + crank_price (→ PumpSwap) + close_short (borrower, first close on the pool)"
             .to_owned(),
-        arch: "no row (§5.4 tx3; the transition crank then the borrower's close on the pool)",
+        arch: "no row (the transition crank then the borrower's close on the pool)",
         expected: 2 + 4 + 17,
         peak: 3,
         v1: false,
         cu_limit: 400_000,
-        setup: Box::new(tx_straddle_3),
+        setup: Box::new(tx_transition_and_close),
     });
     for c in VARIANTS {
         v.push(TraceTx {

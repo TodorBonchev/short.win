@@ -1,6 +1,6 @@
 # M5 stack depth (pump curve)
 
-Peak stack height (1 = top level) of every curve-path instruction of the release short.win on the dumped pump, pump-fees and PumpSwap programs, called directly and through 1–3 levels of the TEST-ONLY CPI wrapper (`wrapper/`), on LiteSVM 0.16.0 with the mainnet feature set (`MAX_INSTRUCTION_STACK_DEPTH = 5`, ARCH §6.3). Written by `M5_DEPTH_WRITE=1 cargo test --manifest-path tests/bench/m5_cu/Cargo.toml --test t_depth` (README.md); the test fails unless each level reaches exactly `direct + levels`, and a level above 5 fails with `CallDepth`. The `complete_curve` row is the straddle helper itself (A66, `programs/complete_curve`; `$COMPLETE_CURVE_SO` or `target/deploy/complete_curve.so`): it reads `rT` at execution and buys it with the keeper as pump's `user`.
+Peak stack height (1 = top level) of every curve-path instruction of the release short.win on the dumped pump, pump-fees and PumpSwap programs, called directly and through 1–3 levels of the TEST-ONLY CPI wrapper (`wrapper/`), on LiteSVM 0.16.0 with the mainnet feature set (`MAX_INSTRUCTION_STACK_DEPTH = 5`, ARCH §6.3). Written by `M5_DEPTH_WRITE=1 cargo test --manifest-path tests/bench/m5_cu/Cargo.toml --test t_depth` (README.md); the test fails unless each level reaches exactly `direct + levels`, and a level above 5 fails with `CallDepth`.
 
 | Instruction | Case | Direct | 1 wrapper | 2 wrappers | 3 wrappers |
 |---|---|---|---|---|---|
@@ -28,4 +28,3 @@ Peak stack height (1 = top level) of every curve-path instruction of the release
 | `crank_price` | Token-2022, 151 B curve near completion (near): `PumpCurve → PumpMigrating` after a synthetic completion (`pc ≠ 0`) | 2 | 3 | 4 | 5 |
 | `crank_price` | Token-2022, 115 B curve (t22_115): `None → PumpCurve` re-detection | 2 | 3 | 4 | 5 |
 | `flag_venue_upgraded` | pump, the dumped ProgramData | 2 | 3 | 4 | 5 |
-| `complete_curve` | Token-2022, 151 B curve near completion (near): the helper → pump buy_v2(rT at execution) (A66) | 3 | 4 | 5 | refused (`CallDepth`) |

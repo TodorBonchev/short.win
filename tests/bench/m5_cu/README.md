@@ -1,7 +1,7 @@
-# m5_cu — M5 CU bench, T-TRACE, T-SIZE preview, T-STRADDLE (curve part) and stack depth on the pump curve
+# m5_cu — M5 CU bench, T-TRACE, T-SIZE preview and stack depth on the pump curve
 
 This is the M5 compute, trace, size and depth gate for the pump bonding-curve venue (ARCHITECTURE
-§6.1–§6.4, §8.2 T-CU / T-TRACE / T-SIZE / T-DEPTH / T-STRADDLE, §9 M5), and since pump-final P3
+§6.1–§6.4, §8.2 T-CU / T-TRACE / T-SIZE / T-DEPTH, §9 M5), and since pump-final P3
 (2026-10-15) gate G1's budget rows (pump-final §6.6, §12): the curve adapter trades `sell_v3` /
 `buy_v3` with 10 TradeExtras, and a buyback past `rT` completes the curve by pump's synthetic
 migration in one instruction. Everything runs the **release** short.win (`anchor build
@@ -43,9 +43,10 @@ migration in one instruction. Everything runs the **release** short.win (`anchor
   of one wallet, a batch of four cranks that all move their market to `PumpMigrating`, the
   keeper's `[crank, liquidate | expire | sol_settle S3]` (synthetic exits past `rT`, regular and
   worst ring; S3 on `PumpMigrating` with and without a pool part, and on `None`), the keeper's
-  top-level `migrate_v2` after a synthetic completion (`pc ≠ 0`: a third party's `buy_v3` past
-  `rT`, and short.win's own synthetic close — the keeper's migration case on the v3 path, held
-  to its `MIGRATE_CU`), the three pump latch flags, a curve listing, `sweep_trader` — each
+  top-level `migrate_v2` after a third party's exact completion (`pc = 0`: a `buy_v2` of exactly
+  `rT`) and after a synthetic one (`pc ≠ 0`: a third party's `buy_v3` past `rT`, and short.win's
+  own synthetic close), each held to its `MIGRATE_CU`, the three pump latch flags, a curve
+  listing, `sweep_trader` — each
   within `MAX_INSTRUCTION_TRACE_LENGTH = 64`
   and at its exact expected count, within ARCH §6.1's CU limit, with its wire sizes (legacy; v0
   through the protocol ALT of A28 **with its pump part**: pump, PumpSwap and pump-fees, their
@@ -54,18 +55,13 @@ migration in one instruction. Everything runs the **release** short.win (`anchor
   (`MaxInstructionTraceLengthExceeded`), how many opens of one wallet fit a v0 transaction, and the
   crank batches the protocol ALT holds (the four real curve markets and synthetic ones beyond
   them, sized only).
-- **T-STRADDLE, curve part** (`trace.md`'s last rows; **retired** by pump-final D2: the bundle
-  and its helper leave with `complete_curve` in P6): the ≥ 3-transaction bundle of ARCH §5.4 —
-  **tx1** `ComputeBudget ×2 + complete_curve(max_sol_cost)` of the `complete-curve` helper (A66,
-  `programs/complete_curve`; its SBF build `$COMPLETE_CURVE_SO`, else
-  `target/deploy/complete_curve.so`): it reads `rT` **at execution** and buys it with the keeper
-  as pump's `user` (helper 1 → pump 2 → Token / System / event 3), measured on the curve as the
-  keeper read it, ★ after a third party's curve buy landed between the keeper's read and the
-  bundle, and as a no-op on a curve a third party completed; **tx2** `ComputeBudget ×2 +
-  migrate_v2` top-level with the two boost accounts after an exact completion (`pc = 0`), held to
-  the keeper's `MIGRATE_CU` (400 k, pump-final §6.6); the v3 path's `migrate_v2` rows (after a
-  synthetic completion, T-TRACE above) stay when tx2 goes. tx3 (the position's PumpSwap exit) is
-  M6's.
+- **T-STRADDLE, curve part: retired** (pump-final P6, owner D2). The straddle bundle's tx1 rows
+  (the `complete_curve` helper's completion at the live `rT`, after a trade, as a no-op) and the
+  helper's depth row left with the helper (`git log` keeps them). A position past `rT` exits in
+  one instruction (the synthetic rows). The bundle's tx2, the keeper's `migrate_v2` after a
+  third party's exact completion (`pc = 0`), measures no helper and stays as a T-TRACE row next
+  to the two after a synthetic completion (`pc ≠ 0`, a third party's or short.win's own), each
+  held to the keeper's `MIGRATE_CU` (400 k, pump-final §6.6).
 - **Stack depth** (`tests/t_depth.rs` → `depth.md`): every curve-path instruction called directly
   and through one, two and three levels of the TEST-ONLY CPI wrapper `wrapper/` (it forwards one
   instruction, as a Squads vault transaction or an integrator's program would call short.win), on
@@ -84,12 +80,12 @@ CI job.
 
 ```sh
 # from the repository root
-anchor build --tools-version v1.57 --arch v3                     # target/deploy/shortwin.so (release), complete_curve.so
+anchor build --tools-version v1.57 --arch v3                     # target/deploy/shortwin.so (release)
 cargo-build-sbf --tools-version v1.57 --arch v3 \
   --manifest-path tests/bench/m5_cu/wrapper/Cargo.toml \
   --sbf-out-dir tests/bench/m5_cu/target/deploy -- --locked      # the wrapper (t_depth, t_trace)
 cargo test --manifest-path tests/bench/m5_cu/Cargo.toml --locked -- --nocapture
-# SHORTWIN_SO / COMPLETE_CURVE_SO / M5_WRAPPER_SO override the ELFs;
+# SHORTWIN_SO / M5_WRAPPER_SO override the ELFs;
 # M5_CU_WRITE=1, M5_TRACE_WRITE=1, M5_DEPTH_WRITE=1 rewrite results.md, trace.md, depth.md.
 ```
 
@@ -109,7 +105,7 @@ fails the bench.
   Every transaction that builds the state goes through `Env::send`, so the invariant hooks run.
 - The coins: `legacy115` (SPL Token, 115 B, no creator — its buys make one System transfer less),
   `t22_115` (Token-2022, 115 B, a creator), `fresh` (Token-2022, 125 B), `near` (Token-2022,
-  151 B, `rT` ≈ 8.9·10¹² — the completing buyback, the migration and the straddle), and the
+  151 B, `rT` ≈ 8.9·10¹² — the completing buyback, the migration and the synthetic exits), and the
   graduated coins (`graduated`, a PumpSwap-class coin, listed on its canonical pool with the pAMM
   init set since M6 — `tests/bench/m6_cu` measures every PumpSwap listing; `fartcoin`, graduated
   elsewhere, the list-only listing).
@@ -170,7 +166,7 @@ build).
   | `liquidate` / `expire` (synthetic and worst ring included) | 126.3–159.2 k | 140–200 k | 300 k | 167.8–198.7 k |
   | keeper `[crank_price, liquidate]` synthetic (`trace.md`, CB ×2 included) | 184.9 k; worst ring 192.6 k | ≤ 245 k | 300 k | n/a |
   | `sol_settle` S3 on `PumpMigrating` (`pc ≠ 0`, ρ) | 69.3 k (64.8 k without a pool part) | ≈ 66 k | 150 k | 64.2 k |
-  | `migrate_v2` (keeper, top level; `trace.md`, CB ×2 included) | 330.9 k after a synthetic completion (`pc ≠ 0`: a third party's or short.win's own) and after an exact one (tx2) alike | unchanged | `MIGRATE_CU` 400 k | 330.3 k |
+  | `migrate_v2` (keeper, top level; `trace.md`, CB ×2 included) | 330.9 k after a synthetic completion (`pc ≠ 0`: a third party's or short.win's own) and after a third party's exact one (`pc = 0`) alike | unchanged | `MIGRATE_CU` 400 k | 330.3 k |
 
   - pump's `sell_v3` is 42.5–49.1 k (`sell_v2` 69.9–85.7 k) and `buy_v3` 44.7–50.9 k plain,
     54.6 k completing and 63.4 k synthetic (`buy_v2` 80.7–98.2 k): no pump-fees CPI, no creator
@@ -226,15 +222,12 @@ build).
   event 3), a synthetic close, liquidation and expiry included, and so does a curve listing
   (short.win 1 → the ATA program / pump 2 → Token / System / pump's event 3): two wrapper levels
   fit (peak 5), a third fails with `CallDepth`. `sol_settle` (S3 after a synthetic pool part
-  included), `crank_price`, `sweep_trader` and `flag_venue_upgraded` peak at 2 and fit three. The
-  retired `complete_curve` helper also peaks at 3.
-- **T-STRADDLE (curve part; retired by D2):** tx1 (the helper) is 12 entries (§6.2: ≈ 11),
-  111.3 k CU, 763 B as v0 + ALT (1,192 B legacy), peak 3 — the same (12 entries, 111.3 k CU) when a
-  third party's curve buy landed between the keeper's read and the bundle (★: the helper completes
-  at the live `rT`), and 3 entries, 10.9 k CU, peak 1 as a no-op on a completed curve; tx2
-  `migrate_v2` is exactly **53** entries (§5.4: 51 + 2), peak **4** (A15), 330.9 k CU with its
+  included), `crank_price`, `sweep_trader` and `flag_venue_upgraded` peak at 2 and fit three.
+- **`migrate_v2`:** since pump-final a position past `rT` exits in one instruction (the synthetic
+  rows above); `migrate_v2` stays the keeper's own transaction. After a third party's exact
+  completion (`pc = 0`) and after a synthetic one (`pc ≠ 0`, a third party's or short.win's
+  own) alike it is exactly **53** entries (51 + 2), peak **4** (A15), 330.9 k CU with its
   ComputeBudget instructions (within the keeper's `MIGRATE_CU` of 400 k and ECON T7/T8's
-  322,371–358,072), 912 B as v0 + ALT. Since pump-final a position past `rT` exits in one
-  instruction (the synthetic rows above); `migrate_v2` stays the keeper's own transaction, and
-  after a synthetic completion (`pc ≠ 0`, a third party's or short.win's own) it is the same 53
-  entries, peak 4, 330.9 k CU and 912 B.
+  322,371–358,072) and 912 B as v0 + ALT. The retired straddle bundle's tx1 (the
+  `complete_curve` helper) measured 12 entries, 111.3 k CU, peak 3
+  (`git log -- tests/bench/m5_cu/trace.md`).
