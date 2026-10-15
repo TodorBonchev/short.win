@@ -29,7 +29,7 @@ tests:
 | Disclosure copy | `src/config/disclosures.ts` | every disclosure's id, title, body, acknowledgement text (§4) | `disclosures.test.ts` (SPEC §5.3 verbatim; every paragraph present in §4 of this file) |
 | `data-testid` contract | `src/config/testids.ts` | every test id and prefix (§11) | `testids.test.ts` (unique; every id present in §11) |
 | Program error messages | `src/config/errors.ts` | a human message and an action for each code 6000–6109 (§5.9) | `errors.test.ts` (against `@shortwin/client`'s constants) |
-| Pinned program ids | `src/config/programs.ts` | the programs a transaction may invoke (§9.1) | `programs.test.ts` (against `constants.rs`, the client, `complete_curve`) |
+| Pinned program ids | `src/config/programs.ts` | the programs a transaction may invoke (§9.1) | `programs.test.ts` (against `constants.rs` and the client) |
 | Route tree | `src/router.tsx` | paths, typed search parameters, page components and their props (§3.2) | `router.test.tsx` (every route renders in the shell) |
 | Transaction pipeline | `src/tx/types.ts`, `useTxFlow.ts`, `TxReviewModal.tsx` | `TxPlan`, the stages, the review (§5) | `tx/*.test.ts` |
 | Venue layer interface | `src/venues/types.ts` | what MARKETS and SHORT share (§5.1, §12) | the type check |
@@ -1781,10 +1781,11 @@ byte 2 at 165, TLV from 166): `CpiGuard` (extension 11, `lock_cpi`) and `MemoTra
    (identified by its discriminator), ATA `CreateIdempotent`, Token-2022 `EnableCpiGuard` /
    `DisableCpiGuard` (the bracket, FE-1), pump `extend_account` / `claim_cashback`, PumpSwap
    `init_user_volume_accumulator` / `claim_cashback` (the post-wipe bundle). Compute-budget
-   instructions are the pipeline's own (`message.ts`), never a plan's. System, SPL Token and
-   `complete_curve` are not allowed (no plan invokes them at the top level; `TOP_LEVEL_ALLOWLIST`
-   lists the five programs). Anything else is refused before simulation; `describe.ts` names the
-   review's instructions from the same table and marks a refused one.
+   instructions are the pipeline's own (`message.ts`), never a plan's. System and SPL Token are
+   not allowed (no plan invokes them at the top level; `TOP_LEVEL_ALLOWLIST` lists the five
+   programs; the `complete_curve` helper is retired, design pump-final D2). Anything else is
+   refused before simulation; `describe.ts` names the review's instructions from the same table
+   and marks a refused one.
 2. `assertSameIntent(expected, signed, tables)`: identical message bytes pass; otherwise both are
    decompiled and must have the same fee payer and the same non-compute-budget instructions
    (program, accounts with roles, data) in the same order (FE-2), and (*v1.2, M9-SEC-4*) the same
@@ -2278,10 +2279,10 @@ Mobile Wallet Adapter (O-6, on by default since 2026-10-13) adds the entry "Use 
 
 ### 9.1 Pinned programs and accounts
 
-`src/config/programs.ts` pins short.win, `complete_curve`, the venue, token, memo, ATA, System and
-ComputeBudget programs; `programs.test.ts` holds them to `constants.rs`, the Codama client and the
-helper's `declare_id!`. Which of their instructions a plan may put at the top level is
-`src/tx/allowlist.ts` (§5.8). The program id is never read from configuration, the indexer or a URL.
+`src/config/programs.ts` pins short.win, the venue, token, memo, ATA, System and ComputeBudget
+programs; `programs.test.ts` holds them to `constants.rs` and the Codama client (*2026-10-15:* the
+`complete_curve` helper and its `declare_id!` check are gone with it, design pump-final D2). Which
+of their instructions a plan may put at the top level is `src/tx/allowlist.ts` (§5.8). The program id is never read from configuration, the indexer or a URL.
 PDAs are derived locally (`find*Pda`); an indexer-supplied address is used only for display and
 navigation, and every account a transaction touches is re-derived or read from the chain.
 
@@ -2470,9 +2471,9 @@ price, caps), close / add-margin previews, P&L and risk.
   `--upgradeable-program 5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK
   target/test-venue/deploy/shortwin.so <generated authority>` (the test-venue build,
   `scripts/build-test-venue.sh`; `initialize_config` requires the upgrade authority's signature),
-  `--bpf-program BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7 target/deploy/mock_cpamm.so`,
-  `--bpf-program 4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ target/deploy/complete_curve.so`, and
-  optionally the dumped venue programs and accounts of `tests/fixtures` (`--bpf-program` /
+  `--bpf-program BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7 target/deploy/mock_cpamm.so`
+  (*2026-10-15:* no longer `complete_curve.so`, retired with pump's v3 exits, design pump-final D2),
+  and optionally the dumped venue programs and accounts of `tests/fixtures` (`--bpf-program` /
   `--account`) for venue-specific specs. *M10 (T-MEMO):* Token-2022 is mainnet's ELF
   (`--upgradeable-program` from `tests/fixtures` group `spl_programs` with its mainnet upgrade
   authority; the built-in is a different build; `SHORTWIN_BUNDLED_SPL=1` keeps the built-in).
@@ -3197,6 +3198,7 @@ the 10-key list is refused by shortwin 1.0.0.
 | Listing (`venues/detect.ts`) | `classifyPump`, on the live branch only: a cashback coin `CurveCashbackCoin` (6109), a depth ≠ 0 `CurveQuoteNotSol` (§5.9) | `state.test.ts` (cashback166 refused, complete cashback lists as `pump_migrating`; depth 1 refused) |
 | Previews, close (`previews.ts`, `trades.ts`, `CloseForm.tsx`) | `PositionMetrics.straddle` and the `CurveStraddle` refusal are gone: a close past `rT` previews and sends at `B̂_v3` (§5.11). The notice, its `close-straddle-notice` test id and its words are removed (D4, G-8: nothing new). `insufficientVault` no longer counts a missing quote as a thin vault ("No buyback quote now") | `vectors/pump-vectors.json` (new; `program_vectors.rs pump`: the **release** build on pump's 2026-10-13 ELFs in LiteSVM, near166): the open preview equals `open_short` (`sell_v3` proceeds, `N_open`, `B̂_ema`, margin, fee, vault, tier, deadline); the close below `rT` and the close past it equal `close_short` — the preview is the program's own `b_live` (`B̂_v3` past `rT`, 692,998,557 against pump's charge of 692,998,555), the payout what the program paid less that slack; the keeper's `liquidate` past `rT` (T-SYNTH-2's ECON D@80 % on the fresh curve, the crowd's buy down to `q/2`): the position metrics equal its event — `B̂_v3` at the live fee (`b_live`) and at the exit risk cap (`b_live_risk`), the EMA leg's CR on the newest ring entry (`cr_ema_bps`) and `R_due` — and the liquidation price is the spot (the event's spot CR is on the robust spot, which the web does not model); `plans.test.ts` builds both opens and closes exactly as the program executed them (the 7-account ReadSet, the 10 TradeExtras); `positions.test.tsx` |
 | The D4 strings | `src/config/copyPump.ts` holds the program's two texts as drafted (§4.3's pump group): `errors.ts` takes 6031 and 6109 from it — byte for byte the program's `#[msg]`, a straight apostrophe and no final full stop on `CurveStraddle` | `copy.test.ts` (the drafted texts, the program's `errors.rs`, `errors.ts` and §4.3 held to each other; 72 / 152), `errors.test.ts` |
+| D2 (`complete_curve` retired) | `programs.ts`, `describe.ts`, the `/security` page and its security.txt, `SECURITY.md`'s scope table; the E2E validator no longer deploys `complete_curve.so` (the `full` profile's indexer config keeps its id until the indexer drops its ingestion, P6) | `programs.test.ts`, `securityPolicy.test.ts` |
 | WASM | `Venue.migratingFv(q, p, state)` (`quote::migrating_fv`); the package rebuilt | `quotes::tests::migrating_fv_follows_the_post_complete_pool`; `js/smoke.cjs` |
 
 ### Mobile wallets (2026-10-13; O-6 lifted)

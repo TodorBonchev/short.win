@@ -1,9 +1,9 @@
 # Security policy
 
 This file, the web app's policy page (`https://short.win/security`), its
-`/.well-known/security.txt` (RFC 9116) and the `security.txt` that both programs embed carry
+`/.well-known/security.txt` (RFC 9116) and the `security.txt` that the program embeds carry
 the same values (owner decision of 2026-10-02, M10 Q3). The release gate refuses any
-placeholder in the programs' copies (`scripts/check-security-txt.py --forbid-placeholders`, CI's
+placeholder in the program's copy (`scripts/check-security-txt.py --forbid-placeholders`, CI's
 `anchor-build` job).
 
 ## Scope
@@ -11,13 +11,14 @@ placeholder in the programs' copies (`scripts/check-security-txt.py --forbid-pla
 | Component | Identifier |
 |---|---|
 | short.win program (Solana mainnet) | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` |
-| `complete_curve` helper program (Solana mainnet) | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` |
 | Web app | `https://short.win` |
 | Keeper, indexer and API operated by short.win | in scope: reports are welcome and handled like the others |
 
-Both programs embed a `security.txt` (`solana-security-txt` 1.1.3). To read it:
-`query-security-txt <program id>`. Its `source_release` is the programs' package version
-(`v1.0.0` at the audit freeze).
+The program embeds a `security.txt` (`solana-security-txt` 1.1.3). To read it:
+`query-security-txt <program id>`. Its `source_release` is the program's package version
+(`v1.0.0` at the audit freeze). The `complete_curve` helper of the audited 1.0.0 scope was never
+deployed and is retired with pump's v3 exits (design pump-final §11, owner decision D2 of
+2026-10-13).
 
 Not in scope:
 - the third-party programs short.win calls: pump.fun, PumpSwap, pump-fees, Raydium, SPL

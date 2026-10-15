@@ -1,8 +1,9 @@
 /**
  * The E2E `solana-test-validator` (FRONTEND.md §10.2): a fresh ledger in `.e2e/ledger` on the
  * dedicated ports, short.win's test-venue build as an upgradeable program whose upgrade authority
- * is the generated `authority` key (`initialize_config` requires its signature), the mock venue and
- * `complete_curve`, the dumped venue programs (pump, pump-fees, PumpSwap, Raydium AMM v4 / CPMM)
+ * is the generated `authority` key (`initialize_config` requires its signature), the mock venue
+ * (`complete_curve` is retired with pump's v3 exits, design pump-final §8 / D2: nothing calls it),
+ * the dumped venue programs (pump, pump-fees, PumpSwap, Raydium AMM v4 / CPMM)
  * with their mainnet upgrade authorities, and the genesis accounts of `genesis.ts`. Token-2022 is
  * mainnet's build (M10 T-MEMO; `splPrograms()`: the dumped ELF as an upgradeable program with its
  * mainnet upgrade authority), replacing the validator's built-in; `SHORTWIN_BUNDLED_SPL=1` keeps the
@@ -71,9 +72,6 @@ export async function startValidator(): Promise<void> {
         PROGRAMS.shortwin,
         progs.shortwin,
         authority,
-        '--bpf-program',
-        PROGRAMS.completeCurve,
-        progs.completeCurve,
         '--account-dir',
         PATHS.accounts,
     ];

@@ -1,8 +1,9 @@
 /**
  * The disclosure policy's values (owner decision of 2026-10-02, M10 Q3): the `/security` page
  * (`features/security/SecurityPolicyPage.tsx`), `public/.well-known/security.txt`, the repository's
- * `SECURITY.md` and the `security.txt` both programs embed (`programs/{shortwin,complete_curve}/src/
- * lib.rs`) carry the same. `securityPolicy.test.ts` holds this file to the committed security.txt.
+ * `SECURITY.md` and the `security.txt` the program embeds (`programs/shortwin/src/lib.rs`; the
+ * `complete_curve` helper is retired, design pump-final D2) carry the same. `securityPolicy.test.ts`
+ * holds this file to the committed security.txt.
  */
 
 /** The security mailbox (security.txt `Contact`, the programs' `contacts` `email:` entry). */

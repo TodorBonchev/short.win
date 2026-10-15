@@ -21,7 +21,7 @@
  *                            off (the app is rebuilt: `sourceFingerprint` hashes the build's `VITE_*`)
  * - `SHORTWIN_CHROMIUM`      browser executable (default `/usr/bin/chromium` when it exists, else
  *                            Playwright's own Chromium from the user cache); `playwright` forces the latter
- * - `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`  program ELFs (defaults under target/)
+ * - `SHORTWIN_SO`, `MOCK_CPAMM_SO`  program ELFs (defaults under target/)
  * - `SOLANA_BIN`             directory of `solana-test-validator` (default: the Agave install)
  * - `SHORTWIN_INDEXER_BIN`, `SHORTWIN_PG_INSTALL_DIR`  the `full` profile's binaries
  */
@@ -94,8 +94,11 @@ export const ENV = {
     ci: flag('CI', false),
 } as const;
 
-/** The program ELFs the validator loads (FRONTEND.md §10.2). */
-export function programPaths(): { shortwin: string; mock: string; completeCurve: string } {
+/**
+ * The program ELFs the validator loads (FRONTEND.md §10.2). The `complete_curve` helper is retired
+ * with pump's v3 exits (design pump-final §8, D2), so the validator no longer deploys it.
+ */
+export function programPaths(): { shortwin: string; mock: string } {
     const shortwin =
         process.env.SHORTWIN_SO ??
         (ENV.program === 'release'
@@ -104,7 +107,6 @@ export function programPaths(): { shortwin: string; mock: string; completeCurve:
     return {
         shortwin,
         mock: process.env.MOCK_CPAMM_SO ?? join(REPO_ROOT, 'target', 'deploy', 'mock_cpamm.so'),
-        completeCurve: process.env.COMPLETE_CURVE_SO ?? join(REPO_ROOT, 'target', 'deploy', 'complete_curve.so'),
     };
 }
 

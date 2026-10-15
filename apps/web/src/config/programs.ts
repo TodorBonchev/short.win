@@ -6,10 +6,12 @@
  */
 import { type Address, address } from '@solana/kit';
 
-/** short.win (`declare_id!`; `@shortwin/client`'s `SHORTWIN_PROGRAM_ADDRESS`). */
+/**
+ * short.win (`declare_id!`; `@shortwin/client`'s `SHORTWIN_PROGRAM_ADDRESS`). The stateless
+ * straddle helper `complete_curve` (A66) is retired with pump's v3 exits (design pump-final §11,
+ * owner D2): nothing the app builds or shows names it.
+ */
 export const SHORTWIN_PROGRAM: Address = address('5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK');
-/** The stateless straddle helper (ARCH §5.4, A66). */
-export const COMPLETE_CURVE_PROGRAM: Address = address('4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ');
 
 export const SYSTEM_PROGRAM: Address = address('11111111111111111111111111111111');
 export const COMPUTE_BUDGET_PROGRAM: Address = address('ComputeBudget111111111111111111111111111111');
@@ -37,7 +39,7 @@ export const MOCK_CPAMM_PROGRAM: Address = address('BPAZFPkmVtYEWEZHCzFUns7oybh1
  * `DisableCpiGuard` for the CPI Guard bracket, FE-1; pump `extend_account` and `claim_cashback`;
  * PumpSwap `init_user_volume_accumulator` and `claim_cashback` for the post-wipe sweep bundle) —
  * and the compute-budget instructions are the pipeline's own (`tx/message.ts`), never a plan's.
- * System, SPL Token and `complete_curve` are not here: no plan invokes them at the top level.
+ * System and SPL Token are not here: no plan invokes them at the top level.
  */
 export const TOP_LEVEL_ALLOWLIST: readonly Address[] = [
     SHORTWIN_PROGRAM,

@@ -963,7 +963,8 @@ than by Playwright's `webServer`, because the build needs the seeded protocol AL
    --limit-ledger-size 200000000` on dedicated ports (RPC 18899, WS 18900, faucet 19900, gossip
    18901, dynamic 18910–18960), with short.win's **test-venue** build
    (`target/test-venue/deploy/shortwin.so`) as an upgradeable program whose upgrade authority is
-   a generated key, `mock_cpamm.so` and `complete_curve.so` from `target/deploy`, the dumped
+   a generated key, `mock_cpamm.so` from `target/deploy` (*2026-10-15:* no longer
+   `complete_curve.so`, retired with pump's v3 exits, design pump-final D2), the dumped
    pump / pump-fees / PumpSwap / Raydium AMM v4 / CPMM ELFs of `tests/fixtures/programs` with
    their mainnet upgrade authorities (CPMM: the 2026-10 redeploy, M10), mainnet's Token-2022
    (`--upgradeable-program` from the `spl_programs` group with its mainnet upgrade authority,
@@ -1061,7 +1062,8 @@ forces Playwright's own Chromium, installed once with `pnpm --filter web exec pl
 chromium` into the user cache — never `--with-deps` as root); `SHORTWIN_E2E_PROGRAM=release`
 (the release `shortwin.so`: list-only markets, the trading specs skip); `SHORTWIN_E2E_VENUES=0`
 (no dumped venues); `SHORTWIN_BUNDLED_SPL=1` (M10: keep the validator's built-in Token-2022 and
-skip the SPL pin check); `SOLANA_BIN`, `SHORTWIN_SO`, `MOCK_CPAMM_SO`, `COMPLETE_CURVE_SO`.
+skip the SPL pin check); `SOLANA_BIN`, `SHORTWIN_SO`, `MOCK_CPAMM_SO` (*2026-10-15:*
+`COMPLETE_CURVE_SO` is gone with the helper, pump-final D2).
 
 **On a shared or small host (M10).**
 - Playwright puts Chromium's profile in `os.tmpdir()`. On a host where `/tmp` is a quota'd or
@@ -1348,7 +1350,7 @@ opt-in (`gh variable set FUZZ_NIGHTLY --body true`) and long fuzz runs are local
 | `program-tests` | on the `anchor-build` artifact: fixture checksums (`SHA256SUMS` and `scripts/dump-fixtures.py check`), `cargo check -p shortwin --target wasm32-unknown-unknown` (T-LAYOUT), `cargo test -p shortwin` on the release feature set, `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests` (incl. every Raydium and pump fork binary, `straddle_it` with the helper) |
 | `codama` | IDL copy and generated client are current; `tsc`; `node --test` (T-LAYOUT Codama leg) |
 | `web` | M9: wasm-bindgen 0.2.129, `@shortwin/math-wasm` build, then `apps/web`'s Biome check, type check, Vitest and production build (FRONTEND.md §10.4) |
-| `web-e2e` | M9: Playwright (profile `chain`) on `solana-test-validator` with the `anchor-build` artifact's test-venue `shortwin.so`, mock and helper plus the dumped venues, the seeded scenario, the production build and the injected test wallet; every spec (incl. the §10.3 CPI Guard and memo exit tests, axe on every page); the `screens` PNGs uploaded always, report, traces and logs on failure |
+| `web-e2e` | M9: Playwright (profile `chain`) on `solana-test-validator` with the `anchor-build` artifact's test-venue `shortwin.so` and mock (since 2026-10-15 not the `complete_curve` helper, pump-final D2) plus the dumped venues, the seeded scenario, the production build and the injected test wallet; every spec (incl. the §10.3 CPI Guard and memo exit tests, axe on every page); the `screens` PNGs uploaded always, report, traces and logs on failure |
 | `m1-cu` | M1 CU baseline bench (`tests/bench/m1_cu`) within budget |
 | `m2-cu` | M2 CU bench and T-TRACE (`tests/bench/m2_cu`) within budget and 64 trace entries |
 | `m3-cu` | M3 CU bench, T-TRACE and stack depth on Raydium (`tests/bench/m3_cu`): builds the TEST-ONLY CPI wrapper (SBPF v3 asserted), every Raydium-path instruction (M4's `propose_pool` / `execute_pool_switch` included) within budget, the worst-case transactions at their exact trace counts, every path through 0–3 wrapper levels |

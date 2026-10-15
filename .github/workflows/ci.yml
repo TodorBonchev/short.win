@@ -525,7 +525,8 @@ jobs:
   web-e2e:
     # M9 web E2E (docs/design/FRONTEND.md §10.2–§10.4; apps/web/e2e), profile `chain`: Playwright
     # 1.63 on a local solana-test-validator (Agave 4.1.2) loading the anchor-build artifact's
-    # test-venue shortwin.so, mock_cpamm.so and complete_curve.so plus the dumped venue fixtures of
+    # test-venue shortwin.so and mock_cpamm.so (no complete_curve.so since pump's v3 exits,
+    # pump-final D2) plus the dumped venue fixtures of
     # tests/fixtures, seeded by e2e/validator/seed.ts (Kit + @shortwin/client); the production build
     # of apps/web served by vite preview; the injected "ShortWin E2E" Wallet Standard wallet (and, in
     # the Android project, the protocol-level fake Mobile Wallet Adapter wallet, O-6, then again
@@ -566,10 +567,10 @@ jobs:
         with:
           name: shortwin-program
           path: target
-      - name: The test-venue build (A49) and the helpers are present
+      - name: The test-venue build (A49) and the mock venue are present
         run: |
           LC_ALL=C grep -aq "shortwin:test-venue:mock-cpamm" target/test-venue/deploy/shortwin.so
-          ls -l target/deploy/mock_cpamm.so target/deploy/complete_curve.so
+          ls -l target/deploy/mock_cpamm.so
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @shortwin/math-wasm build

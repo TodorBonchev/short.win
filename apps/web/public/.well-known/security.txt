@@ -1,8 +1,7 @@
 # short.win vulnerability disclosure (RFC 9116). The policy: https://short.win/security
-# Scope: this web app and the short.win on-chain programs on Solana mainnet:
+# Scope: this web app and the short.win on-chain program on Solana mainnet:
 #   short.win       5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK
-#   complete_curve  4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ
-# Both programs also embed a security.txt (query-security-txt <program id>).
+# The program also embeds a security.txt (query-security-txt <program id>).
 Contact: mailto:security@short.win
 Expires: 2027-09-30T00:00:00.000Z
 Policy: https://short.win/security

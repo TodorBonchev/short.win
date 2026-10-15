@@ -17,7 +17,6 @@ import {
 import { identifyToken2022Instruction, Token2022Instruction } from '@solana-program/token-2022';
 import {
     ASSOCIATED_TOKEN_PROGRAM,
-    COMPLETE_CURVE_PROGRAM,
     COMPUTE_BUDGET_PROGRAM,
     MEMO_PROGRAM,
     PUMP_AMM_PROGRAM,
@@ -41,7 +40,6 @@ export interface InstructionSummary {
 
 const PROGRAM_NAMES: Readonly<Record<string, string>> = {
     [SHORTWIN_PROGRAM]: 'short.win',
-    [COMPLETE_CURVE_PROGRAM]: 'complete_curve',
     [COMPUTE_BUDGET_PROGRAM]: 'Compute Budget',
     [SYSTEM_PROGRAM]: 'System',
     [ASSOCIATED_TOKEN_PROGRAM]: 'Associated Token',

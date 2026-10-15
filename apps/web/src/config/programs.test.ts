@@ -29,9 +29,8 @@ describe('pinned program ids', () => {
         }
     });
 
-    it('match the complete_curve helper’s declare_id', () => {
-        const lib = readRepo('programs/complete_curve/src/lib.rs');
-        expect(lib).toContain(`declare_id!("${P.COMPLETE_CURVE_PROGRAM}")`);
+    it('pin no complete_curve helper (retired with pump v3, D2)', () => {
+        expect(Object.values(P)).not.toContain('4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ');
     });
 
     it('allow only pinned programs at the top level', () => {

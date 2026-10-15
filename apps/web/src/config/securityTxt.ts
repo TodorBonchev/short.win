@@ -1,8 +1,9 @@
 /**
  * The web app's RFC 9116 `security.txt` (`public/.well-known/security.txt`; M10 SECTXT-4), checked
  * by the build (`vite.config.ts`), the unit test, the E2E `frame` spec and the deploy check
- * (`scripts/check-headers.ts`). The two programs embed their own security.txt with the same owner
- * values (`programs/{shortwin,complete_curve}/src/lib.rs`, `scripts/check-security-txt.py`).
+ * (`scripts/check-headers.ts`). The program embeds its own security.txt with the same owner values
+ * (`programs/shortwin/src/lib.rs`, `scripts/check-security-txt.py`; the `complete_curve` helper is
+ * retired, design pump-final D2).
  *
  * The owner fields held `OWNER-FILL` placeholders until the public identity was decided (M10 owner
  * question Q3, answered 2026-10-02: `config/securityPolicy.ts`). A non-production check (every other

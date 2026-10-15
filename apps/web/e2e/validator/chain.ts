@@ -30,6 +30,10 @@ import { URLS } from '../env.ts';
 
 export const PROGRAMS = {
     shortwin: '5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK' as Address,
+    /**
+     * The retired `complete_curve` helper (pump-final D2): not deployed on the validator; only the
+     * `full` profile's indexer config still names it, until the indexer drops its ingestion (P6).
+     */
     completeCurve: '4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ' as Address,
     mock: 'BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7' as Address,
     system: '11111111111111111111111111111111' as Address,

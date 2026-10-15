@@ -10,7 +10,7 @@
 import { Link } from '@tanstack/react-router';
 import { type Column, DataTable } from '../../components/DataTable.tsx';
 import { Panel } from '../../components/Panel.tsx';
-import { COMPLETE_CURVE_PROGRAM, SHORTWIN_PROGRAM } from '../../config/programs.ts';
+import { SHORTWIN_PROGRAM } from '../../config/programs.ts';
 import { SECURITY_EMAIL, SECURITY_TXT_CANONICAL } from '../../config/securityPolicy.ts';
 import { SECURITY_TXT_PATH } from '../../config/securityTxt.ts';
 import { T } from '../../config/testids.ts';
@@ -18,7 +18,6 @@ import './security.css';
 
 const SCOPE: readonly (readonly [string, string])[] = [
     ['short.win program (Solana mainnet)', SHORTWIN_PROGRAM],
-    ['complete_curve helper program (Solana mainnet)', COMPLETE_CURVE_PROGRAM],
     ['Web app', 'https://short.win'],
     ['Keeper, indexer and API operated by short.win', 'in scope'],
 ];
@@ -49,7 +48,7 @@ export function SecurityPolicyPage() {
                         rowKey={([what]) => what}
                     />
                     <p className="sec-note">
-                        Both programs embed a security.txt; read it with{' '}
+                        The program embeds a security.txt; read it with{' '}
                         <code>query-security-txt &lt;program id&gt;</code>.
                     </p>
                     <h3>Not in scope</h3>
