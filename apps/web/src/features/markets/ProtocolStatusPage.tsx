@@ -20,7 +20,8 @@ import { type Column, DataTable } from '../../components/DataTable.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { Empty, ErrorState, Skeleton } from '../../components/States.tsx';
 import { T } from '../../config/testids.ts';
-import { formatDuration } from '../../lib/format.ts';
+import { formatDuration, formatSlot } from '../../lib/format.ts';
+import type { Freshness } from '../../lib/staleness.ts';
 import { formatUtc } from '../../lib/time.ts';
 import './markets.css';
 import { useChainConfig, useChainVenueGuard } from '../../rpc/queries.ts';
@@ -49,6 +50,20 @@ const VENUE_BIT_LABEL: Readonly<Record<string, string>> = {
     jupiter: 'Jupiter',
     mock: 'Mock (test)',
 };
+
+/** The indexer-state badge's text: one casing path (design pass P5-8). */
+const INDEXER_STATE: Readonly<Record<Freshness, string>> = {
+    live: 'Live',
+    lagging: 'Lagging',
+    stale: 'Stale',
+    down: 'Unavailable',
+    unknown: 'Unknown',
+};
+
+/** A slot from the venue model ("449280566", or "—" when unknown) grouped with commas. */
+function slotText(s: string): string {
+    return /^\d+$/.test(s) ? formatSlot(BigInt(s)) : s;
+}
 
 function YesNo({ v, yes, no, tone }: { v: boolean | null; yes: string; no: string; tone: 'ok' | 'warn' | 'danger' }) {
     if (v === null) return <span className="muted">—</span>;
@@ -94,14 +109,14 @@ const VENUE_COLUMNS: readonly Column<VenueProgramRow>[] = [
         header: 'Guard slot',
         align: 'right',
         priority: 2,
-        render: (r) => <span className="num">{r.guardSlot}</span>,
+        render: (r) => <span className="num">{slotText(r.guardSlot)}</span>,
     },
     {
         key: 'deploy',
         header: 'Deploy slot',
         align: 'right',
         priority: 2,
-        render: (r) => <span className="num">{r.deploySlot}</span>,
+        render: (r) => <span className="num">{slotText(r.deploySlot)}</span>,
     },
 ];
 
@@ -245,9 +260,10 @@ export function ProtocolStatusPage() {
                         <div className="stack">
                             <div className="row" data-testid={T.statusIndexerLag} data-state={fresh.state}>
                                 <Badge
+                                    className="badge-status"
                                     tone={fresh.state === 'live' ? 'ok' : fresh.state === 'lagging' ? 'warn' : 'danger'}
                                 >
-                                    {fresh.state === 'down' ? 'Unavailable' : fresh.state}
+                                    {INDEXER_STATE[fresh.state]}
                                 </Badge>
                                 {fresh.lagS !== null && fresh.state !== 'down' && (
                                     <span className="num">{fresh.lagS} s behind the RPC node</span>
@@ -262,13 +278,13 @@ export function ProtocolStatusPage() {
                                             [
                                                 'Confirmed slot',
                                                 <span key="c" className="num">
-                                                    {s.confirmed_slot.toLocaleString('en-US')}
+                                                    {formatSlot(s.confirmed_slot)}
                                                 </span>,
                                             ],
                                             [
                                                 'Finalized slot',
                                                 <span key="f" className="num">
-                                                    {s.finalized_slot.toLocaleString('en-US')}
+                                                    {formatSlot(s.finalized_slot)}
                                                 </span>,
                                             ],
                                             ['Ingest lag', s.lag_s === null ? '—' : formatDuration(s.lag_s)],

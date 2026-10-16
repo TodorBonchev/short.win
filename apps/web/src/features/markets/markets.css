@@ -6,10 +6,11 @@
 /* ---- the intro strip (the owner's thirteenth round, O-3 (a)) ------------------------------- */
 /* A compact band above the list: heading row (How it works, Hide), then three parts side by side
    from 1,024 px, stacked under it. */
+/* A panel's edge on its three plain sides (--line-panel, design pass P5-8); the blue info bar stays. */
 .mk-intro {
     padding: var(--sp-3) var(--sp-4);
     background: var(--bg-1);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel, var(--line));
     border-left: 3px solid var(--info);
     border-radius: var(--radius-lg);
 }
@@ -32,9 +33,9 @@ h2.mk-intro-title {
     margin-top: var(--sp-2);
 }
 
+/* The section tier is base h3's (design pass P5-3): margins only here. */
 .mk-intro-part h3 {
     margin: 0 0 var(--sp-1);
-    font-size: var(--fs-sm);
 }
 
 .mk-intro-risk-title {
@@ -216,6 +217,15 @@ h2.mk-intro-title {
     min-width: 0;
 }
 
+/* The indexer-down form's instruction is a sentence, not a tracked label (design pass P5-7; text unchanged). */
+.mk-open-mint > label,
+.mk-open-mint-label {
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+    text-transform: none;
+    letter-spacing: 0;
+}
+
 /* Every MARKETS DataTable (`.mk-tbl`). As cards, a card in an already padded box (a panel or tab
    body) does not indent a second time. */
 @container tbl (max-width: 559.98px) {
@@ -335,17 +345,29 @@ h2.mk-intro-title {
         padding-inline: var(--sp-3);
     }
 
+    /* One row, merged into the sort bar under it (design pass P5-1): the filter box, "Filters ▾" and the
+       count — which still wraps to its own right-aligned line at 320 px, so the wrap stays. The inline padding
+       is the sort bar's, so the filter box and "Sort by" share a left edge. */
     .mk-toolbar {
-        padding: var(--sp-3);
+        flex-wrap: wrap;
+        padding: var(--sp-3) var(--sp-4) var(--sp-2);
         gap: var(--sp-2) var(--sp-3);
+        border-bottom: 0;
     }
 
     .mk-search {
-        flex: 1 0 100%;
+        flex: 1 1 140px;
+        min-width: 0;
     }
 
     .mk-filters-toggle {
         display: inline-flex;
+        flex: none;
+    }
+
+    .mk-count {
+        flex: none;
+        margin-left: auto;
     }
 
     .mk-filters {
@@ -417,11 +439,13 @@ h2.mk-intro-title {
     text-align: right;
 }
 
+/* A visible track (--meter-track, 1.92 on bg-1) and a fill never thinner than 2 px once there is any
+   utilisation (design pass P5-5); at exactly 0 % the fill is empty and the value beside it reads muted. */
 .mk-util-track {
     display: inline-block;
     width: 48px;
     height: 6px;
-    background: var(--bg-3);
+    background: var(--meter-track, var(--bg-3));
     border-radius: 3px;
     overflow: hidden;
 }
@@ -432,6 +456,10 @@ h2.mk-intro-title {
     background: var(--ok);
 }
 
+.mk-util-fill:not([data-empty]) {
+    min-width: 2px;
+}
+
 .mk-util-fill[data-tone="warn"] {
     background: var(--warn);
 }
@@ -440,9 +468,36 @@ h2.mk-intro-title {
     background: var(--danger);
 }
 
+/* The token column is a link (design pass P5-4): its symbol takes the link's blue, which .mk-token-symbol's
+   --text-0 would otherwise beat — on the markets list and the status page's lists (--info on bg-1 = 6.96:1). */
+.mk-tbl td[data-col="token"] > a .mk-token-symbol {
+    color: inherit;
+}
+
+/* Venue as quiet text in the wide table: eight identical pills out-shout the money columns. Migrating stays
+   warn and Lend only its bordered neutral pill; a card gives the venue its grey tag back beside the tier. */
+.mk-markets-tbl td[data-col="venue"] .badge[data-tone="info"] {
+    background: transparent;
+    padding: 0;
+    color: var(--text-1);
+    font-weight: var(--fw-regular);
+    box-shadow: none;
+}
+
+@container tbl (max-width: 559.98px) {
+    .mk-markets-tbl td[data-col="venue"] .badge[data-tone="info"] {
+        background: var(--tag-bg, var(--bg-3));
+        color: var(--tag, var(--text-1));
+        padding: 0 var(--sp-2);
+    }
+}
+
 /* ---- market page ---------------------------------------------------------------------------- */
 /* The header (D9): the title line (symbol, tier, venue, flags, freshness) and the name · mint line,
    with the prices straight after them at the large size; on a phone the three stack. */
+/* One baseline across the head (design pass P5-3): the name · mint line and the price figures share it —
+   `last baseline` (the @supports block below), because both are columns whose first baseline is a label, not
+   the number; box bottoms where a browser lacks it. */
 .mk-head {
     display: flex;
     flex-wrap: wrap;
@@ -480,7 +535,7 @@ h2.mk-intro-title {
 .mk-head-sub {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: baseline;
     gap: var(--sp-1) var(--sp-3);
     min-width: 0;
     color: var(--text-1);
@@ -507,11 +562,19 @@ h2.mk-intro-title {
     gap: var(--sp-2) var(--sp-6);
 }
 
+@supports (align-items: last baseline) {
+    .mk-head,
+    .mk-head-prices {
+        align-items: last baseline;
+    }
+}
+
+/* The headline price is the hero (--fs-hero: 22 px desktop / 24 phone) over the 20 px title. */
 .mk-head-price {
     display: flex;
     flex-direction: column;
-    font-size: var(--fs-xl);
-    line-height: 1.15;
+    font-size: var(--fs-hero);
+    line-height: var(--lh-tight);
 }
 
 .mk-head-price[data-kind="spot"] {
@@ -519,12 +582,14 @@ h2.mk-intro-title {
     color: var(--text-1);
 }
 
+/* The label tier (P1's --label-* tokens): one recipe with the stat strip's labels under it. */
 .mk-head-price-label {
     display: block;
-    font-size: var(--fs-xs);
-    color: var(--text-2);
+    font-size: var(--label-fs, var(--fs-xs));
+    font-weight: var(--label-fw, var(--fw-medium));
+    letter-spacing: var(--label-ls, 0.04em);
+    color: var(--label-color, var(--text-2));
     text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
 /* A mint as the page title (not listed, loading): it wraps rather than widen the page. */
@@ -575,9 +640,9 @@ h2.mk-intro-title {
     overflow-y: auto;
     padding: var(--sp-4);
     background: var(--bg-2);
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line-panel, var(--line));
     border-radius: var(--radius-lg);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 55%);
+    box-shadow: var(--shadow-pop, 0 12px 32px rgb(0 0 0 / 55%));
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
@@ -595,11 +660,9 @@ h2.mk-intro-title {
     margin: 0;
 }
 
+/* Sized by the shared close rule (components.css: --icon-btn, 44 px under a finger). */
 .mk-popover-close {
     flex: none;
-    width: max(32px, var(--tap-min));
-    height: max(32px, var(--tap-min));
-    padding: 0;
 }
 
 .mk-popover-scrim {
@@ -609,7 +672,7 @@ h2.mk-intro-title {
 .mk-banners {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    gap: var(--sp-3);
 }
 
 .mk-banner {
@@ -622,6 +685,22 @@ h2.mk-intro-title {
     outline: 2px solid var(--focus);
     outline-offset: 2px;
     border-radius: var(--radius);
+}
+
+/* The action bar of a market that cannot be shorted (design pass P5-2): Short steps down to a grey default
+   button — the banner above says why; the sheet still opens on it — and Lend takes the gold. The `.btn.`
+   prefix and the explicit hover keep P3's red `.btn[data-variant="short"]:hover` off it on a hovering tablet. */
+.btn.mk-action[data-variant="short"][data-unavailable] {
+    background: var(--bg-2);
+    border-color: var(--line-strong);
+    color: var(--text-1);
+}
+
+@media (hover: hover) {
+    .btn.mk-action[data-variant="short"][data-unavailable]:hover:not(:disabled) {
+        background: var(--bg-3);
+        filter: none;
+    }
 }
 
 /* The stat strip: the "More stats" toggle exists for a phone only. */
@@ -797,8 +876,13 @@ h2.mk-intro-title {
     max-width: none;
 }
 
-.mk-creator .tbl th {
-    background: var(--bg-3);
+/* The disclosure in the creator box sits on the nested surface, edged like a panel on its three plain sides —
+   never `border-color`: markets.css loads after components.css and would grey the severity bar (P5-8). */
+.mk-creator > .disclosure {
+    background: var(--surface-nested);
+    border-top-color: var(--line-panel, var(--line));
+    border-right-color: var(--line-panel, var(--line));
+    border-bottom-color: var(--line-panel, var(--line));
 }
 
 .mk-badges {
@@ -874,25 +958,14 @@ h2.mk-intro-title {
     }
 }
 
-@media (pointer: coarse) {
-    .mk-popover-close {
-        width: 44px;
-        height: 44px;
-    }
-}
-
 /* ---- create market ------------------------------------------------------------------------- */
+/* The shared side column (--side-col: 360 px, 320 under 1,180 px, P1-4) and the page gap, like the trade and
+   Manage panels (design pass P5-6); one column under 1,024 px, below. */
 .mk-create {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 380px;
-    gap: var(--sp-3);
+    grid-template-columns: minmax(0, 1fr) var(--side-col, 360px);
+    gap: var(--page-gap, var(--sp-3));
     align-items: start;
-}
-
-@media (max-width: 1179.98px) {
-    .mk-create {
-        grid-template-columns: minmax(0, 1fr) 340px;
-    }
 }
 
 /* Paste (a finger has no quick select-all and paste): only under a coarse pointer. */
@@ -982,22 +1055,18 @@ h2.mk-intro-title {
     background: var(--bg-2);
 }
 
-.mk-choice input[type="radio"],
-.mk-pool-choice input[type="radio"] {
-    accent-color: var(--accent);
-}
-
 .mk-pool-choice {
     min-height: var(--tap-min);
     cursor: pointer;
 }
 
-@media (pointer: coarse) {
-    .mk-choice input[type="radio"],
-    .mk-pool-choice input[type="radio"] {
-        width: 20px;
-        height: 20px;
-    }
+/* A form measure for the left column's field and facts, the venue choice and the reasons — never the pools
+   DataTable, which keeps the panel's width, and never the cost column (its Total row spans the panel). */
+.mk-create > .stack .panel-body .field,
+.mk-create > .stack .panel-body .kv,
+.mk-create .mk-choice,
+.mk-create .mk-reasons {
+    max-width: var(--form-measure, 64ch);
 }
 
 /* A pool card: the eligibility (with its reasons) gets the whole width. */
@@ -1054,12 +1123,13 @@ h2.mk-intro-title {
 }
 
 /* ---- protocol status ----------------------------------------------------------------------- */
-/* Panels side by side where 420 px fit, one per row on a phone; a row's panels share its height. */
+/* Panels side by side where 420 px fit, one per row on a phone, the page gap between them; each as tall as its
+   content (design pass P5-8: a stretched frame left 180 px of empty panel). */
 .mk-status-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
-    gap: var(--sp-3);
-    align-items: stretch;
+    gap: var(--page-gap, var(--sp-3));
+    align-items: start;
 }
 
 .mk-status-opens .panel-body {
@@ -1079,6 +1149,13 @@ h2.mk-intro-title {
     align-items: center;
     gap: var(--sp-3);
     font-size: var(--fs-lg);
+}
+
+/* "Open" / "Paused on every market" is the row's statement, not a 12 px tag (design pass P5-8). */
+.mk-status-pause > .badge {
+    font-size: var(--fs-md);
+    height: 22px;
+    padding-inline: var(--sp-3);
 }
 
 /* The market's open positions: from 560 px of table width (a laptop's market column too) every

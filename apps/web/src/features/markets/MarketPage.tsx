@@ -42,7 +42,7 @@ import type { MarketView } from './market/marketView.ts';
 import { OverviewTab } from './market/OverviewTab.tsx';
 import { StatStrip } from './market/StatStrip.tsx';
 import { useMarketData } from './market/useMarketData.ts';
-import { type MarketFlagKey, marketBanners } from './shared/marketFlags.ts';
+import { type MarketFlagKey, marketBanners, SHORT_BLOCKED } from './shared/marketFlags.ts';
 
 const TABS: readonly TabDef<MarketTab>[] = [
     { key: 'overview', label: 'Overview', testId: T.marketTab('overview') },
@@ -94,8 +94,10 @@ function MarketTabs({
 export function MarketPage({ mint }: { mint: Address }) {
     const search = useSearch({ from: '/m/$mint' });
     const navigate = useNavigate({ from: '/m/$mint' });
-    const panel = search.panel ?? 'short';
     const data = useMarketData(mint);
+    // A market that cannot be shorted opens on Lend (design pass P5-2); an explicit ?panel= still wins.
+    const canShort = !data.flags.some((f) => SHORT_BLOCKED.has(f));
+    const panel = search.panel ?? (canShort ? 'short' : 'lend');
     useLiveChannels([`market:${mint}`]);
     const sheet = useSheetParam('/m/$mint');
     const tradeRef = useRef<HTMLElement>(null);
@@ -182,6 +184,7 @@ export function MarketPage({ mint }: { mint: Address }) {
                             type="button"
                             className="btn mk-action"
                             data-variant="short"
+                            data-unavailable={canShort ? undefined : ''}
                             aria-label={`Short ${symbol}`}
                             data-testid={T.marketActionShort}
                             onClick={() => sheet.openSheet('trade', { panel: 'short' })}
@@ -191,6 +194,7 @@ export function MarketPage({ mint }: { mint: Address }) {
                         <button
                             type="button"
                             className="btn mk-action"
+                            data-variant={canShort ? undefined : 'primary'}
                             aria-label={`Lend ${symbol}`}
                             data-testid={T.marketActionLend}
                             onClick={() => sheet.openSheet('trade', { panel: 'lend' })}

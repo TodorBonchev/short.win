@@ -17,6 +17,7 @@ import { T } from '../../../config/testids.ts';
 import { shortAddress } from '../../../lib/format.ts';
 import { nowSeconds } from '../../../lib/time.ts';
 import { FreshnessBadge } from '../../../shell/freshness.tsx';
+import { NavIcon } from '../../../shell/icons.tsx';
 import { FlagBadge } from '../shared/cells.tsx';
 import { useDuplicateSymbol } from '../shared/duplicates.ts';
 import { FLAG_META, type MarketFlagKey } from '../shared/marketFlags.ts';
@@ -31,7 +32,7 @@ export interface MarketHeaderProps {
     readonly oracle: TierWhyInput['oracle'];
 }
 
-/** The mint: the short form opens the full mint with Copy and Explorer; ⧉ copies it at once. */
+/** The mint: the short form opens the full mint with Copy and Explorer; the copy icon copies it at once. */
 function MintText({ mint }: { mint: string }) {
     const [copied, setCopied] = useState(false);
     return (
@@ -54,7 +55,7 @@ function MintText({ mint }: { mint: string }) {
                     });
                 }}
             >
-                {copied ? '✓' : '⧉'}
+                <NavIcon name={copied ? 'check' : 'copy'} className="icon-sm" />
             </button>
         </span>
     );

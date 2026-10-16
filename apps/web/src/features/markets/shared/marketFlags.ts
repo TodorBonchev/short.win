@@ -127,6 +127,20 @@ export const FLAG_META: Readonly<Record<MarketFlagKey, { label: string; tone: 'i
     'pool-window': { label: 'Pool switch window', tone: 'info' },
 };
 
+/**
+ * The flags under which `openBlocked` returns a blocking code: a market page with one of these opens its
+ * trade panel on Lend (design pass P5-2). 'warming-up', 'pool-window', 'graduation-halted', 'mint-unsafe'
+ * and 'venue-upgraded' stay shortable by default: short-lived or partial states, or ones where the Lend side
+ * is not verified to work.
+ */
+export const SHORT_BLOCKED: ReadonlySet<MarketFlagKey> = new Set([
+    'paused-opens',
+    'coverage-paused',
+    'route-broken',
+    'list-only',
+    'migrating',
+]);
+
 /** Everything the flags are derived from; `undefined` = not known (e.g. the indexer is down). */
 export interface MarketStateInput {
     readonly venue: VenueName;

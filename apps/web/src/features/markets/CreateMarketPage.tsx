@@ -55,6 +55,7 @@ import {
 import './markets.css';
 import { useChainConfig, useChainMarket } from '../../rpc/queries.ts';
 import { useRawAccount, useRentMinimums } from './shared/chain.ts';
+import { KvLines } from './shared/KvLines.tsx';
 import { useUrlText } from './shared/useUrlText.ts';
 
 export type VerdictState = 'checking' | 'ok' | 'reject' | 'existing';
@@ -71,11 +72,12 @@ const DETECTED_TEXT: Readonly<Record<VenueDetection['kind'], string>> = {
     pump_swap: 'Graduated to its canonical PumpSwap pool: it lists on PumpSwap (Tier C for the first 24 hours).',
 };
 
+/** The token's facts as hairline rows (`KvLines`, design pass P5-6); a zero supply reads muted. */
 function MintInfo({ v }: { v: MintVerdict }) {
     const b = v.base;
     return (
         <div data-testid={T.createMintInfo}>
-            <Kv
+            <KvLines
                 rows={[
                     [
                         'Token program',
@@ -91,6 +93,7 @@ function MintInfo({ v }: { v: MintVerdict }) {
                         ) : (
                             '—'
                         ),
+                        { zero: !b || b.supply === 0n },
                     ],
                     [
                         'Mint authority',

@@ -55,13 +55,22 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
             key: 'token',
             header: 'Token',
             card: 'title',
+            // A link, as Positions and Lending teach (design pass P5-4): the row stays activatable by Enter and
+            // by a click elsewhere; DataTable routes a click on the link to the link.
             render: (m) => (
-                <TokenLabel
-                    mint={m.mint}
-                    symbol={m.symbol}
-                    name={m.name}
-                    duplicate={!!m.symbol && dupSymbols.has(m.symbol)}
-                />
+                <Link
+                    to="/m/$mint"
+                    params={{ mint: m.mint as Address }}
+                    className="target-link"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <TokenLabel
+                        mint={m.mint}
+                        symbol={m.symbol}
+                        name={m.name}
+                        duplicate={!!m.symbol && dupSymbols.has(m.symbol)}
+                    />
+                </Link>
             ),
         },
         { key: 'venue', header: 'Venue', card: 'aside', render: (m) => <VenueBadge venue={m.venue} /> },
@@ -86,7 +95,7 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
             testId: T.marketsSort('tvl'),
             render: (m) => (
                 <span title={formatUsd(m.tvl_usd)}>
-                    <Sol lamports={big(m.tvl_lamports)} frac={2} />
+                    <Sol lamports={big(m.tvl_lamports)} frac={2} pad />
                 </span>
             ),
         },
@@ -122,7 +131,7 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
             priority: 2,
             sortable: true,
             testId: T.marketsSort('oi'),
-            render: (m) => <Sol lamports={big(m.oi_lamports)} frac={2} />,
+            render: (m) => <Sol lamports={big(m.oi_lamports)} frac={2} pad />,
         },
         {
             key: 'open_positions',
@@ -131,7 +140,11 @@ function columns(now: number, dupSymbols: ReadonlySet<string>): Column<MarketSum
             priority: 2,
             sortable: true,
             testId: T.marketsSort('open_positions'),
-            render: (m) => <span className="num">{m.open_positions}</span>,
+            render: (m) => (
+                <span className="num" data-zero={m.open_positions === 0 ? '' : undefined}>
+                    {m.open_positions}
+                </span>
+            ),
         },
         {
             key: 'flags',
@@ -179,7 +192,7 @@ function OpenMint() {
                 if (mint) void navigate({ to: '/m/$mint', params: { mint } });
             }}
         >
-            <label className="field-label" htmlFor="mk-open-mint">
+            <label className="field-label mk-open-mint-label" htmlFor="mk-open-mint">
                 Open a market by its mint (read from the chain)
             </label>
             <div className="mk-open-mint-row">
@@ -268,7 +281,7 @@ export function MarketsPage() {
                     to="/markets/new"
                     search={mintWithoutMarket ? { mint: mintWithoutMarket } : {}}
                     className="btn"
-                    data-variant={mintWithoutMarket ? 'primary' : 'default'}
+                    data-variant="default"
                     data-testid={T.marketsCreateLink}
                 >
                     {mintWithoutMarket ? 'Create a market for this mint' : 'Create market'}
@@ -379,6 +392,19 @@ export function MarketsPage() {
                                             : 'No market matches this search.'
                                         : 'No markets match these filters.'}
                                 </p>
+                                {/* The action the sentence names, where the sentence is (design pass P5-7);
+                                    the head link reads default while this gold button shows. */}
+                                {mintWithoutMarket && (
+                                    <Link
+                                        to="/markets/new"
+                                        search={{ mint: mintWithoutMarket }}
+                                        className="btn"
+                                        data-variant="primary"
+                                        data-testid={T.marketsEmptyCreate}
+                                    >
+                                        Create a market for this mint
+                                    </Link>
+                                )}
                                 {filtered && !mintWithoutMarket && (
                                     <Button size="sm" onClick={clearFilters} data-testid={T.marketsClearFilters}>
                                         Clear filters

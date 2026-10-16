@@ -74,13 +74,13 @@ export function PositionsTab({ mint, decimals }: { mint: Address; decimals: numb
             align: 'right',
             render: (p) => <Tokens raw={big(p.q)} decimals={decimals} />,
         },
-        { key: 'v', header: 'Vault', align: 'right', priority: 2, render: (p) => <Sol lamports={big(p.v)} /> },
+        { key: 'v', header: 'Vault', align: 'right', priority: 2, render: (p) => <Sol lamports={big(p.v)} pad /> },
         {
             key: 'm',
             header: 'Margin',
             align: 'right',
             priority: 2,
-            render: (p) => <Sol lamports={big(p.m) + big(p.margin_added)} />,
+            render: (p) => <Sol lamports={big(p.m) + big(p.margin_added)} pad />,
         },
         {
             key: 'entry',
@@ -208,7 +208,7 @@ function lenderColumns(decimals: number, now: number): Column<Lender>[] {
             key: 'paid',
             header: 'SOL paid out',
             align: 'right',
-            render: (l) => <Sol lamports={big(l.sol_paid)} />,
+            render: (l) => <Sol lamports={big(l.sol_paid)} pad />,
         },
         {
             key: 'lock',
@@ -285,7 +285,7 @@ const EXIT_TEXT: Readonly<Record<ExitEvent['kind'], string>> = {
 };
 
 function solOrDash(v: string | null) {
-    return v === null ? <span className="muted">—</span> : <Sol lamports={big(v)} />;
+    return v === null ? <span className="muted">—</span> : <Sol lamports={big(v)} pad />;
 }
 
 function exitColumns(decimals: number, now: number): Column<ExitEvent>[] {
@@ -320,14 +320,14 @@ function exitColumns(decimals: number, now: number): Column<ExitEvent>[] {
             header: 'Keeper paid',
             align: 'right',
             priority: 2,
-            render: (x) => <Sol lamports={big(x.keeper_paid)} />,
+            render: (x) => <Sol lamports={big(x.keeper_paid)} pad />,
         },
         {
             key: 'borrower',
             header: 'To borrower',
             align: 'right',
             priority: 2,
-            render: (x) => <Sol lamports={big(x.borrower_payout)} />,
+            render: (x) => <Sol lamports={big(x.borrower_payout)} pad />,
         },
         {
             key: 'position',
@@ -397,7 +397,11 @@ function poolColumns(now: number): Column<PoolRow>[] {
             header: 'Proposals',
             align: 'right',
             priority: 2,
-            render: (x) => <span className="num">{x.proposals}</span>,
+            render: (x) => (
+                <span className="num" data-zero={x.proposals === 0 ? '' : undefined}>
+                    {x.proposals}
+                </span>
+            ),
         },
         {
             key: 'seen',

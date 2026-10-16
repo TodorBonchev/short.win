@@ -8,7 +8,7 @@ import { Badge } from '../../../components/Badge.tsx';
 import { Term } from '../../../components/Glossary.tsx';
 import { explorerTx } from '../../../config/env.ts';
 import { glossaryFor } from '../../../config/glossary.ts';
-import { formatBps, formatCompact, formatDuration, formatFixed, shortAddress } from '../../../lib/format.ts';
+import { formatAge, formatBps, formatCompact, formatFixed, shortAddress } from '../../../lib/format.ts';
 import { formatUtc } from '../../../lib/time.ts';
 import { FLAG_META, type MarketFlagKey } from './marketFlags.ts';
 
@@ -33,27 +33,34 @@ export function CompactTokens({ raw, decimals, testId }: { raw: bigint; decimals
     );
 }
 
-/** Time since `ts` (unix seconds), "3d 4h"; the UTC time in `title`. */
+/** Time since `ts` (unix seconds), "3d 4h" — minutes only past the first minute (`formatAge`, P4); the UTC
+ * time in `title`. */
 export function Age({ ts, now, testId }: { ts: number | null; now: number; testId?: string }) {
     if (ts === null || ts <= 0) return <span className="muted">—</span>;
     return (
         <span className="num" title={formatUtc(ts)} data-testid={testId} data-value={String(ts)}>
-            {formatDuration(Math.max(0, now - ts))}
+            {formatAge(Math.max(0, now - ts))}
         </span>
     );
 }
 
-/** Utilisation as a bar and a percentage (the bar is decorative; the text carries the value). */
+/**
+ * Utilisation as a bar and a percentage (the bar is decorative; the text carries the value). At 0 % the fill is
+ * `data-empty` (no 2 px minimum) and the value `data-zero` (quiet, design pass P5-5).
+ */
 export function UtilBar({ bps, testId }: { bps: number | null; testId?: string }) {
     if (bps === null) return <span className="muted">—</span>;
     const pct = Math.min(100, Math.max(0, bps / 100));
     const tone = bps >= 9_000 ? 'danger' : bps >= 7_500 ? 'warn' : 'ok';
+    const empty = bps === 0 ? '' : undefined;
     return (
         <span className="mk-util" data-testid={testId} data-value={String(bps)}>
             <span className="mk-util-track" aria-hidden="true">
-                <span className="mk-util-fill" data-tone={tone} style={{ width: `${pct}%` }} />
+                <span className="mk-util-fill" data-tone={tone} data-empty={empty} style={{ width: `${pct}%` }} />
             </span>
-            <span className="num">{formatBps(bps, 1)}</span>
+            <span className="num" data-zero={empty}>
+                {formatBps(bps, 1)}
+            </span>
         </span>
     );
 }

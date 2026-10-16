@@ -161,7 +161,9 @@ export function StatStrip({ mint, view, config }: { mint: Address; view: MarketV
                     value={view.lenderCount === null ? undefined : String(view.lenderCount)}
                     priority={2}
                 >
-                    <span className="num">{view.lenderCount ?? '—'}</span>
+                    <span className="num" data-zero={view.lenderCount === 0 ? '' : undefined}>
+                        {view.lenderCount ?? '—'}
+                    </span>
                 </StatBox>
             </div>
             <button

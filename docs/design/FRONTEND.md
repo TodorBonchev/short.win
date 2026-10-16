@@ -3008,6 +3008,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `markets-empty` | `T.marketsEmpty` | empty state |
 | `markets-load-more` | `T.marketsLoadMore` | keyset paging button |
 | `markets-create-link` | `T.marketsCreateLink` | link to /markets/new (prefilled with the searched mint) |
+| `markets-empty-create` | `T.marketsEmptyCreate` | the empty state's "Create a market for this mint" link on /markets when the filter is a mint without a market (design pass P5-7) |
 | `markets-search` | `T.marketsSearch` | filter input `q` (mint, or symbol / name prefix; ≤ 64 chars) |
 | `markets-filter-active` | `T.marketsFilterActive` | checkbox: only markets with open positions (`active`) |
 | `markets-open-mint` | `T.marketsOpenMint` | “open a mint” input, shown instead of the list while the indexer is unreachable (§6.5) |

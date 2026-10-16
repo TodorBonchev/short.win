@@ -80,7 +80,7 @@ export function TierWhyPopover({ input }: { input: TierWhyInput }) {
                                 data-testid={T.marketTierWhyClose}
                                 onClick={close}
                             >
-                                ✕
+                                <NavIcon name="close" className="icon" />
                             </button>
                         </div>
                         <ul className="mk-why-list">

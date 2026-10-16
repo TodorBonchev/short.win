@@ -108,6 +108,7 @@ export const T = {
     marketsFilterTier: 'markets-filter-tier',
     marketsSort: p<'tvl' | 'oi' | 'util' | 'created' | 'open_positions'>('markets-sort'),
     marketsEmpty: 'markets-empty',
+    marketsEmptyCreate: 'markets-empty-create',
     marketsLoadMore: 'markets-load-more',
     marketsCreateLink: 'markets-create-link',
     marketsSearch: 'markets-search',
