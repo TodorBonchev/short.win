@@ -2398,9 +2398,10 @@ from `pnpm-workspace.yaml` (it ignores package.json's `pnpm` field), which pins 
 8.3.0 (one Kit in the lockfile). `minimumReleaseAge: 20160` (14 days, repo-wide) keeps every install
 from resolving anything younger, verified by a probe at install (a young version is refused, an
 older one resolved); the two `@solana-mobile` versions the owner chose to install now are excluded
-by exact version until 2026-10-21 (remove both exclusions then), and 21 versions locked before the
-gate and published 2026-09-29/30 by exact version until 2026-10-15 (pnpm 12 also verifies the
-existing lockfile against the gate). Every new lockfile entry was reviewed with its publish date (M1's
+by exact version until 2026-10-21 (remove both exclusions then). 21 versions locked before the
+gate and published 2026-09-29/30 were excluded the same way until they were 14 days old, and the
+exclusions were removed on 2026-10-16 (pump-final P8; `pnpm install --frozen-lockfile` passes
+without them): pnpm 12 also verifies the existing lockfile against the gate. Every new lockfile entry was reviewed with its publish date (M1's
 commit lists them). `src/wallet/mwaPackage.test.ts` is the drift test: the package files' sha256
 (wallet-standard-mobile's `index.browser.js`, the protocol's `index.browser.js` and both encoding
 files), the in-page transitive versions, the two CSP hashes recomputed from the package, the one
