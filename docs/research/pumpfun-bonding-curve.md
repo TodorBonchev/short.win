@@ -1089,3 +1089,60 @@ On the `near` fixture (`tcand2.txt`, `tcand4.txt`):
   short.win's curve adapter reads `rQ` as the curve's real SOL, so the buckets need no change
   there (`pump_it::buckets`).
 - Every curve test runs the redeploy (`pump_programs_2026_10`); T-LATCH replays the real upgrade.
+
+## Update 2026-10-13 (the pump-final re-pin; short.win 1.0.1)
+
+The design `pump-final` (2026-10-13) and its phases P0 … P8; the figures are the re-pin's gates G0
+and G0b on the dumped ELFs (`tests/fixtures/README.md`, `pump_math_it`). Where this conflicts with
+the sections above, this update and ARCH win.
+
+- **Deploys.** pump was redeployed on **2026-10-08** (slot 454,596,459, trimmed ELF `6956c2f8…bf6f`)
+  and again on **2026-10-13** at 15:40 UTC (slot 456,494,698, `e2020969…52be`; the same upgrade
+  authority); PumpSwap on 2026-10-08 (454,596,406) and pump-fees on 2026-10-12 (456,132,171), see
+  `graduated-venues.md`'s update. The 10-13 build changes only `create_v2`'s quote chain (a quote
+  chain of pump coins, depth capped at 5, pump's new error 6109 `QuoteChainAccountsRequired`); every
+  path short.win uses runs the same code (G0b: 180 transactions on both builds, equal logs, accounts
+  and CU). Mainnet's `Global.max_curve_depth` is **2** since slot 456,495,021 (`set_max_curve_depth`).
+  Fixture groups `pump_programs_2026_10_13`, `pump_programs_2026_10_13b`, `pump_state_2026_10_13`;
+  baseline `VENUE_GUARD_SLOTS_2026_10_13`.
+- **Layouts.** `BondingCurve` is **166 bytes** (`create_v2` allocates it; every v2 or v3 trade grows a
+  shorter curve to it): `creator_fee` @125 and `protocol_fees` @133 (the fee buckets of v3 trades,
+  outside `rQ`), `depth` @141 (u8; 0 for a SOL curve), `initial_virtual_quote_reserves` @142 (`vQ −
+  rQ` of a `create_v2` curve, `ivqr`; 30e9 on a SOL curve), `post_complete_base_out` @150 (`pcB`) and
+  `post_complete_quote_in` @158 (`pcQ`). `Global` is **1,088 bytes** (`max_curve_depth` @1087). The
+  growth tops the curve's rent reserve up from `user`, the reserve counted as `lamports − rQ −` the
+  buckets: 76,200 lamports from 151 B, 127,000 from 141, and **261,600** from the 49-byte legacy
+  curve (its reserve holds the old rent; not 594,360).
+- **v3 trades** (`buy_v3` `07051dc4…`, `sell_v3` `1c92de77…`, `buy_exact_quote_in_v3`; 17 accounts,
+  24 data bytes plus an optional `partial_fill` byte ignored on non-mayhem coins): a buy charges
+  `⌊q·vQ/(vT − q)⌋ + 1` — `⌈⌉` off an exact division; on every one of the 400 exact divisions G0
+  constructed pump took `⌊⌋ + 1`, v2's charge —, a sale pays `⌊⌋`, each fee component `⌈⌉`; the
+  buyback slice is paid out and the rest of the fees stays in the buckets; `vQ − rQ` is unchanged.
+  `TradeEvent.ix_name` reads `buy` / `sell` / `buy_exact_quote_in`, not the `*_v3` names. A cashback
+  coin is refused (6094 `CashbackCoinNotSupported`) on each v3 trade.
+- **Synthetic migration.** `buy_v3(rT + δ)` buys `rT` on the curve, which completes, and `δ` from the
+  would-be pool `(X_s, Y_s)` = (the live `curve_base_ata − rT`, donations counted; `rQ + n₁ − fee`)
+  at `⌈Y_s·δ/(X_s − δ)⌉` (`⌈⌉` on an exact division too), both parts at the curve tier of its
+  **pre-trade market cap on the mint's live supply** (G0's tier tripwire (e)); `max_sol_cost` covers
+  both; `NotEnoughTokensToBuy` if `δ ≥ X_s`. pump writes `pcB = δ`, `pcQ` = the pool part's quote;
+  `rQ` excludes `pcQ`, and `vQ − rQ = ivqr` still holds. Events: `TradeEvent`, `CompleteEvent`,
+  `PostCompleteBuyEvent` (`6fb06d8b…`). `buy_exact_quote_in_v3` past `rT` spends the rest by the v2
+  exact-quote-in rule, `⌊(in − 1)·X_s/(Y_s + in − 1)⌋`. On the 2026-10-02 build a buy past `rT`
+  reverts (6021). Mainnet examples: 98u8RJ's completion `2vVRr9eg…` (pool part 6,238,850,918,425
+  tokens for 2,642,475,552 lamports), the stuck depth-1 completion on `E1bYRCNq…`; 11 of 11 sampled
+  synthetic completions follow the rule.
+- **`migrate_v2` after a synthetic completion** seeds the pool with `(X₁, Y₁)` = (the live
+  `curve_base_ata`, `rQ + pcQ − fee`), donations before or after the completion included, and books
+  the **boost** `VQR = ⌊X₁·Y₁/10¹⁵⌋` (17,669,496,403 lamports with 1e12 donated before, 35,169,012,080
+  with 206.9e12 donated, 17,852,426,396 with 3e12 donated after, against 17,584,506,040 by the proportional
+  `⌊(Y₁ − pcQ)·2069/10⁴⌋`, which holds only without a donation); `vault + VQR = Y₁` each time, so the
+  boost moves no price. 330,859 CU top-level, as after an exact completion.
+- **Multi-hop.** `multi_hop_curve_swap` (`e19a7516…`) and `set_max_curve_depth` are new; short.win
+  uses neither (exact-in only, one more CPI level, a mandatory WSOL ATA, and only for coins quoted in
+  pump coins, which short.win refuses: ADOPTED Q6).
+- **What short.win does with it (1.0.1; ARCH §2.4.1, §4.3, §5.4):** every curve leg trades v3 (10
+  TradeExtras, no pump-fees CPI, no creator vault); a buyback past `rT` is one `buy_v3` priced
+  `B̂_v3` at the live supply's fee (known issues KI-77); a `PumpMigrating` market prices the pool
+  `migrate_v2` creates, ρ-scaled (PUMP-2026-10-13-1); a live cashback curve is refused
+  `CurveCashbackCoin` (6109); U7's cap byte (`partial_fill`) is never sent. The straddle bundle of
+  §7 / U8 and `complete_curve` are retired.

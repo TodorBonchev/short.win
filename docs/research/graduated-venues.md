@@ -1059,3 +1059,38 @@ T-LATCH replays the real loader upgrades from the 2026-09 builds with positions 
 (`latch_pump_it` / `latch_pumpswap_it` `::the_2026_10_*`); `VENUE_GUARD_SLOTS_2026_10_03`;
 `check --live` clean at 452,966,546 and 453,037,762.
 
+## Update 2026-10-13 (the pump-final re-pin; short.win 1.0.1)
+
+**I4 is superseded** as the description of the deployed builds: PumpSwap was redeployed on
+2026-10-08 and pump-fees on 2026-10-12 (pump on 2026-10-08 and 2026-10-13: `pumpfun-bonding-curve.md`'s
+update of the same date). The re-pin's gates G0 / G0b ran on the dumped ELFs
+(`tests/fixtures/README.md`); `check --live` is clean against `VENUE_GUARD_SLOTS_2026_10_13` (slot
+456,579,297 on 2026-10-13, slot 457,523,244 on 2026-10-16).
+
+- **Deploys.** PumpSwap 454,596,406 (trimmed ELF `3ffd5e3b…2ee1`), pump-fees 456,132,171
+  (`8ad2ca93…b8b8`; a 2026-10-08 pump-fees build at 454,596,501 preceded it and was never examined:
+  it can no longer be fetched); group `pump_programs_2026_10_13`. Jupiter moved to 454,465,850.
+- **Interface.** PumpSwap adds `multi_hop_swap` (`2b644913…`; exact-in only, through a pump curve hop;
+  its `BuyEvent` / `SellEvent` name the hop's pool, the mints are the hop's accounts — the indexer
+  reads them so since pump-final P0), pump-fees adds `withdraw` (`b712469c…`, undocumented); nothing
+  is removed; errors appended. short.win's PumpSwap CPIs (`buy`, `sell`, `claim_cashback`,
+  `init_user_volume_accumulator`) keep their discriminators, accounts and seeds.
+- **pump-fees inside short.win's PumpSwap legs** (T-PFEE-CPI, `pamm_it::v3_era`): one `get_fees` /
+  `get_fees_with_quote_mint` per sale and buy on `[PumpSwap's FeeConfig, PumpSwap]`, read-only;
+  never `withdraw`, no short.win account. **`withdraw` (R-PFEE, read from the 10-12 ELF):** it moves
+  the vault ATA of `referral_vault` (PDA of `["referral-vault", user]`) to `user`'s own ATA; its
+  writable accounts are `user` (signer), that PDA, its ATA and an ATA `user` owns — never a
+  `FeeConfig`, a pool or a curve. The design's stop rule does not trigger; pinning pump-fees on
+  mainnet stays the owner's step (known issues PUMP-2026-10-13-5).
+- **Fee buckets are now live on SOL / WSOL venues** (I4's census found none on 2026-10-03): the
+  2026-10-13 survey's read-only sample found non-zero buckets on 8 of 10 SOL curves and 15 of 16 WSOL
+  pools of 301 B. PUMP-2026-10-1's fix covers them (re-run on the new builds).
+- **Graduation after a synthetic completion** (`pumpfun-bonding-curve.md`'s update): `migrate_v2`
+  creates the pool `(X₁, Y₁)` = (the live `curve_base_ata`, `rQ + pcQ − fee`), donations included, and
+  the boost is **`VQR = ⌊X₁·Y₁/10¹⁵⌋`** — the proportional `⌊migrated × 2069/10⁴⌋` (H9, §1.4) is its
+  value when `X₁` is the standard 206.9e12 and nothing was donated; `vault + VQR = Y₁`, so the boost
+  moves no price. 98u8RJ's pool `D4PACvyr…` was created at exactly (200,661,149,081,575,
+  87,632,834,741), ρ = 1.063 above the curve's final price.
+- **short.win 1.0.1** prices a stuck synthetic migration on that pool (ARCH §4.5) and lists a
+  graduated cashback coin on PumpSwap as before (only live cashback curves are refused).
+
