@@ -253,11 +253,12 @@ export function WalletButton() {
 
     useEffect(() => {
         if (!open) return;
-        // A press outside, or on the phone sheet's scrim (inside the anchor), closes it.
+        // A press outside closes it. The phone sheet's scrim (inside the anchor) closes on its own click
+        // instead: unmounted here on pointerdown, it let the tap's click land on the page underneath.
         const close = (e: PointerEvent) => {
             const t = e.target as Element | null;
             if (!box.current || !t) return;
-            if (!box.current.contains(t) || t.classList?.contains('menu-scrim')) walletChooser.set(null);
+            if (!box.current.contains(t)) walletChooser.set(null);
         };
         // Focus goes back to the button from the sheet hook once the popup is gone (the button is
         // inert while it is open, so a focus call here would be lost).
@@ -335,7 +336,7 @@ export function WalletButton() {
             </Button>
             {open && (
                 <>
-                    <div className="menu-scrim" aria-hidden="true" data-sheet-keep="" />
+                    <div className="menu-scrim" aria-hidden="true" data-sheet-keep="" onClick={() => setOpen(false)} />
                     {noWallet ? (
                         <div
                             ref={menu}

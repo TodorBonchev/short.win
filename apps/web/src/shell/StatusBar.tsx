@@ -4,8 +4,9 @@
  *
  * On a phone (FRONTEND.md §7.6) the bar is a one-line strip: a button with the worst state in
  * words and a shape (● ok, ▲ warn, ✕ bad — never colour alone) that expands to every item over a
- * scrim (a press on it folds the list; the strip itself stays clear of it). Tablet and desktop show
- * the items, as before. The summary is not a live region: the pages' banners announce a degradation.
+ * scrim (a tap on it folds the list — on its click, so the tap cannot fall through to the page once
+ * the scrim is gone; the strip itself stays clear of it). Tablet and desktop show the items, as
+ * before. The summary is not a live region: the pages' banners announce a degradation.
  */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -88,8 +89,11 @@ export function StatusBar() {
 
     return (
         <footer ref={bar} className="statusbar" data-testid={T.statusBar} data-expanded={expanded ? '' : undefined}>
-            {/* Inside the footer: the document's outside-press handler leaves it to this one (no double fire). */}
-            {expanded && <div className="status-scrim" aria-hidden="true" onPointerDown={() => setExpanded(false)} />}
+            {/* Inside the footer, so the document's outside-press handler ignores it: this click is the only
+                closer. It closes on click, not on pointerdown: the scrim is still mounted when the tap's click is
+                dispatched, so nothing underneath receives it (unmounted on pointerdown, it let that click land on
+                the page — a tap over a link navigated). */}
+            {expanded && <div className="status-scrim" aria-hidden="true" onClick={() => setExpanded(false)} />}
             <button
                 ref={summaryButton}
                 type="button"
