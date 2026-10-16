@@ -170,7 +170,9 @@ fn near166_exact_curve_part_reproduces_g0() {
 /// (290,200,481,257: 80 / 25 bps), 45,906,126,201 lamports for `rT + 50e12`. P1's synthetic fee
 /// (`fees::pump_curve_at_supply`) resolves that tier and `B̂_v3` covers the charge by 4; the
 /// fixed 10¹⁵ basis (`fees::pump_curve`, 290,253,172,320: 70 / 22 bps) would have quoted
-/// 45,847,068,348, 59,057,853 below it (G0's finding, P1 correction (a)).
+/// 45,847,068,348, 59,057,853 below it (G0's finding, P1 correction (a)). Under the same tiers
+/// `B̂_v3` steps up at `rT` (known-issues KI-77 (c)): 18,513,647,686 at `rT`, 18,537,496,028 at
+/// `rT + 1`.
 #[test]
 fn tier_tripwire_reproduces_g0() {
     let raw: [(u128, u64, u64); 7] = [
@@ -208,6 +210,21 @@ fn tier_tripwire_reproduces_g0() {
     assert!(b - charge <= bound(delta, x_s, &phi_s));
     assert_eq!(b_v3(&NEAR166, x_s, delta, &phi), 45_847_068_348);
     assert_eq!(charge - 45_847_068_348, 59_057_853);
+    // Known-issues KI-77 (c): under these tiers `B̂_v3` steps up at `rT`. `q = rT` is the curve
+    // path's quote at the fixed 10¹⁵ basis's `φ` (70 / 22 bps), `q = rT + 1` the synthetic buy at
+    // `φ_s` (80 / 25 bps) on both parts.
+    let m = MigrationParams {
+        migration_fee: FEE_M,
+        pool_tokens: x_s,
+        post_complete_quote_in: 0,
+    };
+    let rt = u64::try_from(NEAR166.rt).unwrap();
+    let at = |q| {
+        quote::curve_synthetic(q, &NEAR166, &phi, &phi_s, &m)
+            .unwrap()
+            .cost
+    };
+    assert_eq!((at(rt), at(rt + 1)), (18_513_647_686, 18_537_496_028));
 }
 
 /// T-PUMP-MATH-V3 (d): the pools G0's `migrate_v2` calls created, `(X₁, Y₁)` = (the live
