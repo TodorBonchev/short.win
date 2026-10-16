@@ -763,21 +763,40 @@ a.statusbar-item {
     color: var(--text-2);
 }
 
+/* A preview's decisive figure (Total cost, You receive, P&L…; design pass P4): white, a size up and medium — on
+   the dd, or on a `<span data-emph>` inside it (Kv has no attribute slot). The colour sits on the dd, so
+   .pnl[data-sign] and .cr[data-risk] children keep theirs; the size on the number, so a sub-line in the same dd
+   stays regular (its 12 px unit is in the numbers section, after `.unit`). Its label turns white with it. */
+.kv dd[data-emph],
+.kv dd > [data-emph] {
+    color: var(--text-0);
+}
+
+/* `:where()` keeps this at (0,2,0), the file's ceiling for a `.num` rule (the wallet's `.menu-label > .num` comes
+   later; biome noDescendingSpecificity). */
+.kv :where(dd[data-emph], dd > [data-emph]) > .num {
+    font-size: var(--fs-md);
+    font-weight: var(--fw-medium);
+}
+
+.kv dt:has(+ dd[data-emph]),
+.kv dt:has(+ dd > [data-emph]) {
+    color: var(--text-0);
+}
+
 /* Hairline rows (opt-in): an overview's long key / value blocks. */
 .kv[data-lines] {
     row-gap: 0;
 }
 
+/* On the 28 px grid (--kv-row-h), like the table rows in the same tab: a 1lh line of text centred in the row
+   above the hairline, inline flow kept (text-align: right survives, a wrapped value grows its row). Read-only
+   rows do not answer the pointer: nothing static looks clickable (design pass P4). */
 .kv[data-lines] dt,
 .kv[data-lines] dd {
-    padding: var(--sp-2) 0;
+    min-height: var(--kv-row-h);
+    padding: calc((var(--kv-row-h) - 1lh - 1px) / 2) 0;
     border-bottom: 1px solid var(--line);
-}
-
-@media (hover: hover) {
-    .kv[data-lines] .kv-row:hover > * {
-        background: var(--bg-2);
-    }
 }
 
 /* A strip of stats with hairlines drawn by each cell (no line-coloured gaps where the last row is
@@ -787,12 +806,14 @@ a.statusbar-item {
    switch is the clamp below: (980px - 100%) * 999 is hugely positive under 980 px (→ the 25 % cap)
    and negative over it (→ the 1/7 floor) — no container query (FRONTEND.md §7.6 allowlist).
    A tablet's strip is under 980 px, so the same rule makes it 4 + 3 (a 3-up grid left the seventh
-   stat alone on a row). Phone: 2-up, the priority-2 stats behind "More stats". */
+   stat alone on a row). Phone: 2-up, the priority-2 stats behind "More stats". The strip is edged like a
+   panel; a cell is transparent, so its hairlines show between columns and rows (the strip paints bg-1 and
+   clips the outer edges) — like the position hero (design pass P4). */
 .stat-strip {
     display: flex;
     flex-wrap: wrap;
     background: var(--bg-1);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius-lg);
     overflow: hidden;
 }
@@ -800,7 +821,7 @@ a.statusbar-item {
 .stat {
     flex: 1 1 clamp(calc(100% / 7 - 1px), (980px - 100%) * 999, calc(25% - 1px));
     min-width: 0;
-    background: var(--bg-1);
+    background: transparent;
     padding: var(--sp-3) var(--sp-4);
     box-shadow:
         1px 0 0 var(--line),
@@ -827,16 +848,24 @@ a.statusbar-item {
     }
 }
 
+/* The label tier (P1): 12 px medium muted uppercase, one tracking with the table headers and field labels. */
 .stat-label {
-    font-size: var(--fs-xs);
-    color: var(--text-2);
+    font-size: var(--label-fs);
+    font-weight: var(--label-fw);
+    letter-spacing: var(--label-ls);
+    color: var(--label-color);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
 }
 
 .stat-value {
     font-size: var(--fs-lg);
     overflow-wrap: anywhere;
+}
+
+/* The strip's headline figure (Stat `hero` → data-hero; P7 marks the lender's SOL claimable): a size up, medium. */
+.stat[data-hero] .stat-value {
+    font-size: var(--fs-xl);
+    font-weight: var(--fw-medium);
 }
 
 /* ---- buttons ----------------------------------------------------------------------------- */
@@ -1346,15 +1375,22 @@ input[type="radio"]:checked::before {
     white-space: normal;
 }
 
+/* The header on the label tier (P1) in a 28 px row: a 24 px sort button + 2 + 2 (vertical-align stays middle;
+   this rule follows the laptop padding shorthand above, so the block padding holds at every width). z-index 1:
+   positioned row content later in the DOM (.btn.hit copy buttons, .glossary-tip.hit) must not paint over a
+   stuck header (design pass P4). */
 .tbl th {
     position: sticky;
     top: 0;
+    z-index: 1;
+    padding-block: var(--sp-1);
     background: var(--bg-2);
-    color: var(--text-2);
-    font-weight: var(--fw-medium);
-    font-size: var(--fs-xs);
+    color: var(--label-color);
+    font-weight: var(--label-fw);
+    font-size: var(--label-fs);
+    line-height: var(--lh-tight);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--label-ls);
 }
 
 .tbl th[data-align="right"],
@@ -1375,13 +1411,34 @@ input[type="radio"]:checked::before {
     outline: 2px solid var(--focus);
 }
 
+/* The sorted column: white header text over a 2 px gold line (the selected state's line). */
 .tbl th[aria-sort] button {
-    color: var(--text-1);
+    color: var(--text-0);
 }
 
-/* A sortable column that is not the sort: a faint ↕ says it can be. */
-.tbl .sort-hint {
-    opacity: 0.6;
+.tbl th[aria-sort] {
+    box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* The sort marks are registry icons (icons.tsx), 12 px: `sort` (both ways) on a sortable column that is not the
+   sort, `chevron` on the sort and in the card sort bar — down for descending, turned for ascending. */
+.tbl .sort-hint,
+.tbl .sort-dir,
+.tbl-sortbar .sort-dir {
+    flex: none;
+    width: 12px;
+    height: 12px;
+    opacity: 1;
+    color: var(--text-2);
+}
+
+[data-order="asc"] .sort-dir,
+.tbl th[aria-sort="ascending"] .sort-dir {
+    rotate: 180deg;
+}
+
+.tbl th[aria-sort] .sort-dir {
+    color: var(--text-1);
 }
 
 @media (hover: hover) {
@@ -1390,8 +1447,14 @@ input[type="radio"]:checked::before {
         text-decoration: underline;
     }
 
+    .tbl th button:hover .sort-hint {
+        color: var(--text-1);
+    }
+
+    /* An interactive row answers the pointer: bg-hover is P1's token for exactly this (the press is the same step;
+       the focus ring below is the second cue). */
     .tbl tbody tr:hover {
-        background: var(--bg-2);
+        background: var(--bg-hover);
     }
 }
 
@@ -1492,6 +1555,17 @@ input[type="radio"]:checked::before {
         grid-column: 1 / -1;
     }
 
+    /* The sorted column is the card's hero: the one number the list is ordered by, a size up and medium (its
+       ::before label stays 12 px). */
+    [data-cards] > .tbl > tbody > tr > td[data-sorted] {
+        font-size: var(--fs-lg);
+        font-weight: var(--fw-medium);
+    }
+
+    [data-cards] :where(td[data-sorted]) .num {
+        font-size: inherit;
+    }
+
     [data-cards] > .tbl > tbody > tr > td[data-card="aside"] {
         grid-column: 2;
         justify-self: end;
@@ -1538,8 +1612,44 @@ input[type="radio"]:checked::before {
     cursor: pointer;
 }
 
+/* The focused row's ring sits inside it: unclipped under `.tbl-wrap { overflow: auto }` below 1,024 px. */
+.tbl tbody tr[data-interactive="true"]:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
+}
+
 .tbl tbody tr[aria-selected="true"] {
     background: var(--bg-3);
+}
+
+/* An empty list is its message alone (no header row or sort bar framing one line); loading keeps the header and
+   its skeleton rows. DataTable's message carries `.tbl-empty` beside `.empty` (the states section's rule). */
+.tbl-wrap:has(> .empty) > .tbl > thead,
+.tbl-wrap:has(> .empty) > .tbl-sortbar {
+    display: none;
+}
+
+.tbl-wrap > .tbl-empty {
+    padding: var(--sp-7) var(--sp-5);
+}
+
+/* A sticky header that sticks: from 1,024 px every table fits without sideways scroll (§7.3), so the wrap stops
+   being the header's scroll container and the header stays under the app header while a long list scrolls. The
+   positions and lend tables, whose rows carry buttons, wait for a tap-cover run on a long seeded list; the
+   review's deltas table has no .tbl-wrap. A Shift+Tab-focused row or in-row control clears a stuck header up to
+   three lines tall (base.css clears only the app header). */
+@media (min-width: 1024px) {
+    .page .tbl-wrap:not(.positions-tbl, .lend-table) {
+        overflow: visible;
+    }
+
+    .page .tbl-wrap:not(.positions-tbl, .lend-table) .tbl th {
+        top: var(--header-h);
+    }
+
+    .page .tbl-wrap:not(.positions-tbl, .lend-table) .tbl tbody :focus-visible {
+        scroll-margin-top: calc(var(--header-h) + 3 * var(--row-h));
+    }
 }
 
 /* ---- badges ------------------------------------------------------------------------------ */
@@ -1641,6 +1751,18 @@ input[type="radio"]:checked::before {
 }
 
 /* ---- numbers ----------------------------------------------------------------------------- */
+/* A zero reads quieter than the numbers that matter — muted, never hidden (text-2 is ≥ 5.08:1 on every
+   surface); its unit follows. Num sets data-zero on Sol / Tokens / Bps; a feature's plain-span zero sets it
+   too, so a row never mixes grey and white zeros (design pass P4). */
+.num[data-zero] {
+    color: var(--text-2);
+}
+
+/* 'Claim all · <Sol>' can read 0 SOL inside the gold primary button: text-2 on the accent is 1.7:1. */
+.btn .num[data-zero] {
+    color: inherit;
+}
+
 .pnl[data-sign="up"] {
     color: var(--gain);
 }
@@ -1659,6 +1781,17 @@ input[type="radio"]:checked::before {
     font-family: var(--font-ui);
     /* A notch under its number, never under the 12 px floor (O-4: at every width). */
     font-size: max(0.9em, 12px);
+}
+
+/* The unit follows its number where a rule above changes it: a quiet zero's unit takes its colour, an emphasised
+   preview figure's unit stays 12 px. `:where()` keeps both at `.unit`'s own specificity — the untrusted-text
+   section's `.unit` rule comes later in this file (biome noDescendingSpecificity) — and source order decides. */
+:where(.num[data-zero]) > .unit {
+    color: inherit;
+}
+
+:where(.kv dd[data-emph], .kv dd > [data-emph]) .unit {
+    font-size: var(--fs-xs);
 }
 
 /* ---- disclosure -------------------------------------------------------------------------- */

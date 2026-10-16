@@ -63,21 +63,24 @@ export function Skeleton({ width }: { width?: number }) {
 
 /**
  * A labelled statistic for stat strips. `priority` 2: on a phone it waits behind the strip's "More
- * stats" toggle (`.stat-strip[data-expanded]`).
+ * stats" toggle (`.stat-strip[data-expanded]`). `hero`: the strip's headline figure, a size up
+ * (`.stat[data-hero]`; design pass P4).
  */
 export function Stat({
     label,
     children,
     testId,
     priority,
+    hero,
 }: {
     label: string;
     children: ReactNode;
     testId?: string;
     priority?: 1 | 2;
+    hero?: boolean;
 }) {
     return (
-        <div className="stat" data-testid={testId} data-priority={priority}>
+        <div className="stat" data-testid={testId} data-priority={priority} data-hero={hero ? '' : undefined}>
             <div className="stat-label">
                 <Term>{label}</Term>
             </div>

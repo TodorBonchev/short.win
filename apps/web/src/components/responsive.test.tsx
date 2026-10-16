@@ -70,7 +70,7 @@ describe('DataTable (responsive)', () => {
         expect(onSort).toHaveBeenLastCalledWith('age');
         const dir = screen.getByTestId(T.tableSortDir('t'));
         expect(dir.hasAttribute('aria-pressed')).toBe(false);
-        expect(dir.textContent).toBe('Order: ↓Descending');
+        expect(dir.textContent).toBe('Order: Descending');
         expect(dir.getAttribute('data-order')).toBe('desc');
         fireEvent.click(dir);
         expect(onSort).toHaveBeenLastCalledWith('tvl');
@@ -79,7 +79,7 @@ describe('DataTable (responsive)', () => {
     it('names the order the direction button shows: ascending reads Ascending with an up arrow', () => {
         render(<Table onSort={vi.fn()} sort={{ key: 'tvl', order: 'asc' }} />);
         const dir = screen.getByTestId(T.tableSortDir('t'));
-        expect(dir.textContent).toBe('Order: ↑Ascending');
+        expect(dir.textContent).toBe('Order: Ascending');
         expect(dir.getAttribute('data-order')).toBe('asc');
     });
 });

@@ -2,6 +2,8 @@
  * Number cells (FRONTEND.md §7.2): every amount renders through one of these, so formatting,
  * tabular figures, `data-value` (the raw integer, for tests) and the screen-reader text (the plain
  * value with its unit; the visual subscript notation and arrows are hidden from it) are uniform.
+ * A zero carries `data-zero` (quiet, never hidden: `.num[data-zero]`, design pass P4); `pad` keeps
+ * every fraction digit so a SOL column's decimal points align.
  */
 import { formatBps, formatPnlSol, formatPriceSol, formatSol, formatTokens, MINUS } from '../lib/format.ts';
 
@@ -14,12 +16,18 @@ export function Sol({
     lamports,
     frac = 4,
     unit = true,
+    pad = false,
     testId,
     className,
-}: Common & { lamports: bigint; frac?: number; unit?: boolean }) {
-    const text = formatSol(lamports, frac);
+}: Common & { lamports: bigint; frac?: number; unit?: boolean; pad?: boolean }) {
+    const text = formatSol(lamports, frac, pad ? frac : 0);
     return (
-        <span className={`num ${className ?? ''}`.trim()} data-testid={testId} data-value={lamports.toString()}>
+        <span
+            className={`num ${className ?? ''}`.trim()}
+            data-testid={testId}
+            data-value={lamports.toString()}
+            data-zero={lamports === 0n ? '' : undefined}
+        >
             {text}
             {unit ? <span className="unit">SOL</span> : <span className="visually-hidden"> SOL</span>}
         </span>
@@ -31,12 +39,18 @@ export function Tokens({
     decimals,
     symbol,
     frac,
+    pad = false,
     testId,
     className,
-}: Common & { raw: bigint; decimals: number; symbol?: string | null; frac?: number }) {
-    const text = formatTokens(raw, decimals, frac);
+}: Common & { raw: bigint; decimals: number; symbol?: string | null; frac?: number; pad?: boolean }) {
+    const text = formatTokens(raw, decimals, frac, pad);
     return (
-        <span className={`num ${className ?? ''}`.trim()} data-testid={testId} data-value={raw.toString()}>
+        <span
+            className={`num ${className ?? ''}`.trim()}
+            data-testid={testId}
+            data-value={raw.toString()}
+            data-zero={raw === 0n ? '' : undefined}
+        >
             {text}
             {symbol && (
                 <bdi className="unit" title={symbol}>
@@ -49,7 +63,12 @@ export function Tokens({
 
 export function Bps({ value, frac = 2, testId, className }: Common & { value: number | bigint; frac?: number }) {
     return (
-        <span className={`num ${className ?? ''}`.trim()} data-testid={testId} data-value={String(value)}>
+        <span
+            className={`num ${className ?? ''}`.trim()}
+            data-testid={testId}
+            data-value={String(value)}
+            data-zero={value === 0 || value === 0n ? '' : undefined}
+        >
             {formatBps(value, frac)}
         </span>
     );

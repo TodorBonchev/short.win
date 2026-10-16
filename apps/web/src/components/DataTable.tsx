@@ -12,11 +12,17 @@
  *
  * A header the glossary knows (`config/glossary.ts`, by its text or `label`) gets its ⓘ beside the
  * header text — outside the sort button, which it must not nest in (FRONTEND.md §4.3).
+ *
+ * The sort marks are the registry's icons (design pass P4): `sort` (both ways) on a sortable column
+ * that is not the sort, `chevron` on the sort and in the card sort bar (down for descending, turned
+ * by CSS for ascending) — ▲ / ▼ stay P&L's. The sorted column's cells carry `data-sorted` (a card's
+ * hero figure).
  */
 /* biome-ignore-all lint/a11y/noRedundantRoles: CSS display change; roles restore semantics */
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useId, useRef } from 'react';
 import { type GlossaryId, glossaryFor } from '../config/glossary.ts';
 import { T } from '../config/testids.ts';
+import { NavIcon } from '../shell/icons.tsx';
 import { GlossaryTip } from './Glossary.tsx';
 
 /** Whether the event started on a control inside the row (which then handles it itself). */
@@ -84,12 +90,13 @@ function labelOf<T>(c: Column<T>): string {
     return c.label ?? (typeof c.header === 'string' ? c.header : '');
 }
 
-function cellAttrs<T>(c: Column<T>) {
+function cellAttrs<T>(c: Column<T>, sort: SortState | undefined) {
     return {
         'data-col': c.key,
         'data-label': labelOf(c),
         'data-priority': String(c.priority ?? 1),
         'data-card': c.card,
+        'data-sorted': sort?.key === c.key ? '' : undefined,
     };
 }
 
@@ -160,7 +167,7 @@ export function DataTable<T>({
                         }}
                     >
                         <span className="visually-hidden">Order: </span>
-                        <span aria-hidden="true">{sort?.order === 'asc' ? '↑' : '↓'}</span>
+                        <NavIcon name="chevron" className="sort-dir" />
                         {sort?.order === 'asc' ? 'Ascending' : 'Descending'}
                     </button>
                 </div>
@@ -177,7 +184,7 @@ export function DataTable<T>({
                                     key={c.key}
                                     role="columnheader"
                                     scope="col"
-                                    {...cellAttrs(c)}
+                                    {...cellAttrs(c, sort)}
                                     data-align={c.align}
                                     style={c.width !== undefined ? { width: c.width } : undefined}
                                     aria-sort={
@@ -188,11 +195,9 @@ export function DataTable<T>({
                                         <button type="button" onClick={() => onSort(c.key)} data-testid={c.testId}>
                                             {c.header}
                                             {active ? (
-                                                <span aria-hidden="true">{sort?.order === 'asc' ? ' ▲' : ' ▼'}</span>
+                                                <NavIcon name="chevron" className="sort-dir" />
                                             ) : (
-                                                <span className="sort-hint" aria-hidden="true">
-                                                    ↕
-                                                </span>
+                                                <NavIcon name="sort" className="sort-hint" />
                                             )}
                                         </button>
                                     ) : (
@@ -210,7 +215,7 @@ export function DataTable<T>({
                               // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
                               <tr key={i} role="row">
                                   {columns.map((c) => (
-                                      <td key={c.key} role="cell" {...cellAttrs(c)} data-align={c.align}>
+                                      <td key={c.key} role="cell" {...cellAttrs(c, sort)} data-align={c.align}>
                                           <span className="skeleton" />
                                       </td>
                                   ))}
@@ -234,7 +239,7 @@ export function DataTable<T>({
                                   onKeyDown={onRowActivate ? (e) => onKey(e, row) : undefined}
                               >
                                   {columns.map((c) => (
-                                      <td key={c.key} role="cell" {...cellAttrs(c)} data-align={c.align}>
+                                      <td key={c.key} role="cell" {...cellAttrs(c, sort)} data-align={c.align}>
                                           {c.render(row)}
                                       </td>
                                   ))}
@@ -242,7 +247,9 @@ export function DataTable<T>({
                           ))}
                 </tbody>
             </table>
-            {!loading && rows && rows.length === 0 && <div className="empty">{empty ?? 'Nothing here yet.'}</div>}
+            {!loading && rows && rows.length === 0 && (
+                <div className="empty tbl-empty">{empty ?? 'Nothing here yet.'}</div>
+            )}
         </div>
     );
 }

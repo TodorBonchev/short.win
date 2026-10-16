@@ -40,9 +40,9 @@ export function formatSol(lamports: bigint, maxFrac = 4, minFrac = 0): string {
     return formatFixed(lamports, 9, maxFrac, minFrac);
 }
 
-/** Raw token units as UI tokens. */
-export function formatTokens(raw: bigint, decimals: number, maxFrac = Math.min(decimals, 4)): string {
-    return formatFixed(raw, decimals, maxFrac);
+/** Raw token units as UI tokens; `pad` keeps `maxFrac` fraction digits (a column's decimal points align). */
+export function formatTokens(raw: bigint, decimals: number, maxFrac = Math.min(decimals, 4), pad = false): string {
+    return formatFixed(raw, decimals, maxFrac, pad ? maxFrac : 0);
 }
 
 /** Basis points as a percentage ("12.34%"). */
@@ -138,6 +138,30 @@ export function formatDuration(seconds: number | bigint): string {
     if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
     if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
     return `${s}s`;
+}
+
+/** A slot number grouped with commas ("53,422"); "—" for none. */
+export function formatSlot(n: bigint | number | null): string {
+    return n === null ? '—' : n.toLocaleString('en-US');
+}
+
+/**
+ * An age (how long ago) for a dense table: "45s" under a minute, then minutes only ("11m"), then
+ * "3h 12m", then "2d 4h" — a list that refreshes every 15–30 s never churns seconds past the first
+ * minute. Negative or not finite → "0s". `formatDuration` keeps the seconds for countdowns.
+ */
+export function formatAge(seconds: number | bigint): string {
+    let s = typeof seconds === 'bigint' ? Number(seconds) : Math.floor(seconds);
+    if (!Number.isFinite(s) || s <= 0) return '0s';
+    if (s < 60) return `${s}s`;
+    const d = Math.floor(s / 86_400);
+    s -= d * 86_400;
+    const h = Math.floor(s / 3_600);
+    s -= h * 3_600;
+    const m = Math.floor(s / 60);
+    if (d > 0) return `${d}d ${h}h`;
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+    return `${m}m`;
 }
 
 /** Compact magnitude for dense tables ("1.23K", "4.5M", "12B"); `value` is in units of 10^-scale. */
