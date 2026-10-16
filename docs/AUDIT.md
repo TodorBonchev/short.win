@@ -1522,7 +1522,7 @@ both together with this addendum.
   and error codes as before) and T-PUMP-MATH-V3 (a)–(g), (b′) (26 tests: the v3 charge model, the
   synthetic charge and events, the donation-inclusive pool part, `migrate_v2`'s pool and boost
   `⌊X₁·Y₁/10¹⁵⌋`, the tier tripwire, 6094 on a cashback coin, 6021 on the 10-02 build); T-REPIN-1
-  … -3 (the full LiteSVM suite on the new builds with the 1.0.0-era adapter: 1,117 passed);
+  … -3 (the full LiteSVM suite on the new builds with the AI review's v2 adapter: 1,117 passed);
   T-PFEE-CPI. Corrections they made to the design: the boost is `⌊X₁·Y₁/10¹⁵⌋` (the design's
   `⌊(Y − pcQ)·2069/10⁴⌋` holds only without a donation); on an exact division pump charges the
   curve part `⌊⌋ + 1` and the pool part `⌈⌉`; the 49-byte legacy curve's growth costs 261,600
@@ -1544,7 +1544,7 @@ quote and fails precondition 4, `UseSolSettle`), the doc text of
 `instructions/{create_market,propose_pool}.rs`, `Cargo.toml` (1.0.1);
 `crates/shortwin-math/src/quote/{straddle,pricing,mod}.rs`, `fees.rs`;
 `crates/shortwin-venue-state/src/pump.rs` — 14 source files, +1,939 / −356 lines (P8's doc fix
-in `venues/mod.rs` moves three comment lines and no byte); `programs/complete_curve` removed
+in `venues/mod.rs` rewords three comment lines and changes no byte); `programs/complete_curve` removed
 (−471). Non-test nLOC (`audit_scope.py nloc`): `shortwin`
 13,597, `shortwin-math` 6,807, `shortwin-venue-state` 1,705 (§2's audited figures: 13,293 /
 6,593 / 1,636, before the AI review's batch too).

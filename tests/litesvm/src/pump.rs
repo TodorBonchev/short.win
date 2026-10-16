@@ -9,7 +9,7 @@
 //!   mints have no mint authority: the lender's balance is planted) and the listing warm-up
 //!   ([`PumpSpec`]).
 //! - [`PumpMarket`]: the market's keys and its venue's account lists in ARCH §3.12's order (the
-//!   ReadSet C0–C6, the TradeExtras T0–T19), built from the **fixture's** keys and the harness's
+//!   ReadSet C0–C6, the TradeExtras T0–T9), built from the **fixture's** keys and the harness's
 //!   own derivations, not from the program's key functions; it implements [`VenueMarket`], so
 //!   every builder of [`crate::engine`] (`open_short_ix`, `close_short_ix`, `crank_price_ix`,
 //!   `liquidate_ix`, `expire_ix`, `sol_settle_ix`) and [`Env::open`] / [`Env::close`] work on it.
@@ -156,7 +156,7 @@ impl PumpMarket {
         }
     }
 
-    /// The TradeExtras T0–T19 as a list of keys (ARCH §3.12 order).
+    /// The TradeExtras T0–T9 as a list of keys (ARCH §3.12 order).
     pub fn trade_keys(&self) -> Vec<Pubkey> {
         self.trade_extras().iter().map(|a| a.pubkey).collect()
     }
@@ -193,8 +193,8 @@ impl VenueMarket for PumpMarket {
         )
     }
 
-    /// ARCH §6.1's PROPOSED limit for curve opens and closes: measured opens run 178–202 k CU
-    /// (the Anchor PDA inits vary with the borrower's key), above the 200 k default.
+    /// ARCH §6.1's PROPOSED limit for curve opens and closes. On pump's v3 trades opens measure
+    /// 139.1–154.6 k CU and closes 108.2–135.8 k (`tests/bench/m5_cu`), below the 200 k default.
     fn cu_limit(&self) -> Option<u32> {
         Some(CURVE_TRADE_CU)
     }

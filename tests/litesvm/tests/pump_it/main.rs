@@ -21,8 +21,8 @@
 //! | `exits` | expiry and liquidation on the curve, `sweep_trader`'s token leg, token donations during a leg, a `trader_wsol` donation surviving curve legs until `sweep_trader` (FUZZ-M7-1), the pump / pump-fees / PumpSwap latch bits |
 //!
 //! Opens and closes are sent with ARCH §6.1's PROPOSED 250 k CU limit (`VenueMarket::cu_limit`),
-//! keeper exits with 300 k: curve opens measure 176–194 k CU, above the runtime's 200 k default
-//! only in their variance.
+//! keeper exits with 300 k. On pump's v3 trades curve opens measure 139.1–154.6 k CU and closes
+//! 108.2–135.8 k (`tests/bench/m5_cu`), below the runtime's 200 k default.
 
 // `TxResult` is LiteSVM's own `TransactionResult` (as in the harness library).
 #![allow(clippy::result_large_err)]
