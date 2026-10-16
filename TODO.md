@@ -51,11 +51,27 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
 - [x] P8, docs: ARCHITECTURE (changelog 81), ECONOMICS (#119, §10.2's synthetic row, §3.1's
       boost rule `⌊X₁·Y₁/10¹⁵⌋`, §5.8), SPEC §14; the AUDIT addendum (§13) and known issues
       (KI-77: `φ_s` and the fee gates' 10¹⁵ `φ`; PUMP-2026-10-13-1 … -6); the R-PUMP and R-VEN
-      notes. `1f31273`, `d3a64ce`, `6ac7a78`
+      notes; the curve test docs and re-pin gates as built. `1f31273`, `d3a64ce`, `6ac7a78`,
+      `0879185`
+- [x] P8, the final local CI gate on `pump-v3` (2026-10-16, on `0879185`; AUDIT.md §10 "The
+      pump v3 gate"): every CI job that runs on the machine is green, web-e2e (122 passed) and
+      the indexer's PostgreSQL and validator tests included; the full LiteSVM suite 1,289 passed;
+      the hashes equal §0's 1.0.1 table. The m2-cu figures it re-wrote are committed. `b44908b`
+- [x] The final review's fixes (2026-10-16): the indexer stores no pump `TradeEvent` of a curve
+      quoted in another token (`9246792`); T-PUMP-MATH-V3 (b″), the creator-fee rules on both
+      synthetic parts against pump's ELF (`0b34288`); KI-77 (c)'s step pinned (`22fd1dc`); CI's
+      t-pot comment (`a2b80e4`); the gate's record in AUDIT.md §10 and the 1.0.1 wording of AUDIT,
+      known-issues, ARCH, FRONTEND, INDEXER, SPEC, SECURITY.md and the RFQ notes (`c48336c`)
 
 **Still open**
+- [ ] **G2: the owner's review** of the P8 docs and the release evidence (pump-final §15), before
+      telling the auditors.
 - [ ] **Tell the auditors** of the addendum (AUDIT.md §13) and of D2's scope change
       (`complete_curve` leaves the tagged `audit-1` scope) — the owner's step.
+- [ ] **The date of the owner's `φ_s` direction** (accept the live-supply synthetic fee under
+      KI-72's decision of 2026-10-12; KI-77): given after P1 introduced `φ_s` on 2026-10-14, and
+      not recorded in the docs. The owner confirms it; then SPEC §14 (fifteenth round), AUDIT.md
+      §7's pump v3 row and KI-77's Decision column carry it.
 - [ ] **The owner's real-device MWA test** before the release (FE-32; DEVELOPMENT "Mobile wallets
       on a real device"), and who hosts the HTTPS devnet and mainnet builds it needs (P1, P2).
 - [ ] **Remove the two `@solana-mobile` release-age exclusions** in `pnpm-workspace.yaml` after
@@ -204,9 +220,12 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
 
 **Release evidence (needs CI or tools not on the local machine)**
 - [ ] CI on GitHub: the owner asked for the branch to be pushed with `[skip ci]` (2026-10-13),
-      so CI has not run. The jobs not run locally: `deny` (`cargo deny`, `cargo audit`;
-      no lockfile changed since v1.0.0), `verifiable-build` (Docker), `web-e2e` (Playwright on a
-      validator), `indexer`'s PostgreSQL and validator tests.
+      so CI has not run. The jobs not run locally: `deny` (`cargo deny`, `cargo audit`; since
+      v1.0.0 the Cargo lockfiles change only workspace packages, `complete-curve` removed and
+      `shortwin` 1.0.1, and `pnpm-lock.yaml` gained the Mobile Wallet Adapter's npm packages,
+      which deny and audit do not cover) and `verifiable-build` (Docker). `web-e2e` and the
+      indexer's PostgreSQL and validator tests ran locally on `pump-v3` (2026-10-16, AUDIT.md
+      §10).
 - [ ] `rpc_local` (manual, no CI job runs it): `SHORTWIN_RPC_URL=http://127.0.0.1:8899 cargo test
       --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored`
       against `solana-test-validator`; last run by the keeper track at `8945087` (1 passed),
@@ -217,17 +236,21 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       there are a local build's, not verified). *The version is 1.0.1 since `dd24af1` (pump v3,
       above) and its local hashes are in AUDIT.md §0; CI and the verifiable build remain.*
 - [ ] `scripts/mutants.sh` (CI's opt-in `mutants` job, nightly or `workflow_dispatch`): run on
-      every earlier batch, not on the AI review's fixes (it builds into target directories of its
-      own, which this machine's disk budget does not allow).
+      every earlier batch, not on the AI review's fixes nor on 1.0.1 (it builds into target
+      directories of its own, which this machine's disk budget does not allow).
 - [ ] An external fix review (`docs/audit/findings.md`).
 - [x] A ≥ 24 h fuzz run on the fixed program (AUDIT.md §12): **waived** for this batch
       (approved by the owner 2026-10-13); no such run was made. `255ce60`
-- [ ] The PostgreSQL indexer tests on the migrated and re-recorded inputs: `ingest_sessions`,
+- [x] The PostgreSQL indexer tests on the migrated and re-recorded inputs: `ingest_sessions`,
       `api_replayed`, `security_ingest`, and the replay harness's
       `every_session_replays_into_the_chain_state`,
       `the_assertions_hold_on_a_faithful_database_and_catch_tampering` and
       `the_analytics_reproduce_the_sessions_numbers`. Then INDEXER §13's totals (1,369
       transactions / 159 checkpoints, measured at M8; 1,499 / 171 expected) and its note.
+      **Run locally on `pump-v3`** (2026-10-16, uid 1 through `unshare`; AUDIT.md §10):
+      `ingest_sessions` 8, `api_replayed` 1, `security_ingest` 11, the replay harness 8 (nine
+      sessions, 2,371 transactions, 178 checkpoints), again after the final review's indexer
+      fix; INDEXER §13 carries the totals (`c48336c`). CI's run is still owed (above).
 
 **Figures**
 - [x] *Done in `1710890` (2026-10-16), on the 1.0.1 build:* the m7-keeper-bench figures
