@@ -7,7 +7,7 @@
 //! **Baskets.** (1) The launch-cap basket on the mock venue: `min_notional` positions (≈ 0.1 SOL
 //! each) filling the market's 25-SOL cap (`market_max_notional`), one borrower each, on a pool deep
 //! enough that only the launch cap binds. (2) The same on a real PumpSwap pool (the `mature` fork),
-//! whose `liquidate` is the heaviest measured (≈ 212 k requested CU, `tests/bench/m7_keeper`): as
+//! whose `liquidate` is the heaviest measured (≈ 214 k requested CU, `tests/bench/m7_keeper`): as
 //! many `min_notional` positions as its caps admit. **Paths** — those of `cascade.py` scaled to the
 //! positions' Tier C terms (they open at a live CR ≈ 2.9 against `L` = 1.5, so `cascade.py`'s ×1.8
 //! gap and ×2 pump, sized for Tier A, do not reach `L`): a ×3 gap held (not bought back: S1
@@ -520,26 +520,26 @@ fn t_cascade_a_launch_cap_basket_clears_under_the_block_budget() {
     let per_slot = |cu: u64| MARKET_CAP / cu;
     let _ = writeln!(
         md,
-        "\nPer-exit requested CU: mock `liquidate` {}–{}; PumpSwap `liquidate` {}–{} (`tests/bench/m7_keeper`: PumpSwap 212,313, the curve 191,983, AMM v4 105,270, CPMM 125,289). At 12 M per market per slot that is {} mock / {} PumpSwap / {} curve / {} AMM v4 / {} CPMM liquidations a slot — {} / {} / {} / {} / {} a second at 2.5 slots a second; a 250-position basket clears in {} / {} / {} / {} / {} slots.",
+        "\nPer-exit requested CU: mock `liquidate` {}–{}; PumpSwap `liquidate` {}–{} (`tests/bench/m7_keeper`: PumpSwap 214,447, the curve 147,131, AMM v4 104,764, CPMM 124,787). At 12 M per market per slot that is {} mock / {} PumpSwap / {} curve / {} AMM v4 / {} CPMM liquidations a slot — {} / {} / {} / {} / {} a second at 2.5 slots a second; a 250-position basket clears in {} / {} / {} / {} / {} slots.",
         runs[1].0.exit_cu.0,
         mock_liq,
         cp.exit_cu.0,
         cp.exit_cu.1,
         per_slot(mock_liq),
-        per_slot(212_313),
-        per_slot(191_983),
-        per_slot(105_270),
-        per_slot(125_289),
+        per_slot(214_447),
+        per_slot(147_131),
+        per_slot(104_764),
+        per_slot(124_787),
         per_slot(mock_liq) * 5 / 2,
-        per_slot(212_313) * 5 / 2,
-        per_slot(191_983) * 5 / 2,
-        per_slot(105_270) * 5 / 2,
-        per_slot(125_289) * 5 / 2,
+        per_slot(214_447) * 5 / 2,
+        per_slot(147_131) * 5 / 2,
+        per_slot(104_764) * 5 / 2,
+        per_slot(124_787) * 5 / 2,
         250u64.div_ceil(per_slot(mock_liq)),
-        250u64.div_ceil(per_slot(212_313)),
-        250u64.div_ceil(per_slot(191_983)),
-        250u64.div_ceil(per_slot(105_270)),
-        250u64.div_ceil(per_slot(125_289)),
+        250u64.div_ceil(per_slot(214_447)),
+        250u64.div_ceil(per_slot(147_131)),
+        250u64.div_ceil(per_slot(104_764)),
+        250u64.div_ceil(per_slot(124_787)),
     );
     slot_table(
         &mut md,

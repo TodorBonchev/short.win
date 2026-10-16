@@ -58,15 +58,17 @@ PRICES = (0, 1_000, 10_000, 100_000)
 VENUES = ("pumpswap", "pump_curve", "raydium_cpmm", "raydium_amm_v4")
 NAMES = {"pumpswap": "PumpSwap", "pump_curve": "curve", "raydium_cpmm": "CPMM", "raydium_amm_v4": "AMM v4"}
 # Requested CU (ceil(consumed x 1.1)), the costliest measured per kind (tests/bench/m7_keeper/results.json).
+# Re-baselined on short.win 1.0.1 (`72c82879…`, pump's v3 curve adapter; pump-final P8): the curve's
+# exits trade one `buy_v3` with 10 TradeExtras (147,131 / 144,314, were 191,837 / 189,015).
 CU = {
-    "pumpswap": {"crank": 41_437, "sol_settle_keep": 64_324, "sol_settle_settle": 74_445,
-                 "liquidate": 212_585, "expire": 209_329},
-    "pump_curve": {"crank": 37_382, "sol_settle_keep": 62_715, "sol_settle_settle": 72_818,
-                   "liquidate": 191_837, "expire": 189_015},
-    "raydium_cpmm": {"crank": 32_843, "sol_settle_keep": 65_644, "sol_settle_settle": 77_470,
-                     "liquidate": 124_814, "expire": 117_671},
-    "raydium_amm_v4": {"crank": 32_779, "sol_settle_keep": 57_653, "sol_settle_settle": 67_798,
-                       "liquidate": 104_795, "expire": 101_187},
+    "pumpswap": {"crank": 41_149, "sol_settle_keep": 66_136, "sol_settle_settle": 77_008,
+                 "liquidate": 214_447, "expire": 211_324},
+    "pump_curve": {"crank": 38_137, "sol_settle_keep": 63_941, "sol_settle_settle": 74_717,
+                   "liquidate": 147_131, "expire": 144_314},
+    "raydium_cpmm": {"crank": 32_560, "sol_settle_keep": 65_940, "sol_settle_settle": 78_494,
+                     "liquidate": 124_787, "expire": 117_594},
+    "raydium_amm_v4": {"crank": 32_497, "sol_settle_keep": 57_932, "sol_settle_settle": 68_833,
+                       "liquidate": 104_764, "expire": 101_111},
 }
 LP_WRAP_CU = 150_000             # the attacker's [deposit, crank_price, withdraw] (estimate, M4G-2)
 V1_K = 6                         # the keeper's `batch_v1`
@@ -94,7 +96,7 @@ JUNK_PHI_BPS = 100               # its venue fee, one way
 TIER_D = {"cr_open": 40_000, "cr_liq": 17_500, "dur_days": 3, "rate_u0_bps": 10_000, "rate_u50_bps": 28_750}
 OPEN_FEE_BPS = 25
 PROTOCOL_RENT_BPS = 1_500
-SET_COVERAGE_PAUSE_CU = 8_915
+SET_COVERAGE_PAUSE_CU = 8_921
 CRANK_SOL_USD_CU = 7_212
 CRANK_SOL_USD_PER_DAY = 1_560    # a feed publishing every 55 s
 RATE80 = {"A": 5_000, "B": 10_000, "C": 20_000, "D": 40_000}   # APR bps at 80 % utilisation
