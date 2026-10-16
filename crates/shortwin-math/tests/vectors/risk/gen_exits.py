@@ -91,7 +91,7 @@ def default_model(m):
     """Rows are recorded only for the v0.4.1 model with its default switches."""
     P = m.P
     return (type(m) is M and not P.box_obs and not P.pprime_raw and P.ref_cap_lo and P.liq_reserve == "none"
-            and P.exp_reserve == "rent+fee" and P.liq_keeper_parity and P.fv_cap and P.two_leg
+            and P.exp_reserve == "rent+fee" and P.liq_keeper_parity and P.fv_cap and P.two_leg and P.synthetic
             and P.margin_policy == "cr" and P.exit_ref == "fresh")
 
 
@@ -139,7 +139,7 @@ def status(self, pos, t):
     if v.has_route():
         K = self.settle_reward(pos.V)
         qs = st["qs"]
-        slip = self.slip_at(pos.Q, *v.eff())
+        slip = self.slip_at(pos.Q, *v.eff(), live=True)
         ok = qs is not None and qs[1] + pos.ert <= pos.V - K and slip <= pos.slip_max   # try_exit's buyback_ok
         CAP["buyback"].append(dict(v=s(pos.V), k_s=s(K), ert=s(pos.ert), b_live=qv(qs), sigma_live=sig(slip),
                                    sigma_max=s(pos.slip_max), expected=ok))
@@ -147,10 +147,10 @@ def status(self, pos, t):
 
 
 @wrap("slip_at")
-def slip_at(self, Q, X, Y):
-    r = slip_at.__wrapped__(self, Q, X, Y)
+def slip_at(self, Q, X, Y, live=False):
+    r = slip_at.__wrapped__(self, Q, X, Y, live=live)
     if default_model(self):
-        q = self.venue.quote_at(Q, X, Y, two_leg=self.P.two_leg)
+        q = self.venue.quote_at(Q, X, Y, two_leg=self.P.two_leg, live=live)
         CAP["sigma"].append(dict(n=qn(q), q=s(Q), x=s(X), y=s(Y), expected=sig(r)))
     return r
 

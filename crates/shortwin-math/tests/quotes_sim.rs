@@ -3,17 +3,23 @@
 //! (`gen_sim.py`). Every comparison with the sim is exact (no tolerance):
 //!
 //! - live execution quotes and sales on PumpSwap, the curve (ECON §3.1's
-//!   `⌈q·vQ/(vT − q)⌉ + 1`, the straddle `B̂_str`) and Raydium;
+//!   `⌈q·vQ/(vT − q)⌉ + 1`; past `rT` pump's synthetic migration `B̂_v3`, pump-final §5.2,
+//!   and the straddle `B̂_str` of a `PumpMigrating` market's states and the retired bundle)
+//!   and Raydium;
 //! - risk quotes at a fee hard cap: one combined fee at the cap on pump venues
 //!   (`FeeBps::capped`, the sims' `Venue._risk_fees`), `min(rate, cap)` on Raydium;
 //! - quotes on hypothetical states (`Market.quote_repriced`): `reprice` with
 //!   `sp = isqrt⁺(P)`, X floor, Y ceil, at the live fee tier (R3B-7 b);
+//! - a complete curve's pool and FV (pump-final §5.4, P7): `migrated_pool` with `pcQ` and
+//!   the live `curve_base_ata` after a pool part, `migrating_fv_price`'s ρ, `migrating_fv`
+//!   (the sim's `Market.fv_parts`), and `B̂_str` on its reprojected ring states;
 //! - `reprice`, `liquidity` (`sqrt_k`), `pool_select::{lambda_bps, locked_depth}`.
 //!
-//! The sim's own execution of a curve trade (`exact_*`: the program's `⌊·⌋ + 1` charge
-//! and, for a straddle, the pool that migration actually creates) equals
-//! `sol_leg::curve_charge_exact_out` on the curve and sits at most `tolerance` lamports
-//! below the quote (a quote-vs-execution bound, ECON §3.2).
+//! The sim's own execution of a curve trade (`exact_*`: the program's `⌊·⌋ + 1` charge;
+//! pump's synthetic migration past `rT`; for the retired straddle, the pool that migration
+//! actually creates) equals `sol_leg::curve_charge_exact_out` on the curve and sits at most
+//! `tolerance*` lamports below the quote (a quote-vs-execution bound, ECON §3.2, pump-final
+//! §5.2).
 
 mod common;
 
@@ -34,6 +40,8 @@ struct File {
     pump_supply: Dec<u64>,
     pumpswap: Vec<PammCase>,
     curve: Vec<CurveCase>,
+    migrating: Vec<MigratingCase>,
+    migrating_ring: Vec<RingCase>,
     raydium: Vec<RayCase>,
     repriced: Vec<RepricedCase>,
     reprice: Vec<RepriceCase>,
@@ -76,15 +84,57 @@ struct CurveCase {
     ema: Option<[Dec<u128>; 2]>,
     fees: [Dec<u64>; 3],
     cap_bps: Dec<u64>,
-    sim_bundle: Option<Dec<u64>>,
+    /// `B̂_v3`'s would-be pool: the live `curve_base_ata − rT`, or 206.9e12 on a reprojection.
+    pool_tokens: Dec<u128>,
+    sim_v3: Option<Dec<u64>>,
     sim_risk: Option<Dec<u64>>,
+    sim_str: Option<Dec<u64>>,
+    sim_risk_str: Option<Dec<u64>>,
     sim_two_leg: Option<Dec<u64>>,
-    exact_bundle: Option<Dec<u64>>,
+    exact_v3: Option<Dec<u64>>,
+    exact_str: Option<Dec<u64>>,
     exact_two_leg: Option<Dec<u64>>,
     sell_checked: bool,
     sell: Option<Dec<u64>>,
+    tolerance_v3: Dec<u64>,
     tolerance: Dec<u64>,
     tolerance_two_leg: Dec<u64>,
+}
+
+/// A complete curve's FV quote (`Market.fv_parts`, pump-final §5.4).
+#[derive(Deserialize)]
+struct MigratingCase {
+    vt: Dec<u128>,
+    vq: Dec<u128>,
+    rq: Dec<u128>,
+    pcb: Dec<u64>,
+    pcq: Dec<u64>,
+    pool_tokens: Dec<u128>,
+    x1: Dec<u128>,
+    y1: Dec<u128>,
+    p: Dec<u128>,
+    p1: Option<Dec<u128>>,
+    cap_bps: Dec<u64>,
+    q: Dec<u64>,
+    fv: Option<Dec<u64>>,
+}
+
+/// `B̂_str` on a complete curve's reprojected ring state (`PumpCurve.quote_at`).
+#[derive(Deserialize)]
+struct RingCase {
+    vt: Dec<u128>,
+    vq: Dec<u128>,
+    rq: Dec<u128>,
+    pcq: Dec<u64>,
+    pool_tokens: Dec<u128>,
+    off_t: Dec<u128>,
+    off_q: Dec<u128>,
+    l: Dec<u128>,
+    p: Dec<u128>,
+    fees: [Dec<u64>; 3],
+    cap_bps: Dec<u64>,
+    q: Dec<u64>,
+    sim_str: Option<Dec<u64>>,
 }
 
 #[derive(Deserialize)]
@@ -234,6 +284,12 @@ fn pumpswap_matches_sim() {
     assert!(combined >= 50, "{combined}");
 }
 
+/// The curve on the sim's default switches (P7): up to `rT` ECON §3.1's quote, past it
+/// `B̂_v3` — `CurvePricing` with `synthetic` (the curve's fee on both legs, `ε₁ = 1`) on the
+/// case's would-be pool, live (`curve_base_ata − rT`, donations included) or the standard
+/// 206.9e12 on a reprojection — and the sim's own execution of pump's synthetic buy within
+/// pump-final §5.2's bound below it; `B̂_str` (a migrating market's state, the retired bundle)
+/// on `CurvePricing` without `synthetic`; the two-leg `B̂₂`; sales.
 #[test]
 fn curve_and_straddle_match_sim() {
     let f = load();
@@ -244,7 +300,7 @@ fn curve_and_straddle_match_sim() {
         post_complete_quote_in: 0,
     };
     let pool = sched(&tiers, f.pump_supply.0);
-    let (mut straddles, mut emas, mut capped) = (0, 0, 0);
+    let (mut straddles, mut emas, mut capped, mut donated, mut synthetic_exact) = (0, 0, 0, 0, 0);
     for (i, c) in f.curve.iter().enumerate() {
         let off = CurveOffsets {
             token: c.off_t.0,
@@ -274,53 +330,95 @@ fn curve_and_straddle_match_sim() {
         if u128::from(q) > state.rt {
             straddles += 1;
         }
-        let pricing = CurvePricing {
+        if c.pool_tokens.0 != mig.pool_tokens {
+            donated += 1;
+        }
+        let live = MigrationParams {
+            pool_tokens: c.pool_tokens.0,
+            ..mig
+        };
+        // The live curve's pricing (pump-final §6.2): `B̂_v3` past `rT` at the curve's fee.
+        let v3 = CurvePricing {
             fees: fee,
             offsets: off,
-            migration: mig,
+            migration: live,
             pool,
+            synthetic: Some(fee),
+        };
+        // A migrating market's state and the retired bundle: `B̂_str`.
+        let straddle = CurvePricing {
+            migration: mig,
             synthetic: None,
+            ..v3
         };
 
-        let b = quote::curve_straddle(q, &state, &fee, &mig, &pool).map(|b| b.cost);
-        assert_eq!(b, opt(&c.sim_bundle), "case {i} bundle");
-        assert_eq!(pricing.buy(q, &state).map(|b| b.cost), b, "case {i}");
+        let b = quote::curve_synthetic(q, &state, &fee, &fee, &live).map(|b| b.cost);
+        assert_eq!(b, opt(&c.sim_v3), "case {i} B̂_v3");
+        assert_eq!(v3.buy(q, &state).map(|b| b.cost), b, "case {i}");
         if let Some([l, p]) = &c.ema {
-            assert_eq!(
-                pricing.buy_repriced(q, l.0, p.0).map(|b| b.cost),
-                b,
-                "case {i}"
-            );
+            assert_eq!(v3.buy_repriced(q, l.0, p.0).map(|b| b.cost), b, "case {i}");
         }
-        assert_eq!(b.is_some(), c.exact_bundle.is_some(), "case {i}");
-        if let (Some(b), Some(e)) = (b, opt(&c.exact_bundle)) {
+        // pump trades exactly where `B̂_v3` is defined (NotEnoughTokensToBuy past the would-be
+        // pool), except on a reprojected state at or past completion (`rT = 0`), which pump does
+        // not trade while `B̂_v3` still prices it on the pool.
+        if state.rt > 0 {
+            assert_eq!(b.is_some(), c.exact_v3.is_some(), "case {i} B̂_v3 defined");
+        } else {
+            assert!(c.exact_v3.is_none(), "case {i}: an execution at rT = 0");
+        }
+        if let (Some(b), Some(e)) = (b, opt(&c.exact_v3)) {
+            // pump's charge (the sim's `PumpCurve.buy`, its synthetic migration past `rT`) at
+            // most pump-final §5.2's bound below the quote.
             assert!(
-                b >= e && b - e <= c.tolerance.0,
-                "case {i}: exact {e} rust {b}"
+                b >= e && b - e <= c.tolerance_v3.0,
+                "case {i}: exact {e} rust {b} (bound {})",
+                c.tolerance_v3.0
             );
+            synthetic_exact += usize::from(u128::from(q) > state.rt);
         }
         if u128::from(q) <= state.rt {
             let charge = sol_leg::curve_charge_exact_out(q, state.vt, state.vq, &fee);
+            assert_eq!(charge.map(|b| b.cost), opt(&c.exact_v3), "case {i} charge");
+            assert_eq!(opt(&c.exact_v3), opt(&c.exact_str), "case {i}");
+        }
+
+        let s = quote::curve_straddle(q, &state, &fee, &mig, &pool).map(|b| b.cost);
+        assert_eq!(s, opt(&c.sim_str), "case {i} B̂_str");
+        assert_eq!(straddle.buy(q, &state).map(|b| b.cost), s, "case {i}");
+        if let Some([l, p]) = &c.ema {
             assert_eq!(
-                charge.map(|b| b.cost),
-                opt(&c.exact_bundle),
-                "case {i} charge"
+                straddle.buy_repriced(q, l.0, p.0).map(|b| b.cost),
+                s,
+                "case {i}"
+            );
+        }
+        assert_eq!(s.is_some(), c.exact_str.is_some(), "case {i}");
+        if let (Some(s), Some(e)) = (s, opt(&c.exact_str)) {
+            assert!(
+                s >= e && s - e <= c.tolerance.0,
+                "case {i}: exact {e} rust {s}"
             );
         }
 
-        // Risk quote: the curve's fee and the migrated pool's, each capped (V2-1).
-        let risk = pricing.capped(c.cap_bps.0);
+        // Risk quotes: the curve's fee (both legs of `B̂_v3`) and the migrated pool's, each
+        // capped (V2-1).
         if fees::exceeds_cap(fee.oneway_ppm(), c.cap_bps.0) {
             capped += 1;
         }
-        let r = risk.buy(q, &state).map(|b| b.cost);
-        assert_eq!(r, opt(&c.sim_risk), "case {i} risk");
-        if let Some([l, p]) = &c.ema {
-            assert_eq!(
-                risk.buy_repriced(q, l.0, p.0).map(|b| b.cost),
-                r,
-                "case {i}"
-            );
+        for (what, pricing, want) in [
+            ("risk", v3, &c.sim_risk),
+            ("risk B̂_str", straddle, &c.sim_risk_str),
+        ] {
+            let risk = pricing.capped(c.cap_bps.0);
+            let r = risk.buy(q, &state).map(|b| b.cost);
+            assert_eq!(r, opt(want), "case {i} {what}");
+            if let Some([l, p]) = &c.ema {
+                assert_eq!(
+                    risk.buy_repriced(q, l.0, p.0).map(|b| b.cost),
+                    r,
+                    "case {i}"
+                );
+            }
         }
 
         let t = quote::curve_two_leg(q, &state, &fee, &mig, &pool).map(|b| b.cost);
@@ -332,9 +430,9 @@ fn curve_and_straddle_match_sim() {
                 "case {i}: exact {e} rust {t}"
             );
         }
-        if let (Some(t), Some(b)) = (t, b) {
+        if let (Some(t), Some(s)) = (t, s) {
             // V1-9: the two-leg form never prices above the executed bundle.
-            assert!(t <= b, "case {i}");
+            assert!(t <= s, "case {i}");
         }
 
         if c.sell_checked {
@@ -344,9 +442,124 @@ fn curve_and_straddle_match_sim() {
         }
     }
     assert!(
-        straddles >= 50 && emas >= 50 && capped >= 50,
-        "{straddles} {emas} {capped}"
+        straddles >= 50 && emas >= 50 && capped >= 50 && donated >= 20 && synthetic_exact >= 20,
+        "{straddles} {emas} {capped} {donated} {synthetic_exact}"
     );
+}
+
+fn curve_tiers(f: &File) -> (Vec<FeeTier>, MigrationParams) {
+    (
+        tiers(f),
+        MigrationParams {
+            migration_fee: f.pump_migration_fee.0,
+            pool_tokens: f.pump_pool_tokens.0,
+            post_complete_quote_in: 0,
+        },
+    )
+}
+
+/// pump-final §5.4 against the sim's `Market.fv_parts` (P7): on curves completed by an exact
+/// buy of `rT` or by pump's synthetic migration, with token donations before or after, the pool
+/// `migrate_v2` will create is `migrated_pool` on the live `curve_base_ata` after a pool part
+/// (the standard 206.9e12 without one) plus `pcQ`; FV's price is ρ-scaled after a pool part
+/// (`migrating_fv_price`; `p` itself without one) and `migrating_fv` is the sim's `B̂_FV` at
+/// that pool's PumpSwap tier capped, to the lamport.
+#[test]
+fn migrating_fv_matches_sim() {
+    let f = load();
+    let (tiers, standard) = curve_tiers(&f);
+    let (mut rho, mut plain, mut defined) = (0, 0, 0);
+    for (i, c) in f.migrating.iter().enumerate() {
+        let live = CurveState {
+            vt: c.vt.0,
+            vq: c.vq.0,
+            rt: 0,
+            rq: c.rq.0,
+            complete: true,
+        };
+        if c.pcb.0 == 0 && c.pcq.0 == 0 {
+            // Without a pool part a donation is ignored (ARCH §4.3).
+            assert_eq!(c.pool_tokens.0, standard.pool_tokens, "case {i}");
+        }
+        let m = MigrationParams {
+            pool_tokens: c.pool_tokens.0,
+            post_complete_quote_in: c.pcq.0,
+            ..standard
+        };
+        assert_eq!(
+            quote::migrated_pool(&live, &m),
+            Some((c.x1.0, c.y1.0)),
+            "case {i} (X₁, Y₁)"
+        );
+        let p1 = if c.pcq.0 == 0 {
+            plain += 1;
+            Some(c.p.0)
+        } else {
+            rho += 1;
+            let (x0, y0) = quote::migrated_pool(&live, &standard).unwrap();
+            quote::migrating_fv_price(c.p.0, x0, y0, c.x1.0, c.y1.0)
+        };
+        assert_eq!(p1, c.p1.as_ref().map(|d| d.0), "case {i} p'");
+        let s = PammFeeSchedule {
+            cap_bps: Some(c.cap_bps.0),
+            ..sched(&tiers, f.pump_supply.0)
+        };
+        let fv = quote::migrating_fv(c.q.0, c.p.0, &live, &m, &s).map(|b| b.cost);
+        assert_eq!(fv, opt(&c.fv), "case {i} B̂_FV");
+        defined += usize::from(fv.is_some());
+    }
+    assert!(
+        rho >= 100 && plain >= 40 && defined >= 150,
+        "{rho} {plain} {defined}"
+    );
+}
+
+/// `B̂_str` on a complete curve's reprojected ring states (P7; pump-final §5.3, G-2): the
+/// pricing a `PumpMigrating` market's EMA leg reads — no synthetic route, all of `q` past the
+/// state's `rT` on the pool `migrate_v2` will create from that state (`curve_base_ata` after a
+/// pool part, `+ pcQ`) at its tier, capped — equals the sim's `PumpCurve.quote_at` on the
+/// complete curve.
+#[test]
+fn migrating_ring_matches_sim() {
+    let f = load();
+    let (tiers, standard) = curve_tiers(&f);
+    let pool = sched(&tiers, f.pump_supply.0);
+    let mut past = 0;
+    for (i, c) in f.migrating_ring.iter().enumerate() {
+        let off = CurveOffsets {
+            token: c.off_t.0,
+            quote: c.off_q.0,
+        };
+        let state = quote::curve_reprice(c.l.0, c.p.0, off).unwrap();
+        let pricing = CurvePricing {
+            fees: FeeBps::new(c.fees[0].0, c.fees[1].0, c.fees[2].0),
+            offsets: off,
+            migration: MigrationParams {
+                pool_tokens: c.pool_tokens.0,
+                post_complete_quote_in: c.pcq.0,
+                ..standard
+            },
+            pool,
+            synthetic: None,
+        };
+        let got = pricing
+            .capped(c.cap_bps.0)
+            .buy(c.q.0, &state)
+            .map(|b| b.cost);
+        assert_eq!(got, opt(&c.sim_str), "case {i}");
+        assert_eq!(
+            pricing
+                .capped(c.cap_bps.0)
+                .buy_repriced(c.q.0, c.l.0, c.p.0)
+                .map(|b| b.cost),
+            got,
+            "case {i}"
+        );
+        past += usize::from(u128::from(c.q.0) > state.rt);
+        // The complete curve's own fields (the vectors' provenance).
+        assert!(c.vt.0 > 0 && c.vq.0 > c.rq.0, "case {i}");
+    }
+    assert!(past >= 60, "{past}");
 }
 
 #[test]

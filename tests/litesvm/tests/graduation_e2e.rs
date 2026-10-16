@@ -13,7 +13,7 @@
 //! | [`t_venue_switch_the_graduation_rewrites_the_ring_and_the_box_is_narrow_from_the_gate`] | ★T-VENUE-SWITCH (graduation): every ring entry's `l`, `llo`, `lhi` = the pool's `lp_supply`, `(x, y) = reprice(lp_supply, p)`, prices and times kept, `L_slow ≤` the anchor, the bucket and both chains cleared; with the boost running and the keeper cranking every second, `L_ema` at the gate = the pool's `√(X·Y)` within 1 % and every second with the settlement box wider than 1 % in `L` lies inside the gate |
 //! | [`the_atomic_self_financed_complete_and_migrate_is_liquidated_on_the_pool`] | M5-SEC-4's attack, end to end: on ECON's D@80 % market a borrower long `q` tokens (bought before its short) and short `q/2` sends `[buy_v2(rT), migrate_v2]` in one transaction (self-financed: it keeps the `rT` tokens); other users push the pool to ≥ 3.5× the last curve EMA before any observation; the keeper's first crank moves the market onto the pool with `P_ema` carried over, its liquidations wait for the eight integrations, and the position is liquidated on the pool at the pool's price — the lenders get `Q` back plus SOL (in M5 the market froze and S3 paid FV at the frozen EMA). The attacker's net is printed |
 //! | [`m6_sec_1_a_low_recorded_in_the_warm_up_after_the_atomic_attack_is_bounded`] | M6-SEC-1, the security review's reproducer (★T-SEED-FALL; the owner's decision of 2026-09-30): the same attack, and in post-change second 1 / 4 / 8 another `[sell to 0.1× the pool, crank_price, buy back]` next to the keeper's crank; the warm-up seed falls at most one v0.4.1 step per integration (at the gate exactly the fall bound from the low's second, 0.128× / 0.312× / 0.819× the pool, above the low; as built the low itself, 0.100×), and the position is still liquidated on the pool, the lenders' `Q` back plus SOL, 23 / 17 / 12 s after the transition (undisturbed 9 s; as built, by the review's estimate `ln(P_pool/P_low)/ln(7/6)` s more, ≈ 24 s each) |
-//! | [`econ_10_2_the_borrowers_close_of_a_straddle_completes_the_curve`] | ECON §10.2 "rt → Q/2, borrower closes 30 s later" (D@97 %) on pump's v3 (pump-final P2): the curve is bought down to `rT = Q/2`, `B̂_v3` keeps the position healthy, and the borrower's own close completes the curve in one instruction (synthetic migration; `PumpMigrating` in its events): `B − growth` = pump's charge `≤ B̂_v3 ≤` charge + 7, below the retired bundle's 1.9227 SOL; the borrower gets `V − B − R`. (The keeper's bundle for M5-SEC-4's self-made straddle is retired: `synthetic_exit_it`.) Checked against pump's events only: the sim still prices the bundle, so the exact sim differential waits for pump-final §12's sim work (pending) |
+//! | [`econ_10_2_the_borrowers_close_of_a_straddle_completes_the_curve`] | ECON §10.2 "rt → Q/2, borrower closes 30 s later" (D@97 %) on pump's v3 (pump-final P2): the curve is bought down to `rT = Q/2`, `B̂_v3` keeps the position healthy, and the borrower's own close completes the curve in one instruction (synthetic migration; `PumpMigrating` in its events): `B − growth` = pump's charge `≤ B̂_v3 ≤` charge + 7, below the retired bundle's 1.9227 SOL; the borrower gets `V − B − R`. (The keeper's bundle for M5-SEC-4's self-made straddle is retired: `synthetic_exit_it`.) Since pump-final §12's sim work (P7) also the exact sim differential: `B`, the rent `R_min`, the payout and `pcB` / `pcQ` equal the normative sim's synthetic close to the lamport (1,883,736,744 / 720,630 / 4,603,772,566) |
 //! | [`a_completing_close_then_the_graduation_carries_the_other_position`] | ECON §10.2 `q = rt` (D@97 %): other users buy the curve down to one borrower's `q`, its close buys exactly `rT` at pump's charge and completes the curve (`VenueStateChanged → PumpMigrating` in the close itself, ARCH §5.4 case 1), the other position's close pauses (`VenueMigrating`); `migrate_v2`, the transition, and the other position closes on the pool during the warm-up at the pool's quote; every lent token back |
 //! | [`the_boost_gate_on_a_real_graduation`] | ARCH §5.4 case 3 (A13) on a pool `migrate_v2` just created: the whole boost (the sim's 40 chunks every 9 s) moves the price ×(1 + 0.2069)² = ×1.4566 exactly as ECON §10.1 says; opens refuse `BoostInProgress` while the vault holds more than `boost_dust_lamports` (343 refusals), resume once the last chunk has closed the vault's ATA (and the EMA has followed the push); a donor who re-creates the ATA and parks 1 SOL there blocks opens only until `graduated_at + boost_window_s` |
 
@@ -773,10 +773,22 @@ fn m6_sec_1_a_low_recorded_in_the_warm_up_after_the_atomic_attack_is_bounded() {
 
 // ---- ECON §10.2: a straddle's close completes the curve (pump-final P2) -------------------------
 
-/// The sim's D@97 % close through the retired bundle path (`Market._buy_back`: `pool.buy(Q)` right
-/// after `migrate()`): what the borrower paid before pump's synthetic migration (ECON 1.9227 SOL).
+/// The sim's D@97 % close through the retired bundle path (`Market._buy_back` with `synthetic`
+/// off: `pool.buy(Q)` right after `migrate()`): what the borrower paid before pump's synthetic
+/// migration (ECON 1.9227 SOL).
 const D97_STR_B: u64 = 1_922_674_204;
 const D97_V: u64 = 6_488_229_940;
+/// The sim's D@97 % close on pump's v3 (pump-final §12, P7; `shortwin_sim.py`'s default
+/// `synthetic` switch, ECON §10.2's "synthetic v3 (one transaction)" row): `PumpCurve.buy(Q)` past
+/// `rT = Q/2`, pump's synthetic migration — `⌊rT·vQ/(vT − rT)⌋ + 1` on the curve, `⌈Y_s·q₂/(X_s −
+/// q₂)⌉` on the would-be pool, each part's fees ceil'ed —, its rent at the program's `r_min` (4 h at
+/// the pre-open 0 %, the market's first position) and the borrower's `V − B − R`.
+const D97_V3_B: u64 = 1_883_736_744;
+const D97_V3_RENT: u64 = 720_630;
+const D97_V3_PAYOUT: u64 = 4_603_772_566;
+/// The sim's post-complete fields after that close (`pcB = Q − rT`, `pcQ = n₂`).
+const D97_V3_PCB: u64 = 2_260_866_303_878;
+const D97_V3_PCQ: u64 = 938_978_951;
 
 /// ECON §10.2 "rt → Q/2, borrower closes 30 s later" (D@97 %) on pump's v3 (pump-final §5.2; owner
 /// D1 (a), D3): the curve is bought down to `rT = Q/2`; the straddle's quote `B̂_v3` keeps the
@@ -785,11 +797,9 @@ const D97_V: u64 = 6_488_229_940;
 /// in its own events. `B − growth` is pump's charge, `≤ B̂_v3 ≤` charge + 7, below the retired
 /// bundle's 1.9227 SOL; the borrower gets `V − B − R`. (M5-SEC-4's self-made straddle, which this
 /// file drove through the keeper's bundle, is `synthetic_exit_it::a_self_made_straddle_is_
-/// liquidated_at_once`.) **No sim differential yet:** the normative sim (`docs/design/sim/
-/// shortwin_sim.py`) still prices the retired bundle (`B_str`), so this test checks the v3 exit
-/// against pump's own events only; its exact `B`, payout and `R_min` assertions against the sim
-/// return when pump-final §12's sim work gives the sim `B̂_v3` (`synthetic` mode) and regenerates
-/// ECON §10.2's table — pending, not part of P2.
+/// liquidated_at_once`.) **The sim differential** (pump-final §12, P7): `B` is the normative sim's
+/// own close of the same position (`shortwin_sim.py`, synthetic mode) to the lamport, as are the
+/// rent (`R_min` at the pre-open utilisation), the payout and the curve's `pcB` / `pcQ`.
 #[test]
 fn econ_10_2_the_borrowers_close_of_a_straddle_completes_the_curve() {
     let mut g = Grad::d_market(D97_SOLD, lend_for_80(D97_Q));
@@ -850,9 +860,30 @@ fn econ_10_2_the_borrowers_close_of_a_straddle_completes_the_curve() {
     );
     assert!(b_v3 >= charge && b_v3 - charge <= 7);
     assert!(ev.buyback_cost < D97_STR_B, "below the retired bundle's B");
+    // The sim differential (P7): the sim's synthetic close, to the lamport.
+    assert_eq!(
+        charge, D97_V3_B,
+        "pump's charge = the sim's PumpCurve.buy(Q)"
+    );
+    assert_eq!(
+        ev.buyback_cost,
+        D97_V3_B + growth,
+        "B = the sim's (+ the curve's growth)"
+    );
+    assert_eq!(ev.rent, D97_V3_RENT, "R_min (4 h at the pre-open 0 %)");
     assert_eq!(ev.borrower_payout, pos.v - ev.buyback_cost - ev.rent);
+    assert_eq!(
+        ev.borrower_payout + growth,
+        D97_V3_PAYOUT,
+        "the sim's V − B − R"
+    );
     let c = g.s.pm.curve.state(&g.s.env.svm);
     assert!(c.complete && c.post_complete_base_out == D97_Q - rt);
+    assert_eq!(
+        (c.post_complete_base_out, c.post_complete_quote_in),
+        (D97_V3_PCB, D97_V3_PCQ),
+        "the sim's pcB, pcQ"
+    );
     eprintln!(
         "ECON §10.2 on v3: close +30 s completes the curve, B {:.4} SOL (the bundle's 1.9227), \
          payout {:.4} SOL (borrower P&L {})",

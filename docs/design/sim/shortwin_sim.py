@@ -193,6 +193,25 @@ What it models (integer math wherever the on-chain program uses integers):
     there hold its expiry up for up to an hour (M6E-1, part 3 (f) (iv): the buyback on the drained pool 1.2 % above a
     reference at twice its depth, over delta_exp = 1 %).  Raydium keeps pool_lock_min_bps for its sizing (its
     reference cap is D too since AIR-14).
+  * pump's v3 (pump-final, owner decisions of 2026-10-13 D1 (a) - D4; §12's sim work, P7): the curve adapter trades
+    buy_v3 / sell_v3, so a live curve's buyback of q > rT is ONE buy_v3 by pump's synthetic migration
+    (PumpCurve.buy): rT from the curve at floor(rT*vQ/(vT - rT)) + 1, the rest q2 from the would-be pool
+    (X_s, Y_s) = (curve_base_ata - rT, rQ + n1 - pool_migration_fee) at ceil(Y_s*q2/(X_s - q2)), both parts at the
+    curve's fees; the curve completes with pcB = q2, pcQ = n2 (PumpCurve.base_ata / pcb / pcq; rQ excludes pcQ).
+    Params.synthetic (default True):
+      - quote_at prices a live curve's q > rT as B_v3 (both legs at the curve's fee, eps1 = 1; X_s the live
+        curve_base_ata - rT for the live state, live=True from Market.quote_spot and the live sigma of
+        Market.slip_at (S2's live leg, the keeper's buyback gate), else 206.9M); B_str stays the quote of a
+        migrating market's states (pump-final G-2) -- on the post-completion pool;
+      - the pool migrate_v2 creates (PumpCurve.migrate) is (curve_base_ata, rQ + pcQ - fee) with the boost
+        floor(X1*Y1/1e15) (CPPool.graduate; P1 correction (b)), and migrate_preview prices the pause on it after a
+        pool part (the live curve_base_ata, donations included) and on the standard 206.9M without one;
+      - fv_parts on a migrating curve reprices at p' = ceil(ceil(p*Y1/Y0)*X0/X1) after a pool part (rho; §5.4,
+        Market._migrating_price), p itself without one;
+      - the straddle bundle (_straddle_to_pool) runs only with synthetic=False: the retired path of ECON §10.2's
+        comparison row; a keeper's or a borrower's exit of q > rT is the synthetic buy itself (_buy_back).
+    Without a pool part and without a token donation (donate_tokens; no scenario has one) every output is
+    bit-identical to v0.4.1's except where a live curve's q > rT used to be quoted B_str.
   * Scenario library, EMA / exit-bound lag study, loss-given-gap curves,
     break-even gap frequencies, an ILLUSTRATIVE (uncalibrated) jump-diffusion
     Monte Carlo, and a randomised exit fuzz with attacker bundles, attacker-only
@@ -280,6 +299,9 @@ PUMP_MIGRATION_FEE = 15_000_001         # Global.pool_migration_fee
 PUMP_POOL_TOKENS = PUMP_SUPPLY - PUMP_RT0   # 206.9M tokens seeded into PumpSwap
 # Pool.virtual_quote_reserves = floor(migrated_sol * 2069 / 10_000): exact on all 130
 # non-mayhem migrations decoded 2026-09-25..27 (R-VEN §1.4); source closed (UNVERIFIED as a rule).
+# Since pump-final P1 (correction (b), measured on pump's 2026-10-08 / 10-13 ELFs with and without
+# donations) the rule is floor(X1*Y1/1e15) on the pool migrate_v2 creates (CPPool.graduate), which is
+# this figure on the standard 206.9M tokens and more after a token donation to curve_base_ata.
 BOOST_BPS = 2069
 BOOST_CALLS = 40
 BOOST_DURATION_S = 360
@@ -376,8 +398,10 @@ class Venue:
         net = cdiv(Y * q, X - q) + self.plus_one
         return net, net + sum(fee_ceil(net, f) for f in fees)
 
-    def quote_at(self, q: int, X: int, Y: int, two_leg: bool = True, cap_ppm: Optional[int] = None):
-        """Executable quote on a hypothetical state (X, Y) of this venue."""
+    def quote_at(self, q: int, X: int, Y: int, two_leg: bool = True, cap_ppm: Optional[int] = None,
+                 live: bool = False):
+        """Executable quote on a hypothetical state (X, Y) of this venue (live: (X, Y) is the venue's own live
+        state; only the pump curve reads it, PumpCurve.quote_at)."""
         return self.quote_buy_on(q, X, Y, cap_ppm)
 
     def move_to_price(self, p_wad: int) -> None:
@@ -397,12 +421,26 @@ class PumpCurve(Venue):
     # completed curve stays migrating (the stuck-migration path, ECON §10.3), and since M6-SEC-3 (owner decision
     # 2026-09-30, #105) opens on a live curve are refused (GraduationHalted); read from the curve's ReadSet (C6)
     create_pool_halted = False
+    # pump's v3 (pump-final §5.2, §5.3; the program's CurvePricing.synthetic): a live curve's buy of q > rT executes
+    # as ONE buy_v3 by synthetic migration -- rT from the curve, which completes, and q - rT from the would-be pool
+    # (curve_base_ata - rT, rQ + n_curve(rT) - pool_migration_fee), both parts at the curve's fees -- and is quoted
+    # B_v3 (quote_at).  False (Params.synthetic, set by Market): the retired straddle bundle, quoted B_str, executed
+    # by Market._straddle_to_pool (comparison rows of ECON §10.2 only).
+    synthetic = True
 
-    def __init__(self, vt: int, vs: int, rt: int, rs: int, sched: FeeSchedule = PUMP_CURVE_FEES):
+    def __init__(self, vt: int, vs: int, rt: int, rs: int, sched: FeeSchedule = PUMP_CURVE_FEES,
+                 base_ata: Optional[int] = None):
         self.vt, self.vs, self.rt, self.rs = vt, vs, rt, rs
         self.off_t, self.off_s = vt - rt, vs - rs      # constant per curve [ECON §1.1]
         self.sched = sched
         self.complete = rt == 0
+        # curve_base_ata: the tokens the curve holds -- rT and the 206.9M migrate_v2 seeds, plus any token donation
+        # (donate_tokens); a synthetic buy prices its pool part on curve_base_ata - rT and migrate_v2 seeds the pool
+        # with what it holds then (pump-final V3, §5.4)
+        self.base_ata = rt + PUMP_POOL_TOKENS if base_ata is None else base_ata
+        # BondingCurve.post_complete_base_out / post_complete_quote_in (@150 / @158; pcB, pcQ): written by the buy
+        # that completes the curve with a pool part; rQ excludes pcQ (pump-final V5)
+        self.pcb = self.pcq = 0
 
     @classmethod
     def at_progress(cls, frac: float) -> "PumpCurve":
@@ -427,15 +465,44 @@ class PumpCurve(Venue):
 
     # exact venue execution (mirrors pump SDK / program rounding)
     def buy(self, q: int) -> int:
-        assert not self.complete and 0 < q <= self.rt, (q, self.rt, self.complete)
+        """pump's exact-out buy of q: floor(q*vQ/(vT - q)) + 1 on the curve, each fee ceil'ed on top.  q > rT is
+        pump's v3 synthetic migration (pump-final §5.2, V3; T-PUMP-MATH-V3 (b)): the curve part rT at n1 =
+        floor(rT*vQ/(vT - rT)) + 1 (v3's ceil, which it takes as floor + 1 on an exact division too), then the
+        pool part q2 = q - rT on the would-be pool (X_s, Y_s) = (curve_base_ata - rT, rQ + n1 - pool_migration_fee)
+        at n2 = ceil(Y_s*q2/(X_s - q2)) (NotEnoughTokensToBuy unless q2 < X_s), both parts at the curve's fees at its
+        pre-trade market cap; the curve completes with pcB = q2, pcQ = n2, rQ = rQ0 + n1 (rQ excludes pcQ)."""
+        assert not self.complete and q > 0, (q, self.rt, self.complete)
+        if q > self.rt:
+            return self._buy_synthetic(q)
         net = q * self.vs // (self.vt - q) + 1
         cost = net + sum(fee_ceil(net, f) for f in self.fees())
         self.vs += net
         self.vt -= q
         self.rt -= q
         self.rs += net
+        self.base_ata -= q
         if self.rt == 0:
             self.complete = True
+        return cost
+
+    def _buy_synthetic(self, q: int) -> int:
+        fees = self.fees()
+        rt = self.rt
+        n1 = rt * self.vs // (self.vt - rt) + 1 if rt > 0 else 0
+        x_s = self.base_ata - rt
+        q2 = q - rt
+        if q2 >= x_s:
+            raise ValueError("NotEnoughTokensToBuy")
+        y_s = self.rs + n1 - PUMP_MIGRATION_FEE
+        n2 = cdiv(y_s * q2, x_s - q2)
+        cost = sum(n + sum(fee_ceil(n, f) for f in fees) for n in ((n1, n2) if rt > 0 else (n2,)))
+        self.vs += n1
+        self.vt -= rt
+        self.rs += n1
+        self.rt = 0
+        self.base_ata -= q
+        self.pcb, self.pcq = q2, n2
+        self.complete = True
         return cost
 
     def sell(self, q: int) -> int:
@@ -447,13 +514,30 @@ class PumpCurve(Venue):
         self.vt += q
         self.rt += q
         self.rs -= gross
+        self.base_ata += q
         return out
 
-    def quote_at(self, q: int, X: int, Y: int, two_leg: bool = True, cap_ppm: Optional[int] = None):
-        """Quote on a hypothetical curve state (vt = X, vs = Y).  If q exceeds that
-        state's real token reserves: the straddle quote B_str of the executed bundle
-        path (keeper completes the curve with its own SOL, migrate_v2, the position
-        buys ALL of q on the new pool; V1-9).  two_leg=False = 'no straddle quote'
+    def donate_tokens(self, d: int) -> None:
+        """A token transfer to curve_base_ata (anyone may send one): a live curve's synthetic buy prices its pool
+        part on it, and migrate_v2 seeds it; FV prices it only after a pool part (pump-final §5.4, §6.8)."""
+        self.base_ata += d
+
+    def quote_at(self, q: int, X: int, Y: int, two_leg: bool = True, cap_ppm: Optional[int] = None,
+                 live: bool = False):
+        """Quote on a hypothetical curve state (vt = X, vs = Y).  If q exceeds that state's real token
+        reserves rT = X - off_t:
+          * a live curve (synthetic, pump-final §5.2): B_v3, what pump's buy_v3 executes -- rT on the curve,
+            then q - rT on the would-be pool (X_s, Y_s) = (pool tokens, rQ + n_curve(rT) - pool_migration_fee),
+            BOTH legs at the curve's fees (capped in the risk view) with eps1 = 1 (quote_buy_on); X_s is the live
+            curve_base_ata - rT for the live state (live=True: Market.quote_spot, the live sigma of Market.slip_at)
+            and the standard 206.9M on every hypothetical one (the EMA leg, the box, B_ref; a live curve carries no
+            pool part, pump-final G-3);
+          * a migrating curve's state (complete; the EMA leg's ring entries reproject to live-looking curves,
+            pump-final G-2), or synthetic=False (the retired bundle, comparison rows only): the straddle quote B_str,
+            ALL of q on the pool migrate_v2 will create from that state, at its PumpSwap tier (V1-9) -- the
+            post-completion pool (§5.4: the live curve_base_ata after a pool part, + pcQ) on a migrating curve.
+        The state's rQ = Y - off_s saturates at 0, as the program's curve_reprice (a price below the curve's
+        start; B_str's q > rT is then above the pool's 206.9M anyway).  two_leg=False = 'no straddle quote'
         (analysis rows only)."""
         if q <= 0:
             return (0, 0)
@@ -462,17 +546,42 @@ class PumpCurve(Venue):
             return self.quote_buy_on(q, X, Y, cap_ppm)
         if not two_leg:
             return None
+        rq = max(Y - self.off_s, 0)
+        if self.synthetic and not self.complete:
+            leg1 = self.quote_buy_on(rt, X, Y, cap_ppm) if rt > 0 else (0, 0)
+            if leg1 is None:
+                return None
+            x_s = self.base_ata - self.rt if live else PUMP_POOL_TOKENS
+            y_s = rq + leg1[0] - PUMP_MIGRATION_FEE
+            if y_s <= 0:
+                return None
+            leg2 = self.quote_buy_on(q - rt, x_s, y_s, cap_ppm)
+            if leg2 is None:
+                return None
+            return leg1[0] + leg2[0], leg1[1] + leg2[1]
         leg1 = self.quote_buy_on(rt, X, Y) if rt > 0 else (0, 0)
-        migrated = (Y - self.off_s) + leg1[0] - PUMP_MIGRATION_FEE
-        pool = CPPool.graduate(migrated)
+        tokens, pcq = (self.pool_tokens(), self.pcq) if self.complete else (PUMP_POOL_TOKENS, 0)
+        migrated = rq + leg1[0] - PUMP_MIGRATION_FEE + pcq
+        pool = CPPool.graduate(migrated, tokens)
         return pool.quote_buy_on(q, *pool.eff(), cap_ppm=cap_ppm)
 
+    def pool_tokens(self) -> int:
+        """The tokens §5.4 prices a migrating curve's pool on (pump-final §5.4, R-2): the live curve_base_ata after a
+        pool part (what migrate_v2 seeds, donations included), else the deterministic 206.9M (a donation ignored,
+        ARCH §4.3)."""
+        return self.base_ata if (self.pcb or self.pcq) else PUMP_POOL_TOKENS
+
     def migrate_preview(self) -> "CPPool":
-        return CPPool.graduate(self.rs - PUMP_MIGRATION_FEE)
+        """The pool migrate_v2 will create, as short.win prices the pause (pump-final §5.4): (pool_tokens(),
+        rQ - pool_migration_fee + pcQ)."""
+        return CPPool.graduate(self.rs - PUMP_MIGRATION_FEE + self.pcq, self.pool_tokens())
 
     def migrate(self) -> "CPPool":
+        """pump's migrate_v2: the canonical pool seeded with the live curve_base_ata and rQ + pcQ - fee (pump-final
+        V5, T-PUMP-MATH-V3 (d)); = migrate_preview() unless tokens were donated to a curve completed without a pool
+        part."""
         assert self.complete
-        return self.migrate_preview()
+        return CPPool.graduate(self.rs - PUMP_MIGRATION_FEE + self.pcq, self.base_ata)
 
     def move_to_price(self, p_wad: int) -> None:
         """Exogenous traders move the curve toward p_wad (stops at completion)."""
@@ -513,10 +622,13 @@ class CPPool(Venue):
         self.boost_interval = 1
 
     @classmethod
-    def graduate(cls, migrated: int) -> "CPPool":
-        """Canonical pool right after migrate_v2 (proportional boost)."""
-        vq = migrated * BOOST_BPS // BPS
-        return cls(PUMP_POOL_TOKENS, migrated - vq, PUMPSWAP_CANONICAL_FEES, PUMP_SUPPLY, vq=vq,
+    def graduate(cls, migrated: int, tokens: int = PUMP_POOL_TOKENS) -> "CPPool":
+        """Canonical pool right after migrate_v2: `tokens` (206.9M on a standard curve; the live curve_base_ata,
+        pump-final §5.4) and `migrated` lamports of effective quote, of which the boost floor(tokens*migrated/1e15)
+        is booked as virtual_quote_reserves (pump-final P1 correction (b), shortwin_math::quote::migration_boost;
+        = floor(migrated*2069/1e4), BOOST_BPS, on the standard 206.9M)."""
+        vq = tokens * migrated // PUMP_SUPPLY
+        return cls(tokens, migrated - vq, PUMPSWAP_CANONICAL_FEES, PUMP_SUPPLY, vq=vq,
                    boost_vault=vq, canonical=True)
 
     def start_boost(self, t: int) -> None:
@@ -816,6 +928,9 @@ class Params:
     pool_fast_route_s: int = 120           # Raydium fast path: pool_fail continuously for 120 s ...
     pool_fast_window_s: int = 60           # ... then a 60 s collection window
     # ---- analysis-only switches (not protocol parameters) ------------------------------
+    synthetic: bool = True                 # pump's v3 (pump-final §5.2): a live curve's q > rT is one buy_v3 by
+                                           #   synthetic migration, quoted B_v3 (PumpCurve.quote_at / buy);
+                                           #   False: the retired straddle bundle, B_str (comparison rows, §10.2)
     two_leg: bool = True                   # False: 'no straddle quote' rows (§10.2)
     box_obs: bool = False                  # comparison rows only: the v0.4 box (medians of clamped obs)
     pprime_raw: bool = False               # comparison rows only: the v0.4 p' (raw CR-liquidatable flag)
@@ -1085,6 +1200,8 @@ class Market:
 
     def __init__(self, venue: Venue, tier: Tier, P: Params = DEFAULT, util_bps: int = 8000, t0: int = 0):
         self.venue, self.tier, self.P = venue, tier, P
+        if isinstance(venue, PumpCurve):
+            venue.synthetic = P.synthetic          # B_v3 on the live curve, or the retired bundle (comparison rows)
         self.util_bps = util_bps
         self.t = t0
         self.ema = venue.spot_wad()
@@ -1441,11 +1558,12 @@ class Market:
         return self.P.venue_fee_hard_cap_bps * 100
 
     def quote_spot(self, Q: int, risk: bool = False):
-        """Execution quote (live fee) or risk quote (fee capped at the hard cap)."""
+        """Execution quote (live fee) or risk quote (fee capped at the hard cap) on the live state (a live curve's
+        B_v3 on its live would-be pool, curve_base_ata - rT: pump-final §5.2)."""
         v = self.venue
         if not v.has_route():
             return None
-        return v.quote_at(Q, *v.eff(), two_leg=self.P.two_leg, cap_ppm=self.cap_ppm() if risk else None)
+        return v.quote_at(Q, *v.eff(), two_leg=self.P.two_leg, cap_ppm=self.cap_ppm() if risk else None, live=True)
 
     def quote_xy(self, Q: int, X: int, Y: int):
         """Risk quote on a hypothetical state (cached ring entry or a reprojection)."""
@@ -1461,10 +1579,12 @@ class Market:
         e = self.ring[-1]
         return self.quote_xy(Q, e[3], e[4])
 
-    def slip_at(self, Q: int, X: int, Y: int) -> int:
+    def slip_at(self, Q: int, X: int, Y: int, live: bool = False) -> int:
         """sigma: average execution premium over the marginal price of (X, Y), ex fees,
-        in bps, floor (SPEC S2 slippage; ECON §2 numerics)."""
-        q = self.venue.quote_at(Q, X, Y, two_leg=self.P.two_leg)
+        in bps, floor (SPEC S2 slippage; ECON §2 numerics).  live=True: (X, Y) is the venue's live state, so a live
+        curve's B_v3 prices its pool part on the live curve_base_ata - rT, as the program's sigma_live does
+        (RiskQuotes::live -> Quoter::buy_live; pump-final §5.2): S2's live leg and the keeper's buyback gate."""
+        q = self.venue.quote_at(Q, X, Y, two_leg=self.P.two_leg, live=live)
         if q is None:
             return INF
         p = Y * WAD // X
@@ -1856,7 +1976,7 @@ class Market:
         s1 = ((qs_r is None or qs_r[1] + pos.ert > pos.V - K)
               and self._s1_at(pos, K, st["p_rs"], st["L_live"])
               and self._s1_at(pos, K, P_lo, L_hi))
-        s2 = (self.slip_at(pos.Q, *v.eff()) > pos.slip_max
+        s2 = (self.slip_at(pos.Q, *v.eff(), live=True) > pos.slip_max
               and self._s2_at(pos, st["p_rs"], st["L_live"])
               and self._s2_at(pos, P_lo, L_hi))
         return s1, s2
@@ -1889,8 +2009,12 @@ class Market:
         case the expiry fee (SPEC §4 reading, O15).  A contrary low observation (which
         fails the robust-spot leg) therefore cannot switch the reading."""
         if self.migrating():
+            # pump-final §5.4: the pool migrate_v2 will create, (X1, Y1) = migrate_preview(), repriced at p' on its own
+            # liquidity -- p' = p*rho rounded up after a pool part, rho = P(X1, Y1)/P(X0, Y0), (X0, Y0) the same
+            # curve's standard pool (206.9M, rQ - fee) -- at its PumpSwap tier capped at the hard cap
             pool = self.venue.migrate_preview()
-            s = reprice(pool.sqrt_k(), p)
+            p1 = self._migrating_price(pool, p)
+            s = reprice(pool.sqrt_k(), p1) if p1 is not None else None
             q = pool.quote_buy_on(pos.Q, *s, cap_ppm=self.cap_ppm()) if s else None
         else:
             q = self.quote_repriced(pos.Q, p, L)
@@ -1904,6 +2028,22 @@ class Market:
         elif st["expired"] and st["Veff"] * BPS // b >= pos.L:
             pen = self.P.expiry_fee_bps
         return b + cdiv(pen * b, BPS) + st["R"], b, pen
+
+    def _migrating_price(self, pool: "CPPool", p: int) -> Optional[int]:
+        """FV's price on a migrating curve (pump-final §5.4; shortwin_math::quote::migrating_fv_price): p itself
+        without a pool part (pcQ = 0: bit-identical to the FV before pump's v3), else p' = ceil(ceil(p*Y1/Y0)*X0/X1)
+        with (X1, Y1) = pool.eff() and (X0, Y0) = (206.9M, rQ - pool_migration_fee); None where the crate's is
+        (Y0 = 0, X1 = 0, above u128)."""
+        v = self.venue
+        if not getattr(v, "pcq", 0):
+            return p
+        x1, y1 = pool.eff()
+        x0, y0 = PUMP_POOL_TOKENS, v.rs - PUMP_MIGRATION_FEE
+        if y0 <= 0 or x1 <= 0:
+            return None
+        scaled = cdiv(p * y1, y0)
+        p1 = cdiv(scaled * x0, x1)
+        return p1 if max(scaled, p1) < 2**128 else None
 
     def fv_at(self, pos: Position, st: dict, p: int, L: int):
         r = self.fv_parts(pos, st, p, L)
@@ -1989,19 +2129,20 @@ class Market:
                     pos.s_last = t
             return None
 
-        if P.two_leg and not settle_only and v_is_straddle(v, Q):
-            # M6 as built (ARCH §5.4 tx3; services/keeper decide Plan::Straddle; OWNER-M6R-4, accepted 2026-09-30,
-            # #105): the keeper's straddle bundle is tx1 its own completion of the curve, tx2 migrate_v2 and tx3 the
-            # transition (a crank on the curve's ReadSet) plus a crank on the pool's (its first bucket).  tx3 carries
-            # no exit -- the transition starts the post-change warm-up, so a keeper liquidate / expire would revert
-            # the bundle (EmaWarmingUp) -- and the keeper exits on the pool once the warm-up has passed
+        if not P.synthetic and P.two_leg and not settle_only and v_is_straddle(v, Q):
+            # The retired straddle bundle (synthetic=False, comparison rows only; M6 as built, ARCH §5.4 tx3,
+            # OWNER-M6R-4): the keeper's tx1 its own completion of the curve, tx2 migrate_v2 and tx3 the transition
+            # (a crank on the curve's ReadSet) plus a crank on the pool's (its first bucket).  tx3 carried no exit --
+            # the transition starts the post-change warm-up -- and the keeper exited on the pool once the warm-up
+            # had passed.  Since pump-final §6 (synthetic) the keeper's liquidate / expire below buys q > rT itself
+            # in one instruction, pump's synthetic migration (_buy_back), priced B_v3
             self._straddle_to_pool(t)
             return None
 
         if v.has_route() and not settle_only:
             qs = st["qs"]
             buyback_ok = (qs is not None and qs[1] + ert <= V - K
-                          and self.slip_at(Q, *v.eff()) <= pos.slip_max)
+                          and self.slip_at(Q, *v.eff(), live=True) <= pos.slip_max)
             if buyback_ok:
                 r = self._buyback_exit(pos, st, t, res, K)
                 if r is not None:
@@ -2039,9 +2180,18 @@ class Market:
                 self.reserve_waits = getattr(self, "reserve_waits", 0) + 1   # ghost: waits caused by a reserve
             return None                         # wait: buyback above the reference bound
         b_quote = qs[1]
+        v = self.venue
+        tol = 5
+        if v_is_straddle(v, Q) and P.synthetic:
+            # pump-final §5.2's bound on B_v3 - charge: (1 + sum ceil(b_i/1e4)) + (D2 + sum ceil(D2*b_i/1e4)),
+            # D2 = 1 + ceil(q2/(X_s - q2)) over the non-zero fee components (<= 7 for q2 <= X_s/2)
+            q2, x_s = Q - v.rt, v.base_ata - v.rt
+            d2 = 1 + cdiv(q2, x_s - q2)
+            bs = [b for b in v.fees() if b > 0]
+            tol = (1 + sum(cdiv(b, BPS) for b in bs)) + (d2 + sum(cdiv(d2 * b, BPS) for b in bs))
         B = self._buy_back(Q, t)
-        if P.check_invariants and not (b_quote - 5 <= B <= b_quote):
-            raise InvariantError(("venue charge outside [quote-5, quote]", B, b_quote))
+        if P.check_invariants and not (b_quote - tol <= B <= b_quote):
+            raise InvariantError(("venue charge outside [quote-tol, quote]", B, b_quote, tol))
         base = min(st["qs_r"][1], b_ref)            # fee base on quoted (risk) costs
         W = V - B
         r_paid = min(R, W)
@@ -2170,7 +2320,9 @@ class Market:
             raise InvariantError(("liquidation keeper below K_s with borrower equity left", res))
 
     def _straddle_to_pool(self, t: int) -> CPPool:
-        """The straddle bundle's first three transactions (V1-9; M6 as built, ECONOMICS.md #104, #105; ARCH §5.4):
+        """RETIRED (pump-final D2): reached only with synthetic=False (ECON §10.2's comparison rows); since pump's v3
+        a live curve's q > rT is one buy_v3 (_buy_back, PumpCurve.buy).
+        The straddle bundle's first three transactions (V1-9; M6 as built, ECONOMICS.md #104, #105; ARCH §5.4):
         tx1 the completer (the keeper, or the borrower's client) buys the curve's rT with its own SOL and keeps the
         tokens (keeper_straddle_cost), tx2 migrate_v2 creates the canonical pool and starts its boost, tx3's crank on
         the curve's ReadSet moves the market onto it (_graduate; this second's bucket was cleared by the rewrite) and
@@ -2186,16 +2338,19 @@ class Market:
 
     def _buy_back(self, Q: int, t: int) -> int:
         v = self.venue
-        if v_is_straddle(v, Q):
-            # the borrower's own >= 3-transaction bundle (a close; ECON §10.2): tx3 = the pool's accounts, the
-            # transition crank and its close_short, which the warm-up does not gate: the position buys all of Q on
-            # the new pool at once (B = B_str)
+        if v_is_straddle(v, Q) and not self.P.synthetic:
+            # the retired borrower's own >= 3-transaction bundle (synthetic=False, comparison rows; a close, ECON
+            # §10.2): tx3 = the pool's accounts, the transition crank and its close_short, which the warm-up does
+            # not gate: the position bought all of Q on the new pool at once (B = B_str)
             return self._straddle_to_pool(t).buy(Q)
+        # pump's v3 (pump-final §5.2): Q > rT is one buy_v3 by synthetic migration (PumpCurve.buy), the curve
+        # completes in this instruction and the market is migrating (observe: the curve's final state is recorded)
         return v.buy(Q)
 
 
 def v_is_straddle(v: Venue, Q: int) -> bool:
-    """A buyback of Q on a live curve with Q > rT, which pump refuses (6021): only the straddle bundle executes it."""
+    """A buyback of Q on a live curve with Q > rT: pump's v3 executes it by synthetic migration (pump-final §5.2); before
+    v3 pump refused it (6021) and only the retired straddle bundle executed it (synthetic=False)."""
     return v.kind == "curve" and not v.complete and Q > v.rt
 
 
@@ -2860,8 +3015,10 @@ def scenario_tables():
     out.append(table(SCEN_HEADERS, rows))
     out.append("\n### Buyback larger than remaining real_token_reserves (Tier D opened at 97% progress)\n")
     rows = []
-    for two_leg in (True, False):
-        P = replace(DEFAULT, two_leg=two_leg)
+    for label, synthetic, two_leg in (("synthetic v3 (one transaction)", True, True),
+                                      ("straddle quote B_str (bundle path, retired)", False, True),
+                                      ("no straddle quote", True, False)):
+        P = replace(DEFAULT, synthetic=synthetic, two_leg=two_leg)
         for sc in (
             Scenario("rt -> Q/2, borrower closes 30s later", lambda t: None,
                      events=((TE, leave_real_reserves(0.5)),), close_at=TE + 30, window=600),
@@ -2872,7 +3029,7 @@ def scenario_tables():
             m = new_market("D@97%", P)
             pos, r, P1 = run(m, 1.0, sc)
             s = summarize(pos, r, P1)
-            rows.append(["straddle quote B_str (bundle path)" if two_leg else "no straddle quote", sc.name, s["kind"],
+            rows.append([label, sc.name, s["kind"],
                          f"{s['t'] - TE:+d}s", f"{s['mult']:.3f}x", f"{sol(r['B']):.4f}", f"{sol(pos.B_open):.4f}",
                          "-" if s["borrower_pnl"] is None else f"{sol(s['borrower_pnl']):+.4f}"])
     out.append(table(["policy", "scenario", "outcome", "exit vs event", "price at exit", "buyback cost (SOL)",

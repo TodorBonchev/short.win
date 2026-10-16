@@ -20,9 +20,21 @@ The v1.1 two-leg `B̂₂` is no longer in the sim; `sim_two_leg` transcribes ECO
 `CPPool.graduate`). On the pump curve each case also records `exact_*`: the same trade
 executed by the sim's venue-execution methods (`PumpCurve.buy`, `CPPool.graduate`,
 "mirrors pump SDK / program rounding"): the program charges `⌊q·vQ/(vT − q)⌋ + 1`
-(ARCH §4.3; Rust `sol_leg::curve_charge_exact_out` equals `exact_bundle` on the curve),
+(ARCH §4.3; Rust `sol_leg::curve_charge_exact_out` equals `exact_*` on the curve),
 which the quote exceeds by `0..=tolerance` lamports — a bound between quote and
 execution, not a tolerance against the sim.
+
+Since pump-final §12 (P7) the sim prices a live curve's `q > rT` as pump's v3 executes it
+(`synthetic`, the default switch): `sim_v3` / `sim_risk` are `B̂_v3` (`PumpCurve.quote_at`;
+Rust `CurvePricing` with `synthetic`, `quote::curve_synthetic`) on the case's would-be pool
+`pool_tokens` (the live `curve_base_ata − rT`, a token donation included, on a live state;
+206.9e12 on a reprojected one), and `exact_v3` is the sim's `PumpCurve.buy` (pump's
+synthetic migration: `⌊⌋ + 1` on the curve part, `⌈⌉` on the pool part), at most §5.2's bound
+`tolerance_v3` below it. `sim_str` / `sim_risk_str` / `exact_str` keep the straddle `B̂_str`
+(a `PumpMigrating` market's states; the retired bundle). `migrating`: completed curves (an exact
+or a synthetic completion, a donation before or after) — §5.4's FV quote `B̂_FV`
+(`Market.fv_parts`' pool and `_migrating_price`; Rust `quote::migrating_fv`) and `B̂_str` on
+reprojected ring states of the complete curve (Rust `CurvePricing` without `synthetic`).
 
 Writes `sim.json` next to itself.
 """
@@ -106,9 +118,9 @@ def pumpswap_case(rng, pool, q):
                 buy=pair(buy), buy_risk=pair(risk), sell=None if sell is None or sell < 0 else S(sell))
 
 
-def curve_exact(curve, q):
-    """What the bundle actually costs: the program's curve buy, or complete + migrate +
-    buy all of q on the new pool (V1-9)."""
+def curve_exact_str(curve, q):
+    """What the retired bundle cost: the program's curve buy, or complete + migrate + buy all
+    of q on the new pool (V1-9)."""
     c = copy.deepcopy(curve)
     if q <= c.rt:
         return c.buy(q)
@@ -119,6 +131,32 @@ def curve_exact(curve, q):
     if q >= X:
         return None
     return pool.quote_buy_on(q, X, Y)[1]
+
+
+def curve_exact_v3(curve, q):
+    """What pump's v3 charges (`PumpCurve.buy`): the curve, or past `rT` the synthetic
+    migration on the would-be pool `curve_base_ata − rT` (`None`: NotEnoughTokensToBuy, or a
+    reprojected state at or past completion, `rT = 0`, which pump does not trade)."""
+    if curve.complete:
+        return None
+    try:
+        return copy.deepcopy(curve).buy(q)
+    except ValueError:
+        return None
+
+
+def v3_tolerance(state, q):
+    """How far the quote may sit above pump's charge: 3 on the curve (ε₁ and two ceil'ed fees);
+    past `rT` pump-final §5.2's bound `(1 + Σ⌈bᵢ/10⁴⌉) + (Δ₂ + Σ⌈Δ₂·bᵢ/10⁴⌉)`, `Δ₂ = 1 +
+    ⌈q₂/(X_s − q₂)⌉` over the non-zero fee components."""
+    if q <= state.rt:
+        return 3
+    q2, x_s = q - state.rt, state.base_ata - state.rt
+    if q2 >= x_s:
+        return 0
+    d2 = 1 + sim.cdiv(q2, x_s - q2)
+    bs = [b for b in state.fees() if b > 0]
+    return (1 + sum(sim.cdiv(b, sim.BPS) for b in bs)) + (d2 + sum(sim.cdiv(d2 * b, sim.BPS) for b in bs))
 
 
 def curve_two_leg_exact(curve, q):
@@ -149,44 +187,105 @@ def two_leg_quote(live, q, X, Y):
 
 
 def curve_case(rng, curve, q, ema=None):
-    """The live curve's quote on its own state, or (ema = (L, P)) on `reprice(L, P)` through
-    `Market.quote_repriced` (the live curve's fees and offsets)."""
+    """The live curve's quote on its own state (its would-be pool the live `curve_base_ata −
+    rT`), or (ema = (L, P)) on `reprice(L, P)` through `Market.quote_repriced` (the live curve's
+    fees and offsets, the standard 206.9e12): `B̂_v3` (the default `synthetic` switch) and the
+    retired / migrating-state `B̂_str` (`synthetic` off)."""
     cap = rng.choice(CAPS)
-    if ema is None:
+    live = ema is None
+    if live:
         X, Y = curve.vt, curve.vs
         state = curve
     else:
         X, Y = sim.reprice(*ema)
         rt = max(X - curve.off_t, 0)
-        state = sim.PumpCurve(X, Y, rt, Y - curve.off_s)
+        # rQ saturates at 0 below the curve's start, as the program's curve_reprice
+        state = sim.PumpCurve(X, Y, rt, max(Y - curve.off_s, 0))
         state.off_t, state.off_s = curve.off_t, curve.off_s
-    bundle = curve.quote_at(q, X, Y)
-    risk = curve.quote_at(q, X, Y, cap_ppm=cap * 100)
-    if ema is not None:
+    v3 = curve.quote_at(q, X, Y, live=live)
+    risk = curve.quote_at(q, X, Y, cap_ppm=cap * 100, live=live)
+    if not live:
         m = market(copy.deepcopy(curve), cap)
         assert m.quote_repriced(q, ema[1], ema[0]) == risk
+    retired = copy.deepcopy(curve)
+    retired.synthetic = False
+    bstr = retired.quote_at(q, X, Y)
+    risk_str = retired.quote_at(q, X, Y, cap_ppm=cap * 100)
     two = two_leg_quote(curve, q, X, Y)
-    exact = curve_exact(state, q)
+    exact_v3 = curve_exact_v3(state, q)
+    exact_str = curve_exact_str(state, q)
     two_exact = curve_two_leg_exact(state, q)
     sell = None
-    if ema is None:
+    if live:
         g = q * state.vs // (state.vt + q)
         if g <= state.rs:            # the curve pays g out of its real SOL
             sell = copy.deepcopy(state).sell(q)
+    u64 = lambda x: None if x is None or x > U64 else S(x)  # noqa: E731
     return dict(
-        # A price below the curve's start leaves rQ negative in the sim; curve_reprice
-        # saturates it at 0 (it only matters past completion, where rT is 0).
         q=S(q), vt=S(state.vt), vq=S(state.vs), rt=S(state.rt), rq=S(max(state.rs, 0)),
-        off_t=S(curve.off_t), off_q=S(curve.off_s), ema=None if ema is None else [S(ema[0]), S(ema[1])],
+        off_t=S(curve.off_t), off_q=S(curve.off_s), ema=None if live else [S(ema[0]), S(ema[1])],
         fees=[S(f) for f in curve.fees()], cap_bps=S(cap),
-        sim_bundle=cost(bundle), sim_risk=cost(risk), sim_two_leg=cost(two),
-        exact_bundle=None if exact is None or exact > U64 else S(exact),
-        exact_two_leg=None if two_exact is None or two_exact > U64 else S(two_exact),
-        sell_checked=ema is None,
+        pool_tokens=S(curve.base_ata - curve.rt if live else sim.PUMP_POOL_TOKENS),
+        sim_v3=cost(v3), sim_risk=cost(risk), sim_str=cost(bstr), sim_risk_str=cost(risk_str),
+        sim_two_leg=cost(two),
+        exact_v3=u64(exact_v3), exact_str=u64(exact_str), exact_two_leg=u64(two_exact),
+        sell_checked=live,
         # Quote (ceil + 1) above the program's execution (floor + 1): n, then each ceil'ed fee.
-        tolerance=S(3 if q <= state.rt else 8), tolerance_two_leg=S(32),
+        tolerance_v3=S(v3_tolerance(state, q)), tolerance=S(3 if q <= state.rt else 8),
+        tolerance_two_leg=S(32),
         sell=None if sell is None or sell < 0 else S(sell),
     )
+
+
+def migrating_cases(rng):
+    """Completed curves (pump-final §5.4): the curve at 90 / 97 / 99.9 % completed by an exact
+    buy of `rT` or by a synthetic buy past it (δ a fraction of `X_s`), a token donation to
+    `curve_base_ata` before or after, then — on a `Market` over the complete curve — FV's quote
+    `B̂_FV(q; p)` exactly as `Market.fv_parts` prices it (`migrate_preview`'s pool `(X₁, Y₁)`,
+    `_migrating_price`'s `p'`, at the pool's tier capped), and `B̂_str` on reprojected ring
+    states of the complete curve (`PumpCurve.quote_at`: all of `q` past the state's `rT` on that
+    pool)."""
+    fv, ring = [], []
+    T = sim.PUMP_POOL_TOKENS
+    for frac in (0.9, 0.97, 0.999):
+        for delta_ppm, before, after in ((0, 0, 0), (0, 0, 10**13), (10_000, 0, 0), (50_000, 10**12, 0),
+                                         (250_000, 0, 3 * 10**12), (500_000, T, 0), (999_000, 0, 0)):
+            c = sim.PumpCurve.at_progress(frac)
+            if before:
+                c.donate_tokens(before)
+            x_s = c.base_ata - c.rt
+            c.buy(c.rt + x_s * delta_ppm // 1_000_000)
+            if after:
+                c.donate_tokens(after)
+            assert c.complete
+            pool = c.migrate_preview()
+            x1, y1 = pool.eff()
+            p_end = c.spot_wad()
+            L = math.isqrt(c.vt * c.vs)
+            for k in (0.5, 0.97, 1.0, 1.03, 2.0):
+                cap = rng.choice(CAPS)
+                m = market(c, cap)
+                p = max(1, int(p_end * k))
+                p1 = m._migrating_price(pool, p)
+                st = sim.reprice(pool.sqrt_k(), p1) if p1 is not None else None
+                edges = (1, x1 - 1, x1) if k == 1.0 else ()
+                for q in (rng.randint(1, x1 // 100), x1 // 20) + edges:
+                    b = pool.quote_buy_on(q, *st, cap_ppm=cap * 100) if st else None
+                    fv.append(dict(vt=S(c.vt), vq=S(c.vs), rq=S(c.rs), pcb=S(c.pcb), pcq=S(c.pcq),
+                                   pool_tokens=S(c.pool_tokens()), x1=S(x1), y1=S(y1), p=S(p),
+                                   p1=None if p1 is None else S(p1), cap_bps=S(cap), q=S(q), fv=cost(b)))
+                # Ring states of the complete curve: the curve at P_i reprojected (rT_i > 0 below its end).
+                if k > 1.0:
+                    continue
+                X, Y = sim.reprice(L, p)
+                rt_i = max(X - c.off_t, 0)
+                for q in (max(1, rt_i // 2), max(rt_i, 1), rt_i + 10**12):
+                    r = c.quote_at(q, X, Y, cap_ppm=cap * 100)
+                    ring.append(dict(vt=S(c.vt), vq=S(c.vs), rq=S(c.rs), pcq=S(c.pcq),
+                                     pool_tokens=S(c.pool_tokens()), off_t=S(c.off_t), off_q=S(c.off_s),
+                                     l=S(L), p=S(p), fees=[S(f) for f in c.fees()], cap_bps=S(cap), q=S(q),
+                                     sim_str=cost(r)))
+    return fv, ring
 
 
 def raydium_case(rng, pool, q):
@@ -252,6 +351,19 @@ def main():
             for q in (c.rt // 3 + 1, max(c.rt, 1), c.rt + 10**13):
                 curve.append(curve_case(rng, c, q, ema=(L, P)))
 
+    # pump-final §12 (P7): live curves whose curve_base_ata received a token donation (the live would-be
+    # pool of B̂_v3 and of pump's synthetic buy), and completed curves (§5.4); their own random stream, so
+    # every other section's cases are unchanged.
+    rng2 = random.Random(SEED + 12)
+    for frac in (0.5, 0.97):
+        for d in (10**12, sim.PUMP_POOL_TOKENS):
+            c = sim.PumpCurve.at_progress(frac)
+            c.donate_tokens(d)
+            x_s = c.base_ata - c.rt
+            for q in (c.rt // 2, c.rt, c.rt + 1, c.rt + x_s // 3, c.rt + x_s - 1, c.rt + x_s):
+                curve.append(curve_case(rng2, c, q))
+    migrating, migrating_ring = migrating_cases(rng2)
+
     raydium = []
     rpools = [sim.MARKETS["RA"](), sim.MARKETS["RB"](), sim.MARKETS["RC"]()]
     for _ in range(10):
@@ -311,19 +423,22 @@ def main():
                           lambda_bps=S(p.lock_bps()), locked_depth=S(p.locked_depth())))
     assert len(depth) > 100
 
+    assert sim.DEFAULT.synthetic and sim.DEFAULT.two_leg
     dump(dict(
         generator="gen_sim.py",
-        source=("docs/design/sim/shortwin_sim.py v0.4.1 (default switches): CPPool, PumpCurve.quote_at/buy/sell, "
+        source=("docs/design/sim/shortwin_sim.py v0.4.1 + pump-final P7 (default switches): CPPool, "
+                "PumpCurve.quote_at/buy/sell/migrate_preview, Market.fv_parts (_migrating_price), "
                 "RaydiumPool, Venue._risk_fees, Market.quote_repriced, reprice, sqrt_k, lock_bps, locked_depth"),
         pumpswap_tiers=tiers_of(sim.PUMPSWAP_CANONICAL_FEES),
         pump_migration_fee=S(sim.PUMP_MIGRATION_FEE), pump_pool_tokens=S(sim.PUMP_POOL_TOKENS),
         pump_supply=S(sim.PUMP_SUPPLY),
-        pumpswap=pumpswap, curve=curve, raydium=raydium, repriced=repriced, reprice=reprice,
-        liquidity=liquidity, locked_depth=depth,
-        note=("sim_*, buy*, risk* equal Rust exactly; curve exact_* is the program's execution (floor + 1), "
-              "0..=tolerance lamports below the quote; sim_two_leg is ECON §3.1's B̂₂ on the sim's primitives"),
+        pumpswap=pumpswap, curve=curve, migrating=migrating, migrating_ring=migrating_ring, raydium=raydium,
+        repriced=repriced, reprice=reprice, liquidity=liquidity, locked_depth=depth,
+        note=("sim_*, buy*, risk*, fv equal Rust exactly; curve exact_* is the program's (pump's) execution, "
+              "0..=tolerance* lamports below the quote; sim_two_leg is ECON §3.1's B̂₂ on the sim's primitives"),
     ), Path(__file__).with_name("sim.json"))
-    print(len(pumpswap), len(curve), len(raydium), len(repriced), len(reprice), len(liquidity), len(depth))
+    print(len(pumpswap), len(curve), len(migrating), len(migrating_ring), len(raydium), len(repriced), len(reprice),
+          len(liquidity), len(depth))
 
 
 if __name__ == "__main__":

@@ -71,7 +71,8 @@ PEN = ("pen_lender_bps", "pen_protocol_bps", "pen_keeper_bps")
 # The sim's protocol parameters the crate carries (Params fields that are neither analysis
 # switches nor sim-only modelling knobs).
 SIM_ONLY = {"migration_delay_s", "fv_cap", "ring_len", "exit_ref", "liq_keeper_parity", "s3_obs_gap_s", "two_leg",
-            "box_obs", "pprime_raw", "ref_cap_lo", "liq_reserve", "exp_reserve", "margin_policy", "check_invariants"}
+            "synthetic", "box_obs", "pprime_raw", "ref_cap_lo", "liq_reserve", "exp_reserve", "margin_policy",
+            "check_invariants"}
 GLOBAL_FIELDS = [f.name for f in fields(sim.Params) if f.name not in SIM_ONLY]
 
 # Bit width of the crate's field (default u32).

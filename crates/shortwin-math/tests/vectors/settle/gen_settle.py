@@ -203,7 +203,7 @@ def prm_line(m):
     # Only the normative v0.4.1 readings (ARCH §2.2: vectors use the default switches).
     assert (T.ema_tau_s == 5 and P.ring_len == 8 and not P.box_obs and not P.pprime_raw and P.ref_cap_lo
             and P.liq_reserve == "none" and P.exp_reserve == "rent+fee" and P.fv_cap and P.exit_ref == "fresh"
-            and P.liq_keeper_parity and P.two_leg), P
+            and P.liq_keeper_parity and P.two_leg and P.synthetic), P
     return line("prm", T.ema_dtmax_s, T.ema_clamp_bps, P.liq_slow_tau_s, P.liq_slow_dtmax_s, "|",
                 P.kappa_liq_bps, P.kappa_base_bps, P.delta_liq_bps, P.delta_exp_bps, P.kappa_growth_n,
                 P.ref_max_age_s, "|", P.liq_persist_n, P.exec_tol_bps, P.expiry_fee_bps, "|", P.settle_persist_n,
@@ -497,7 +497,7 @@ def settle_line(m, pos, t, path, st, bx, ctx, before, after):
     v = m.venue
     executable = v.has_route()
     qs_r = st["qs_r"]
-    sig_live = sig(m.slip_at(pos.Q, *v.eff())) if executable else "."
+    sig_live = sig(m.slip_at(pos.Q, *v.eff(), live=True)) if executable else "."
     legs = ctx["legs"]
     b01 = lambda x: "." if x is None else x
     settled = [i for i in ctx["settles"] if i["r"] is not None]
@@ -1112,7 +1112,7 @@ def unit_evaluate(rng, n):
         m.quote_repriced = lambda Q, p, L: (None if table_c[(p, L)] is None else (0, table_c[(p, L)]))
         m.slip_repriced = lambda Q, p, L: sim.INF if table_s[(p, L)] is None else table_s[(p, L)]
         sig_live = draw_sig()
-        m.slip_at = lambda Q, X, Y, s=sig_live: sim.INF if s is None else s
+        m.slip_at = lambda Q, X, Y, live=False, s=sig_live: sim.INF if s is None else s
         m.tier = replace(sim.TIERS["A"], max_liq_slip_bps=slip_max, penalty_bps=pen, cr_liq_bps=L_cr)
         emit(m, line("pos", 0, pos.Q, V, K, ert, L_cr, pen, slip_max))
         M.try_exit(m, pos, t, settle_only=True)

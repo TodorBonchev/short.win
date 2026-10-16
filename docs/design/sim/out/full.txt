@@ -243,8 +243,10 @@ S3 with observation-gap rule 60 s: first S3 1020 s after the first outage (route
 
 | policy | scenario | outcome | exit vs event | price at exit | buyback cost (SOL) | B_open (SOL) | borrower P&L (SOL) |
 |---|---|---|---|---|---|---|---|
-| straddle quote B_str (bundle path) | rt -> Q/2, borrower closes 30s later | close | +30s | 1.193x | 1.9227 | 1.5745 | -0.3939 |
-| straddle quote B_str (bundle path) | rt -> Q/2, then others complete curve at +10min, close after | close | +30s | 1.193x | 1.9227 | 1.5745 | -0.3939 |
+| synthetic v3 (one transaction) | rt -> Q/2, borrower closes 30s later | close | +30s | 1.193x | 1.8837 | 1.5745 | -0.3550 |
+| synthetic v3 (one transaction) | rt -> Q/2, then others complete curve at +10min, close after | close | +30s | 1.193x | 1.8837 | 1.5745 | -0.3550 |
+| straddle quote B_str (bundle path, retired) | rt -> Q/2, borrower closes 30s later | close | +30s | 1.193x | 1.9227 | 1.5745 | -0.3939 |
+| straddle quote B_str (bundle path, retired) | rt -> Q/2, then others complete curve at +10min, close after | close | +30s | 1.193x | 1.9227 | 1.5745 | -0.3939 |
 | no straddle quote | rt -> Q/2, borrower closes 30s later | S1 | +56s | 1.193x | 0.0000 | 1.5745 | -4.9566 |
 | no straddle quote | rt -> Q/2, then others complete curve at +10min, close after | S1 | +56s | 1.193x | 0.0000 | 1.5745 | -4.9566 |
 
@@ -384,13 +386,13 @@ price = GBM(sigma) x Poisson up/down gaps with Pareto(alpha, 1.5x) multiples (<=
 | calm | A | sigma=1.5, up/dn gaps 0.002/d, alpha=2 | 400 | S1 7%, expiry 86%, liquidation 6% | -2.10% +/- 2.14% | 5.0% | -6.4% |
 | calm | B | sigma=2.5, up/dn gaps 0.005/d, alpha=2 | 400 | S1 4%, expiry 89%, liquidation 6% | -0.08% +/- 1.84% | 3.2% | -7.2% |
 | calm | C | sigma=4, up/dn gaps 0.02/d, alpha=2 | 400 | S1 4%, expiry 89%, liquidation 7% | -13.57% +/- 8.62% | 3.8% | -4.5% |
-| calm | D@0% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 2%, expiry 90%, liquidation 8% | -0.71% +/- 3.12% | 2.0% | -5.6% |
+| calm | D@0% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 2%, expiry 90%, liquidation 8% | -0.70% +/- 3.10% | 2.0% | -5.6% |
 | calm | D@50% | sigma=6, up/dn gaps 0.05/d, alpha=2 | 400 | S1 5%, expiry 86%, liquidation 9% | -3.82% +/- 2.79% | 4.0% | -10.6% |
 | calm | RA | sigma=1.5, up/dn gaps 0.002/d, alpha=2 | 400 | S1 6%, expiry 88%, liquidation 6% | +0.89% +/- 1.02% | 5.5% | -5.1% |
 | stressed | A | sigma=1.5, up/dn gaps 0.02/d, alpha=1.5 | 400 | S1 26%, expiry 62%, liquidation 12% | -71.60% +/- 14.53% | 23.5% | -20.0% |
 | stressed | B | sigma=2.5, up/dn gaps 0.05/d, alpha=1.5 | 400 | S1 24%, expiry 64%, liquidation 12% | -99.63% +/- 19.02% | 21.5% | -23.0% |
 | stressed | C | sigma=4, up/dn gaps 0.2/d, alpha=1.5 | 400 | S1 24%, expiry 55%, liquidation 21% | -121.25% +/- 22.16% | 21.5% | -30.2% |
-| stressed | D@0% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 28%, expiry 40%, liquidation 32% | -188.01% +/- 37.36% | 26.5% | -44.3% |
+| stressed | D@0% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 28%, expiry 40%, liquidation 32% | -188.00% +/- 37.36% | 26.5% | -44.3% |
 | stressed | D@50% | sigma=6, up/dn gaps 1/d, alpha=1.5 | 400 | S1 30%, expiry 39%, liquidation 31% | -155.48% +/- 26.96% | 25.8% | -46.0% |
 | stressed | RA | sigma=1.5, up/dn gaps 0.02/d, alpha=1.5 | 400 | S1 24%, expiry 66%, liquidation 9% | -107.47% +/- 25.84% | 21.5% | -11.8% |
 
