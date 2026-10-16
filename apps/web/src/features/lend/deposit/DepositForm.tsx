@@ -206,12 +206,13 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     [
                         'Shares minted',
                         preview?.ok ? (
-                            <Tokens
-                                key="r193"
-                                raw={preview.value.shares}
-                                decimals={decimals}
-                                testId={T.lendPreview('shares')}
-                            />
+                            <span key="r193" data-emph>
+                                <Tokens
+                                    raw={preview.value.shares}
+                                    decimals={decimals}
+                                    testId={T.lendPreview('shares')}
+                                />
+                            </span>
                         ) : (
                             '—'
                         ),

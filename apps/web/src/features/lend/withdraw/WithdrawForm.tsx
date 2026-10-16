@@ -209,13 +209,14 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                     [
                         'You may withdraw now',
                         lim ? (
-                            <Tokens
-                                key="r191"
-                                raw={lim.allowance}
-                                decimals={decimals}
-                                symbol={symbol}
-                                testId={T.withdrawPreview('allowance')}
-                            />
+                            <span key="r191" data-emph>
+                                <Tokens
+                                    raw={lim.allowance}
+                                    decimals={decimals}
+                                    symbol={symbol}
+                                    testId={T.withdrawPreview('allowance')}
+                                />
+                            </span>
                         ) : (
                             '—'
                         ),

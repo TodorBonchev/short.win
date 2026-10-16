@@ -149,7 +149,7 @@ export function LendPanelView({
 
     return (
         <div className="lend" data-testid={T.lendPanel} data-mint={mint} data-action={action}>
-            <Tabs label="Lend" idPrefix="lend" value={action} onChange={onAction} tabs={TABS} />
+            <Tabs label="Lend" idPrefix="lend" value={action} onChange={onAction} tabs={TABS} variant="sub" />
             <TabPanel idPrefix="lend" tabKey={action}>
                 <div className="stack lend-body">{body}</div>
             </TabPanel>

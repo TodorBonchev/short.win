@@ -209,6 +209,7 @@ export function LenderDashboardPage() {
                     <Sol
                         lamports={r.position.claimable}
                         frac={solFrac(r.position.claimable)}
+                        pad
                         testId={T.lenderCell('claimable')}
                     />
                 ) : (
@@ -236,7 +237,7 @@ export function LenderDashboardPage() {
             align: 'right',
             priority: 2,
             render: (r) =>
-                r.position ? <Sol lamports={r.position.vesting} frac={6} testId={T.lenderCell('vesting')} /> : '—',
+                r.position ? <Sol lamports={r.position.vesting} frac={6} pad testId={T.lenderCell('vesting')} /> : '—',
         },
         {
             key: 'lock',
@@ -256,6 +257,7 @@ export function LenderDashboardPage() {
                         className="num"
                         data-testid={T.lenderCell('lock-until')}
                         data-value={r.position.lockUntil.toString()}
+                        data-zero={r.position.lock > 0n ? undefined : ''}
                     >
                         {r.position.lock > 0n ? formatUtc(r.position.lockUntil) : '—'}
                     </span>
@@ -408,7 +410,12 @@ export function LenderDashboardPage() {
                 <>
                     <div className="stat-strip lend-kpis">
                         <Stat label="Markets">
-                            <span className="num" data-testid={T.lenderKpi('markets')} data-value={rows.length}>
+                            <span
+                                className="num"
+                                data-testid={T.lenderKpi('markets')}
+                                data-value={rows.length}
+                                data-zero={rows.length === 0 ? '' : undefined}
+                            >
                                 {rows.length}
                             </span>
                         </Stat>
@@ -433,7 +440,7 @@ export function LenderDashboardPage() {
                                 </span>
                             )}
                         </Stat>
-                        <Stat label="SOL claimable">
+                        <Stat label="SOL claimable" hero>
                             <Sol
                                 lamports={totalClaimable}
                                 frac={solFrac(totalClaimable)}

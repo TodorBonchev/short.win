@@ -17,19 +17,22 @@
     gap: var(--sp-3);
 }
 
+/* The lender's position: a sunken well (bg-0, edged like a panel) for read-only figures — the same
+   surface as the Short preview beside it, never a raised note (design pass P7). */
 .lend-position {
     padding: var(--sp-3);
-    background: var(--bg-2);
-    border: 1px solid var(--line);
+    background: var(--surface-well);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius);
 }
 
+/* The account select reads at --fs-input like the amount field under it (base.css: 13 px with a mouse,
+   16 px under a finger — iOS no longer zooms the sheet); a long label truncates (design pass P7). */
 .lend-select {
     width: 100%;
     min-width: 0;
     color: var(--text-0);
     font-family: var(--font-num);
-    font-size: var(--fs-sm);
 }
 
 .lend-select:focus-visible {
@@ -82,8 +85,9 @@
     outline: none;
 }
 
+/* The tolerance box: the shared narrow-field measure (120 px, like the Short slippage box). */
 .lend-tolerance {
-    max-width: 120px;
+    max-width: var(--field-narrow-w);
 }
 
 .lend-form .kv dd {
@@ -113,11 +117,9 @@
     margin-left: var(--sp-2);
 }
 
-/* The KPI strip: four in a row from a tablet up, two by two on a phone (the strip's own rules). */
-.lend-dashboard .stat-strip {
-    max-width: 880px;
-}
-
+/* The KPI strip spans the page like the table under it (no width cap: the strip's own rules split four
+   cells equally from a tablet up, two by two on a phone). The strip's one hero is SOL claimable — the
+   number the page's only primary action repeats (Stat `hero`, components.css). */
 .lend-kpi-note {
     display: block;
     font-size: var(--fs-xs);
@@ -126,6 +128,14 @@
 
 .lend-kpi-approx > .lend-kpi-note {
     margin-top: 2px;
+}
+
+/* A narrow phone's 2-up cell: the hero at --fs-lg (16 px), so "0.016481 SOL" never clips inside the
+   strip's overflow: hidden (--fs-xl is 20 px under 640 px). */
+@media (max-width: 399.98px) {
+    .lend-kpis > .stat[data-hero] .stat-value {
+        font-size: var(--fs-lg);
+    }
 }
 
 /* "Claim all": one element — in the page header on a desktop (the action bar's box steps aside),
@@ -199,16 +209,6 @@
     flex-direction: column;
     align-items: center;
     gap: var(--sp-4);
-}
-
-/* Connect wallet (and the chooser it opens) a usable width, centred: the action row spans the
-   empty state rather than shrinking to the button. */
-.lend-dashboard .empty[data-layout="block"] > .empty-action {
-    align-self: stretch;
-}
-
-.lend-dashboard .empty-action > .connect-cta {
-    width: min(360px, 100%);
 }
 
 /* Cards under 960 px of table width — a tablet, a landscape phone, a phone: a lender row carries
@@ -316,6 +316,13 @@
         .lend-table > .tbl > tbody > tr > td:not([data-card])[data-label]:not([data-label=""])::before {
             content: attr(data-label);
         }
+    }
+
+    /* The card's fixed hero: CLAIMABLE, the number the row's Claim repeats — a size up, medium (its
+       12 px label above is set by the rule before). */
+    .lend-table > .tbl > tbody > tr > td[data-col="claimable"] {
+        font-size: var(--fs-lg);
+        font-weight: var(--fw-medium);
     }
 
     /* Priority-3 fields (lock ends, creator) stay on the market's lend panel; a quiet "Current"
