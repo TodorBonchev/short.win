@@ -816,9 +816,9 @@ impl VenueState {
     /// FV): a position the honest state holds healthy was liquidated. At the EMA's market cap a
     /// same-transaction trade can only lower the fee the risk view takes; the execution quote
     /// (`B̂_live`, the buyback itself) keeps the live fee. φ at `P_ema` is resolved on the live
-    /// mint supply, so a holder's burn earlier in the transaction still raises it (the
-    /// residual; a supply snapshot would close it). Elsewhere the hard cap alone: Raydium's fees
-    /// are fixed and the curve's single tier sits on a fixed supply.
+    /// mint supply, so a holder's burn earlier in the transaction still raises it (KI-72). Else
+    /// the hard cap alone: Raydium's fees are fixed, the curve's on the fixed 10¹⁵ supply but
+    /// its synthetic fee past `rT`, on the live one: a burn can raise that too (KI-77).
     pub fn exit_risk_cap_bps(&self, hard_cap_bps: u64) -> u64 {
         match (self.kind, self.pool.as_ref()) {
             (VenueKind::PumpSwap, Some(p)) if p.fee_ppm_at_ema != u32::MAX => {

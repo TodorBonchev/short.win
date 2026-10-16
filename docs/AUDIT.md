@@ -43,6 +43,15 @@ to build and test the code, what the code relies on, and what we already know ab
   and their follow-ups have passed local runs of the CI gate (the latest on 2026-10-13, §10)
   but have not yet been through CI or an external fix review; the owner waived the ≥ 24 h fuzz
   run for this batch on 2026-10-13, so none was run on its program (§12).
+- **After the AI review: short.win 1.0.1, pump v3** (branch `pump-v3`, 2026-10-13 … 16; the
+  design `pump-final`, the owner's decisions D1 (a) … D4 of 2026-10-13; §13). pump redeployed
+  three times after the tag; the curve adapter now trades pump's v3 instructions, a position past
+  the curve's `rT` exits in one instruction by pump's synthetic migration, a stuck synthetic
+  migration is priced on the pool `migrate_v2` creates, and the straddle helper `complete_curve`
+  is retired (D2: **an audit-scope change the auditors must be told of**, with this addendum).
+  The build's hashes (§0) are a **local build, not verified**: no verifiable build (its tools are
+  not installed on the machine that built them, and that session's rules allowed no network
+  beyond read-only Solana RPC to fetch them: §0) and no CI run.
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -67,7 +76,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | Item | Value |
 |---|---|
 | Audit commit / tag | **`e4895c2`, tagged `audit-1` / `v1.0.0`** (2026-10-11), the head of `m1-core` at the tag: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration), then the **FE-30 batch** (branch `m10/fe30`, 2026-10-08: the web and the indexer only, owner decisions of the ninth round; the program bytes unchanged), then the fuzzer fix `9861c5a` (run D's two oracle findings, FUZZ-24D-A and FUZZ-M10-24H-D-B: `tests/fuzz` and docs), then the **M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10: phone and tablet layouts, the desktop terminal's fixes; the owner's twelfth round; approved as built in the thirteenth round, 2026-10-10) and the **round-13 UX batch** (m1-core `7a64dcd`, 2026-10-11: O-1 lend order, O-2 coverage notice once, O-3 newcomer help, O-4 12 px floor, O-5 Claim wording; its 143 new strings and the `borrower.liquidation` ¶3 amendment approved by the owner on 2026-10-11) — the web only; then the evidence sync `04c5236` (docs), the lint fix `7b2121d` (the web's lint configuration, M10-CI-LINT) and the CI record `e4895c2` (docs). The program bytes are those of the KI-66 full / KI-67 batch. **Tagged on 2026-10-11** (the owner's decision of that day; owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x); its program hashes are the table below (CI run 38125079869's verifiable build on `7b2121d`; `e4895c2` changes only docs) |
-| Package version | `shortwin` and `complete_curve` are both 1.0.0 (`programs/*/Cargo.toml`); `security.txt`'s `source_release` reads `v1.0.0` |
+| Package version | At the tag `shortwin` and `complete_curve` were both 1.0.0 (`programs/*/Cargo.toml`; `security.txt`'s `source_release` `v1.0.0`). **Since 2026-10-16 `shortwin` is 1.0.1** (`source_release` `v1.0.1`; the owner's 1.0.x rule; §13) and `complete_curve` is retired |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
 | TEST-ONLY mock venue | `BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7` (`tests/mock_cpamm`; never deployed; out of scope, §2) |
@@ -142,6 +151,43 @@ proposed fixes' bytes, not release hashes:
 - The package version is still 1.0.0. A release of these fixes as 1.0.x (owner decision of
   2026-10-02) changes the version, which `security.txt`'s `source_release` carries, and so
   these hashes.
+
+**After the tag: short.win 1.0.1, pump v3** (branch `pump-v3`, 2026-10-16: the AI review's fixes
+above, then pump-final P0 … P8; §13). `anchor build --tools-version v1.57 --arch v3
+--ignore-keys` and `scripts/build-test-venue.sh` with the pinned toolchain, on `dd24af1` (the
+version bump; no later commit changes program bytes: `venues/mod.rs`'s doc comment of
+2026-10-16 keeps every line number, and a rebuild gave the same bytes). **A local build, not
+verified:** no verifiable build ran and no CI run. The machine that built it has no Docker, and
+the `--local` mode (no Docker daemon) lacks its prerequisites there too: solana-verify 0.5.2,
+bubblewrap and the extracted image are not installed. The session's rules allowed no network
+beyond read-only Solana RPC, so none of them could be fetched, nor the image from Docker Hub or
+the crates and platform-tools v1.57 the build downloads.
+`scripts/verifiable-build.sh --local --compare target/deploy` (pump-final §15 P8; or Docker
+mode, or CI's `verifiable-build` job) is still to run. These are the bytes to verify, not yet
+release hashes:
+
+| Program | sha256 of the `.so` file | executable hash (trailing zeros trimmed) | bytes |
+|---|---|---|---|
+| `shortwin.so` 1.0.1 | `72c82879accac8323af6ef0ce777baea6b40c1ce312cefaf65aaa152a3f21429` | `0610d4196b645c6e5a3130184835289d290e07f8ec239d52bbf427f77ee62dfc` | 1,635,424 |
+
+- The TEST-ONLY test-venue build is `fd46da2c6b907486fe0021a06b5a075965b0db0d59981749bd4ed85b2ca89db7`
+  (1,666,464 B; 1.0.0's was `8cea17e1…bb98`, and the version bump alone moves it: below), and
+  `mock_cpamm.so` is `4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9`
+  (281,240 B, **unchanged** since 1.0.0). `e_flags` 0x3 on all three; A49 ok (`check-a49.py`:
+  the release ELF carries neither the mock id nor the test-venue marker; `mock_cpamm.so` and the
+  test-venue build carry the mock id, and the test-venue build the marker);
+  `check-security-txt.py --forbid-placeholders --source-release v1.0.1`: ok, exactly one
+  security.txt in the release ELF and none in the test-venue build.
+- Deterministic: the same tree with the version set back to 1.0.0 gives `b3130ae2…8e31` /
+  `1f10334c…6553` (the build pump-final P2 … P7 tested and measured, 1,635,424 / 1,670,584 B),
+  and two recompiles at 1.0.1 gave the bytes above. The version is the only difference between
+  the two; it enters `security.txt` and the crate's metadata hash, which moves the test-venue
+  build's layout (it compiles security.txt out).
+- `shortwin` grows by 25,808 B over v1.0.0 (`4d19c582…`, 1,609,616 B) and by 488 B over the AI
+  review's build (`fba9dd75…`, 1,634,936 B). `complete_curve` is no longer built (retired, D2).
+- Gates on these bytes: `dump-fixtures.py check --live` at slot 457,523,244 (2026-10-16
+  05:38 UTC): every pinned program and account matches mainnet, the venue ELFs §13 lists
+  included; `python3 scripts/audit_scope.py check`: ok.
 
 ---
 
@@ -469,19 +515,20 @@ invariants.
 
 ## 6. Known issues
 
-[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 76 rows (KI-01 …
-KI-76), each with its bound, the decision that covers it and its status, plus the M10
-findings and their resolution (its §6) and the AI review's findings and theirs (its §7). Do
+[`docs/audit/known-issues.md`](audit/known-issues.md) is the single register: 77 rows (KI-01 …
+KI-77), each with its bound, the decision that covers it and its status, plus the M10
+findings and their resolution (its §6, with pump v3's PUMP-2026-10-13-1 … -6 since 1.0.1) and
+the AI review's findings and theirs (its §7). Do
 not report these as findings unless the stated bound is wrong or can be exceeded. Summary:
 
 | Section | Rows | What |
 |---|---|---|
-| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 … KI-68, KI-71, KI-72, KI-75, KI-76 | Economic residuals (O19) (★eighth round: KI-66 fixed in full by the forward chain, its latent-unit residual disclosed; KI-67 fixed in the program; KI-68, a touch's per-touch floor, disclosed; ninth round: KI-68 accepted): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it); the pot behind a rebase record (KI-66, the owner-signed rule's price; **fixed in the program** by the pot-only touch, its post-record residual disclosed); a position paid by `claim_sol` after its owner's exit stayed open with its rent (KI-67, latent since M1; **fixed**: `claim_sol` closes it); a touch of a current or parked lender floors per touch, ≤ 1 lamport (KI-68, predates KI-66; accepted 2026-10-08); the AI review's, accepted on 2026-10-12: the **drained-pool deposit gate**'s refusals of honest deposits (KI-71, AIR-07), a same-transaction burn's PumpSwap exit tier (KI-72, AIR-10), the box corner as the only S1/S2 veto inside an LP's withdrawal (KI-75, AIR-20), the sustained growth's trade-off (KI-76, AIR-22: a 2-s held sandwich, the two-in-three flat-step veto) |
+| §1 | KI-01 … KI-15, KI-52, KI-53, KI-65 … KI-68, KI-71, KI-72, KI-75 … KI-77 | Economic residuals (O19) (★1.0.1: KI-77, pump's synthetic fee on the live supply — a burn can raise it, and the fee gates keep 10¹⁵ —, accepted beside KI-72; no effect under pump's single flat curve tier) (★eighth round: KI-66 fixed in full by the forward chain, its latent-unit residual disclosed; KI-67 fixed in the program; KI-68, a touch's per-touch floor, disclosed; ninth round: KI-68 accepted): the 2 % exit bound and the held model, with the real-venue figures accepted on 2026-10-03 (AMM v4 +61.27, CPMM +37.33 / atomic extra +5.34, PumpSwap +10.20 SOL); no liquidation reserve; baskets; settlement push and deferral; degraded-mode S2→S1; the sale-wrapped open's notional (accepted); the run residual; gap risk; creator self-dealing; **M10-8C-1 (fixed)**; the **late-depositor shortfall** (accepted, with the deposit warning at 1 % / 1 SOL); the **rebase-orphan vest** (found by the final tree's 24 h fuzz; **fixed in the program**, KI-65: cumulative conversion rounding, no rebase orphans; KI-11 with it); the pot behind a rebase record (KI-66, the owner-signed rule's price; **fixed in the program** by the pot-only touch, its post-record residual disclosed); a position paid by `claim_sol` after its owner's exit stayed open with its rent (KI-67, latent since M1; **fixed**: `claim_sol` closes it); a touch of a current or parked lender floors per touch, ≤ 1 lamport (KI-68, predates KI-66; accepted 2026-10-08); the AI review's, accepted on 2026-10-12: the **drained-pool deposit gate**'s refusals of honest deposits (KI-71, AIR-07), a same-transaction burn's PumpSwap exit tier (KI-72, AIR-10), the box corner as the only S1/S2 veto inside an LP's withdrawal (KI-75, AIR-20), the sustained growth's trade-off (KI-76, AIR-22: a 2-s held sandwich, the two-in-three flat-step veto) |
 | §2 | KI-16 … KI-29 | Pool switches and third-party LP (O18; ECON §12.12 residuals 1–17), graduation delays |
 | §3 | KI-30 … KI-41 | Keeper coverage and budget (O17, OWNER-M7-*), transaction sizes |
-| §4 | KI-42 … KI-46, KI-54 … KI-64, KI-69, KI-70, KI-73, KI-74 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** (KI-63 corrected: an extension blocks the program for the rest of its slot); the AI review's, accepted on 2026-10-12: the **venue latch's extension test** and its residuals (KI-69, AIR-01), new authority keys installed unsigned (KI-70, AIR-04), **`ExtendProgram`'s one-slot block** (KI-73, AIR-18), the conservative S3-chain mark (KI-74, AIR-19) |
-| §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events) |
-| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy), the 24 h fuzz findings (runs 1 and 3: FUZZ-M7-24H-1 … -3, FUZZ-M10-24H-A, -B; run D on the final program bytes: FUZZ-24D-A, FUZZ-M10-24H-D-B — all the harness's), FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66, fixed by the pot-only touch; KI65B-REV-LOW) and the KI-66 batch's (KI66-REV-LOW: the surplus move checked by the math properties, the fuzz's never-returns model, the sub-unit warning judged on the worst case, KI-67) and the KI-66 full / KI-67 batch's (KI67-REV: the web's read of a funded lender PDA, the 3012 retry, the fuzz's chain coverage and residual cross-check, the withdrawal close hook, the park mutant, KI-68), the WP-1 / WP-10 doc findings, GC-F1, M10-CI-LINT |
+| §4 | KI-42 … KI-46, KI-54 … KI-64, KI-69, KI-70, KI-73, KI-74 | Trust: the venue guard window, halted venues, upgradeable venues and programs (with the pump venues' 2026-10-02 redeploy and their 2026-10-08 / 10-12 / 10-13 redeploys, KI-44; the curve's 166-byte growth, KI-64), admin powers; the **extras-denylist residuals** (batch 3); the **CPMM creator-fee share**; the Squads source; the **Squads semantics** (KI-63 corrected: an extension blocks the program for the rest of its slot); the AI review's, accepted on 2026-10-12: the **venue latch's extension test** and its residuals (KI-69, AIR-01), new authority keys installed unsigned (KI-70, AIR-04), **`ExtendProgram`'s one-slot block** (KI-73, AIR-18), the conservative S3-chain mark (KI-74, AIR-19) |
+| §5 | KI-47 … KI-51 | Platform facts relied on (U16's 40 M limit, U17, U25, U29, log events; since 1.0.1 no exit uses a Jito bundle, KI-51) |
+| §6 | — | M10 findings: M10-8C-1, B2-2, the extras denylist, PUMP-2026-10-1 … -3 (the pump venues' redeploy; since 1.0.1 also **PUMP-2026-10-13-1 … -6**: the synthetic migration's pricing and its two residuals, the cashback scope cut D1 (a), `B̂_v3` above `rT` D3, the v3 dependency, pump-fees and R-PFEE, the curve's fee buckets), the 24 h fuzz findings (runs 1 and 3: FUZZ-M7-24H-1 … -3, FUZZ-M10-24H-A, -B; run D on the final program bytes: FUZZ-24D-A, FUZZ-M10-24H-D-B — all the harness's), FUZZ-M10-1, the KI-65 batch's review findings (KI65-REV-SEC1: owner-signed rebase conversions; KI65-REV-CU: `MAX_RECORDS` 8) and its follow-up's (KI65-REV-POT: the pot behind a rebase record, KI-66, fixed by the pot-only touch; KI65B-REV-LOW) and the KI-66 batch's (KI66-REV-LOW: the surplus move checked by the math properties, the fuzz's never-returns model, the sub-unit warning judged on the worst case, KI-67) and the KI-66 full / KI-67 batch's (KI67-REV: the web's read of a funded lender PDA, the 3012 retry, the fuzz's chain coverage and residual cross-check, the withdrawal close hook, the park mutant, KI-68), the WP-1 / WP-10 doc findings, GC-F1, M10-CI-LINT |
 | §7 | — | The AI review of v1.0.0: AIR-01 … AIR-24 and the refuted lead L-1, each with its fix commit or the row that discloses it |
 
 **Status by owner decision** (SPEC §14, ARCH §10):
@@ -597,7 +644,8 @@ IX-11 are not.
 **Decided after the tag** (2026-10-12 and 2026-10-13; the AI review's README, "Decisions for the
 owner", records them): the AI review's open points (the table's first row). Its program fixes
 are built. On 2026-10-13 the owner also lifted O-6 (the Mobile Wallet Adapter; its row follows the
-thirteenth round's): web only.
+thirteenth round's): web only. Also on 2026-10-13 the owner decided the pump v3 catch-up (the
+design `pump-final`; its row below; §13): a program change, built as 1.0.1.
 
 | Item | Decision needed | Build default (in force) | Changes program code? |
 |---|---|---|---|
@@ -629,6 +677,7 @@ thirteenth round's): web only.
 | The seventh and eighth rounds' web wording | **Decided (2026-10-08, ninth round): approved as written** — `lender.potSyncs`, `lender.potSyncsDeferred`, `lender.claimCloses` and `lender.subUnitConversion` (FRONTEND §4.2) | As written in FRONTEND §4.2 | Web only |
 | The web on phones and the thirteenth round's UX items (M10-RESP; O-1 … O-6; FRONTEND §13) | **Decided (2026-10-10, thirteenth round): the M10-RESP redesign approved as built** (the twelfth round's request of 2026-10-09: phones, tablets and desktops in the dark terminal style), with **O-1** the lend deposit order, **O-2** the coverage notice once, **O-3** newcomer help (the intro strip, the glossary, How it works), **O-4** a 12 px text floor and **O-5** the Claim wording to build, and **O-6** the Mobile Wallet Adapter after the audit, off by default (the "Open in Backpack / Phantom / Solflare" links stay). **Decided (2026-10-11): the round's 143 new or changed strings approved word for word** (FRONTEND §4.3), with recommendations 6–10 (Tier C as How it works' example, the risk texts there without tick boxes, "short.win" in running text and "ShortWin" as the brand mark, the glossary cuts, "Lending page") approved; **`borrower.liquidation` ¶3 amended** (the expiry fee made conditional: "Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty."; SPEC §5.3, `expire.rs`'s `UseLiquidate`; FRONTEND §4.2); and the round's questions: a Claim shortfall under 10,000 lamports counts as none (`CLAIM_DUST_LAMPORTS`), the Lending page's Claim is the market panel's claim with its pot syncs, and a Claim is enabled with something claimable now or syncs that can pay, the short-phone breakpoint approved, the lone header ⓘ accepted until a design pass after the audit | Built (`acbe323`, `7a64dcd`); O-6 lifted 2026-10-13 (its own row) | Web only |
 | **O-6, the Mobile Wallet Adapter** (FRONTEND §5.4 (6), §9.3, §13 FE-32) | **Decided (2026-10-13): O-6 lifted.** Built now and switched on (default on; `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false` keeps an off switch). `@solana-mobile/wallet-standard-mobile` 0.7.0, with the protocol pinned to 3.0.0 through pnpm overrides; Kit stays 8.3.0. The mobile UX fixes ship with their strings as drafted. No WalletConnect / Reown. The security review's safeguards taken as decided: the adapter signs only through `solana:signTransaction`, a repo-wide 14-day `minimumReleaseAge` (the two packages excluded until 2026-10-21), Disconnect local only, the `ws://localhost` CSP residual accepted. This replaces the decision of 2026-10-10 (after the audit, off by default). | Built, on by default; **the owner's real-device test pending** (it precedes the release; DEVELOPMENT "Mobile wallets on a real device") | No. Web only: CSP `connect-src` + `ws://localhost:*`, `http://localhost` and two style hashes, in flag-on builds |
+| **pump v3** (the design `pump-final`; known-issues KI-77, PUMP-2026-10-13-1 … -6; §13) | **Decided (2026-10-13):** change the program — `PumpMigrating` priced on the post-completion fields, v3 for every curve leg; **D1 (a)** refuse live cashback curves (`CurveCashbackCoin` 6109); **D2** retire `complete_curve` and the 3-transaction straddle bundle (an audit-scope change: **the auditors must be told**, with this addendum); **D3** `B̂_v3` is the risk and exit price above `rT`; **D4** the two strings (6109's and 6031's) as drafted; every residual of the design's §16 / §17 accepted; the release order keeper (both TradeExtras formats) → program upgrade → web; version **1.0.1**; the re-pin to pump's 2026-10-13 build (slot 456,494,698). The live-supply synthetic fee `φ_s` (a burn can raise it under a multi-tier curve `FeeConfig`) and the fee gates' 10¹⁵ `φ` disclosed beside KI-72 and accepted under its decision (KI-77); no code change | Built (P0 … P8, `pump-v3`); hashes §0 (local, not verified) | **Program** (built: 1.0.1; the `complete_curve` program removed) |
 | Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6); whether to publish the private audit report (recommended, before the beta) | As built; publication undecided | No |
 | Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign; add them to the RFQ if the owner wants them reviewed | Out of scope (§2) | No |
 
@@ -652,13 +701,13 @@ are historical: where they disagree with ARCH §12 or the code, ARCH §12 and th
 |---|---|---|---|
 | U1 | PDA `user` under CPI (pump buy, PumpSwap buy) | VERIFIED on the dumped ELFs (M5, M6). A PumpSwap buy by a third-party PDA is unseen on mainnet | — |
 | U2, U3, U6, U7, U9, U11, U24 | Non-ATA WSOL, `disable_flags` bits, rent debits, ATA depth, unsigned `claim_cashback`, CPMM exact-out creator fee, trailing accounts | VERIFIED / RESOLVED (M3–M6) | — |
-| U4 | Whole-instruction CU, trace and size figures | **VERIFIED (measured)** for every instruction class (`m1_cu`, `m2_cu`, `m3_cu`, `m5_cu`, `m6_cu`, `m7_keeper`), within the PROPOSED limits, re-baselined after each M10 batch | — |
+| U4 | Whole-instruction CU, trace and size figures | **VERIFIED (measured)** for every instruction class (`m1_cu`, `m2_cu`, `m3_cu`, `m5_cu`, `m6_cu`, `m7_keeper`), within the PROPOSED limits, re-baselined after each M10 batch and for pump v3 (the curve and PumpSwap benches on `b3130ae2…`, pump-final P3; `m7_keeper` / `m7_cascade` on 1.0.1, P8; §13) | — |
 | U5 | Copying a 10 MiB ProgramData | VERIFIED for CU (not metered). Latency and fee are unmeasured. Since AIR-01 a flag or a revalidation after an extension also hashes the trimmed ELF: ≤ 0.44 M CU measured on pump-fees, CPMM and AMM v4 (`latch_raydium_it`, `latch_pump_it` `air01_*`; pump-fees and CPMM after one 10 KiB extension), and ≈ 0.48 M estimated for pump-fees grown near the 10 MiB cap, so its sender requests ≥ 0.6 M CU or sizes the limit by simulation; Jupiter's is not measured and is sized by simulation (KI-69) | M11 (mainnet) |
-| U8, U22, U25 | The straddle bundle's pre-flight and a live block engine; Jito semantics; v1 transactions landing | Fork parts VERIFIED; the live parts **UNVERIFIED**: no mainnet spend before the audit (owner default Q6) | M11 probes |
+| U8, U22, U25 | The straddle bundle's pre-flight and a live block engine; Jito semantics; v1 transactions landing | Fork parts VERIFIED; the live parts **UNVERIFIED**: no mainnet spend before the audit (owner default Q6). **Since 1.0.1 (pump-final, D2) no exit uses a bundle** (a position past `rT` exits in one `buy_v3`): U8 and U22 gate nothing any more; U25 stays for the keeper's v1 crank batches (KI-51) | M11 probes (U25) |
 | U10 | Delegated `pool_vault` sell; direct delivery for Token-2022 CPMM | **VERIFIED** on the dumped ELFs, re-run on the 452,376,460 CPMM ELF | a mainnet example in M11 |
 | U12 | Raydium deployed binaries vs public source | **CPMM closed:** the redeploy is `raydium-cp-swap@bdeee23`, rebuilt byte for byte (the manifest's `source.status` text still says UNVERIFIED; ARCH §12 is normative). **AMM v4:** a behavioural match only | — |
 | U13, U14 | Raydium admin history; the `open_time` clamp deploy | Keeper monitor; a conservative constant | — |
-| U15, U30 | VQR drift; pump's announced upgrade | Third-party LP explains the drift. The upgrade **was deployed on 2026-10-02** (the `pump-rust-client` 0.2.0 release; what its added `.text` does is UNVERIFIED, coverage is behavioural); re-dumped as `pump_programs_2026_10`, every pump suite and the T-LATCH replay re-run on it, the fee buckets read since batch 4 (PUMP-2026-10-1) | Closed for the freeze; a later pump upgrade goes through the addendum (§12) |
+| U15, U30 | VQR drift; pump's announced upgrade | Third-party LP explains the drift. The upgrade **was deployed on 2026-10-02** (the `pump-rust-client` 0.2.0 release; what its added `.text` does is UNVERIFIED, coverage is behavioural); re-dumped as `pump_programs_2026_10`, every pump suite and the T-LATCH replay re-run on it, the fee buckets read since batch 4 (PUMP-2026-10-1). **Successors** (pump-final, §13): pump and PumpSwap 2026-10-08, pump-fees 2026-10-12, pump 2026-10-13, through the addendum's steps 1–4 — re-dumped (`pump_programs_2026_10_13`, `_13b`, `pump_state_2026_10_13`), interface-diffed, gates G0 / G0b on the ELFs, and the adapter moved to v3 (1.0.1); what the new `.text` does beyond the paths short.win and its tests exercise stays UNVERIFIED (behavioural coverage) | Closed for 1.0.1; a later pump upgrade goes through the addendum again (§12) |
 | U16 | The per-writable-account limit | **Desk-checked:** 40 M CU on mainnet in Agave master and Firedancer (below); other clients not checked | monitoring |
 | U17 | CPI'd memo satisfies Token-2022 MemoTransfer | **VERIFIED on the mainnet build** (Token-2022 v11.0.0 `7ea94a02…`, spl-memo v3) | a mainnet transaction (M11, TMEMO-10) |
 | U18 | `declare_program!`, the lockfile resolution, solana-verify vs `anchor build` | **RESOLVED:** byte-identical for both programs (§0) | CI on this tree (§10) |
@@ -734,7 +783,8 @@ the toolchain is installed; the times in the comments are this package's gate (�
 They reproduce the audited tree: run them on a checkout of the tag `audit-1` (`v1.0.0`), whose
 hashes are §0's. On a tree after PUMP-V3 P6 the workspace builds `shortwin` alone (the
 `complete_curve` helper is retired, §0): drop `complete_curve.so` from step 2, and compare
-`shortwin.so` with the hashes recorded for that tree, not §0's.
+`shortwin.so` with the hashes recorded for that tree, not the tag's (1.0.1: §0's last table,
+§13).
 
 ```sh
 # 1. Build both programs (release) and the TEST-ONLY test-venue build; check SBPF v3.
@@ -1331,7 +1381,9 @@ These are where we would look first. They are not limits on the scope.
    (donations of lamports, tokens or accounts), and the `ApproveChecked` of exactly `q` to the
    trader with the delegate auto-cleared at 0 (ARCH §2.4, I7).
 3. **Venue CPIs:**
-   - the sell and buy legs on pump (`buy_v2` / `sell_v2` with the trailing cap byte, U29),
+   - the sell and buy legs on pump (`buy_v2` / `sell_v2` with the trailing cap byte, U29; since
+     1.0.1 `sell_v3` / `buy_v3` with 10 TradeExtras, the synthetic exit past `rT` and the
+     `PumpMigrating` pricing on the pool `migrate_v2` creates, §13),
      PumpSwap (`buy` / `sell` with fee ATAs and UVA existence), AMM v4 (`swap_base_in_v2` /
      `swap_base_out_v2`) and CPMM;
    - measuring every leg against the post-normalisation baseline (I13);
@@ -1417,6 +1469,9 @@ A finding may instead be acknowledged with a written rationale; it then becomes 
    (the adapter diff plus the venue's interface diff), its own hashes, and the same fix
    policy.
 
+pump's 2026-10-08 / 10-12 / 10-13 redeploys went through all four steps after the tag; the
+adapter change is short.win 1.0.1, and §13 is its addendum.
+
 **Doc changes.** A change to ARCH, ECON or SPEC that alters a bound in `known-issues.md`
 updates the register in the same commit.
 
@@ -1424,3 +1479,154 @@ updates the register in the same commit.
 fixes and before the beta. The public contest follows the fixes; the bug bounty starts at the
 beta (M11). Published reports are listed on `https://short.win/security`, and both programs'
 `security.txt` then gains its `auditors` field (a program upgrade).
+
+---
+
+## 13. Addendum: pump v3 (short.win 1.0.1)
+
+The §12 venue-upgrade addendum for pump's redeploys after the tag (the design `pump-final`,
+revision 2 of 2026-10-13; the owner's decisions of 2026-10-13, §7's "pump v3" row). Built on
+the branch `pump-v3` (2026-10-13 … 16, phases P0 … P8, each commit with its tests in its
+message). **Not yet through CI, a verifiable build or an external review.**
+
+**For the auditors (owner decision D2):** this addendum changes the audit scope. The
+`complete_curve` helper of the tagged `audit-1` scope (§0, §1, §2) is retired: removed from the
+workspace, the release, Governance's upgrade set and `scope.txt` (4 lines out, 2 reworded); it
+was never deployed. The curve adapter is rewritten (below). The owner is to tell the auditors of
+both together with this addendum.
+
+### 13.1 Steps 1–3: the re-pin
+
+| Program | Build | Deploy slot | Trimmed-ELF sha256 (the on-chain comparison) | Fixture group |
+|---|---|---|---|---|
+| pump | 2026-10-13 15:40 UTC (in force) | 456,494,698 | `e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be` | `pump_programs_2026_10_13b` |
+| pump | 2026-10-08 (superseded the same week) | 454,596,459 | `6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f` | `pump_programs_2026_10_13` |
+| PumpSwap | 2026-10-08 | 454,596,406 | `3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1` | `pump_programs_2026_10_13` |
+| pump-fees | 2026-10-12 (a 10-08 build at 454,596,501 preceded it, never examined: it can no longer be fetched) | 456,132,171 | `8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8` | `pump_programs_2026_10_13` |
+| Jupiter | — | 454,465,850 | no fixture (held to the constant) | — |
+
+- **Baseline** `VENUE_GUARD_SLOTS_2026_10_13` (`constants.rs`; a test and `check --live` baseline,
+  the program never reads it). **`check --live` at slot 457,523,244** (2026-10-16 05:38 UTC,
+  read-only RPC): every pinned program and account matches mainnet. The state of the new builds
+  is `pump_state_2026_10_13` (slot 456,395,752: the 1,088-byte `Global`, ten coin roles).
+- **Interface diff** (`tests/fixtures/README.md`): the 10-08 build adds pump's
+  `multi_hop_curve_swap` and `set_max_curve_depth`, PumpSwap's `multi_hop_swap` and pump-fees'
+  `withdraw`; nothing is removed; errors are appended; `BondingCurve` grows to 166 bytes
+  (`creator_fee` @125, `protocol_fees` @133, `depth` @141, `ivqr` @142, `pcB` @150, `pcQ` @158),
+  `Global` to 1,088 (`max_curve_depth` @1087); `buy_v3` past `rT` completes a curve by
+  **synthetic migration** (the rest from the would-be pool). The 10-13 build changes only
+  `create_v2`'s quote chain (pump's own new error 6109 `QuoteChainAccountsRequired`, unrelated to
+  short.win's 6109); every path short.win uses is the same code (gate G0b: 180 transactions on
+  both builds in lockstep, equal logs, accounts and CU).
+- **Gates G0 / G0b on the dumped ELFs, the adapter unchanged:** T-PUMP-MATH (v2 cost, proceeds
+  and error codes as before) and T-PUMP-MATH-V3 (a)–(g), (b′) (26 tests: the v3 charge model, the
+  synthetic charge and events, the donation-inclusive pool part, `migrate_v2`'s pool and boost
+  `⌊X₁·Y₁/10¹⁵⌋`, the tier tripwire, 6094 on a cashback coin, 6021 on the 10-02 build); T-REPIN-1
+  … -3 (the full LiteSVM suite on the new builds with the 1.0.0-era adapter: 1,117 passed);
+  T-PFEE-CPI. Corrections they made to the design: the boost is `⌊X₁·Y₁/10¹⁵⌋` (the design's
+  `⌊(Y − pcQ)·2069/10⁴⌋` holds only without a donation); on an exact division pump charges the
+  curve part `⌊⌋ + 1` and the pool part `⌈⌉`; the 49-byte legacy curve's growth costs 261,600
+  lamports (not 594,360).
+- **R-PFEE** (read from the 10-12 ELF): `withdraw` writes only its signer `user`, the
+  `referral_vault` PDA derived from it, that PDA's ATA and an ATA `user` owns — never a
+  `FeeConfig`, a pool or a curve; the stop rule does not trigger (PUMP-2026-10-13-5). Pinning or
+  revalidating pump-fees' 10-12 build on mainnet stays the owner's step.
+
+### 13.2 Step 4: the adapter change (1.0.1)
+
+**Scope** (against the AI review's tree `c0e0900`; `git diff --stat c0e0900..dd24af1`):
+`programs/shortwin/src/venues/{pump_curve,mod,detect}.rs`, `errors.rs`, `constants.rs`,
+`instructions/close_short.rs` (the close's venue check, `close_venue_checks`),
+`instructions/liquidate.rs` (**code**: the keeper exits' `exit_venue_checks` no longer takes
+`q` and no longer refuses `q > rT` with `CurveStraddle` before the CPI; such an exit is an
+ordinary synthetic one, and one the curve and its would-be pool cannot deliver has no execution
+quote and fails precondition 4, `UseSolSettle`), the doc text of
+`instructions/{create_market,propose_pool}.rs`, `Cargo.toml` (1.0.1);
+`crates/shortwin-math/src/quote/{straddle,pricing,mod}.rs`, `fees.rs`;
+`crates/shortwin-venue-state/src/pump.rs` — 14 source files, +1,939 / −356 lines (P8's doc fix
+in `venues/mod.rs` moves three comment lines and no byte); `programs/complete_curve` removed
+(−471). Non-test nLOC (`audit_scope.py nloc`): `shortwin`
+13,597, `shortwin-math` 6,807, `shortwin-venue-state` 1,705 (§2's audited figures: 13,293 /
+6,593 / 1,636, before the AI review's batch too).
+
+**What changed** (ARCH §2.4.1, §2.5, §3.12, §4.3, §4.5, §5.4 and changelog 81; ECON #119):
+- **Reader:** the 166-byte curve's six fields (0 on a shorter curve) and pump's invariant
+  `vQ − rQ = ivqr` (`quote_offset_consistent`).
+- **Curve legs on v3:** opens `sell_v3`, every exit `buy_v3` — 10 TradeExtras (were 20), the
+  IDL's 17 accounts, exactly 24 data bytes (never `partial_fill`), no pump-fees CPI, no creator
+  vault, the trader PDA the only signer. A buyback past `rT` buys `rT` on the curve and the rest
+  from the would-be pool in one instruction; `sync_after_leg` moves the market to `PumpMigrating`
+  in it. `CurveStraddle` (6031, D4's message) is now only a close beyond what the curve and its
+  would-be pool hold, unreachable under the caps; keeper exits there get `UseSolSettle`.
+- **Pricing past `rT` (D3):** `B̂_v3`, the curve leg and the would-be pool's leg at the fee pump
+  charges, the curve tier at its market cap on the mint's **live** supply (`φ_s`, KI-77), `+1`
+  on both legs; `B̂_str` only for a `PumpMigrating` market's states.
+- **`PumpMigrating`:** priced on the pool `migrate_v2` creates — after a synthetic pool part the
+  live `curve_base_ata` and `rQ − fee + pcQ`, without one the deterministic 206.9e12 (bit-identical)
+  — with FV ρ-scaled; a migrating curve whose post-complete fields are not known has no FV (S3
+  gives the lenders the whole take: the documented exception to A63's cap-only rule); a live
+  curve carrying them is not executable (PUMP-2026-10-13-1).
+- **Listing (D1 (a)):** a live cashback curve is refused `CurveCashbackCoin` (6109, D4's
+  message) and never executable; a complete one is observed and priced; a live curve of `depth`
+  ≠ 0 is `CurveQuoteNotSol`.
+- Unchanged: account layouts (`Market` 3,104 B, `ShortPosition`), instruction signatures,
+  events, the ReadSet (7 slots), the PumpSwap adapter, the latch masks.
+
+**Measured on the 1.0.1 code** (gate G1, `tests/bench/m5_cu` on `b3130ae2…`, the same code as
+1.0.1 but for the version; Mollusk and LiteSVM agree on all 65 cases; limits ARCH §6.1):
+
+| Row | Measured | Limit |
+|---|---|---|
+| `open_short` curve | 139.1–154.6 k (the v2 adapter: 172.3–202.0 k on the AI review's build, 172.4–202.1 k at the 1.0.0 tag) | 250 k |
+| `close_short`, `q ≤ rT` / completing / synthetic (`q > rT`) | 108.2–123.3 k / 125.5 k / 135.8 k | 250 k |
+| `liquidate` / `expire` (synthetic and worst ring included) | 126.3–159.2 k | 300 k |
+| the keeper's `[CB ×2, crank_price, liquidate]` past `rT` | 184,881 CU (worst ring 192,601) | 300 k |
+| the keeper's `[CB ×2, crank_price, expire]` past `rT` | **188,021** CU (worst ring 189,585) | 300 k |
+| `sol_settle` S3 on `PumpMigrating` after a pool part (ρ) | 69.3 k (64.8 k without one) | 150 k |
+| the keeper's top-level `migrate_v2` | **330,859 CU** after a third party's exact completion (`pc = 0`) and after a synthetic one (`pc ≠ 0`, a third party's or short.win's own) alike; 53 trace entries, peak 4, 912 B v0 | `MIGRATE_CU` 400 k |
+| the tipped `[crank_price, liquidate]` with 4 extras (v0) | **1,159–1,160 B** through A28 (1,128–1,129 through the build-alt table), now asserted (`tx_size_pump_it`); the tipped liquidation alone 1,134–1,135 B | 1,232 B |
+
+Every curve transaction is 144 B smaller than 1.0.0's (a client close 864–865 B, was
+1,008–1,009); every leg peaks at stack height 3; every exit is ≤ 15 trace entries (a synthetic
+one 12). On 1.0.1 itself (`tests/bench/m7_keeper`, P8): the keeper's curve `liquidate` /
+`expire` 147,131 / 144,314 requested CU at 1,122 B (191,837 / 189,015 at 1,452 B before, −23.3 %;
+ECON §5.8 re-baselined).
+
+**Tests** (each phase's commit messages give the runs): T-READER, T-MATH-1 … -5 (the math
+crate's properties over the full domain, the 11 mainnet synthetic completions); T-V3-ADAPTER,
+T-OPEN-V3, T-SYNTH-1 … -6, T-SIGMA, T-MIG-PRICE / -S3 / -HALT / -DONATION / -GUARD,
+T-LIVE-PC-GUARD, T-LISTING, T-LISTING-CASHBACK, T-WIPE-GATE (AIR-05, AIR-08, M5-SEC-1 and
+M6-SEC-5's tests re-expressed on a non-cashback curve, names and assertions kept), T-SIZEOF,
+T-LATCH, T-REPLAY, T-CU / -TRACE / -SIZE / -DEPTH; the whole LiteSVM suite at P6 (79 binaries,
+1,289 passed); the keeper's `upgrade_window` scenarios (the keeper liquidates on 1.0.0 with the
+20-key list and on the upgraded build with the 10-key one, no failed send); the fuzzer's v3 crowd
+and `migrating` oracle (P7: 10-minute smokes and ≈ 1 h each of the curve and PumpSwap profiles,
+0 failures, 0 anomalies).
+
+**T-SELF-UPGRADE's 1.0.0 fixture.** `tests/fixtures/shortwin/shortwin_1_0_0.so` is the `v1.0.0`
+tag (`e4895c2` = `audit-1`) built on 2026-10-15 in a worktree of its own with the pinned
+`anchor build`: sha256 `4d19c582…1f75`, trimmed `52a29a51…186b`, 1,609,616 B — equal to §0's
+**verified** 1.0.0 hashes (and so were that build's `complete_curve.so` and `mock_cpamm.so`).
+The harness refuses a file whose hash differs. Its bytes are the verified build's because they
+are equal; no solana-verify run produced them (neither Docker nor solana-verify and bubblewrap
+for `--local` on that machine).
+`upgrade_it::v1_0_0_positions_close_and_liquidate_after_the_v3_upgrade` opens curve positions on
+it with the 20-key list, upgrades through the loader and closes and liquidates them on the new
+build (a 20-key close refused cleanly).
+
+**Release coordination** (owner, 2026-10-13): the keeper first, with both TradeExtras formats
+chosen per short.win deploy slot; then the Governance upgrade (48 h); then the web, which builds
+the 10-key list only; the next release deletes the keeper's 20-key builder. PumpCurve
+`VenueExtras` sets must be empty at the upgrade (none exist on mainnet).
+
+**Not verified, or not run:**
+- the 1.0.1 hashes (§0): a local build only, no verifiable build (neither Docker nor the
+  `--local` mode's solana-verify and bubblewrap installed, and the session's rules allowed no
+  network to fetch them), no CI run on `pump-v3`;
+- no external review of this change; no ≥ 24 h fuzz run on 1.0.1 (P7's runs above);
+- the Surfpool fork run of pump-final §14 (`tests/litesvm/tests/graduation_surfpool.rs`, ignored;
+  it still names the 2026-10-02 builds): not run, no Surfpool on the machine;
+- pump-fees' 2026-10-08 build: never examined (it was replaced before it could be dumped);
+- what the new pump `.text` does beyond the paths short.win and its tests exercise (U30);
+- a multi-tier curve `FeeConfig` (KI-77): only the tier tripwire on a synthetic `FeeConfig`;
+- the keeper's format selection across a real Governance upgrade: LiteSVM only (`upgrade_window`).
