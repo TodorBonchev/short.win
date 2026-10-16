@@ -8,6 +8,78 @@ The follow-ups are done on the branch `air-followups` (2026-10-12/13; the owner 
 be pushed with `[skip ci]`, so it has not been through CI). Each ticked item names its commits;
 what is still open is under [What remains](#what-remains).
 
+## pump v3 and the Mobile Wallet Adapter (2026-10-13 … 16; branch `pump-v3`)
+
+The branch `pump-v3` holds `main` (`c0e0900`), the pump catch-up of the design `pump-final`
+(phases P0 … P8) and the Mobile Wallet Adapter (O-6, cherry-picked on 2026-10-15). Not pushed, not
+through CI. The owner's decisions of 2026-10-13 are recorded in SPEC §14 (fifteenth round) and
+AUDIT.md §7; the addendum is AUDIT.md §13.
+
+**Done**
+- [x] P0 / P0b, the re-pin to pump's 2026-10-08/12 builds, then to pump's 2026-10-13 build (slot
+      456,494,698): fixtures, `VENUE_GUARD_SLOTS_2026_10_13`, the harness, gates G0 and G0b,
+      T-PFEE-CPI and R-PFEE's reading of the 10-12 pump-fees `withdraw`. `12b6599`, `0f3796f`,
+      `53ec869`, `0c0ccf0`, `ad1b7e8`, `56857aa`; `fc02f01`, `fa40f42`, `3140431`, `a6b863b`,
+      `a7867fa`
+- [x] P1, the reader and the math (`B̂_v3`, the post-complete pool, ρ, `φ_s` on the live
+      supply). `d0d2062`, `b066308`, `5481749`
+- [x] P2, the program: every curve leg on v3, synthetic exits, `PumpMigrating` on the post-buy
+      pool, `CurveCashbackCoin` (D1 (a)), D3, D4's strings. `48994cb`, `2851bec`
+- [x] P3, budgets, T-LATCH and T-SELF-UPGRADE (gate G1). `1856c8b`, `6a4eb2d`, `6fbe0a6`,
+      `2ec4437`
+- [x] P4, the keeper: no straddle bundle, both TradeExtras formats for the upgrade window, duty-10
+      alerts; the web's 10-key list and the keeper vectors. `e5c817c`, `0b412af`, `12ae9a4`
+- [x] P5, the web on v3 (and the WASM `migratingFv`), the D2 removals, a `q > rT` close on the
+      validator. `cb85ca7`, `5d46c3b`, `38c536e`, `02d52be`
+- [x] P6, `complete_curve` retired (D2): Governance, tests and benches, the indexer, the
+      workspace. `9f1a30f`, `68ddaae`, `df15ed7`, `2c402ff`
+- [x] P7, fuzz (the v3 crowd, the `migrating` oracle; smokes and ≈ 1 h per profile, clean) and the
+      sim on v3 (ECON §10.2's synthetic row). `3e3b43b`, `434dcbc`, `59844d6`
+- [x] O-6, the Mobile Wallet Adapter on by default (packages 0.7.0 / 3.0.0, the drafted strings,
+      the review's safeguards), its E2E and the reviewed Android screenshots. `5b37256`, `e79a11e`,
+      `a4c2522`, `ab148e6`, `a130a25`, `02af5d3`, `8e6c227`, `8af0375`, `5b40961`
+- [x] P8, version **1.0.1** (`programs/shortwin/Cargo.toml`; `security.txt`'s `source_release`
+      `v1.0.1`) and the release evidence of a fresh local build: `shortwin.so` `72c82879…1429`
+      (executable `0610d419…2dfc`, 1,635,424 B), test-venue `fd46da2c…9db7`, `mock_cpamm.so`
+      unchanged, the three venue ELF hashes, `check --live` at slot 457,523,244 (AUDIT §0, §13).
+      `dd24af1`
+- [x] P8, the m7 keeper bench re-baselined on 1.0.1 (`M7_COST_WRITE`, `M7_CASCADE_WRITE`,
+      `keeper_cost.py`'s constants, `out/keeper_cost.txt`, ECON §5.8): the curve's `liquidate`
+      147,131 requested CU (−23.3 %). `1710890`
+- [x] P8, the 21 pre-gate `minimumReleaseAge` exclusions removed (`pnpm install
+      --frozen-lockfile` passes). `27df645`
+- [x] P8, docs: ARCHITECTURE (changelog 81), ECONOMICS (#119, §10.2's synthetic row, §3.1's
+      boost rule `⌊X₁·Y₁/10¹⁵⌋`, §5.8), SPEC §14; the AUDIT addendum (§13) and known issues
+      (KI-77: `φ_s` and the fee gates' 10¹⁵ `φ`; PUMP-2026-10-13-1 … -6); the R-PUMP and R-VEN
+      notes. `1f31273`, `d3a64ce`, `6ac7a78`
+
+**Still open**
+- [ ] **Tell the auditors** of the addendum (AUDIT.md §13) and of D2's scope change
+      (`complete_curve` leaves the tagged `audit-1` scope) — the owner's step.
+- [ ] **The owner's real-device MWA test** before the release (FE-32; DEVELOPMENT "Mobile wallets
+      on a real device"), and who hosts the HTTPS devnet and mainnet builds it needs (P1, P2).
+- [ ] **Remove the two `@solana-mobile` release-age exclusions** in `pnpm-workspace.yaml` after
+      2026-10-21, then `pnpm install --frozen-lockfile` again.
+- [ ] **CI on GitHub** for `pump-v3` (nothing here has run in CI).
+- [ ] **The verifiable build** of 1.0.1 (`scripts/verifiable-build.sh --local --compare
+      target/deploy`: it needs solana-verify 0.5.2 and bubblewrap, not installed on the P8
+      machine, and network for them, the image, the crates and platform-tools, which that
+      session's rules did not allow (read-only Solana RPC only); or Docker mode, or CI's
+      `verifiable-build` job), then the 1.0.1 hashes in AUDIT.md §0 as verified ones.
+- [ ] **R-PFEE before pinning pump-fees on mainnet:** re-read `withdraw`'s accounts and authority
+      on the build to be pinned (done for the 10-12 build, the stop rule did not trigger), then
+      `initialize_config` or Emergency's `revalidate_venue` (PUMP-2026-10-13-5).
+- [ ] **The release order:** the keeper (both TradeExtras formats) first, then the Governance
+      program upgrade, then the web; at the upgrade the PumpCurve `VenueExtras` sets must be empty
+      (release checklist); on a non-mainnet deployment, exit or settle cashback-curve positions
+      first. **The next release deletes the keeper's V2 builder** (`pump_trade_extras_v2`).
+- [ ] The Surfpool fork run of a synthetic close (pump-final §14 "Fork",
+      `tests/litesvm/tests/graduation_surfpool.rs`, which still names the 2026-10-02 builds): not
+      run (no Surfpool here).
+- [ ] A ≥ 24 h fuzz run on 1.0.1 (AUDIT.md §12's fix policy), or the owner's waiver as for the
+      AI review's batch; P7 ran 10-minute smokes and ≈ 1 h per profile.
+- [ ] An external review of the adapter change (with the AI review's fixes, below).
+
 ## Decisions (owner)
 
 The owner decided these on 2026-10-12 (the review's README, "Decisions for the owner", `63b673c`;
@@ -142,7 +214,8 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
 - [ ] Release as 1.0.x (owner decision of 2026-10-02; SPEC §14): bump the version in
       `programs/*/Cargo.toml`, which `security.txt`'s `source_release` carries; then CI and the
       verifiable build on that tree, and its hashes in AUDIT.md §0 (the 1.0.0-versioned hashes
-      there are a local build's, not verified).
+      there are a local build's, not verified). *The version is 1.0.1 since `dd24af1` (pump v3,
+      above) and its local hashes are in AUDIT.md §0; CI and the verifiable build remain.*
 - [ ] `scripts/mutants.sh` (CI's opt-in `mutants` job, nightly or `workflow_dispatch`): run on
       every earlier batch, not on the AI review's fixes (it builds into target directories of its
       own, which this machine's disk budget does not allow).
@@ -157,7 +230,8 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       transactions / 159 checkpoints, measured at M8; 1,499 / 171 expected) and its note.
 
 **Figures**
-- [ ] The m7-keeper-bench figures (`tests/bench/m7_keeper`, `tests/bench/m7_cascade`) still name
+- [x] *Done in `1710890` (2026-10-16), on the 1.0.1 build:* the m7-keeper-bench figures
+      (`tests/bench/m7_keeper`, `tests/bench/m7_cascade`) still name
       v1.0.0's build. The gate of 2026-10-13 re-wrote them, but they fail `keeper_cost.py`'s
       cross-check (PumpSwap's crank 41,437 → 41,149 requested CU, its settling `sol_settle`
       74,445 → 76,992), so they were not committed: refresh them with the sim's constants,
