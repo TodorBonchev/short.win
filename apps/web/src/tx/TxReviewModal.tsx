@@ -21,7 +21,6 @@ import { useRouter } from '@tanstack/react-router';
 import { createContext, Fragment, type ReactNode, useContext, useMemo } from 'react';
 import { Button } from '../components/Button.tsx';
 import { Disclosure } from '../components/Disclosure.tsx';
-import { Select } from '../components/Field.tsx';
 import { Modal } from '../components/Modal.tsx';
 import { Reveal } from '../components/Reveal.tsx';
 import { walletCopy } from '../config/copyWallet.ts';
@@ -42,6 +41,12 @@ import {
     signHold,
     type TxFlow,
 } from './useTxFlow.ts';
+
+/** The priority fee's two speeds, as the review offers them (both visible: a chip pair, not a menu). */
+const SPEEDS: readonly (readonly [FeeSpeed, string])[] = [
+    ['normal', 'Normal'],
+    ['fast', 'Fast'],
+];
 
 const RETRY_TEXT: Record<Exclude<RetryMode, 'none'>, string> = {
     resimulate: 'Retry',
@@ -401,15 +406,23 @@ export function TxReviewModal({ flow }: { flow: TxFlow }) {
                     </dd>
                     <dt>Priority</dt>
                     <dd>
-                        <Select<FeeSpeed>
-                            label="Priority fee"
-                            value={state.speed}
-                            onChange={(s) => flow.setSpeed(s)}
-                            options={[
-                                { value: 'normal', label: 'Normal' },
-                                { value: 'fast', label: 'Fast' },
-                            ]}
-                        />
+                        {/* The one choice the review offers, whole: the pressed chip is the selected state
+                            (`.chip[aria-pressed]`); `hit` gives each a 44 px touch area under a finger. A
+                            fieldset with a hidden legend names the pair, as the withdraw shares do. */}
+                        <fieldset className="chip-group tx-priority">
+                            <legend className="visually-hidden">Priority fee</legend>
+                            {SPEEDS.map(([speed, label]) => (
+                                <button
+                                    key={speed}
+                                    type="button"
+                                    className="chip hit"
+                                    aria-pressed={state.speed === speed}
+                                    onClick={() => flow.setSpeed(speed)}
+                                >
+                                    {label}
+                                </button>
+                            ))}
+                        </fieldset>
                     </dd>
                 </dl>
             )}

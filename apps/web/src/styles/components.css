@@ -1900,6 +1900,9 @@ details > summary::-webkit-details-marker {
 }
 
 /* ---- modal ------------------------------------------------------------------------------- */
+/* The dialog layer: bg-1 under the modal shadow every floating surface shares (design pass P9). Its
+   --line-strong edge stays — over the 72 % scrim the dialog and the dimmed page are within ~1.1:1, so the
+   edge is what makes the dialog read as a window. */
 .modal {
     width: min(560px, calc(100vw - 32px));
     max-height: calc(100dvh - 64px);
@@ -1908,7 +1911,15 @@ details > summary::-webkit-details-marker {
     background: var(--bg-1);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius-lg);
-    box-shadow: 0 16px 48px rgb(0 0 0 / 60%);
+    box-shadow: var(--shadow-modal);
+}
+
+/* Open, the dialog is a column: head and foot keep their content height (a flex item's min-height: auto),
+   only the body shrinks and scrolls — so the body uses whatever the dialog's own max-height leaves it,
+   not a 100dvh − 200px guess (the UA's margin: auto keeps it centred). */
+.modal[open] {
+    display: flex;
+    flex-direction: column;
 }
 
 .modal::backdrop {
@@ -1924,13 +1935,14 @@ details > summary::-webkit-details-marker {
 }
 
 .modal-body {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: var(--sp-4);
     padding: var(--sp-4);
     overflow: auto;
     overscroll-behavior: contain;
-    max-height: calc(100dvh - 200px);
     container: dialog / inline-size;
 }
 
@@ -1944,25 +1956,16 @@ details > summary::-webkit-details-marker {
     border-top: 1px solid var(--line);
 }
 
+/* The shrink guard beside a long .grow title, not a size: the ✕ box is the shared close rule's (buttons
+   section: --icon-btn, 44 px under a finger), the sheet's ✕ the sheets block's 44 px. */
 .modal-close {
     flex: none;
-}
-
-/* `.btn` too: a small button's own min-height (`[data-size="sm"]`) would otherwise win. */
-@media (pointer: coarse) {
-    .btn.modal-close,
-    .btn.sheet-close {
-        min-width: 44px;
-        min-height: 44px;
-    }
 }
 
 /* Phone: a dialog fills the screen (head and foot stay, the body scrolls; the primary action gets
    its own full-width bottom row — DOM order unchanged); a sheet rises from the bottom edge. */
 @media (max-width: 639.98px) {
     .modal[open] {
-        display: flex;
-        flex-direction: column;
         width: 100%;
         max-width: none;
         height: 100dvh;
@@ -1981,8 +1984,6 @@ details > summary::-webkit-details-marker {
     }
 
     .modal-body {
-        flex: 1;
-        max-height: none;
         padding-inline: max(var(--sp-4), var(--safe-l)) max(var(--sp-4), var(--safe-r));
     }
 
@@ -2001,13 +2002,23 @@ details > summary::-webkit-details-marker {
         min-height: 48px;
     }
 
+    /* A bottom sheet is a bg-2 surface under the sheet shadow, like every other bottom sheet (the wallet
+       sheet, a Reveal popover) — not a bg-1 slab with no shadow. */
     .modal[open][data-variant="sheet"] {
         inset: auto 0 0;
         height: auto;
         max-height: 85dvh;
         margin: auto 0 0;
+        background: var(--bg-2);
         border-top: 1px solid var(--line-strong);
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        box-shadow: var(--shadow-sheet);
+    }
+
+    /* Its sticky head is the sheet's own surface (the phone's dialog head is bg-1 by default): a darker title
+       band on a bg-2 sheet would be a surface reuse — as .menu-head is on the wallet sheet. */
+    .modal[data-variant="sheet"] .modal-head {
+        background: var(--bg-2);
     }
 
     .modal[data-variant="sheet"] .modal-body {
@@ -2016,17 +2027,39 @@ details > summary::-webkit-details-marker {
 }
 
 /* ---- review: the plan's instructions ------------------------------------------------------ */
+/* The instructions are read-only figures: a sunken well edged like a panel, not another bg-2 note among the
+   bg-2 disclosures below it. */
 .tx-steps {
     margin: 0;
     padding: var(--sp-2) var(--sp-3) var(--sp-2) calc(var(--sp-3) + 20px);
-    background: var(--bg-2);
-    border: 1px solid var(--line);
+    background: var(--surface-well);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius);
     font-size: var(--fs-sm);
 }
 
 .tx-steps li + li {
     margin-top: var(--sp-1);
+}
+
+/* The priority fee's Normal / Fast chips (the review's one choice, both options visible; a pressed chip is
+   the selected state) sit at the value side of their key / value row. */
+.modal-body .kv dd:has(> .chip-group) {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Its label sits level with the chips (a 36 px row under a finger), not at the row's top edge. */
+.modal-body .kv dt:has(+ dd > .chip-group) {
+    align-self: center;
+}
+
+/* The pair is a fieldset (its hidden legend names it): no UA box of its own, like lend.css's .lend-quick. */
+.tx-priority {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
 }
 
 /* A link that is a target on its own, not inside running text (WCAG 2.5.8): 24 px, 36 px under a
@@ -2054,9 +2087,15 @@ details > summary::-webkit-details-marker {
     z-index: var(--z-toast);
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
     width: min(360px, calc(100vw - 2 * var(--gutter)));
     pointer-events: none;
+}
+
+/* Both live-region stacks (polite, assertive) are always in the DOM — a live region must exist before it
+   speaks — so the 8 px between them is a margin only when both hold a toast: an empty stack with a flex gap
+   put an error toast 8 px lower than a success (8 px down the sheet head's title strip). */
+.toast-region > .stack:not(:empty) + .stack:not(:empty) {
+    margin-top: var(--sp-3);
 }
 
 @media (max-width: 639.98px) {
@@ -2069,15 +2108,17 @@ details > summary::-webkit-details-marker {
     }
 
     /* A full-screen sheet covers the header and fills the screen with controls: a toast takes the
-       sheet head's title strip instead — one line, 16 px clear of the sheet's ✕ — so it covers
-       text, never a control. The newest of each kind shows. A success or a note has no ✕ of its
-       own there (it goes by itself, and its links wait for the full toast once the sheet closes;
-       the review dialog has them meanwhile); an error keeps its one-line reason and a "Dismiss"
-       word, never a second ✕ beside the sheet's. */
+       sheet head's title strip instead — one line, sized to the head (top = --safe-t, min-height =
+       --sheet-head-h: the head's content box), ending 4 px short of the sheet's ✕ box and 4 px past
+       the title box — so it covers text, never a control, and no title ink shows under it. The
+       newest of each kind shows. A success or a note has no ✕ of its own there (it goes by itself,
+       and its links wait for the full toast once the sheet closes; the review dialog has them
+       meanwhile); an error keeps its one-line reason and a "Dismiss" word, never a second ✕ beside
+       the sheet's. */
     html[data-sheet-open] .toast-region {
-        top: calc(var(--safe-t) + 4px);
-        left: max(var(--sp-2), var(--safe-l));
-        right: calc(var(--gutter) + 44px + var(--sp-5));
+        top: var(--safe-t);
+        left: 0;
+        right: calc(var(--sp-2) + 44px + var(--sp-2));
     }
 
     html[data-sheet-open] .toast-region .toast:not(:last-child),
@@ -2092,9 +2133,16 @@ details > summary::-webkit-details-marker {
         display: inline;
     }
 
+    /* The strip is the head's height, squared and flush: the head's own hairline for a bottom edge (the
+       1 px bottom border, in the head's line colour), the kind's 3 px bar at the left, no shadow. */
     html[data-sheet-open] .toast-region .toast {
+        min-height: var(--sheet-head-h);
         align-items: center;
         padding-block: var(--sp-1);
+        border-radius: 0;
+        border-width: 0 0 1px 3px;
+        border-bottom-color: var(--line);
+        box-shadow: none;
     }
 
     html[data-sheet-open] .toast-region .toast > .grow {
@@ -2139,7 +2187,7 @@ details > summary::-webkit-details-marker {
     border-left-width: 3px;
     border-radius: var(--radius);
     font-size: var(--fs-sm);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 50%);
+    box-shadow: var(--shadow-toast);
 }
 
 .toast[data-kind="success"] {
@@ -2601,24 +2649,30 @@ bdi,
         max-height: none;
         overflow-y: auto;
         overscroll-behavior: contain;
-        padding-top: var(--safe-t);
+        padding-top: 0;
         background: var(--bg-1);
         border: 0;
         border-radius: 0;
         animation: sheet-in var(--t-sheet) ease-out;
-        scroll-padding-top: calc(var(--header-h) + var(--sp-3));
+        scroll-padding-top: calc(var(--sheet-head-h) + var(--safe-t) + var(--sp-3));
         scroll-padding-bottom: calc(120px + var(--safe-b));
     }
 
+    /* The head carries the notch inset itself (top: 0; the inset as padding inside its height), as
+       .modal-head does: a scroll container's padding-top scrolls away with its content, and a sticky
+       head with a negative top is then pinned above the scrollport — in a wallet's in-app browser
+       (a 47 px inset) ~5 px of the title and its ✕ were left once the form scrolled. The host's
+       scroll-padding keeps today's 8 px clearance under it for a focused control (2.4.11). */
     .sheet-host[data-sheet="open"] .sheet-head {
         position: sticky;
-        top: calc(-1 * var(--safe-t));
+        top: 0;
         z-index: 1;
         display: flex;
         align-items: center;
         gap: var(--sp-3);
-        min-height: calc(var(--header-h) + var(--sp-2));
+        min-height: calc(var(--sheet-head-h) + var(--safe-t));
         padding: 0 var(--sp-2) 0 max(var(--sp-4), var(--safe-l));
+        padding-top: var(--safe-t);
         background: var(--bg-1);
         border-bottom: 1px solid var(--line);
     }

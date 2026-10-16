@@ -8,6 +8,7 @@
  * action on its own full-width bottom row) and a `sheet` rises from the bottom edge.
  */
 import { type ReactNode, useEffect, useRef } from 'react';
+import { NavIcon } from '../shell/icons.tsx';
 
 export interface ModalProps {
     readonly open: boolean;
@@ -100,7 +101,7 @@ export function Modal({
                                 onClick={onClose}
                                 aria-label="Close"
                             >
-                                ✕
+                                <NavIcon name="close" className="icon" />
                             </button>
                         )}
                     </header>

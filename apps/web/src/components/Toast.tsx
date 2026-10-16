@@ -7,6 +7,7 @@
  */
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 import { T } from '../config/testids.ts';
+import { NavIcon } from '../shell/icons.tsx';
 
 export type ToastKind = 'success' | 'error' | 'info';
 
@@ -100,9 +101,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 onClick={() => dismiss(t.id)}
                 aria-label="Dismiss"
             >
-                <span className="toast-dismiss-x" aria-hidden="true">
-                    ✕
-                </span>
+                <NavIcon name="close" className="icon toast-dismiss-x" />
                 <span className="toast-dismiss-word" aria-hidden="true">
                     Dismiss
                 </span>

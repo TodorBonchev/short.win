@@ -12,6 +12,7 @@
  * CSS does the rest (`.sheet-host[data-sheet="open"]`, components.css).
  */
 import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
+import { NavIcon } from '../shell/icons.tsx';
 import { COMPACT, useMedia } from '../styles/breakpoints.ts';
 
 export interface SheetModeOptions {
@@ -143,7 +144,7 @@ export function SheetHead({
                 data-testid={testId}
                 onClick={onClose}
             >
-                ✕
+                <NavIcon name="close" className="icon" />
             </button>
         </header>
     );
