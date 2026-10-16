@@ -8,6 +8,32 @@ The follow-ups are done on the branch `air-followups` (2026-10-12/13; the owner 
 be pushed with `[skip ci]`, so it has not been through CI). Each ticked item names its commits;
 what is still open is under [What remains](#what-remains).
 
+## Design polish: the logo and the web app's look (2026-10-16; on `main`)
+
+A new brand mark and favicon set, and a nine-package polish of the web app at phone and desktop widths inside
+FRONTEND.md §7's dark terminal. Rebased onto `main` at `d805c19` and pushed with `[skip ci]`; then every other
+branch was removed (archived in `../short.win-archived-branches-2026-10-16.bundle`), so `main` is the only
+branch. The full record is in [`docs/design/design-pass-2026-10/`](docs/design/design-pass-2026-10/):
+`STATUS.md` (done, verification, what is left) and `CONVERSATION-SUMMARY.md` (how and why, how to continue).
+
+**Done**
+- [x] The brand mark (the W of "Win" drawn as a price chart), the favicon set, the app icons and the web manifest.
+      `5ac926d`; the wallet adapter's `icon-192.png` re-rendered from the new favicon, `1011177`
+- [x] P1 … P9 and the P11 cleanup: tokens and type tiers, the shell, the core components, tables and numbers,
+      reading pages and empty / error states, markets, short, lend and overlays. `c41ba84` … `1ba6805`
+- [x] FRONTEND.md records the pass as built (`cb91e3d`); every reference screenshot set re-shot (`9363b4c`)
+- [x] Local gate on `main` with freshly built 1.0.1 programs: lint, typecheck, 1,026 unit tests, the responsive
+      gate (96 passed) and the web E2E on desktop and phone green
+
+**Still open**
+- [ ] The owner's review of the new look and six owner decisions: the logo concept (the W shipped; the judges'
+      totals favoured "fall-to-check"), the compact markets intro on every phone, the scrollbar gutter at
+      1,024–1,279 px, the lend KPI hero at 390 px, "3h 05m" against "3h 5m", a 48 px demoted submit
+      (`STATUS.md` has each one's change)
+- [ ] **CI on GitHub** for the design pass (nothing in it has run in CI)
+- [ ] 14 Android tests of `mobile-mwa.spec.ts` time out on the local machine, with or without the design pass
+      (untouched `d805c19` fails the same 14); the owner's own gate had them green
+
 ## pump v3 and the Mobile Wallet Adapter (2026-10-13 … 16; branch `pump-v3`)
 
 The branch `pump-v3` holds `main` (`c0e0900`), the pump catch-up of the design `pump-final`
