@@ -5,7 +5,8 @@
 //!   fields are decoded tolerantly: known prefix, trailing bytes ignored). Its `ix_name` is a
 //!   label, never a dispatch key: v3 trades emit `buy` / `sell` / `buy_exact_quote_in` (not the
 //!   `*_v3` names pump's docs give), multi-hop ones `multi_hop_swap`; the `fee_recipient` of a v3
-//!   trade is the zero key;
+//!   trade is the zero key; a row on a SOL-quoted curve only (the `quote_mint` after the
+//!   shareholders vector, [`pump_trade`]);
 //! - pump `PostCompleteBuyEvent` (pump's 2026-10-08 redeploy): the synthetic-migration part of a
 //!   buy past `rT` — the tokens a completing buy takes from the would-be pool — as a second pump
 //!   trade row of the same instruction, on a SOL-quoted curve only ([`pump_post_complete_buy`]);
@@ -242,7 +243,35 @@ pub fn bonding_curve_of(mint: &Pubkey) -> Pubkey {
     Pubkey::find_program_address(&[b"bonding-curve", mint.as_ref()], &PUMP).0
 }
 
-/// pump `TradeEvent` (body after the discriminator; field order per pump's IDL).
+/// The `quote_mint` of a pump `TradeEvent`, read from the fields after `creator_fee` (pump's IDL
+/// of the 2026-10-13 build): `track_volume`, four u64 / i64 volume fields, `ix_name` (a Borsh
+/// string), `mayhem_mode`, `cashback_fee_basis_points`, `cashback`, `buyback_fee_basis_points`,
+/// `buyback_fee`, the variable-length `shareholders` vector (a u32 count of 34-byte `{address,
+/// share_bps: u16}`), then `quote_mint`. `None` for an event that ends before it: one emitted
+/// before pump quoted curves in another token, when every curve was a SOL curve.
+fn pump_trade_quote_mint(r: &mut Rd<'_>) -> Option<Pubkey> {
+    let _track_volume = r.bool()?;
+    for _ in 0..4 {
+        r.u64()?; // total_unclaimed_tokens … last_update_timestamp
+    }
+    let n = usize::try_from(r.u32()?).ok()?;
+    r.take(n)?; // ix_name
+    let _mayhem_mode = r.bool()?;
+    for _ in 0..4 {
+        r.u64()?; // cashback_fee_basis_points, cashback, buyback_fee_basis_points, buyback_fee
+    }
+    let n = usize::try_from(r.u32()?).ok()?;
+    r.take(n.checked_mul(32 + 2)?)?; // shareholders
+    r.key()
+}
+
+/// pump `TradeEvent` (body after the discriminator; field order per pump's IDL). `None` unless
+/// the curve is SOL-quoted: a `quote_mint` (read past the shareholders vector,
+/// [`pump_trade_quote_mint`]) other than the zero key, which pump writes for a SOL curve, or
+/// WSOL is a curve quoted in another token (since pump's 2026-10-08 build, e.g. the curve hop of
+/// a `multi_hop_swap` through a pump coin), whose `sol_amount` and fees are in that token's
+/// units, not lamports (M8-SEC-6, as [`pump_post_complete_buy`]). An event that ends before
+/// `quote_mint` is a SOL curve's.
 pub fn pump_trade(body: &[u8]) -> Option<Trade> {
     let mut r = Rd(body);
     let mint = r.key()?;
@@ -261,6 +290,9 @@ pub fn pump_trade(body: &[u8]) -> Option<Trade> {
     let creator = r.key()?;
     let _creator_fee_bps = r.u64()?;
     let creator_fee = r.u64()?;
+    if pump_trade_quote_mint(&mut r).is_some_and(|q| q != Pubkey::default() && q != WSOL) {
+        return None;
+    }
     let fees = fee.saturating_add(creator_fee);
     let (side, trader_sol) = if is_buy {
         (Side::Buy, sol_amount.saturating_add(fees))
@@ -1357,9 +1389,9 @@ mod tests {
     /// group wins over the fallback). With the hop paired with WSOL, the sale of H6Jj… on `8KPE…`.
     /// With a pool no hop group names, the fallback to `venue_pools`: the same sale, and no row
     /// when `venue_pools` does not know the pool either. The curve hop's pump `TradeEvent` (a
-    /// curve quoted in H6Jj…, not SOL) still gives a `pump_curve` row in every case: a v3
-    /// `TradeEvent` carries its `quote_mint` only after the variable-length shareholders vector,
-    /// and the SOL-only filter for it is the indexer phase's (open).
+    /// curve quoted in H6Jj…, not SOL: its `quote_mint` past the shareholders vector) gives no
+    /// `pump_curve` row in any case (M8-SEC-6, `trade_events_of_non_sol_curves_give_no_row`);
+    /// with its `quote_mint` the zero key, a SOL curve's, the curve hop's row at its place.
     #[test]
     fn multi_hop_swap_decodes_through_the_aggregator_tree() {
         use crate::model::EvSource;
@@ -1388,21 +1420,11 @@ mod tests {
                 .partition(|r| r.trade.program == PUMP_AMM);
             (amm, curve)
         };
-        // The curve hop's row, the same in every case (the indexer phase's open filter).
+        // The curve hop: a curve quoted in H6Jj…, no row in any case (M8-SEC-6).
         let trade = unhex(MULTI_HOP_TRADE);
-        let curve_hop = pump_trade(&trade[8..]).expect("the curve hop");
+        assert!(pump_trade(&trade[8..]).is_none(), "a non-SOL curve");
         let curve_row = |rows: &[super::super::TradeRow]| {
-            assert_eq!(rows.len(), 1, "{rows:?}");
-            let r = &rows[0];
-            assert_eq!(
-                (r.ix_index, r.ev_source, r.ev_seq, r.is_shortwin, r.market),
-                (2, EvSource::Cpi, 4, false, None)
-            );
-            assert_eq!(r.trade, curve_hop);
-            assert_eq!(
-                r.trade.mint,
-                Some(key("CKL7wxBLZsBvH5PEvTkNPSUxX9NRfPv2qhhjW6SZpump"))
-            );
+            assert!(rows.is_empty(), "{rows:?}");
         };
 
         // As on mainnet: no PumpSwap row, the fallback not taken.
@@ -1412,6 +1434,27 @@ mod tests {
             assert!(amm.is_empty(), "{amm:?}");
             curve_row(&curve);
         }
+        // Control: the same tree with the curve hop SOL-quoted gives its row at its place.
+        let mut sol_tx = multi_hop_tx(|_| {});
+        let hop = &mut sol_tx.instructions[2].inner[4];
+        let body_at = anchor_lang::event::EVENT_IX_TAG_LE.len() + 8;
+        let at = body_at + trade_quote_mint_at(&trade[8..]);
+        assert_eq!(hop.data[at..at + 32], h6.to_bytes());
+        hop.data[at..at + 32].fill(0);
+        let sol_hop = pump_trade(&hop.data[body_at..]).expect("the SOL curve hop");
+        let (amm, curve) = decode(&sol_tx, &PoolCtx::default());
+        assert!(amm.is_empty(), "{amm:?}");
+        assert_eq!(curve.len(), 1, "{curve:?}");
+        let r = &curve[0];
+        assert_eq!(
+            (r.ix_index, r.ev_source, r.ev_seq, r.is_shortwin, r.market),
+            (2, EvSource::Cpi, 4, false, None)
+        );
+        assert_eq!(r.trade, sol_hop);
+        assert_eq!(
+            r.trade.mint,
+            Some(key("CKL7wxBLZsBvH5PEvTkNPSUxX9NRfPv2qhhjW6SZpump"))
+        );
 
         // The hop paired with WSOL: the sale, from the hop group's mints.
         let (amm, curve) = decode(&multi_hop_tx(|g| g[1] = WSOL), &PoolCtx::default());
@@ -1452,18 +1495,20 @@ mod tests {
     /// their known prefix whatever their `ix_name` ("buy_exact_quote_in" of a v3 buy, not the
     /// docs' `*_v3`; "multi_hop_swap" of a multi-hop hop; any other label), with the zero
     /// `fee_recipient` v3 trades carry and the trailing fields up to `creator_fee_unclaimed`
-    /// ignored; a body cut inside the prefix does not decode.
+    /// ignored (the multi-hop hop's curve, quoted in a pump coin, made SOL-quoted here: its
+    /// `quote_mint` set to the zero key); a body cut inside the prefix does not decode.
     #[test]
     fn trade_events_decode_on_their_prefix_whatever_the_ix_name() {
-        // The prefix ends with creator_fee; ix_name follows 1 + 4 × 8 bytes later.
-        let prefix = 32 + 8 + 8 + 1 + 32 + 8 + 4 * 8 + 32 + 8 + 8 + 32 + 8 + 8;
+        let prefix = TRADE_PREFIX;
         let fee_recipient = 32 + 8 + 8 + 1 + 32 + 8 + 4 * 8;
         let name_at = prefix + 1 + 4 * 8;
         for (hex, name) in [
             (SYNTH_TRADE, "buy_exact_quote_in"),
             (MULTI_HOP_TRADE, "multi_hop_swap"),
         ] {
-            let payload = unhex(hex);
+            let mut payload = unhex(hex);
+            let at = 8 + trade_quote_mint_at(&payload[8..]);
+            payload[at..at + 32].fill(0);
             let body = &payload[8..];
             assert_eq!(body[fee_recipient..fee_recipient + 32], [0u8; 32], "{name}");
             let n = u32::from_le_bytes(body[name_at..name_at + 4].try_into().unwrap()) as usize;
@@ -1483,6 +1528,88 @@ mod tests {
                 b.extend(&body[name_at + 4 + n..]);
                 assert_eq!(pump_trade(&b), Some(t.clone()), "{name} as {other}");
             }
+        }
+    }
+
+    /// A `TradeEvent` body's prefix up to `creator_fee`: what [`pump_trade`] needs to decode.
+    const TRADE_PREFIX: usize = 32 + 8 + 8 + 1 + 32 + 8 + 4 * 8 + 32 + 8 + 8 + 32 + 8 + 8;
+
+    /// Where a `TradeEvent` body's `quote_mint` starts: past `ix_name` and the shareholders
+    /// vector (the walk of [`pump_trade_quote_mint`], counted here independently).
+    fn trade_quote_mint_at(body: &[u8]) -> usize {
+        let u32_at = |o: usize| u32::from_le_bytes(body[o..o + 4].try_into().unwrap()) as usize;
+        let name_at = TRADE_PREFIX + 1 + 4 * 8;
+        let shareholders_at = name_at + 4 + u32_at(name_at) + 1 + 4 * 8;
+        shareholders_at + 4 + 34 * u32_at(shareholders_at)
+    }
+
+    /// T-INDEXER `trade_events_of_non_sol_curves_give_no_row` (M8-SEC-6): a pump `TradeEvent`
+    /// gives a row on a SOL-quoted curve only. Its `quote_mint` follows the variable-length
+    /// shareholders vector: the zero key on `2vVRr9eg…`'s SOL curve, `H6Jj…pump` on `2b9feozi…`'s
+    /// curve hop, a curve quoted in a pump coin. That hop's event names `sol_amount` 0 and its
+    /// amount, 646,905,050,533 H6Jj… units, only in `quote_amount`, but its `creator_fee`
+    /// 6,469,050,506 is in H6Jj… units too: its row was a sale for 0 lamports with that "lamport"
+    /// creator fee. The hop gives no row; with the zero key or WSOL in its place, either event
+    /// gives the row of its prefix, and with a pump coin there, none. A shareholder entry (34
+    /// bytes) moves `quote_mint` and is skipped. An event that ends before `quote_mint` (pump's
+    /// layouts before it quoted curves in another token) is a SOL curve's.
+    #[test]
+    fn trade_events_of_non_sol_curves_give_no_row() {
+        let h6 = key("H6JjfjdR1X4ANrmMEVoXJ5LecWcVtETbY1ncYQn4pump");
+        let w5 = key("W5vQGEpVR9wmWjWdKuEug1GmfwrUio44365KrDupump");
+        let u64_at = |b: &[u8], o: usize| u64::from_le_bytes(b[o..o + 8].try_into().unwrap());
+        for (hex, quote, sol_amount, quote_amount) in [
+            (SYNTH_TRADE, Pubkey::default(), 1_238_167_329, 1_238_167_329),
+            (MULTI_HOP_TRADE, h6, 0, 646_905_050_533),
+        ] {
+            let payload = unhex(hex);
+            let body = &payload[8..];
+            let at = trade_quote_mint_at(body);
+            assert_eq!(body[at - 4..at], [0u8; 4], "{quote}: no shareholder");
+            assert_eq!(body[at..at + 32], quote.to_bytes(), "{quote}");
+            assert_eq!(
+                body.len(),
+                at + 32 + 6 * 8,
+                "{quote}: the fields after quote_mint"
+            );
+            assert_eq!(
+                (u64_at(body, 32), u64_at(body, at + 32)),
+                (sol_amount, quote_amount),
+                "{quote}: sol_amount, quote_amount"
+            );
+            let row = pump_trade(&body[..TRADE_PREFIX]).expect("the prefix decodes");
+            let sol = quote == Pubkey::default();
+            if !sol {
+                assert_eq!(
+                    (row.side, row.sol_amount, row.fee_creator_lamports),
+                    (Side::Sell, 0, Some(6_469_050_506)),
+                    "the row the hop gave before"
+                );
+            }
+            assert_eq!(pump_trade(body), sol.then(|| row.clone()), "{quote}");
+            let quoted = |m: &Pubkey, shareholders: u32| {
+                let mut b = body[..at - 4].to_vec();
+                b.extend(shareholders.to_le_bytes());
+                for k in 0..shareholders {
+                    b.extend(Pubkey::new_unique().to_bytes());
+                    b.extend(u16::try_from(5_000 + k).unwrap().to_le_bytes());
+                }
+                b.extend(m.to_bytes());
+                b.extend(&body[at + 32..]);
+                pump_trade(&b)
+            };
+            for shareholders in [0, 1, 3] {
+                assert_eq!(quoted(&quote, shareholders), pump_trade(body), "{quote}");
+                assert_eq!(quoted(&Pubkey::default(), shareholders), Some(row.clone()));
+                assert_eq!(quoted(&WSOL, shareholders), Some(row.clone()));
+                assert_eq!(quoted(&h6, shareholders), None);
+                assert_eq!(quoted(&w5, shareholders), None);
+            }
+            assert_eq!(
+                pump_trade(&body[..at]),
+                Some(row.clone()),
+                "ends before quote_mint"
+            );
         }
     }
 
