@@ -225,22 +225,39 @@ code (`qrcode`, `@noble/curves/secp256k1`; mobile.md R10).
   Status), the search combobox (`SearchBox`: `/v1/search` results by symbol / name prefix, an exact
   mint always offers "Open mint" even before the indexer knows it; `/` focuses it), the wallet
   button (`WalletButton`: Wallet Standard discovery and connect, address and disconnect).
+  *Design pass (2026-10-16, P2; as built):* the brand is the mark (§7) and the wordmark, 8 px apart;
+  from 640 px the cluster badge sits 4 px closer to the brand and the nav 8 px further off, so brand
+  and badge read as one group (P2-2); under 400 px the mark is 30 px alone and "ShortWin" is hidden
+  only while the cluster badge shows — on mainnet it shows at every width (P2-2). The header's edge
+  is the first layer of `--shadow-header` (a `--line-panel` hairline with a faint drop under it; no
+  border), and from 1,680 px the header and the status bar pad in to the page column (P2-4). Under
+  1,024 px the header's free space sits before the search, so ⌕ (in `--text-0`) and the wallet button
+  form the trailing group (P2-4). Menus and the search results float under `--shadow-pop`; a focused or hovered
+  menu item steps to `--bg-4`, and the search's highlighted option is `--bg-4` with a 2 px gold inset
+  bar at its left (P2-4).
 - **Status bar** (`StatusBar`): RPC slot and health, indexer freshness and lag (§6.6), live-feed
   state, SOL/USD (from `/v1/stats`), the math module's state and version, cluster, and (*M10*) a
   "Security" link to `/security` (`nav-security`). Always visible: stale data is never silent.
   *Thirteenth round:* a "How it works" link before Security (`nav-how-it-works`, §3.11), and a
   glossary ⓘ on the RPC, indexer, live-feed and math items (§4.3).
+  *Design pass P2-3 / P2-4:* the bar is inset by the page gutter (`--gutter`, as the header: the
+  first dot starts where the title and the panels do), and its items take their state's colour — a
+  healthy indexer badge quiet (`--text-1`), a warning or a lagging badge amber (`--warn`), a bad item
+  or a stale / down badge red (`--danger`) — so a degraded item is never grey beside a green one.
 - **Indexer-down banner**: while `/v1/status` fails, pages fall back to RPC reads (§6.5).
 - **Keyboard**: skip link to `#main`; `/` search; table rows reachable by Tab, moved with ↑ / ↓,
   opened with Enter; Escape closes menus and dismissible dialogs.
 - *M10-RESP — the document scrolls* (not `main`); the header is sticky, the status bar sticky at the
   bottom. **Tablet (640–1023):** the text nav stays; the search folds into a Search button
   (`search-toggle`) opening a full-screen overlay; the cluster leaves the status bar (the header
-  badge has it). **Phone (< 640):**
+  badge has it). *Design pass P2-6:* a landscape phone (a coarse pointer, wider than tall, in this
+  tier) gets the phone's status strip below instead of the eight-item bar, which would clip at that
+  width; a mouse window keeps the bar with an 8 px item gap, so it fits from ≈ 666 px — a 640–665 px
+  mouse window still clips the end of "Security" (no device class, no gate viewport). **Phone (< 640):**
 
 ```
 ┌──────────────────────────────────┐ ← safe area
-│ W ShortWin [LOCALNET]  (⌕) [Connect] │ 48 (52 under a coarse pointer) sticky ("ShortWin" visually hidden < 400)
+│ W ShortWin [LOCALNET]  (⌕) [Connect] │ 48 (52 under a coarse pointer) sticky ("ShortWin" hidden < 400 only while the badge shows)
 │  page (document scroll)          │
 │ [ ▼ Short ]       [  Lend  ]     │ 56 action bar (pages that have one), fixed
 │ ● All live · RPC 3,012        ⌃  │ 28 status strip (status-summary), fixed
@@ -251,10 +268,23 @@ code (`qrcode`, `@noble/curves/secp256k1`; mobile.md R10).
 
   The tab bar's More (`nav-more`) opens a bottom sheet with How it works (`more-how-it-works`,
   first; thirteenth round), Status, the security policy, Create market and the network facts
-  (SOL/USD, math, cluster). The status strip says the worst state in
+  (SOL/USD, math, cluster); *design pass P2-9 / P9-2:* each row carries a leading 20 px icon and a
+  trailing chevron from the registry (`icons.tsx`), on a `--bg-2` sheet under `--shadow-sheet`. The
+  status strip says the worst state in
   words with a shape (● ok, ▲ warn, ✕ bad) and expands to every status item (Escape from inside
-  it returns focus to the strip). Toasts drop under the header. The wallet popup is a bottom sheet
-  with its title and a ✕ (`wallet-sheet-close`); like the trade sheet it has its own history entry
+  it returns focus to the strip). *Design pass P2-3 / P2-5 (as built):* the strip is a `--bg-2` band
+  with a 16 px registry chevron (up while folded, down while open); a warn or bad state tints the
+  whole band (`--warn-bg` / `--danger-bg`, its top line in the tone) and sets the words in `--text-0`
+  at medium weight — tint, weight and words, three cues; the open list (44 px rows; the RPC slot
+  grouped, "RPC 2,064") sits over a scrim that dims the page down to the strip's top edge and folds
+  the list on its click (never on pointerdown, so a tap cannot fall through to the page once the
+  scrim is gone), its two links bordered buttons side by side at the end; the active tab is gold
+  with a 32 px bar at the cell's top edge and a heavier icon, the tab bar's edge is `--line-panel`,
+  and the action bar floats under `--shadow-up` with no hairline, so action bar, strip and tab bar
+  read as panel / status band / tab bar. Toasts drop under the header. The wallet popup is a bottom
+  sheet with its title and a ✕ (`wallet-sheet-close`; *P2-8:* its edge the top line only, under
+  `--shadow-sheet`, the balance the identity block's one focal number, the no-wallet chooser one
+  bordered list of 48 px rows); like the trade sheet it has its own history entry
   (`state.walletSheet`), so Back closes it, closing it any other way pops that entry, and its
   My positions / My lending replace it.
 
@@ -300,6 +330,25 @@ OI, positions / flags), sorted by the table's sort bar. The filter reads "Filter
 (`min(380px, 100%)`, mono for a mint); on a phone venue, tier and open positions fold behind
 "Filters · n" (`markets-filters-toggle`); an empty filtered list offers Clear filters.
 
+*Design pass (2026-10-16, P5 and P11; as built):* the token cell is a link to the market
+(`target-link`: 24 px, 36 under a finger; the row stays activatable by Enter and by a click
+elsewhere), its symbol in link blue (P5-4); in the wide table the venue is quiet text — only
+Migrating (warn) and Lend only (the ringed neutral pill) stay pills — and a card gives the venue its
+grey tag back beside the tier (P5-4); TVL and open interest are padded to two decimals so a column's
+decimal points align, and a zero reads muted (P5-4, P4-1); the utilisation track is `--meter-track`,
+its fill never thinner than 2 px once there is any utilisation and empty at 0 % with a muted "0.0%"
+(P5-5); the age column is `formatAge` ("45s", then "11m", "3h 12m", "2d 4h"; the UTC time in
+`title`), so a list that refreshes every 15–30 s never churns seconds past the first minute (P5-5).
+When the filter is a mint without a market the empty state carries the action its sentence names —
+a gold "Create a market for this mint" (`markets-empty-create`) under it — and the head's Create
+market link is the default button (P5-7); the indexer-down form's "Open a market by its mint" is a
+sentence, not a tracked label (P5-7). On a phone the toolbar is one row merged into the sort bar —
+the filter box, "Filters ▾" and the count, which still wraps to its own right-aligned line at
+320 px (P5-1); the compact intro strip on every phone is an owner item (§7.6). *P11:* in the
+priority table (under 960 px of table width) the token cell is two lines, symbol over mint, so a
+768 px tablet's table fits its frame; a hand-typed `?q=` of digits only is still a filter (the
+router's search parser reads it as a number).
+
 *Thirteenth round (O-3 (a), audit finding D-03):* above the list, the **intro strip**
 (`markets-intro`, `MarketsIntro`): a heading row ("New to short.win?", How it works, Hide) and three
 parts — "Short a token", "Lend a token", "What can go wrong" — of one sentence each, side by side from
@@ -321,7 +370,9 @@ the header text, never inside its sort button; the flag badges carry one with th
 
 ### 3.4 Market page (MARKETS; panels SHORT / LEND)
 
-Layout `.layout-trade`: left the market column, right the 360 px trade panel (tabs Short | Lend).
+Layout `.layout-trade` (*design pass P2-7:* an alias of the shared `.layout-side` grid — `--side-col`,
+360 px and 320 px under 1,180 px — and of `.side-sticky`, which the Manage panel shares, §7.6): left
+the market column, right the trade panel (tabs Short | Lend).
 
 - **Header:** symbol, name, mint (copy), tier badge (popover "Why this tier": the tier inputs — pool
   age from `graduated_at` / listing, locked liquidity in USD, SOL/USD age — and the
@@ -329,6 +380,12 @@ Layout `.layout-trade`: left the market column, right the 360 px trade panel (ta
   *As built:* the popover shows the Tier A / B liquidity thresholds in USD and in SOL at the
   oracle price, not the pool's own locked liquidity Λ (FE-14); an `OracleCache` never cranked
   reads "No reading yet".
+  *Design pass P5-3 / P5-8 (as built):* the EMA price is the hero (`--fs-hero`: 22 px on a desktop,
+  24 on a phone) over the 20 px title, the spot `--fs-lg` in `--text-1`, and the name · mint line and
+  the price figures share one baseline (`last baseline` where supported); the price labels are the
+  label tier; the mint's quick-copy glyph and the "Why this tier" ✕ are registry icons (`copy` /
+  `check`; `close` in the shared 32 px box, 44 under a finger), the popover edged with `--line-panel`
+  under `--shadow-pop`; the tier badge keeps its inline ⓘ. The banners sit 8 px apart.
 - **Banners** in severity order: `market.mintUnsafe`, `market.routeBroken`, `market.coveragePause`,
   `market.venueUpgraded`, `market.migrating`, `market.graduationHalted`, `market.listOnly`; a
   collection window or a warm-up (`ema_warm > 0`) shows `market.poolSwitch`. *Thirteenth round (O-2,
@@ -359,7 +416,7 @@ Layout `.layout-trade`: left the market column, right the 360 px trade panel (ta
 - **Live:** subscribes `market:<mint>` (and `trades:<mint>` if a sparkline is shown); the panels
   read the chain (FE-D1).
 - *M10-RESP (§7.6):* the header puts the prices (EMA, spot) right after the title at the large
-  size, the tier badge reads "Tier C ⓘ" (the mark an inline SVG, not a font glyph), the mint is a Reveal (full mint, Copy, Explorer), and a
+  size (*design pass P5-3:* the EMA price at the hero size, the spot at `--fs-lg`), the tier badge reads "Tier C ⓘ" (the mark an inline SVG, not a font glyph), the mint is a Reveal (full mint, Copy, Explorer), and a
   flag that repeats the venue badge ("Lend only", "Migrating") is that badge. The stat strip
   starts with rate, utilisation, TVL and size cap; inventory, OI and lenders are priority 2 (behind
   "More stats" on a phone). Overview: hairline key / value blocks in two columns that share the
@@ -378,6 +435,16 @@ Layout `.layout-trade`: left the market column, right the 360 px trade panel (ta
   sticky submit is above the status bar on the first screen (with the header above the panel, the
   panel's viewport-high box reached under the status bar until the page scrolled). The app-wide
   indexer-down banner still sits above both columns.
+  *Design pass P5-2 and P11 (as built):* a market that cannot be shorted — `SHORT_BLOCKED`: paused
+  opens, coverage paused, route broken, lend only, migrating (the flags under which `openBlocked`
+  refuses; warming up, a pool window, a halted graduation, an unsafe mint and an upgraded venue stay
+  shortable by default) — opens its trade panel on Lend; an explicit `?panel=` still wins, and the
+  Short tab, its notice and the coverage link remain. The default waits for the market's view (its
+  flags): until then the panel shows skeleton lines, so the Short panel never mounts and then flips
+  to Lend. Under 1,024 px (a tablet included) the action bar's Short steps down to a grey default button (`data-unavailable`;
+  the banner above says why, the sheet still opens on it, its hover and press stay grey) and Lend
+  takes the gold. *P5-8:* the creator box's disclosure sits on the nested surface (`--surface-nested`),
+  edged with `--line-panel` on its plain sides; the stat strip's lender count reads muted at zero.
 
 ### 3.5 Create market (MARKETS)
 
@@ -408,6 +475,12 @@ disabled (`create-submit-reason`): sticky above the bottom bars on a tablet, the
 on a phone. Under 1,024 px one column (mint → verdict → venue → pools as cards → cost); the mint
 input takes `addressInputProps` and, under a coarse pointer, Paste (`create-mint-paste`).
 
+*Design pass P5-6 (as built):* the page is on the shared side column (`--side-col`: 360 px, 320 under
+1,180 px, the page gap between) like the trade and Manage panels; the left column's fields, the token
+facts, the venue choice and the reasons keep a 64ch form measure (`--form-measure`; the pools table
+keeps the panel's width); the token facts are hairline rows (`KvLines`, a zero supply muted); the
+radios are drawn by the app (§7.4).
+
 ### 3.6 Lend panel (LEND)
 
 Tabs Deposit | Withdraw | Claim (`lendTab-*`, `?action=`).
@@ -421,6 +494,18 @@ disabled submit. Withdraw has 25 / 50 / 75 % chips of the holding (Max, what may
 stays in the field) and a "≈ N TOKEN" line under the shares (display only). *Thirteenth round:* the
 deposit follows the Short form's order (O-1, below) and the Claim button says what it does (O-5,
 below).
+
+*Design pass P7 and P11 (as built):* Deposit | Withdraw | Claim is the `Tabs` `sub` variant — a
+segmented row on a `--bg-2` track, the selection a `--bg-3` fill with an inset ring — under the Short |
+Lend underline (P7-2); the position summary is a sunken well (`--surface-well`, edged with
+`--line-panel`, 8 / 12 px inset like the Short preview; P7-2, P11); the account select reads at
+`--fs-input` like the amount field (13 px with a mouse, 16 under a finger, so iOS no longer zooms the
+sheet) and truncates a long label; the tolerance box is `--field-narrow-w` (120 px); "Shares minted"
+and "You may withdraw now" are the preview's emphasised figures (`data-emph`, §7.4 `Kv`; P7-2).
+*P11:* the key / value rows share their width (labels 1fr, values 1.2fr) at every width and a long
+value wraps at its spaces, so the desktop column's labels never collapse to a word a line; a UTC stamp
+keeps its date and its time with the zone each on one line (`UtcStamp`, `lend/ui.tsx`), breaking only
+between them.
 
 - **Deposit:** source token account select (`readOwnerTokenAccounts`, ATA first; balance; CPI
   Guard flag), amount (`AmountInput`, Max = balance), preview (shares minted
@@ -673,6 +758,17 @@ keeps the mint's case and wraps, the read age on its own line. The review's posi
 UTC date (`kind: 'timestamp'`) and its confirmed banner leads to the new position (`TxPlan.next`);
 a confirmed open, close or add margin also pushes a toast (View position / Explorer).
 
+*Design pass P6-1, P6-4 and P11 (as built):* the preview is the well for read-only figures
+(`--surface-well`, edged with `--line-panel`); Total cost, CR at open (spot and EMA) and Liquidation
+price are its emphasised rows (`data-emph`: `--fs-md` medium in `--text-0`, their labels white; §7.4
+`Kv`), a value's explanatory sub-line is a second `<dd>` spanning the row under its number (the value
+`<dd>` keeps its testid and `data-value`), a hairline opens the risk group (CR at open) and the terms
+group (Rent rate) and one sits over the caps list, whose non-binding caps read muted while the binding
+one keeps its amber — every cap stays exact. On a phone Size takes the sheet's width and Slippage is a
+120 px box (`--field-narrow-w`) under it, as from 1,024 px (the 640–1,023 side sheet keeps the two side
+by side). The Close form's "You receive" and "P&L" are emphasised the same way, its sub-lines second
+`<dd>`s.
+
 ### 3.8 Positions, position detail, lender dashboard
 
 - **Positions** (SHORT; SPEC §8): one row per position (`positionRow-<pubkey>`): market, `Q` owed,
@@ -698,7 +794,7 @@ a confirmed open, close or add margin also pushes a toast (View position / Explo
   single-status filter). Under 560 px of table width each row is a card (market and risk badge on
   top, the numbers in pairs, Add margin / Close as a button row); the row actions link to the
   position with `?sheet=add-margin|close`. Disconnected: an empty state with
-  `connect-cta-positions`, no table frame; no open positions: "Open a short"
+  `connect-cta-positions` (the framed block of §3.10), no table; no open positions: "Open a short"
   (`positions-empty-cta`). The position page reads the position account only when it is a
   short.win `ShortPosition` (owner, discriminator, size); otherwise a not-found state with "Back to
   positions" (`position-not-found-cta`). It shows the health banner (its tone follows the risk) and a
@@ -707,6 +803,17 @@ a confirmed open, close or add margin also pushes a toast (View position / Explo
   chosen form with its heading focused, and ✕ (`manage-sheet-close`), Escape, the scrim or Back
   close; from 1024 px it stays in view beside the details. Each form's submit is in a sticky foot
   with its reason (`add-margin-reason`, `close-reason`).
+  *Design pass P6 and P11 (as built):* the totals are a KPI strip spanning the table's width (the
+  lender strip's pair: a label over a `--fs-lg` number per cell, hairlines between, the first cell
+  "1 OPEN" inline with its number; 2 × 2 on a phone, two cells under the Closed / Liquidated / Expired
+  filters), its SOL padded like the table's; the position page's CR is the hero (`--fs-hero`, the
+  largest thing on the page) and the title's account id a 12 px regular grey sub-element
+  (`.position-id`; its own line on a phone); the Manage panel shares `.layout-side` / `.side-sticky`
+  with the trade panel (§7.6), a hairline between its two forms with 16 px above and under it, and
+  its last foot alone casting `--shadow-up`; the facts and the timeline sit on the 28 px grid
+  (`--kv-row-h`) and do not answer the pointer; the status badges are `.badge-status` (capitalised);
+  RISK stays on one line from 1,280 px; vault and rent are padded to their precision (P6-5). The
+  no-wallet and not-found states are `Empty` blocks (§3.10).
 - **Lender dashboard** (LEND; `/lend`): per market (`lenderRow-<market>`): shares and share of the
   pool, token value (`previewTokenValue`), SOL claimable (`previewClaim`), vesting, lock and
   `lock_until`, creator badge; claim per row and "claim all" (one transaction per market; each
@@ -725,6 +832,13 @@ a confirmed open, close or add margin also pushes a toast (View position / Explo
   the thirteenth round's decisions): in the page header on a desktop, in the action bar under 1024 px. Under
   560 px of table width the rows are cards (market and value on top, the actions a button row).
   Without a wallet: Connect wallet; with no positions: Browse markets.
+  *Design pass P7 and P11 (as built):* the KPI strip spans the page (four equal cells from a tablet
+  up, 2 × 2 on a phone) with SOL claimable as its one hero (`Stat` `hero`: `--fs-xl` medium; `--fs-lg`
+  under 400 px so a 2-up cell never clips — an owner item, §7.6), the number the page's only primary
+  action repeats; the claimable cell is padded to its row's precision (`solFrac`, 6 or 9, so
+  decimals align within rows of equal precision only) and the vesting cell at 6; a card's hero is CLAIMABLE (`--fs-lg`
+  medium); the no-wallet state is the shared framed block with its 360 px Connect wallet (§3.10;
+  lend.css's own copies are gone, P7-3).
   *Thirteenth round (the owner's decision of 2026-10-11; audit finding D-21):* **a row's Claim is
   the Lend → Claim tab's.** Each row carries the panel's claim view (`previewClaimView`:
   claimable now and the shortfall, 0 under the 10,000-lamport dust threshold, §3.6) and runs the
@@ -807,14 +921,26 @@ upgraded latch, guard slot vs ProgramData slot, flagged at; enabled bit; route-b
 extras sets in force, markets in degraded mode (coverage-paused) and with route-broken or a running
 no-route chain (FE-5), the indexer's health (`/v1/status`: lag, quarantined, missing, truncated
 logs), the keeper coverage totals (`/v1/stats.coverage_gap_s`).
-*M10-RESP:* "New shorts" is a full-width row at the top; the other panels share rows of equal
-height (`minmax(min(420px, 100%), 1fr)`); the tables are DataTables (cards on a phone).
+*M10-RESP:* "New shorts" is a full-width row at the top; the other panels sit side by side where
+420 px fit (`minmax(min(420px, 100%), 1fr)`), 12 px apart, each as tall as its content (*design pass
+P5-8:* a stretched frame left empty panel; rows of equal height before); the tables are DataTables
+(cards on a phone). *P5-8:* "Open" / "Paused on every market" is a 13 px badge beside its prose, the
+indexer state a capitalised `.badge-status` (Live / Lagging / Stale / Unavailable), and every slot —
+confirmed, finalized, guard, deploy — is grouped with commas (`formatSlot`).
 
 ### 3.10 Loading, empty and error states
 
 Skeleton rows while loading (never a spinner over a table); empty states say what would fill them
 and offer the next action; errors show the mapped message with Retry (`ErrorState`); 404 from the
 indexer for a market that exists on chain renders the chain view (FE-D1).
+*Design pass P8-3 and P4-3 (as built):* an `Empty` with a title and an action (no wallet, Not found,
+no positions) is one framed `--bg-1` block edged with `--line-panel`, at least 200 px tall with its
+lines centred and its action row spanning it (a Connect wallet 360 px wide, the whole row on a
+narrower phone); a table's empty line stays centred and muted in place of the rows and hides the
+table and its sort bar with it (the axe fix: nothing is left for axe to require rows of, and the sort
+buttons are no Tab stops). `ErrorState` is a left-bar note in the danger tint (`--text-0` on
+`--danger-bg`) with Retry beside the message, an unbroken token wrapping instead of pushing the box
+past 320 px; in a flush panel or tab body it keeps the body's 12 px inset (P11).
 
 ### 3.11 How it works (GUIDE; the owner's thirteenth round, O-3 (c))
 
@@ -833,6 +959,15 @@ Tier C's opening CR, the tiers' shortest and longest duration); until it is read
 skeleton, never a word. An anchor in the URL (the intro strip's risk links) scrolls to its heading
 and focuses it once the numbers are in; a link to a collapsed disclosure opens it. Linked from the
 intro strip, the status bar and the phone's More sheet (`page-how-it-works`, `how-it-works-section-<anchor>`).
+
+*Design pass P8 (as built):* a 15 px lede (`--fs-lg`, `--text-1`) on a 60ch measure, 14 px / 1.55
+paragraphs and lists (`--fs-prose` / `--lh-prose`; 15 px on a phone) with the embedded risk boxes at
+the prose size, 18 px sections (`--fs-xl`; 18 px on a phone too, under the 20 px title — P11) with
+32 px above and sub-headings with 16 px above; the contents box is edged with `--line-panel`, wraps
+into rows of 44 px links on a phone so the first section starts on the first screen, and from
+1,280 px is a sticky 200 px rail beside the body (a grid; DOM order kept, no `order`; the first
+section's hairline level with the rail's top). Security reads the same way (the lede, the prose tier,
+16 px above a sub-heading; the Scope note keeps its 12 px).
 
 ---
 
@@ -1623,7 +1758,9 @@ program and instruction name decoded from each instruction's own program id and 
 `src/tx/describe.ts` — the Codama / `@solana-program` identifiers, pump and PumpSwap by their
 Anchor discriminators — never from the feature's description; *added at integration*), the delta
 table (before → after → change, signed and coloured, units), compute units and fee, the priority
-selector (Normal p75 / Fast p95, re-simulates), the plan's disclosures with their checkboxes,
+choice (*design pass P9-4:* a Normal / Fast chip pair — both visible, the pressed chip the selected
+state, a 36 px chip with a 44 px touch area (`.hit`) under a finger — in place of a select; p75 / p95, re-simulates), the plan's
+disclosures with their checkboxes,
 `tx.simulation` (collapsed; *v1.2:* in every review, M9-UX-3), and errors with their action.
 Titles and delta labels name the token by symbol **and** short mint ("Open short · 1,000 BONK ·
 DezX…B263", "Borrowed (BONK · DezX…B263)"; M9-SEC-5). **Watched accounts per flow** (minimum): create market — wallet SOL; deposit —
@@ -2011,7 +2148,7 @@ the text "▼" glyph and the falling-line favicon.
 ### 7.1 Colour tokens (`src/styles/tokens.css`)
 
 *Design pass P1 (2026-10-16, the tokens package):* the rows marked *P1* were added or changed by it; a row names
-the package that consumes the token where that package has not landed yet. Every ratio below was recomputed
+the package that consumes the token (all landed: P2–P9 and the P11 cleanup). Every ratio below was recomputed
 (WCAG 2.x relative luminance) when the row was written.
 
 | Token | Value | Use | Contrast (on `--bg-0` / `--bg-1` / `--bg-3`) |
@@ -2089,7 +2226,9 @@ rows 24 px apart so two rows' ⓘ never overlap. The positions table's headers w
 (only its values stay on one line). The market's stat strip keeps each label on one line from
 1,280 px: in its one-row case (≥ 980 px wide) a cell is at least as wide as its label, so the
 values share one line. Every table fits its width without sideways scroll at 1,024, 1,280 and
-1,440 px with the trade panel where the base did (the responsive gate's h-scroll counts, §10.5). Number rules (`lib/format.ts`, `components/Num.tsx`): amounts
+1,440 px with the trade panel where the base did (the responsive gate's h-scroll counts, §10.5; *design pass
+P1:* re-measured at 1,280 and 1,440 px with the 12 px gutter and the reserved scrollbar gutter — 0 sideways
+scrollers, §7.3). Number rules (`lib/format.ts`, `components/Num.tsx`): amounts
 are `bigint` end to end and formatted once; balances truncate (never round up); SOL 4 decimals in
 tables; tokens by their decimals (≤ 4 shown); tiny prices with subscript zeros (`0.0₅1234`), the
 plain value in `title` and for screen readers; P&L always signed with U+2212 and ▲ / ▼; numeric
@@ -2101,12 +2240,29 @@ bold `--text-1` uppercase, 0.05em — the base `h3`, one pixel smaller than befo
 outranks a label (`--label-*`, 12 px medium `--text-2` uppercase, 0.04em). The page `h1` is `--fs-title`
 (20 px at every width, −0.01em; it was 18 px on a desktop and a tablet) so it stands clear of the 15 px
 wordmark, and a hero number is `--fs-hero` (= `--fs-2xl`, 22 / 24 px), so a hero number outranks the title
-once P5-3 (the EMA price) and P6-2 (the CR) consume it; reading prose is `--fs-prose` 14 px (15 on a
-phone) at `--lh-prose` 1.55 once P8 consumes it. `h3` lands exactly on the 12 px floor on a desktop (the gate
+(the market's EMA price, P5-3; the position's CR, P6-2); reading prose is `--fs-prose` 14 px (15 on a
+phone) at `--lh-prose` 1.55 (P8). `h3` lands exactly on the 12 px floor on a desktop (the gate
 fails only below 12). **Press states** (`base.css`): a pressed default / danger / ghost button, menu item or
 search option steps to `--bg-4`; a pressed tab, nav link, the phone's More button (new: it had no press
 feedback) and an interactive row step to `--bg-hover`; the filled primary and short buttons are excluded
 and take their own presses (P3-3).
+
+*Design pass P4, P5–P7 and P11 (numbers, as built):* an amount that reads as zero carries `data-zero`
+and is muted (`--text-2`, its unit with it; never hidden, and `inherit` inside a button so "Claim all ·
+0 SOL" stays legible on gold) — judged by the displayed digits, so dust that rounds to "0.0000" is as
+quiet as an exact zero while `data-value` keeps the raw integer; a feature's plain-span zero (a count, a
+utilisation of 0 %) sets it too, so a row never mixes grey and white zeros. SOL columns are padded to
+their column's precision (`Sol` / `Tokens` `pad`: every fraction digit kept, so the decimal points
+align — the markets list's TVL and OI at 2, the market tabs' and the positions' SOL at 4, rent at 6, the
+lender's claimable at its row's `solFrac`); whole-token quantities stay unpadded, and so do the review's
+delta rows (`formatFixed`, where a padded round "before" would be noise). Slots are grouped with commas
+(`formatSlot`; "—" for none) and ages read "45s", "11m", "3h 12m", "2d 4h" (`formatAge`; `Countdown`
+and `formatDuration` keep their seconds). In a card the sorted column is the hero figure
+(`td[data-sorted]`: `--fs-lg` medium, its label 12 px; a skeleton row carries no `data-sorted`), and in
+a table the sorted column's header is white over a 2 px gold line. A unit is an atomic inline (a line
+may break between a number and its unit, never inside the unit). Hairline key / value rows and the
+position's facts sit on the 28 px grid (`--kv-row-h`), and a preview's decisive figure (`data-emph`) is
+`--fs-md` medium in `--text-0` with its label white and its unit 12 px.
 
 ### 7.3 Density and layout
 
@@ -2117,7 +2273,9 @@ landscape phone too — `(min-width: 640px) and (max-width: 1023.98px) and (poin
 landscape)` — so the 844 × 390 chrome is 52 + 56 + 28 = 136 px); *M10-RESP:* no minimum width (§7.6) and, under a coarse pointer at any
 width, 44 px controls and rows, 16 px inputs (the unused `data-density` block is gone; a density
 toggle is owner item O-4); `.page` stops at 1,680 px and centres; the trade layout is a fluid market column plus a
-360 px panel (320 px under 1,180 px). Panels: 6 px radius, hairline borders, uppercase 12 px titles.
+360 px panel (320 px under 1,180 px). Panels: 6 px radius, a `--line-panel` edge with a 1 px top highlight
+(`--edge-highlight`), 13 px bold white uppercase titles (the title tier; *design pass P3-1*; 12 px light grey
+before).
 *As built (the visual pass, §10.2 `screens`):* the trade panel is sticky and scrolls on its own
 (its submit stays a short scroll from the inputs while the market column scrolls); table cells
 tighten to 4 px padding under 1,280 px so the markets table fits 1,024 px without sideways
@@ -2134,7 +2292,9 @@ packed the numbers into one block and left the text columns empty: dropped, ever
 the spare width; the review's delta table keeps its numbers shrink-wrapped, and a date there may
 break between its day and its time). A position's facts fill up to three columns top to bottom, in groups (size,
 risk now, rent and dates). The trade and Manage panels reserve their scrollbar gutter on both
-edges (`stable both-edges`, thin), so the insets are symmetric. The status bar's top line is a
+edges (`stable both-edges`, thin), so the insets are symmetric (*design pass P2-7:* one recipe,
+`.side-sticky`, §7.6 — the thumb in `--scrollbar-thumb`, `scroll-padding` clearing the sticky foot, the last
+foot under `--shadow-up`). The status bar's top line is a
 shadow, so a 24 px target in it never makes a short page 1 px taller than the screen. A
 `details` summary has a bordered chevron (right / down) in `--text-1`.
 
@@ -2158,28 +2318,29 @@ Security — 0 sideways scrollers and 0 px of document overflow before and after
 
 | Component | Contract |
 |---|---|
-| `Button` | variants default / primary / short / danger / ghost, sizes sm / md, `busy` |
-| `Panel` | titled `<section>`, actions slot, flush body |
-| `DataTable` | columns (align, sortable, width), sticky header, `aria-sort`, row activation by click / Enter, ↑ / ↓ between rows, skeleton rows, empty state, caption; *as built:* `rowAttrs` (`data-*` state on a row, e.g. `data-status`), and a click or key on a link / button / input inside a cell is that control's, not the row's |
-| `Sol`, `Tokens`, `Bps`, `Price`, `Pnl` (`Num.tsx`) | formatted numbers with `data-value` and screen-reader text |
-| `Badge`, `TierBadge`, `RiskBadge`, `VenueBadge`, `riskLevel` | tone / risk / tier semantics |
-| `Modal` | native `<dialog>` (focus trap, Escape, focus return), non-dismissible mode |
-| `ToastProvider` / `useToast` | polite and assertive live regions; errors persist; *as built:* bottom-left (the trade panel is the right column), the empty region lets clicks through |
-| `Field`, `AmountInput`, `Checkbox`, `Select` | labelled inputs, strict amount parsing, Max, hints and errors wired with `aria-describedby` |
-| `Tabs`, `TabPanel` | WAI-ARIA tabs (arrows, Home / End) |
-| `Disclosure` | verbatim disclosure with optional acknowledgement, collapsible; a disclosure whose acknowledgement is its whole text (SPEC §5.3's sentence) shows it once, as the checkbox's label |
-| `Empty`, `ErrorState`, `Skeleton`, `Stat`, `Kv` | states, stat strips, key / value previews |
-| `AddressText`, `Countdown` | short address with copy; live time left |
-| `TxReviewModal` (`src/tx`) | the review of §5.3; *M10-RESP:* the error under the stage, the simulation badge gone once the wallet has it, "Cancelled in your wallet" + Try again, timestamp deltas as dates, the sign hint, the confirmed link (`TxPlan.next`); full screen on a phone |
+| `Button` | variants default / primary / short / danger / ghost, sizes sm / md, `busy`; *design pass P3-2 / P3-3 (as built):* a disabled button keeps its shape (`--bg-2`, a `--line-strong` edge, `--text-2`) at regular weight, so it is told from an enabled default button beside it, and with a Connect CTA in the same foot it is a quiet caption-like row (no box, 24 px with a mouse, 44 under a finger); `busy` (`aria-busy`, only while it works) spins a ring before the text (`cursor: progress`); under the pointer a default or ghost button steps to `--bg-4`, the primary presses to `--accent-active`, short hovers and presses to `--loss-hover`, danger hovers to its own tint (`--danger-bg`); the shared close ✕ (`.modal-close`, `.glossary-close`, `.mk-popover-close`) is one `--icon-btn` box (32 px; 44 under a finger) in `--text-0` — the sheet's ✕ keeps its 44 px box, the toast's its small ghost box (it shows the word "Dismiss" over an open sheet) |
+| `Panel` | titled `<section>`, actions slot, flush body; *P3-1:* a `--line-panel` edge with `--edge-highlight`, the title on the title tier (13 px bold white, `--title-*`) |
+| `DataTable` | columns (align, sortable, width), sticky header, `aria-sort`, row activation by click / Enter, ↑ / ↓ between rows, skeleton rows, empty state, caption; *as built:* `rowAttrs` (`data-*` state on a row, e.g. `data-status`), and a click or key on a link / button / input inside a cell is that control's, not the row's; *design pass P4 and P11 (as built):* the header sits on the label tier in a 28 px row (a 24 px sort button plus 2 + 2) and from 1,024 px sticks under the app header except in the positions and lend tables (the wrap stops being its scroll container; rows and in-row controls carry `scroll-margin-top: calc(var(--header-h) + 3 * var(--row-h))`, so a Shift+Tab-focused row — the `focus.spec.ts` walk over the markets list, Tab and Shift+Tab — clears a stuck header up to three lines tall; the review's deltas table has no wrap); the sorted column's header is white over a 2 px gold line and the sort marks are registry icons (`sort` on a sortable column, `chevron` on the sort — turned for ascending — and an `arrow` in the card sort bar before "Descending" / "Ascending"); an interactive row (`onRowActivate`) lifts to `--bg-hover` under the pointer and shows an inset focus ring, a read-only row does not (P11); an empty list hides its table and sort bar and shows its message alone (P4-3, the axe fix); a card's sorted cell is its hero (P4-4) |
+| `Sol`, `Tokens`, `Bps`, `Price`, `Pnl` (`Num.tsx`) | formatted numbers with `data-value` and screen-reader text; *P4 / P11:* `data-zero` on an amount that reads as zero, `pad` on `Sol` / `Tokens` (§7.2) |
+| `Badge`, `TierBadge`, `RiskBadge`, `VenueBadge`, `riskLevel` | tone / risk / tier semantics; *P3-8:* an info badge is a grey tag (`--tag` on `--tag-bg`: link blue stays a link's), a neutral badge is ringed (`--bg-2` with an inset `--line-strong` hairline), and `className="badge-status"` capitalises a single-word enum (position status, indexer state) without changing its text; the tier badge is untouched |
+| `Modal` | native `<dialog>` (focus trap, Escape, focus return), non-dismissible mode; *P9-2 / P9-5:* under `--shadow-modal` with its `--line-strong` edge; open, a column whose body takes the height the dialog's own `max-height` leaves (no 200 px constant); the `sheet` variant a `--bg-2` sheet under `--shadow-sheet` with a `--bg-2` head; its ✕ the registry's `close` icon in the shared box |
+| `ToastProvider` / `useToast` | polite and assertive live regions; errors persist; *as built:* bottom-left (the trade panel is the right column), the empty region lets clicks through; *P9 / P11:* under `--shadow-toast`; over an open sheet on a phone the toast is a strip sized to the sheet head and 4 px clear of its ✕ box (§7.6); on a tablet the column stops 12 px short of the side sheet; the gap between the two live-region stacks is a margin only while both hold a toast |
+| `Field`, `AmountInput`, `Checkbox`, `Select` | labelled inputs, strict amount parsing, Max, hints and errors wired with `aria-describedby`; *P3-4 / P3-7:* an error never replaces the hint (the hint carries the limit the error is about): error first, then the hint, both in `aria-describedby`; the select, the checkbox and a radio are drawn by the app (`appearance: none` — the registry chevron in a `--select-arrow-w` gutter at the field's height `--field-h`; a `--check` box, 18 px and 20 under a finger, that fills gold with a drawn tick, a radio a gold ring and dot); a disabled field sinks to `--bg-1` with a hairline and muted text; Max is a `--text-1` text control, not gold |
+| `Tabs`, `TabPanel` | WAI-ARIA tabs (arrows, Home / End); *P3-6:* a hover (white text, a grey underline), a fade at the edge where tabs are out of view (`data-overflow` = start / end / both) and `variant="sub"` — a segmented row on a `--bg-2` track, the selection a `--bg-3` fill with an inset ring, 44 px under a finger (Deposit / Withdraw / Claim) |
+| `Disclosure` | verbatim disclosure with optional acknowledgement, collapsible; a disclosure whose acknowledgement is its whole text (SPEC §5.3's sentence) shows it once, as the checkbox's label; *P3-1 / P3-5:* a `--surface-note` box edged with `--line-panel` and its 3 px severity bar; the acknowledgement is a control row — a bordered `--bg-3` row that turns gold when ticked, one focus ring on the row (keyboard only), its box 24 px (`max(24px, --check + 4px)`); a `details` chevron is a 7 px, 2-stroke mark |
+| `Empty`, `ErrorState`, `Skeleton`, `Stat`, `Kv` | states, stat strips, key / value previews; *P4-5 / P4-7 / P8-3:* `Stat` `hero` (`data-hero`: `--fs-xl` medium, the strip's one headline) and the strip's hairlines between cells (a cell is transparent, the strip paints `--bg-1` and clips the outer edges); `Kv` rows on the 28 px grid under `data-lines`, with `dd[data-emph]` / `dd > [data-emph]` for a decisive figure, and no hover; the `Empty` block and the left-bar `ErrorState` (§3.10) |
+| `AddressText`, `Countdown` | short address with copy; live time left; *P3-10:* the copy glyph is the registry's `copy` (`check` in `--ok` while "Copied"), muted beside the text |
+| `TxReviewModal` (`src/tx`) | the review of §5.3; *M10-RESP:* the error under the stage, the simulation badge gone once the wallet has it, "Cancelled in your wallet" + Try again, timestamp deltas as dates, the sign hint, the confirmed link (`TxPlan.next`); full screen on a phone; *P9-2 / P9-4:* the instructions on the sunken well (`--surface-well`), the priority fee as a Normal / Fast chip pair (§5.3) |
 | *M10-RESP* `DataTable` | column `priority` (1–3), `label`, `card` (title / aside / actions); every cell `data-col`, `data-label`, `data-priority`, `data-card`; explicit table roles; a sort bar (`table-sort-<id>`, `table-sort-dir-<id>`) in card mode; `className`, `sortLabel` |
-| *M10-RESP* `useSheetMode`, `SheetHead`, `Scrim` (`Sheet.tsx`) | an element that becomes a modal sheet under a query (default compact) while open: dialog role, `aria-modal`, the rest inert (not `[data-sheet-keep]` / an open `<dialog>`), focus in and back, Escape; nothing on a desktop |
-| *M10-RESP* `FormFoot`, `ActionBar` | the sticky submit with a `role=status` reason (a button to the control to fix with `reasonTarget`); the page's fixed thumb bar under 1,024 px |
-| *M10-RESP* `Reveal` | a truncated value → popover with the full value, Copy, Explorer (`reveal-<kind>`); opt-in on `TokenId` / `AddressText` (`reveal`) |
-| *M10-RESP* `ConnectCta`, `WalletChooser` (`src/wallet`) | an enabled Connect wallet on a surface and the shared chooser (one open at a time, `walletUi.ts`); mobile without a wallet: open-in-wallet links (§5.4) |
+| *M10-RESP* `useSheetMode`, `SheetHead`, `Scrim` (`Sheet.tsx`) | an element that becomes a modal sheet under a query (default compact) while open: dialog role, `aria-modal`, the rest inert (not `[data-sheet-keep]` / an open `<dialog>`), focus in and back, Escape; nothing on a desktop; *P9-1 / P9-5:* the head carries the notch inset itself (`top: 0`, `--safe-t` as padding inside a `min-height` of `--sheet-head-h` + `--safe-t`), so it keeps its height in a wallet's in-app browser; its ✕ the `close` icon |
+| *M10-RESP* `FormFoot`, `ActionBar` | the sticky submit with a `role=status` reason (a button to the control to fix with `reasonTarget`); the page's fixed thumb bar under 1,024 px; *P3-2 / P2-5:* the submit wraps instead of overflowing a 320 px foot, a 12 px fade sits above the foot's hairline (not on a sheet's static foot or the create page's fixed one), a disabled submit under a Connect CTA is a caption (`Button`), the reason-button is link blue; the action bar floats under `--shadow-up` with no hairline |
+| *M10-RESP* `Reveal` | a truncated value → popover with the full value, Copy, Explorer (`reveal-<kind>`); opt-in on `TokenId` / `AddressText` (`reveal`); *P3-10:* the dotted line is a text underline on the baseline (the 24 px box kept), the popover edged with `--line-panel` under `--shadow-pop`, Explorer with the `external` icon |
+| *M10-RESP* `ConnectCta`, `WalletChooser` (`src/wallet`) | an enabled Connect wallet on a surface and the shared chooser (one open at a time, `walletUi.ts`); mobile without a wallet: open-in-wallet links (§5.4); *P2-8:* the chooser's links are one bordered list of 48 px rows (the focus ring inside a row), the cluster hint an info note (`.wallet-note`), the open-in and explorer links with the `external` icon |
 | *M10-RESP* `Modal` `variant`, `Empty` `title` / `action`, `Stat` `priority`, `Panel` `ref` / `head`, `AmountInput` Max in the field, `addressInputProps`, `Toast` kind word / `links`, `Tabs` sideways scroll | as §7.6 |
-| *Thirteenth round* `GlossaryTip`, `Term` (`Glossary.tsx`) | the glossary control (§4.3) |
+| *Thirteenth round* `GlossaryTip`, `Term` (`Glossary.tsx`) | the glossary control (§4.3); *P3-10:* the resting ⓘ is `--icon-muted` at 12 px (the text colour under the pointer, `--info` while open; its hit areas unchanged), its ✕ the `close` icon in the shared box |
 | *Thirteenth round* `PageBannersContext`, `focusBanner` (`PageBanners.tsx`) | which banners the page shows, whether its panel is a sheet, and a way to a banner (O-2, §3.4) |
 | *Thirteenth round* `.link-button` | a button that reads as a link (an in-page action), 24 px target, underlined |
+| *Design pass P2-1* `NavIcon` (`shell/icons.tsx`) | the one glyph registry: the tab bar's icons, `info`, and `close`, `chevron`, `arrow`, `sort`, `copy`, `check`, `external`, `shield`, `plus` — 20 px inline SVG stroked 1.6 in `currentColor`, presentation attributes only, aria-hidden (the control's text or `aria-label` names it); outside the tab bar it takes `.icon` (`--icon`, 16 px), `.icon-sm` (`--icon-sm`, 14 px) or its own class (the More rows' 20 px icon and 16 px chevron, the status strip's 16 px chevron, the 12 px sort marks, glossary ⓘ and tier ⓘ); every close, copy, external, sort and chevron glyph in a control is its (the P&L ▲ / ▼, the status strip's ● ▲ ✕ and the action bar's "▼ Short" stay text). The brand mark is `Logo.tsx`, not an icon |
 
 Track-specific components live in the track's directory; a component two tracks need is proposed
 to the integrator for `src/components`.
@@ -2188,7 +2349,10 @@ to the integrator for `src/components`.
 
 Short transitions (80–140 ms) on hover and focus only; no number flashing or animated tickers
 by default; skeleton shimmer; everything off under `prefers-reduced-motion`. *M10-RESP:* sheets
-slide in over `--t-sheet` (140 ms; 0 under reduced motion).
+slide in over `--t-sheet` (140 ms; 0 under reduced motion). *Design pass (as built):* a button's
+background steps over `--t-fast` (80 ms); a busy button's ring spins (0.8 s, linear) and stands still as
+a half-tone mark under reduced motion (P3-2); the status strip's chevron turns over `--t` (140 ms), a
+`details` chevron over `--t-fast`; hover and press are colour steps on the P1 tokens, no new transition.
 
 ### 7.6 Responsive conventions (M10-RESP)
 
@@ -2210,7 +2374,10 @@ both on pc and phone", keeping the dark terminal. The rules every track follows:
   (a ~390 px sheet cannot lift a sticky foot over a form that starts low; it covered the fields
   and cut off the submit; *the fix round's review:* with `z-index: auto` too, as a flex item's
   z-index stacks in the flow and the Manage sheet's Add margin foot painted over the sticky head
-  and its ✕), and (thirteenth round) the markets intro strip is compact (§3.3);
+  and its ✕), (thirteenth round) the markets intro strip is compact (§3.3), *(design pass P2-6, P11)* the
+  status bar is the phone's strip with its open list two items a row (§3.1), and *(P11)* the review
+  dialog takes all but 24 px of the height with 8 px of block padding in its head and foot (its body
+  242 px, from 186);
   *thirteenth round:* once, `(max-height: 699.98px)` with
   `(max-width: 399.98px)`: a short phone (320 × 640, 375 × 667), where the markets list's intro strip
   keeps only its heading row and "What can go wrong" (§3.3) — `MEDIA_HEIGHTS`, the only height
@@ -2278,14 +2445,18 @@ both on pc and phone", keeping the dark terminal. The rules every track follows:
   text field is 44 px inside its border under a coarse pointer; action-bar buttons are ≥ 44 px; a
   `FormFoot` in the page sticks above the fixed bars under 1,024 px and at the bottom of an open
   sheet; an open sheet's `scroll-padding` clears its head and its foot (2.4.11); on a phone, a toast
-  over an open sheet takes the sheet head's title strip (one line, 16 px clear of its ✕: it covers
-  text, never a control; a success or a note has no ✕ of its own there, an error keeps its
-  one-line reason and a "Dismiss" word); a toast's 6 s count only while it is in view (not under a
+  over an open sheet takes the sheet head's title strip (one line, sized to the head — `top` =
+  `--safe-t`, `min-height` = `--sheet-head-h` — and 4 px clear of its 44 px ✕ box, 4 px past the
+  title box, so it covers text, never a control, and no title ink shows under it; *design pass
+  P9-3*, 16 px clear and shorter than the head before; a success or a note has no ✕ of its own
+  there, an error keeps its one-line reason and a "Dismiss" word); a toast's 6 s count only while it is
+  in view (not under a
   dialog or a sheet); the acknowledgement checkbox takes an id
   (`Disclosure ackId`, `Checkbox id`) for `FormFoot reasonTarget`. *Fix round:* a card whose
   title has no aside takes the whole first row; a card table's clipped header shows while focus is
   in it (its sort buttons are never an invisible Tab stop); the sort bar's direction button names
-  the order ("↓ Descending" / "↑ Ascending", `data-order`), no pressed state; a sheet that
+  the order ("Descending" / "Ascending" after an `arrow` icon — down for descending, turned for
+  ascending; `data-order`; *design pass P4-3, P11*), no pressed state; a sheet that
   unmounts as it closes (the wallet popup) or has no opener (a deep link) returns focus to the
   opener or `#main`, never `<body>`; a shortened id ("8oBK…6cTC") in a review title or account
   label never splits across lines (`.nowrap`).
@@ -2302,6 +2473,29 @@ both on pc and phone", keeping the dark terminal. The rules every track follows:
   `both-edges`; if the owner wants 1,024–1,279 covered too, the only safe form there is on the lock rule itself
   (`scrollbar-gutter: stable` beside `overflow: hidden`), which costs nothing at rest but moves the jump to
   short pages at open time.
+- **The shared side column** (*design pass P2-7, P5-6, P6-3*). `.layout-side` is the two-column grid of a
+  page with a side panel — `minmax(0, 1fr)` and `--side-col` (360 px; 320 under 1,180 px), `--page-gap`
+  between, one column under 1,024 px — and `.side-sticky` the panel's recipe from 1,024 px: sticky under
+  the header, its own thin scroller (`--scrollbar-thumb`, the gutter on both edges), `scroll-padding`
+  clearing its sticky foot, the last form's foot under `--shadow-up`. The market page's `.layout-trade` /
+  `.trade-panel` are aliases of the same declarations; the Manage panel carries the classes, and the
+  create page's own grid takes the same tokens.
+- **The sheet head under the notch** (*P9-1*). The head carries the inset itself: `top: 0` with `--safe-t`
+  as padding inside a `min-height` of `--sheet-head-h` + `--safe-t` (a scroll container's padding-top scrolls
+  away with its content, and a sticky head with a negative `top` was pinned above the scrollport: in a
+  wallet's in-app browser only ~5 px of the title and its ✕ were left once the form scrolled); the host's
+  `scroll-padding-top` keeps the 8 px clearance under it for a focused control (2.4.11). The side sheet
+  follows through the same rule; nothing changes at a 0 inset.
+- **Owner items from the design pass** (*2026-10-16; each left as built until the owner rules*). (1) *The
+  compact intro strip on every phone (P5-1):* the strip is compact on a short phone and a landscape phone
+  only (above, §3.3); adding `(max-width: 639.98px)` to the markets.css prelude (keeping the approved
+  short-phone query) would compact it on every phone, so the first market shows higher at the cost of
+  "Short a token" and "Lend a token", which How it works carries — not applied without an explicit yes
+  (the toolbar's one-row recipe landed, §3.3). (2) *The scrollbar gutter at 1,024–1,279 px:* off (the bullet
+  above); the only safe form there is on the lock rule itself. (3) *The lend KPI hero under 400 px (P7-1):*
+  the strip's hero is `--fs-lg` (16 px) under 400 px so a 2-up cell never clips "0.016481 SOL" inside the
+  strip's `overflow: hidden`, and `--fs-xl` from 400 px (20 px on a phone, 18 from 640 px) — so a 390 px
+  phone shows the 16 px hero, the card's size, not the plan's larger one; it reads fine as built.
 
 ### 7.7 Supported widths and the pages at each (M10-RESP, as built)
 
@@ -2311,21 +2505,22 @@ stops and centres. The tier is the viewport width; density is the pointer (§7.6
 
 | Width | Shell | Tables | The trade panel / Manage | Type |
 |---|---|---|---|---|
-| **< 640 px** (phone; "ShortWin" hidden < 400) | 48 px header (brand, cluster, Search button, wallet), the `<nav>` as a bottom tab bar with More, the status strip (worst state in words, expands) | cards (container < 560 px), sort bar; priority-3 hidden | a full-screen sheet from the page's action bar (`?sheet=`), Back closes it | one notch up: 12–24 px |
-| **640–1,023 px** (tablet, landscape phone) | text nav, Search button → overlay, the status bar as on a desktop (no cluster) | priority mode (container < 960 px: p3 hidden), cards where the container is < 560 px | a right-side sheet (`min(440px, 100vw)`) over a scrim; on a landscape phone its submit sits under the fields, not sticky (usable, cramped: the header, action bar and status bar take a third of 390 px — a device check, §10.3) | as a desktop |
-| **≥ 1,024 px** (laptop, desktop) | the terminal header and status bar, inline search with `/` | full tables (the market page's 680 px column at 1,024 is a priority-mode container) | in the page: the sticky right column | 12–22 px (thirteenth round; 11–22 before) |
+| **< 640 px** (phone; under 400 px "ShortWin" is hidden only while the cluster badge shows) | 48 px header (52 under a coarse pointer: the mark — 30 px alone under 400 — and the wordmark, the cluster badge, then ⌕ and the wallet as the trailing group), the `<nav>` as a bottom tab bar with More (the active tab gold with a 32 px bar), the status strip (worst state in words, tinted when degraded, expands over a scrim) | cards (container < 560 px) with the sorted column as each card's hero, sort bar; priority-3 hidden | a full-screen sheet from the page's action bar (`?sheet=`), Back closes it; its head keeps its height under the notch | one notch up: 12–24 px |
+| **640–1,023 px** (tablet, landscape phone) | text nav, Search button → overlay, the status bar as on a desktop (no cluster; an 8 px item gap, so a 640–665 px mouse window still clips the end of "Security") — a landscape phone (a coarse pointer, wider than tall) gets the phone's status strip instead, its open list two items a row | priority mode (container < 960 px: p3 hidden), cards where the container is < 560 px | a right-side sheet (`min(440px, 100vw)`) over a scrim; on a landscape phone its submit sits under the fields, not sticky (usable, cramped: the header, action bar and status strip take 136 px of 390, §7.3 — a device check, §10.3) | as a desktop |
+| **≥ 1,024 px** (laptop, desktop) | the terminal header and status bar, inline search with `/` | full tables, the header stuck under the app header except in the positions and lend tables (the market page's 680 px column at 1,024 is a priority-mode container) | in the page: the sticky right column (`.layout-side` / `.side-sticky`; 360 px, 320 under 1,180) | 12–22 px (thirteenth round; 11–22 before); the page title 20 px, a hero number 22 px |
 
 **Pages** (the §3 sections have the details):
 
 | Page | Phone | Tablet | Desktop |
 |---|---|---|---|
-| `/markets` (§3.3) | cards (symbol and mint, venue and tier; price / TVL, utilisation / OI, positions / flags), "Filters · n" toggle, sort bar | priority table | the table; "Filter this list" (mono for a mint), Clear filters |
-| `/m/$mint` (§3.4) | prices under the title, 2-up stats with "More stats", sideways tabs, tab tables as cards; action bar Short / Lend → trade sheet | one column, stats 4 + 3, side sheet | two columns, the trade panel sticky |
-| `/markets/new` (§3.5) | one column; Review is the page's bottom bar with its reason; Paste under a coarse pointer | one column, sticky foot | two columns; a rejected token says "Cannot be listed" and has no Review |
-| `/positions` (§3.8) | totals line, position cards with Add margin / Close | priority table | the table, "How risk is graded" |
-| `/positions/$position` (§3.8) | health banner, hero line (CR, P&L, time left), facts in one column; action bar → Manage sheet at the chosen form | facts in two columns, side sheet | Manage sticky beside the facts |
-| `/lend` (§3.8) | KPIs 2 × 2, lender cards with Withdraw / Deposit / Claim, Claim all in the action bar | cards (the lender table is cards under 960 px of container) | the table, Claim all in the header |
-| `/status`, `/security` (§3.9) | one column, tables as cards; identifiers wrap | one column | panels side by side; the policy centred at 920 px |
+| `/markets` (§3.3) | cards (symbol and mint, venue and tier; price / TVL, utilisation / OI, positions / flags; the sorted figure the hero), one toolbar row with the "Filters · n" toggle and the count, sort bar | priority table | the table (the token a link, the venue quiet text); "Filter this list" (mono for a mint), Clear filters or "Create a market for this mint" |
+| `/m/$mint` (§3.4) | the 24 px EMA price under the title, 2-up stats with "More stats", sideways tabs, tab tables as cards; action bar Short / Lend → trade sheet (Lend gold and Short grey on a market that cannot be shorted, which opens on Lend) | one column, stats 4 + 3, side sheet; the action bar as on a phone | two columns, the trade panel sticky (Lend first when shorting is blocked) |
+| `/markets/new` (§3.5) | one column; Review is the page's bottom bar with its reason; Paste under a coarse pointer | one column, sticky foot | two columns on the shared side column, the form on a 64ch measure; a rejected token says "Cannot be listed" and has no Review |
+| `/positions` (§3.8) | totals strip 2 × 2, position cards with Add margin / Close | priority table | the totals strip over the table, "How risk is graded" |
+| `/positions/$position` (§3.8) | health banner, hero line (the CR at 24 px, P&L, time left), facts in one column; action bar → Manage sheet at the chosen form | facts in two columns, side sheet | Manage sticky beside the facts (`.side-sticky`) |
+| `/lend` (§3.8) | KPIs 2 × 2 (SOL claimable the hero), lender cards (CLAIMABLE the hero) with Withdraw / Deposit / Claim, Claim all in the action bar | cards (the lender table is cards under 960 px of container) | the KPI strip spanning the table, Claim all in the header |
+| `/status`, `/security` (§3.9) | one column, tables as cards; identifiers wrap | one column | panels side by side, each as tall as its content; the policy centred at 920 px |
+| `/how-it-works` (§3.11) | one column: the contents wrapped into rows of 44 px links, the prose 15 px | one column, at most 760 px | the prose at 760 px with, from 1,280 px, the contents as a sticky 200 px rail beside it (*design pass P8-2*) |
 
 **Mobile wallet entry** (§5.4 (6)): on a phone or tablet the chooser offers "Open in Backpack /
 Phantom / Solflare" universal links (alphabetical) to the same page — the content without a wallet
@@ -3150,7 +3345,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `close-preview-<…>` | `T.closePreview` | `<field>` ∈ buyback, rent, payout, pnl |
 | `close-submit` | `T.closeSubmit` | opens the review (*2026-10-15, pump v3:* `close-straddle-notice` is removed with FE-3, §5.11) |
 | `short-submit-reason` | `T.shortSubmitReason` | *M10-RESP:* why `short-submit` is disabled, one line in the form's sticky foot (`role=status`; `data-reason` while there is one); while the acknowledgement blocks it, a button that focuses the box |
-| `positions-totals` | `T.positionsTotals` | *M10-RESP:* the dashboard's totals line — count, vault, P&L (sign and arrow), rent due |
+| `positions-totals` | `T.positionsTotals` | *M10-RESP:* the dashboard's totals line (a KPI strip since design pass P6-2) — count, vault, P&L (sign and arrow), rent due |
 | `positions-empty-cta` | `T.positionsEmptyCta` | *M10-RESP:* "Open a short" (to `/markets`) when there are no open positions |
 | `position-not-found-cta` | `T.positionNotFoundCta` | *M10-RESP:* "Back to positions" on a position page with no position at the address |
 | `position-action-add-margin` | `T.positionActionAddMargin` | *M10-RESP:* the position's action bar (under 1024 px; open positions): opens the Manage sheet at Add margin (`?sheet=add-margin`) |
