@@ -41,7 +41,8 @@ info:
     `/v1/keepers`, `/v1/markets` with `q` (however the parameter name is encoded), and a
     WebSocket `subscribe` with `since` (its replay).
   license:
-    name: Proprietary
+    name: Apache-2.0
+    identifier: Apache-2.0
 security:
   - {}
   - ApiKey: []

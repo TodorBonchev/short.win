@@ -1,0 +1,9 @@
+No licence
+
+The files this notice applies to (REUSE.toml lists them) are unmodified copies of programs that
+pump.fun deployed on Solana mainnet: the pump bonding curve, PumpSwap and pump-fees. Each is
+stored with the loader header that tests/fixtures/README.md describes. pump.fun publishes
+neither source code nor a licence for them.
+
+They are kept in this repository only to test short.win's interoperability with those programs.
+No licence in this repository applies to them, and they must not be redistributed.

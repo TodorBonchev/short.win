@@ -40,7 +40,8 @@ allow = [
 # are permissive. Nothing in the program's dependency graph uses them.
 
 [licenses.private]
-# Our own crates are `publish = false` and carry no licence yet.
+# Our own crates are `publish = false`; their licence (BUSL-1.1) is declared in REUSE.toml,
+# not in Cargo.toml.
 ignore = true
 
 [bans]

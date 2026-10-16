@@ -8,6 +8,35 @@ The follow-ups are done on the branch `air-followups` (2026-10-12/13; the owner 
 be pushed with `[skip ci]`, so it has not been through CI). Each ticked item names its commits;
 what is still open is under [What remains](#what-remains).
 
+## Licensing (2026-10-17; on `main`)
+
+The owner asked for the recommended licence on every file (the research of 2026-10-11, with its
+sources, is in `~/.cache/shortwin-work/publish-research/result.json`). Nothing is public yet.
+
+**Done**
+- [x] `LICENSE`: the Business Source License 1.1 for the protocol. Licensor Todor Bonchev; Licensed
+      Work short.win 1.0.1; an Additional Use Grant for production use that interacts with the
+      official deployment (keepers, liquidators, indexers, front ends, wallets, CPI integrations;
+      deploying the code as another program excluded; `GRANTS.md`); Change Date 2030-10-01; Change
+      License Apache-2.0
+- [x] `REUSE.toml` assigns every file: Apache-2.0 for `clients/js` (with its own `LICENSE` and
+      `package.json` field) and `openapi.yaml`; CC BY-NC-ND 4.0 for the documentation; all rights
+      reserved for `apps/web`, `packages/math-wasm` and the logo; third-party files under their
+      own licences (`THIRD_PARTY_NOTICES.md`, texts in `LICENSES/`). `reuse lint` (5.0.2): every
+      file covered, REUSE 3.3 compliant. No source file was edited, so the program bytes are
+      unchanged
+
+**Still open**
+- [ ] A lawyer's review of the Additional Use Grant and the Licensor before anything is published
+      (Bulgarian copyright law's defaults for an author's licence; a company as Licensor)
+- [ ] Once a company holds the IP: a written assignment, then the company as Licensor in the next
+      version's `LICENSE`
+- [ ] At each release, the Licensed Work's version in `LICENSE` and `LICENSES/BUSL-1.1.txt` (the two
+      files stay identical)
+- [ ] Cargo `license` fields in the crates' manifests at the next program batch (in-scope files)
+- [ ] Before any public copy: leave out the ten pump.fun ELFs (no licence), §7.1's Jupiter quotes in
+      `docs/research/jupiter-cpi.md`, the RFQ log, `apps/web` and `packages/math-wasm`
+
 ## Design polish: the logo and the web app's look (2026-10-16; on `main`)
 
 A new brand mark and favicon set, and a nine-package polish of the web app at phone and desktop widths inside

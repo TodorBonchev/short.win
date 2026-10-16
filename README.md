@@ -38,3 +38,19 @@ tests/mock_cpamm/             the test-only mock venue program (M2)
 scripts/                      config gate, test-venue build, protocol ALT, fixture dumps
 docs/                         spec, design, research, development guide
 ```
+
+## Licence
+
+short.win is source-available, not open source. [`REUSE.toml`](REUSE.toml) gives every file's
+licence, and the licence texts are in [`LICENSES/`](LICENSES/).
+
+- The protocol (the program, crates, keeper, indexer, tests and scripts): the Business Source
+  License 1.1 ([`LICENSE`](LICENSE)). Non-production use is free. Production use is allowed when
+  it interacts with the official short.win deployment: keepers, liquidators, indexers, front
+  ends, wallets and CPI integrations ([`GRANTS.md`](GRANTS.md)). Each version becomes Apache-2.0
+  on 2030-10-01, or four years after its first public release if that is earlier.
+- The TypeScript client (`clients/js`, with the IDL) and the indexer's API description: Apache-2.0.
+- The documentation: CC BY-NC-ND 4.0.
+- The web app (`apps/web`, `packages/math-wasm`) and the brand (the name and the logo): all
+  rights reserved.
+- Third-party files keep their own licences: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

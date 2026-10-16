@@ -1,0 +1,9 @@
+Copyright (c) 2026 Todor Bonchev. All rights reserved.
+
+The files this licence applies to (REUSE.toml lists them: the short.win web application, its
+WebAssembly package, and the brand's logo, icons and their source files) are proprietary. No
+licence to copy, modify, distribute or otherwise use them is granted, except where the law
+permits such use without a licence.
+
+"short.win", "ShortWin" and the short.win logo identify the short.win project. No licence in
+this repository grants any right to use them.
