@@ -205,7 +205,7 @@ export function GlossaryTip({ id, className }: { id: GlossaryId; className?: str
                                         close(true);
                                     }}
                                 >
-                                    ✕
+                                    <NavIcon name="close" className="icon" />
                                 </button>
                             </div>
                             <Definition id={id} />

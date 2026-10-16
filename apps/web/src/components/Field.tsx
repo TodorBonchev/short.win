@@ -54,14 +54,16 @@ export function Field({ label, hint, error, aside, children }: FieldProps) {
                 labelEl
             )}
             {children({ inputId, describedBy })}
-            {hint && !error && (
-                <div id={hintId} className="field-hint">
-                    {hint}
-                </div>
-            )}
+            {/* The error never replaces the hint (the hint carries the limit the error is about):
+                error first, then the hint; `aria-describedby` lists both. */}
             {error && (
                 <div id={errId} className="field-error" role="alert">
                     {error}
+                </div>
+            )}
+            {hint && (
+                <div id={hintId} className="field-hint">
+                    {hint}
                 </div>
             )}
         </div>

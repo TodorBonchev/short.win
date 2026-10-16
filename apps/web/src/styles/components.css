@@ -529,35 +529,40 @@ a.statusbar-item {
     background: var(--danger);
 }
 
+/* One grammar for toned boxes (design pass P3): a banner is a short notice with a tint and a 3 px
+   left bar in its tone; a disclosure is long text with the bar and no tint; toasts and .mk-reason
+   follow it. The severity is always worded in the text, so the bar is never a colour-only cue. */
 .banner {
     display: flex;
     gap: var(--sp-3);
     align-items: center;
     padding: var(--sp-2) var(--sp-4);
     margin-bottom: var(--sp-3);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel);
+    border-left: 3px solid var(--text-2);
     border-radius: var(--radius);
+    background: var(--surface-note);
     font-size: var(--fs-sm);
 }
 
 .banner[data-tone="warn"] {
+    border-left-color: var(--warn);
     background: var(--warn-bg);
-    border-color: var(--warn);
 }
 
 .banner[data-tone="danger"] {
+    border-left-color: var(--danger);
     background: var(--danger-bg);
-    border-color: var(--danger);
 }
 
 .banner[data-tone="info"] {
+    border-left-color: var(--info);
     background: var(--info-bg);
-    border-color: var(--info);
 }
 
 .banner[data-tone="ok"] {
+    border-left-color: var(--ok);
     background: var(--ok-bg);
-    border-color: var(--ok);
 }
 
 @media (max-width: 639.98px) {
@@ -680,11 +685,19 @@ a.statusbar-item {
 }
 
 /* ---- panel ------------------------------------------------------------------------------- */
+/* A panel is bg-1 edged with --line-panel and a 1 px top highlight (the surface tiers, FRONTEND.md
+   §7.2); --line stays for the hairlines inside it. */
 .panel {
     background: var(--bg-1);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius-lg);
     min-width: 0;
+    box-shadow: var(--edge-highlight);
+}
+
+/* The open sheet resets the panel's border, not its shadow. */
+.panel.sheet-host[data-sheet="open"] {
+    box-shadow: none;
 }
 
 .panel-head {
@@ -696,12 +709,13 @@ a.statusbar-item {
     border-bottom: 1px solid var(--line);
 }
 
+/* The title tier: it outranks the h3 sections in the body, which outrank the field labels. */
 .panel-title {
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-bold);
+    font-size: var(--title-fs);
+    font-weight: var(--title-fw);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-1);
+    letter-spacing: var(--title-ls);
+    color: var(--title-color);
 }
 
 .panel-actions {
@@ -843,9 +857,11 @@ a.statusbar-item {
     white-space: nowrap;
 }
 
+/* The pointer: a default or ghost button steps up to bg-4 (a bg-2 surface's hover), the filled
+   variants to their own hover colours, the red outline to its tint — never to a neutral grey. */
 @media (hover: hover) {
     .btn:hover:not(:disabled) {
-        background: var(--bg-3);
+        background: var(--bg-4);
         text-decoration: none;
     }
 
@@ -854,8 +870,25 @@ a.statusbar-item {
     }
 
     .btn[data-variant="short"]:hover:not(:disabled) {
-        background: var(--loss);
-        filter: brightness(1.08);
+        background: var(--loss-hover);
+        border-color: var(--loss-hover);
+    }
+
+    .btn[data-variant="danger"]:hover:not(:disabled) {
+        background: var(--danger-bg);
+    }
+
+    .btn[data-variant="ghost"]:hover:not(:disabled) {
+        background: var(--bg-4);
+        color: var(--text-0);
+    }
+
+    .btn.modal-close:hover,
+    .btn.sheet-close:hover,
+    .btn.glossary-close:hover,
+    .btn.mk-popover-close:hover,
+    .btn.toast-dismiss:hover {
+        background: var(--bg-4);
     }
 }
 
@@ -865,14 +898,22 @@ a.statusbar-item {
     color: var(--text-inverse);
 }
 
-.btn[data-variant="primary"]:active:not(:disabled) {
-    background: var(--accent-hover);
-}
-
 .btn[data-variant="short"] {
     background: var(--loss);
     border-color: var(--loss);
     color: var(--text-inverse);
+}
+
+/* The filled variants' own presses (base.css leaves them out of the bg-4 press): they darken like
+   everything else instead of lightening. */
+.btn[data-variant="primary"]:active:not(:disabled) {
+    background: var(--accent-active);
+    border-color: var(--accent-active);
+}
+
+.btn[data-variant="short"]:active:not(:disabled) {
+    background: var(--loss-hover);
+    border-color: var(--loss-hover);
 }
 
 .btn[data-variant="danger"] {
@@ -894,12 +935,34 @@ a.statusbar-item {
     font-size: var(--fs-sm);
 }
 
-/* A disabled button is neutral, whatever its variant: it never reads as the primary action. */
+/* One close ✕ box on every surface: --icon-btn (32 px; 44 under a finger), never under the tap
+   floor. After [data-size="sm"] (the modal's ✕ carries it; both rules are (0,2,0)). The sheet close
+   keeps its 44 px from the sheets block; the toast dismiss keeps its small ghost box (over an open
+   sheet it shows the word "Dismiss", which a fixed square would clip). */
+.btn.modal-close,
+.btn.glossary-close,
+.btn.mk-popover-close {
+    width: max(var(--icon-btn), var(--tap-min));
+    height: max(var(--icon-btn), var(--tap-min));
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    color: var(--text-0);
+}
+
+.btn.sheet-close,
+.btn.toast-dismiss {
+    color: var(--text-0);
+}
+
+/* A disabled button is neutral, whatever its variant: it never reads as the primary action — but it
+   keeps its shape, and its regular weight tells it from an enabled default button beside it. */
 .btn:disabled,
 .btn[data-variant]:disabled {
     background: var(--bg-2);
-    border-color: var(--line);
+    border-color: var(--line-strong);
     color: var(--text-2);
+    font-weight: var(--fw-regular);
     opacity: 1;
     cursor: not-allowed;
 }
@@ -907,6 +970,37 @@ a.statusbar-item {
 .btn[data-variant="ghost"]:disabled {
     background: transparent;
     border-color: transparent;
+}
+
+/* A busy button (aria-busy, set by Button only while it works) spins a ring before its text; under
+   reduced motion the ring stands still as a half-tone mark. After :disabled (both (0,2,0)). */
+.btn[aria-busy="true"] {
+    cursor: progress;
+}
+
+.btn[aria-busy="true"]::before {
+    content: "";
+    flex: none;
+    width: 1em;
+    height: 1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.8s linear infinite;
+}
+
+@keyframes btn-spin {
+    to {
+        transform: rotate(1turn);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn[aria-busy="true"]::before {
+        animation: none;
+        border-right-color: currentColor;
+        opacity: 0.5;
+    }
 }
 
 .btn[data-block="true"],
@@ -926,13 +1020,15 @@ a.btn {
     gap: var(--sp-1);
 }
 
+/* The label tier (12 px medium muted uppercase): under a panel title and a section heading. */
 .field-label {
     display: flex;
     justify-content: space-between;
-    font-size: var(--fs-xs);
-    color: var(--text-1);
+    font-size: var(--label-fs);
+    font-weight: var(--label-fw);
+    color: var(--label-color);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: var(--label-ls);
 }
 
 .field-hint {
@@ -945,20 +1041,20 @@ a.btn {
     color: var(--danger);
 }
 
+/* The error and the hint together (the hint carries the limit the error is about): error first. */
+.field-error + .field-hint {
+    margin-top: calc(-1 * var(--sp-1) + 1px);
+}
+
+/* --field-h: the control height with a mouse, 2 px more under a finger, so the field itself is the
+   44 px target inside the wrap's 1 px border. */
 .input-wrap {
     display: flex;
     align-items: center;
-    height: var(--control-h);
+    height: var(--field-h);
     background: var(--bg-3);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
-}
-
-/* A finger: the field itself is the 44 px target, inside the wrap's 1 px border. */
-@media (pointer: coarse) {
-    .input-wrap {
-        height: calc(var(--control-h) + 2px);
-    }
 }
 
 .input-wrap:focus-within {
@@ -987,25 +1083,56 @@ a.btn {
     white-space: nowrap;
 }
 
-/* Max, at the field's right edge (after the unit). */
+/* Max, at the field's right edge (after the unit): a text control, not a gold warning. */
 .input-wrap .input-max {
     flex: none;
     margin-right: var(--sp-2);
     border-left: 1px solid var(--line);
     border-radius: 0;
-    color: var(--accent);
+    color: var(--text-1);
+}
+
+@media (hover: hover) {
+    .input-wrap .input-max:hover {
+        color: var(--text-0);
+    }
 }
 
 .input-wrap:has(.input-max) .input-suffix {
     padding-right: var(--sp-2);
 }
 
+/* A disabled field looks disabled: the well sinks to bg-1 with a hairline, its text and unit mute. */
+.input-wrap:has(> .input:disabled) {
+    background: var(--bg-1);
+    border-color: var(--line);
+}
+
+.input-wrap:has(> .input:disabled) .input-suffix,
+.input:disabled {
+    color: var(--text-2);
+    cursor: not-allowed;
+}
+
+/* A select drawn by the app: the field's height and well, the registry's chevron (--text-1's hex:
+   a data URI cannot read a variable; csp.ts allows img-src data:) in the --select-arrow-w gutter. */
 .select {
-    height: var(--control-h);
-    padding: 0 var(--sp-3);
-    background: var(--bg-3);
+    appearance: none;
+    height: var(--field-h);
+    padding: 0 var(--select-arrow-w) 0 var(--sp-3);
+    color: var(--text-0);
+    text-overflow: ellipsis;
+    background:
+        var(--bg-3)
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23aab4bf' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E")
+        no-repeat right var(--sp-3) center / 16px;
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
+}
+
+.select:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 0;
 }
 
 .checkbox {
@@ -1017,15 +1144,65 @@ a.btn {
     cursor: pointer;
 }
 
-.checkbox input {
-    width: 16px;
-    height: 16px;
-    margin-top: 2px;
-    accent-color: var(--accent);
+/* Checkboxes and radios drawn by the app (the OS's accent-colour widgets differ per browser): a
+   --check box (18 px; 20 under a finger) on the input well; checked, the box fills gold with a drawn
+   tick, the radio takes a gold ring and dot — the mark itself is the non-colour cue. */
+.checkbox input,
+input[type="radio"] {
+    appearance: none;
+    width: var(--check);
+    height: var(--check);
     flex: none;
+    display: inline-grid;
+    place-content: center;
+    background: var(--bg-3);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
 }
 
-/* A finger: the whole label row (≥ 44 px) is the target, with a 20 px box. */
+input[type="radio"] {
+    margin: 0;
+    border-radius: 50%;
+}
+
+.checkbox input:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.checkbox input:checked::before {
+    content: "";
+    width: 5px;
+    height: 9px;
+    border: solid var(--text-inverse);
+    border-width: 0 2px 2px 0;
+    transform: translateY(-1px) rotate(45deg);
+}
+
+input[type="radio"]:checked {
+    border-color: var(--accent);
+}
+
+input[type="radio"]:checked::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+
+.checkbox input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* With a mouse the row aligns to the top (a label may wrap): the box sits on the first line. */
+.checkbox input {
+    margin-top: 2px;
+}
+
+/* A finger: the whole label row (≥ 44 px) is the target, with a 20 px box (--check). */
 @media (pointer: coarse) {
     .checkbox {
         min-height: var(--tap-min);
@@ -1034,15 +1211,13 @@ a.btn {
     }
 
     .checkbox input {
-        width: 20px;
-        height: 20px;
         margin-top: 0;
     }
 }
 
 /* ---- tabs -------------------------------------------------------------------------------- */
-/* A tablist that does not fit scrolls sideways (snapping, a fade at the edge while more is to the
-   right: `data-overflow`, set by Tabs). Never replaced by a select. */
+/* A tablist that does not fit scrolls sideways (snapping, a fade at the edge where more is out of
+   view: `data-overflow` = start | end | both, set by Tabs). Never replaced by a select. */
 .tabs {
     display: flex;
     gap: var(--sp-1);
@@ -1058,8 +1233,16 @@ a.btn {
     display: none;
 }
 
-.tabs[data-overflow] {
+.tabs[data-overflow="end"] {
     mask-image: linear-gradient(to right, #000 85%, transparent);
+}
+
+.tabs[data-overflow="start"] {
+    mask-image: linear-gradient(to right, transparent, #000 15%);
+}
+
+.tabs[data-overflow="both"] {
+    mask-image: linear-gradient(to right, transparent, #000 15%, #000 85%, transparent);
 }
 
 .tab {
@@ -1082,6 +1265,42 @@ a.btn {
 
 .tab[data-tone="short"][aria-selected="true"] {
     border-bottom-color: var(--loss);
+}
+
+/* A tab under the pointer: white text and a grey underline where the selection's gold would be. */
+@media (hover: hover) {
+    .tab:hover:not([aria-selected="true"]) {
+        color: var(--text-0);
+        border-bottom-color: var(--line-strong);
+    }
+}
+
+/* The sub-level variant (`variant="sub"`: Deposit | Withdraw | Claim under Short | Lend): a
+   segmented row on a bg-2 track, the selection a bg-3 fill with an inset ring — a shape cue beside
+   aria-selected, like the top level's underline. A .tab is a primary control: 44 px under a finger. */
+.tabs[data-variant="sub"] {
+    display: inline-flex;
+    align-self: flex-start;
+    max-width: 100%;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-2);
+}
+
+.tabs[data-variant="sub"] .tab {
+    height: max(28px, var(--tap-min));
+    padding: 0 var(--sp-3);
+    border-bottom: 0;
+    border-radius: var(--radius-sm);
+    font-size: var(--fs-sm);
+}
+
+.tabs[data-variant="sub"] .tab[aria-selected="true"] {
+    background: var(--bg-3);
+    color: var(--text-0);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 
 /* ---- table ------------------------------------------------------------------------------- */
@@ -1343,9 +1562,22 @@ a.btn {
     color: var(--ok);
 }
 
+/* An informational tag is grey (--tag on --tag-bg), so link blue stays a link's alone. */
 .badge[data-tone="info"] {
-    background: var(--info-bg);
-    color: var(--info);
+    background: var(--tag-bg);
+    color: var(--tag);
+}
+
+/* The neutral badge has a visible bound on a bg-1 row: a bg-2 fill with an inset hairline. */
+.badge[data-tone="neutral"] {
+    background: var(--bg-2);
+    box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+/* A single-word enum badge (position status, indexer state, settle condition) reads capitalised,
+   like its neighbours; the text itself is unchanged (textContent). */
+.badge-status {
+    text-transform: capitalize;
 }
 
 .badge[data-tone="warn"] {
@@ -1430,12 +1662,13 @@ a.btn {
 }
 
 /* ---- disclosure -------------------------------------------------------------------------- */
+/* A note surface (bg-2) edged like a panel, with a 3 px left bar in its severity (below). */
 .disclosure {
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel);
     border-left-width: 3px;
     border-radius: var(--radius);
     padding: var(--sp-3) var(--sp-4);
-    background: var(--bg-2);
+    background: var(--surface-note);
     font-size: var(--fs-sm);
 }
 
@@ -1465,9 +1698,36 @@ a.btn {
     margin-top: var(--sp-2);
 }
 
+/* The acknowledgement is a control row, not another bullet: a bordered bg-3 row that turns gold
+   when ticked, with one focus ring on the row (keyboard only) and a box 4 px larger than a plain
+   checkbox's (22 px with a mouse, 24 under a finger). Scoped here: the markets toolbar's checkbox
+   is untouched. */
 .disclosure .checkbox {
     margin-top: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--bg-3);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
     font-weight: var(--fw-medium);
+}
+
+.disclosure .checkbox:has(input:checked) {
+    border-color: var(--accent);
+}
+
+.disclosure .checkbox:has(input:focus-visible) {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+}
+
+.disclosure .checkbox input:focus-visible {
+    outline: none;
+}
+
+.disclosure .checkbox input {
+    width: calc(var(--check) + 4px);
+    height: calc(var(--check) + 4px);
+    margin-top: 0;
 }
 
 details > summary {
@@ -1480,16 +1740,17 @@ details > summary {
     list-style: none;
 }
 
-/* A chevron drawn with borders (a font's small triangle read as a speck): points right closed,
-   down open; the turn is --t-fast, 0 under reduced motion. */
+/* A chevron drawn with borders (a font's small triangle read as a speck), on the icon set's
+   measure: a 7 px square with 2 px strokes (1.6 px would snap to 1 px on a 1× screen); points right
+   closed, down open; the turn is --t-fast, 0 under reduced motion. */
 details > summary::before {
     content: "";
     flex: none;
-    width: 0.42em;
-    height: 0.42em;
-    margin: 0 0.2em 0 0.05em;
-    border-right: 2px solid var(--text-1);
-    border-bottom: 2px solid var(--text-1);
+    width: 7px;
+    height: 7px;
+    margin: 0 var(--sp-1) 0 2px;
+    border: solid var(--text-1);
+    border-width: 0 2px 2px 0;
     transform: rotate(-45deg);
     transition: transform var(--t-fast);
 }
@@ -2100,6 +2361,22 @@ bdi,
     font-size: var(--fs-xs);
 }
 
+/* An address's copy button: a muted registry glyph beside the text, --ok while it says "Copied".
+   The hover is (0,4,0): it must outrank the ghost variant's own hover colour. */
+.address-text .btn {
+    color: var(--text-2);
+}
+
+.address-text .btn[data-copied] {
+    color: var(--ok);
+}
+
+@media (hover: hover) {
+    .address-text .btn:hover:not(:disabled) {
+        color: var(--text-1);
+    }
+}
+
 /* ---- chain-read age (FRONTEND.md §6.6) ---------------------------------------------------- */
 .slot-age {
     display: inline-block;
@@ -2268,16 +2545,70 @@ bdi,
         position: static;
         z-index: auto;
     }
+
+    /* In the flow, the foot has no rows sliding under it to fade (and no box of its own to hang
+       the fade from). */
+    .sheet-host[data-sheet="open"] .form-foot::before {
+        display: none;
+    }
 }
 
+/* The submit wraps rather than overflow a 320 px foot ("Review deposit (with CPI Guard bracket)"):
+   its height grows from the control height; the coarse 48 px floor below still wins. */
 .form-foot > .btn {
     width: 100%;
+    white-space: normal;
+    height: auto;
+    min-height: var(--control-h);
+    padding-block: var(--sp-1);
+    line-height: var(--lh-tight);
 }
 
 @media (pointer: coarse) {
     .form-foot > .btn {
         min-height: 48px;
     }
+}
+
+/* The rows the sticky foot slides over fade into it (a 12 px soft edge above its hairline). */
+.form-foot::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 12px;
+    background: linear-gradient(to bottom, transparent, var(--bg-1));
+    pointer-events: none;
+}
+
+/* short.css puts this foot back to static while the inline wallet chooser is open. */
+.form-foot:has(.wallet-inline)::before {
+    display: none;
+}
+
+/* The create page's foot is fixed over the page's bg-0 under 640 px: a fade to bg-1 would glow
+   over nothing. */
+@media (max-width: 639.98px) {
+    .mk-create-foot .form-foot::before {
+        display: none;
+    }
+}
+
+/* While a Connect CTA is in the foot, the disabled submit is a caption under it, not a second
+   button-shaped slab saying the same thing: no box, regular weight, the tap floor (24 px with a
+   mouse, 44 under a finger — (0,4,0) outranks the coarse 48 px rule above). The reason line, the CTA
+   and the submit stay in the DOM with their testids and texts. */
+.form-foot:has(.connect-cta) {
+    gap: var(--sp-1);
+}
+
+.form-foot:has(.connect-cta) > .btn:disabled {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-2);
+    font-weight: var(--fw-regular);
+    min-height: var(--tap-min);
 }
 
 .form-reason {
@@ -2290,11 +2621,14 @@ bdi,
     display: none;
 }
 
-/* A reason that points at the control to fix: a text button that focuses it. */
+/* A reason that points at the control to fix: a text button that focuses it — link blue, like every
+   other in-page action (unscoped: it also reaches the modal's button.form-reason.tx-sign-hint;
+   p.form-reason stays text-1). */
 button.form-reason {
     padding: 0;
     background: none;
     border: 0;
+    color: var(--info);
     text-align: left;
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -2345,11 +2679,12 @@ button.form-reason {
     gap: var(--sp-2);
 }
 
+/* The system's radius (no pills); pressed is the selected state: a bg-3 fill under the gold line. */
 .chip {
     min-height: var(--tap-sm);
     padding: 0 var(--sp-3);
     border: 1px solid var(--line-strong);
-    border-radius: 999px;
+    border-radius: var(--radius);
     background: transparent;
     color: var(--text-1);
     font-size: var(--fs-sm);
@@ -2357,26 +2692,31 @@ button.form-reason {
 }
 
 .chip[aria-pressed="true"] {
+    background: var(--bg-3);
     border-color: var(--accent);
     color: var(--text-0);
+    font-weight: var(--fw-medium);
 }
 
 @media (hover: hover) {
-    .chip:hover:not(:disabled) {
-        background: var(--bg-3);
+    .chip:hover:not([aria-pressed="true"]) {
+        background: var(--bg-4);
     }
 }
 
 /* Reveal: a truncated value whose full text, Copy and Explorer open in a popover (a bottom sheet
    on a phone). */
+/* The 24 px box the gate passes; the dotted line is a text underline, so it hugs the text's
+   baseline instead of the box's bottom edge 8 px below the glyphs. */
 .reveal {
     all: unset;
     display: inline-flex;
-    align-items: baseline;
+    align-items: center;
     gap: var(--sp-1);
     min-height: 24px;
     cursor: pointer;
-    border-bottom: 1px dotted var(--line-strong);
+    text-decoration: underline dotted var(--line-strong);
+    text-underline-offset: 3px;
 }
 
 .reveal:focus-visible {
@@ -2384,19 +2724,20 @@ button.form-reason {
     outline-offset: 1px;
 }
 
+/* The popover: a bg-2 note edged like a panel, with the popover shadow, over the overlay scrim. */
 .reveal-pop {
     width: min(420px, calc(100vw - 2 * var(--gutter)));
     margin: calc(var(--header-h) + var(--sp-5)) auto auto;
     padding: var(--sp-4);
     color: var(--text-0);
     background: var(--bg-2);
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius-lg);
-    box-shadow: 0 16px 48px rgb(0 0 0 / 60%);
+    box-shadow: var(--shadow-pop);
 }
 
 .reveal-pop::backdrop {
-    background: rgb(5 7 9 / 40%);
+    background: var(--bg-overlay);
 }
 
 .reveal-value {
@@ -2825,7 +3166,9 @@ a.menu-item {
    line (12 px × 1.25), so a label with an ⓘ is exactly as tall as one without (one rhythm for
    hairline rows and stat labels), and its text keeps the line's own baseline (a taller line box put
    the label's last word, the one beside the ⓘ, a pixel lower than the rest). The icon's centre sits
-   on the capitals' centre: 0.36 em above the baseline, less half the 13 px icon. Where rows sit
+   on the capitals' centre: 0.36 em above the baseline, less half the 12 px icon. The mark rests at
+   --icon-muted (≥ 3:1 on bg-0..2, WCAG 1.4.11 for an icon-only control), dimmer than the label it
+   follows, and takes the text colour under the pointer and --info while open. Where rows sit
    closer than 24 px, the list spaces them (`.kv` below) so two rows' ⓘ never overlap; 44 px of
    touch area under a finger (`.hit`). The definition is fixed-position (placed from the ⓘ by JavaScript, CSSOM)
    on a tablet and a desktop, a bottom sheet over a scrim on a phone. */
@@ -2843,12 +3186,12 @@ a.menu-item {
     height: 24px;
     margin-block: -5px;
     padding: 0;
-    color: var(--text-2);
+    color: var(--icon-muted);
     background: transparent;
     border: 0;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    vertical-align: calc(0.36em - 6.5px);
+    vertical-align: calc(0.36em - 6px);
     text-transform: none;
     letter-spacing: 0;
 }
@@ -2871,13 +3214,13 @@ a.menu-item {
 @media (hover: hover) {
     .glossary-tip:hover {
         color: var(--text-0);
-        background: var(--bg-3);
+        background: var(--bg-4);
     }
 }
 
 .glossary-tip-icon {
-    width: 13px;
-    height: 13px;
+    width: 12px;
+    height: 12px;
 }
 
 .glossary-popover {
@@ -2932,11 +3275,9 @@ h2.glossary-title {
     font-weight: var(--fw-bold);
 }
 
+/* Its ✕ is the shared close box (the buttons section). */
 .btn.glossary-close {
     flex: none;
-    width: max(28px, var(--tap-min));
-    height: max(28px, var(--tap-min));
-    padding: 0;
 }
 
 .glossary-scrim {
@@ -2977,7 +3318,7 @@ h2.glossary-title {
     /* No negative block margins here: a wrapped header puts the ⓘ under its sort button, and the
        two 24 px targets must not overlap. */
     margin: 0 0 0 2px;
-    color: var(--text-2);
+    color: var(--icon-muted);
     vertical-align: middle;
     border-radius: var(--radius-sm);
 }
@@ -2986,7 +3327,7 @@ h2.glossary-title {
     .tbl th button.glossary-tip:hover {
         color: var(--text-0);
         text-decoration: none;
-        background: var(--bg-3);
+        background: var(--bg-4);
     }
 }
 

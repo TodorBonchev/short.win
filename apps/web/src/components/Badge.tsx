@@ -9,14 +9,17 @@ export function Badge({
     children,
     testId,
     title,
+    className,
 }: {
     tone?: Tone;
     children: ReactNode;
     testId?: string;
     title?: string;
+    /** Merged after `badge` (e.g. `badge-status`: a single-word enum shown capitalised). */
+    className?: string;
 }) {
     return (
-        <span className="badge" data-tone={tone} data-testid={testId} title={title}>
+        <span className={`badge ${className ?? ''}`.trim()} data-tone={tone} data-testid={testId} title={title}>
             {children}
         </span>
     );

@@ -1,7 +1,8 @@
 /**
  * Accessible tabs (WAI-ARIA tabs pattern: arrow keys move, Home / End jump). A tablist wider than
- * its space scrolls sideways (FRONTEND.md §7.6): `data-overflow` fades its right edge while more
- * tabs are out of view, and the selected tab is scrolled into view.
+ * its space scrolls sideways (FRONTEND.md §7.6): `data-overflow` (`start` | `end` | `both`) fades
+ * the edge where more tabs are out of view, and the selected tab is scrolled into view. `variant`
+ * `sub` is the sub-level look (a segmented row inside a tabpanel: Deposit | Withdraw | Claim).
  */
 import { type KeyboardEvent, useEffect, useRef } from 'react';
 
@@ -18,21 +19,24 @@ export function Tabs<K extends string>({
     onChange,
     label,
     idPrefix,
+    variant,
 }: {
     tabs: readonly TabDef<K>[];
     value: K;
     onChange: (k: K) => void;
     label: string;
     idPrefix: string;
+    variant?: 'sub';
 }) {
     const list = useRef<HTMLDivElement>(null);
-    // The fade while tabs are hidden to the right (no ResizeObserver in jsdom: no fade).
+    // The fade at the edge(s) where tabs are out of view (no ResizeObserver in jsdom: no fade).
     useEffect(() => {
         const el = list.current;
         if (!el || typeof ResizeObserver === 'undefined') return;
         const update = () => {
-            const more = el.scrollWidth - el.clientWidth - el.scrollLeft > 4;
-            if (more) el.setAttribute('data-overflow', '');
+            const start = el.scrollLeft > 4;
+            const end = el.scrollWidth - el.clientWidth - el.scrollLeft > 4;
+            if (start || end) el.setAttribute('data-overflow', start && end ? 'both' : start ? 'start' : 'end');
             else el.removeAttribute('data-overflow');
         };
         const ro = new ResizeObserver(update);
@@ -72,7 +76,7 @@ export function Tabs<K extends string>({
         }
     };
     return (
-        <div className="tabs" role="tablist" aria-label={label} ref={list} onKeyDown={onKey}>
+        <div className="tabs" role="tablist" aria-label={label} ref={list} onKeyDown={onKey} data-variant={variant}>
             {tabs.map((t) => (
                 <button
                     key={t.key}

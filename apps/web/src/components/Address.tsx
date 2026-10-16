@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { explorerAddress } from '../config/env.ts';
 import { shortAddress } from '../lib/format.ts';
+import { NavIcon } from '../shell/icons.tsx';
 import { Reveal } from './Reveal.tsx';
 
 /**
@@ -40,6 +41,7 @@ export function AddressText({
                     data-variant="ghost"
                     data-size="sm"
                     aria-label={copied ? 'Copied' : `Copy ${address}`}
+                    data-copied={copied ? '' : undefined}
                     onClick={() => {
                         void navigator.clipboard?.writeText(address).then(() => {
                             setCopied(true);
@@ -47,7 +49,7 @@ export function AddressText({
                         });
                     }}
                 >
-                    {copied ? '✓' : '⧉'}
+                    <NavIcon name={copied ? 'check' : 'copy'} className="icon-sm" />
                 </button>
             )}
         </span>

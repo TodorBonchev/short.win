@@ -7,6 +7,7 @@
  */
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { T } from '../config/testids.ts';
+import { NavIcon } from '../shell/icons.tsx';
 
 export function Reveal({
     value,
@@ -70,7 +71,8 @@ export function Reveal({
                     </button>
                     {explorer && (
                         <a className="btn" href={explorer} target="_blank" rel="noopener noreferrer">
-                            Explorer ↗
+                            Explorer
+                            <NavIcon name="external" className="icon-sm" />
                         </a>
                     )}
                     <button
