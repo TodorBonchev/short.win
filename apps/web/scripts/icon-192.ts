@@ -6,9 +6,10 @@
  *   node scripts/icon-192.ts           # writes public/icon-192.png
  *   node scripts/icon-192.ts --check   # exits 1 when the file is not the rendering of favicon.svg
  *
- * The favicon is two shapes, and this renders exactly those: the rounded square (`rect` with `rx`)
- * and the stroked polyline (`path` of `M` / `l` commands, round caps and joins, i.e. every point
- * within half the stroke width of a segment), 8 × 8 samples per pixel, transparent outside the
+ * The favicon is a rounded square (`rect` with `rx`) and the paths painted over it, and this renders
+ * exactly those: a filled path (`M` / `L` / `Z`, the nonzero rule; the brand mark's two halves, the
+ * design pass of 2026-10-16) or a stroked one (round caps and joins, i.e. every point within half the
+ * stroke width of a segment), in paint order, 8 × 8 samples per pixel, transparent outside the
  * square, encoded as an 8-bit RGBA PNG with Node's zlib. Deterministic: the same SVG gives the same
  * pixels. `--check` and `mobileWalletAdapter.test.ts` compare the committed file's decoded pixels,
  * not its bytes: another zlib may compress the same image differently. A favicon with any other
@@ -38,11 +39,65 @@ function hex(c: string): Rgb {
     return [Number.parseInt(m[1], 16), Number.parseInt(m[2], 16), Number.parseInt(m[3], 16)];
 }
 
-/** The favicon's two shapes, read from the SVG (anything else is refused). */
+function optAttr(tag: string, name: string): string | null {
+    return new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1] ?? null;
+}
+
+/** A path's subpaths: `M` / `L` (absolute), `m` / `l` (relative), `Z` / `z` closing one; nothing else. */
+function subpaths(d: string): { points: Point[]; closed: boolean }[] {
+    const cmds = [...d.matchAll(/([MLmlZz])([^MLmlZz]*)/g)];
+    if (cmds.map((c) => c[0]).join('') !== d.replace(/\s+$/, '')) throw new Error(`favicon.svg: unsupported path ${d}`);
+    const out: { points: Point[]; closed: boolean }[] = [];
+    let current: { points: Point[]; closed: boolean } | null = null;
+    let at: Point = [0, 0];
+    for (const [, cmd, args] of cmds) {
+        if (cmd === 'Z' || cmd === 'z') {
+            if ((args ?? '').trim() !== '' || !current) throw new Error(`favicon.svg: bad path ${d}`);
+            current.closed = true;
+            at = current.points[0] as Point;
+            current = null;
+            continue;
+        }
+        // SVG numbers need no separator before a sign ("4-4" is 4 then -4).
+        const n = ((args ?? '').match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? []).map(Number);
+        if (n.length === 0 || n.length % 2 !== 0 || n.some((v) => !Number.isFinite(v))) {
+            throw new Error(`favicon.svg: bad path ${d}`);
+        }
+        const rel = cmd === 'm' || cmd === 'l';
+        for (let i = 0; i < n.length; i += 2) {
+            const p: Point = rel
+                ? [at[0] + (n[i] as number), at[1] + (n[i + 1] as number)]
+                : [n[i] as number, n[i + 1] as number];
+            if ((cmd === 'M' || cmd === 'm') && i === 0) {
+                current = { points: [], closed: false };
+                out.push(current);
+            }
+            if (!current) throw new Error(`favicon.svg: a path must start with M (${d})`);
+            current.points.push(p);
+            at = p;
+        }
+    }
+    return out;
+}
+
+/** A shape painted over the tile: a filled polygon (nonzero rule) or a stroke with round caps and joins. */
+type Shape =
+    | { readonly kind: 'fill'; readonly color: Rgb; readonly rings: readonly (readonly Point[])[] }
+    | {
+          readonly kind: 'stroke';
+          readonly color: Rgb;
+          readonly halfWidth: number;
+          readonly segments: readonly (readonly [Point, Point])[];
+      };
+
+/**
+ * The favicon read from the SVG: one rounded square filling the viewBox, then its paths in paint order — each
+ * either filled (a hex `fill`, no stroke) or an unfilled stroke with round caps and joins. Anything else is refused.
+ */
 export function parseFavicon(svg: string) {
     const tags = svg.match(/<(rect|path)\b[^>]*>/g) ?? [];
-    if (tags.length !== 2 || !tags[0]?.startsWith('<rect') || !tags[1]?.startsWith('<path')) {
-        throw new Error('favicon.svg: expected exactly one <rect> then one <path>');
+    if (tags.length < 2 || !tags[0]?.startsWith('<rect') || tags.slice(1).some((t) => !t.startsWith('<path'))) {
+        throw new Error('favicon.svg: expected one <rect> then one or more <path>');
     }
     if (/<(circle|ellipse|line|polyline|polygon|g|image|text|use)\b/.test(svg)) {
         throw new Error('favicon.svg: unexpected element');
@@ -50,41 +105,35 @@ export function parseFavicon(svg: string) {
     const view = attr(/<svg\b[^>]*>/.exec(svg)?.[0] ?? '', 'viewBox')
         .split(/\s+/)
         .map(Number);
-    const [rect, path] = tags as [string, string];
+    const rect = tags[0];
     const size = Number(attr(rect, 'width'));
     if (view.join(' ') !== `0 0 ${size} ${size}` || Number(attr(rect, 'height')) !== size) {
         throw new Error('favicon.svg: the square must fill the viewBox');
     }
-    if (attr(path, 'fill') !== 'none' || attr(path, 'stroke-linecap') !== 'round') {
-        throw new Error('favicon.svg: the path must be an unfilled stroke with round caps');
-    }
-    if (attr(path, 'stroke-linejoin') !== 'round') throw new Error('favicon.svg: round joins expected');
-    const d = attr(path, 'd');
-    const cmds = [...d.matchAll(/([MLml])([^MLml]*)/g)];
-    if (cmds.map((c) => c[0]).join('') !== d.replace(/\s+$/, '')) throw new Error(`favicon.svg: unsupported path ${d}`);
-    const points: Point[] = [];
-    for (const [, cmd, args] of cmds) {
-        // SVG numbers need no separator before a sign ("4-4" is 4 then -4).
-        const n = ((args ?? '').match(/-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? []).map(Number);
-        if (n.length === 0 || n.length % 2 !== 0 || n.some((v) => !Number.isFinite(v))) {
-            throw new Error(`favicon.svg: bad path ${d}`);
+    const shapes: Shape[] = tags.slice(1).map((path) => {
+        const parts = subpaths(attr(path, 'd'));
+        const fill = optAttr(path, 'fill');
+        const stroke = optAttr(path, 'stroke');
+        if (fill !== null && fill !== 'none') {
+            if (stroke !== null && stroke !== 'none')
+                throw new Error('favicon.svg: a path is filled or stroked, not both');
+            return { kind: 'fill', color: hex(fill), rings: parts.map((s) => s.points) };
         }
-        for (let i = 0; i < n.length; i += 2) {
-            const prev = points.at(-1) ?? [0, 0];
-            const x = n[i] as number;
-            const y = n[i + 1] as number;
-            const rel = cmd === 'l' || (cmd === 'm' && points.length > 0);
-            points.push(rel ? [prev[0] + x, prev[1] + y] : [x, y]);
+        if (attr(path, 'stroke-linecap') !== 'round' || attr(path, 'stroke-linejoin') !== 'round') {
+            throw new Error('favicon.svg: a stroke needs round caps and joins');
         }
-    }
-    return {
-        size,
-        radius: Number(attr(rect, 'rx')),
-        fill: hex(attr(rect, 'fill')),
-        stroke: hex(attr(path, 'stroke')),
-        halfWidth: Number(attr(path, 'stroke-width')) / 2,
-        points,
-    };
+        const segments = parts.flatMap((s) => {
+            const pts = s.closed ? [...s.points, s.points[0] as Point] : s.points;
+            return pts.slice(1).map((q, i) => [pts[i] as Point, q] as const);
+        });
+        return {
+            kind: 'stroke',
+            color: hex(attr(path, 'stroke')),
+            halfWidth: Number(attr(path, 'stroke-width')) / 2,
+            segments,
+        };
+    });
+    return { size, radius: Number(attr(rect, 'rx')), fill: hex(attr(rect, 'fill')), shapes };
 }
 
 function segmentDistance2(px: number, py: number, a: Point, b: Point): number {
@@ -97,14 +146,36 @@ function segmentDistance2(px: number, py: number, a: Point, b: Point): number {
     return x * x + y * y;
 }
 
+/** The nonzero winding number of the point about the rings (each implicitly closed). */
+function winding(px: number, py: number, rings: readonly (readonly Point[])[]): number {
+    let w = 0;
+    for (const ring of rings) {
+        for (let i = 0; i < ring.length; i++) {
+            const a = ring[i] as Point;
+            const b = ring[(i + 1) % ring.length] as Point;
+            const side = (b[0] - a[0]) * (py - a[1]) - (px - a[0]) * (b[1] - a[1]);
+            if (a[1] <= py) {
+                if (b[1] > py && side > 0) w += 1;
+            } else if (b[1] <= py && side < 0) {
+                w -= 1;
+            }
+        }
+    }
+    return w;
+}
+
+function covers(shape: Shape, x: number, y: number): boolean {
+    if (shape.kind === 'fill') return winding(x, y, shape.rings) !== 0;
+    const w2 = shape.halfWidth * shape.halfWidth;
+    return shape.segments.some(([p, q]) => segmentDistance2(x, y, p, q) <= w2);
+}
+
 /** The RGBA pixels (row-major, 4 bytes each) of the favicon at `ICON_SIZE` px. */
 export function renderPixels(svg: string): Uint8Array {
     const f = parseFavicon(svg);
     const scale = f.size / ICON_SIZE;
     const out = new Uint8Array(ICON_SIZE * ICON_SIZE * 4);
     const r = f.radius;
-    const w2 = f.halfWidth * f.halfWidth;
-    const segments = f.points.slice(1).map((p, i) => [f.points[i] as Point, p] as const);
     for (let py = 0; py < ICON_SIZE; py++) {
         for (let px = 0; px < ICON_SIZE; px++) {
             let a = 0;
@@ -116,8 +187,8 @@ export function renderPixels(svg: string): Uint8Array {
                     const cx = Math.min(Math.max(x, r), f.size - r);
                     const cy = Math.min(Math.max(y, r), f.size - r);
                     if ((x - cx) ** 2 + (y - cy) ** 2 > r * r) continue; // outside the rounded square
-                    const onStroke = segments.some(([p, q]) => segmentDistance2(x, y, p, q) <= w2);
-                    const c = onStroke ? f.stroke : f.fill;
+                    let c = f.fill;
+                    for (const shape of f.shapes) if (covers(shape, x, y)) c = shape.color; // paint order
                     a += 1;
                     sum[0] = (sum[0] as number) + c[0];
                     sum[1] = (sum[1] as number) + c[1];

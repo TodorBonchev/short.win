@@ -289,10 +289,10 @@ describe('the icon wallets show (appIdentity.icon)', () => {
         expect([file.width, file.height]).toEqual([192, 192]);
         expect(Buffer.compare(Buffer.from(file.pixels), Buffer.from(renderPixels(svg)))).toBe(0);
         expect(isIconOf(png, svg)).toBe(true);
-        // The decoder reads what the script writes, and another stroke colour is not this icon.
+        // The decoder reads what the script writes, and another colour of the mark is not this icon.
         const rendered = renderIcon192(svg);
         expect(Buffer.compare(Buffer.from(decodePng(rendered).pixels), Buffer.from(file.pixels))).toBe(0);
-        const recoloured = svg.replace('stroke="#ff5c6c"', 'stroke="#123456"');
+        const recoloured = svg.replace('fill="#f0b90b"', 'fill="#123456"');
         expect(recoloured).not.toBe(svg);
         expect(isIconOf(png, recoloured)).toBe(false);
     });
