@@ -1623,8 +1623,11 @@ input[type="radio"]:checked::before {
 }
 
 /* An empty list is its message alone (no header row or sort bar framing one line); loading keeps the header and
-   its skeleton rows. DataTable's message carries `.tbl-empty` beside `.empty` (the states section's rule). */
-.tbl-wrap:has(> .empty) > .tbl > thead,
+   its skeleton rows. DataTable's message carries `.tbl-empty` beside `.empty` (the states section's rule). The
+   whole table goes, not only its header: a `role="table"` whose only rows are hidden fails axe's
+   aria-required-children (the responsive gate's one finding on the design pass), and the sort buttons of an
+   empty list would be invisible Tab stops. */
+.tbl-wrap:has(> .empty) > .tbl,
 .tbl-wrap:has(> .empty) > .tbl-sortbar {
     display: none;
 }

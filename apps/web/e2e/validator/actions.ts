@@ -685,7 +685,11 @@ async function simulateAccount(feePayer: KeyPairSigner, ix: Instruction, address
             accounts: { addresses: [address], encoding: 'base64' },
         })
         .send();
-    if (value.err) throw new Error(`simulation failed: ${JSON.stringify(value.err)}\n${(value.logs ?? []).join('\n')}`);
+    if (value.err) {
+        // A BigInt inside the error (a custom program error's u64) would make JSON.stringify throw and hide the cause.
+        const err = JSON.stringify(value.err, (_k, v: unknown) => (typeof v === 'bigint' ? v.toString() : v));
+        throw new Error(`simulation failed: ${err}\n${(value.logs ?? []).join('\n')}`);
+    }
     const acct = value.accounts?.[0];
     if (!acct) throw new Error(`the simulation returned no account ${address}`);
     return new Uint8Array(Buffer.from(acct.data[0], 'base64'));
