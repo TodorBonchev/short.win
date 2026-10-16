@@ -13,6 +13,7 @@ import { NAV_COPY } from '../config/copyNav.ts';
 import { config } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import { useMath } from '../math/useMath.ts';
+import { NavIcon } from './icons.tsx';
 
 export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     const stats = useQuery({ ...indexerQueries.stats(), enabled: open });
@@ -21,21 +22,30 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
     return (
         <Modal open={open} onClose={onClose} title="More" testId={T.moreSheet} variant="sheet">
             <nav aria-label="More" className="more-links">
+                {/* A row: a leading icon, the title, its muted line, a trailing chevron (CSS places them). */}
                 <Link to="/how-it-works" className="more-row" data-testid={T.moreHowItWorks} onClick={onClose}>
+                    <NavIcon name="info" className="more-icon" />
                     {NAV_COPY['more.howItWorks.title'].text}
                     <span className="muted">{NAV_COPY['more.howItWorks.sub'].text}</span>
+                    <NavIcon name="chevron" className="more-chevron" />
                 </Link>
                 <Link to="/status" className="more-row" data-testid={T.moreStatus} onClick={onClose}>
+                    <NavIcon name="status" className="more-icon" />
                     Status
                     <span className="muted">Indexer, venues, paused markets</span>
+                    <NavIcon name="chevron" className="more-chevron" />
                 </Link>
                 <Link to="/security" className="more-row" data-testid={T.moreSecurity} onClick={onClose}>
+                    <NavIcon name="shield" className="more-icon" />
                     Security policy
                     <span className="muted">Report a vulnerability</span>
+                    <NavIcon name="chevron" className="more-chevron" />
                 </Link>
                 <Link to="/markets/new" className="more-row" data-testid={T.moreCreateMarket} onClick={onClose}>
+                    <NavIcon name="plus" className="more-icon" />
                     Create market
                     <span className="muted">List a token for lending and shorting</span>
+                    <NavIcon name="chevron" className="more-chevron" />
                 </Link>
             </nav>
             <section aria-label="Network" className="more-network">

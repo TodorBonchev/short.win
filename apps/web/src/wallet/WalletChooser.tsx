@@ -26,6 +26,7 @@ import { config } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import { useStore } from '../lib/store.ts';
 import { useAppClient } from '../rpc/context.tsx';
+import { NavIcon } from '../shell/icons.tsx';
 import { isMobileDevice } from '../styles/breakpoints.ts';
 import { browseLink, MOBILE_WALLETS, WALLET_NAMES, WALLET_SITES } from './deepLinks.ts';
 import { localNetwork, requestLocalNetwork, watchLocalNetwork } from './localNetwork.ts';
@@ -103,11 +104,11 @@ function OpenInLinks() {
                         rel="noopener noreferrer"
                         data-testid={T.walletOpenIn(w)}
                     >
-                        Open in {WALLET_NAMES[w]} <span aria-hidden="true">↗</span>
+                        Open in {WALLET_NAMES[w]} <NavIcon name="external" className="icon-sm" />
                     </a>
                 ))}
             </div>
-            {config.cluster !== 'mainnet' && <p>Set your wallet to {config.cluster} first.</p>}
+            {config.cluster !== 'mainnet' && <p className="wallet-note">Set your wallet to {config.cluster} first.</p>}
         </>
     );
 }

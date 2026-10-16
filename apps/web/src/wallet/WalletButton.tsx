@@ -35,6 +35,7 @@ import { T } from '../config/testids.ts';
 import { formatSol, shortAddress } from '../lib/format.ts';
 import { useStore } from '../lib/store.ts';
 import { useAppClient } from '../rpc/context.tsx';
+import { NavIcon } from '../shell/icons.tsx';
 import { PHONE, useMedia } from '../styles/breakpoints.ts';
 import { MWA_NOT_FOUND_FRESH_MS, mwaWalletNotFound } from './mwa.ts';
 import { NoWallet, useWalletList, WalletOptions } from './WalletChooser.tsx';
@@ -119,7 +120,7 @@ function AccountMenu({
                         rel="noopener noreferrer"
                         data-testid={T.walletExplorer}
                     >
-                        View on explorer <span aria-hidden="true">↗</span>
+                        View on explorer <NavIcon name="external" className="icon-sm" />
                     </a>
                 )}
                 <Link
@@ -174,7 +175,7 @@ function MenuHead({ titleId, title, onClose }: { titleId: string; title: string;
                 data-testid={T.walletSheetClose}
                 onClick={onClose}
             >
-                ✕
+                <NavIcon name="close" className="icon" />
             </button>
         </div>
     );

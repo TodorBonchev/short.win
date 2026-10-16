@@ -3,9 +3,9 @@
  * live-feed state, SOL/USD. Always visible, so stale data is never silent.
  *
  * On a phone (FRONTEND.md §7.6) the bar is a one-line strip: a button with the worst state in
- * words and a shape (● ok, ▲ warn, ✕ bad — never colour alone) that expands to every item. Tablet
- * and desktop show the items, as before. The summary is not a live region: the pages' banners
- * announce a degradation.
+ * words and a shape (● ok, ▲ warn, ✕ bad — never colour alone) that expands to every item over a
+ * scrim (a press on it folds the list; the strip itself stays clear of it). Tablet and desktop show
+ * the items, as before. The summary is not a live region: the pages' banners announce a degradation.
  */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -22,6 +22,7 @@ import { useStore } from '../lib/store.ts';
 import { useMath } from '../math/useMath.ts';
 import { rpcSlot } from '../rpc/slot.ts';
 import { useIndexerFreshness } from './freshness.tsx';
+import { NavIcon } from './icons.tsx';
 
 export type SummaryState = 'ok' | 'warn' | 'bad';
 
@@ -87,6 +88,8 @@ export function StatusBar() {
 
     return (
         <footer ref={bar} className="statusbar" data-testid={T.statusBar} data-expanded={expanded ? '' : undefined}>
+            {/* Inside the footer: the document's outside-press handler leaves it to this one (no double fire). */}
+            {expanded && <div className="status-scrim" aria-hidden="true" onPointerDown={() => setExpanded(false)} />}
             <button
                 ref={summaryButton}
                 type="button"
@@ -102,14 +105,13 @@ export function StatusBar() {
                 </span>
                 <span className="grow">{summary.text}</span>
                 <span className="visually-hidden">, network status details</span>
-                <span className="status-chevron" aria-hidden="true">
-                    ⌃
-                </span>
+                <NavIcon name="chevron" className="status-chevron" />
             </button>
             <div id="statusbar-items" className="statusbar-items">
                 <span className="statusbar-item" data-testid={T.statusRpc} data-state={slot.ok ? 'ok' : 'bad'}>
                     <span className="dot" data-state={slot.ok ? 'ok' : 'bad'} aria-hidden="true" />
-                    RPC <span className="num">{slot.slot?.toString() ?? '—'}</span>
+                    RPC{' '}
+                    <span className="num">{slot.slot === null ? '—' : Number(slot.slot).toLocaleString('en-US')}</span>
                     <GlossaryTip id="rpc" />
                 </span>
                 <span className="statusbar-item stale-badge" data-testid={T.statusIndexer} data-state={fresh}>

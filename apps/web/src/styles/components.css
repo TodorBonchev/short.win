@@ -22,7 +22,10 @@
     height: calc(var(--header-h) + var(--safe-t));
     padding: var(--safe-t) max(var(--gutter), var(--safe-r)) 0 max(var(--gutter), var(--safe-l));
     background: var(--bg-1);
-    border-bottom: 1px solid var(--line);
+    /* The edge is the shadow's first layer (a 1 px hairline) with a faint drop under it: no border, so the
+       header's box stays --header-h tall and the nav underline meets its edge. */
+    border-bottom: 0;
+    box-shadow: var(--shadow-header);
 }
 
 /* The header is a stacking context (sticky): while its search overlay or wallet sheet is open it
@@ -62,6 +65,20 @@
 
 .brand-mark-win {
     fill: var(--accent);
+}
+
+/* Registry icons outside the tab bar (icons.tsx): NavIcon's default class .nav-icon is display: none from
+   640 px up, so every other use passes one of these two sizes. */
+.icon {
+    width: var(--icon);
+    height: var(--icon);
+    flex: none;
+}
+
+.icon-sm {
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    flex: none;
 }
 
 .cluster-badge {
@@ -113,7 +130,8 @@
 .app-main {
     min-width: 0;
     overflow: visible;
-    padding: var(--sp-3) max(var(--gutter), var(--safe-r))
+    /* 12 px under the header (--page-gap, the page rhythm); the bottom clears the phone's fixed bars. */
+    padding: var(--sp-4) max(var(--gutter), var(--safe-r))
         calc(var(--sp-3) + var(--tabbar-h) + var(--actionbar-h) + var(--safe-b)) max(var(--gutter), var(--safe-l));
 }
 
@@ -124,7 +142,8 @@
     display: flex;
     align-items: center;
     height: calc(var(--statusbar-h) + var(--safe-b));
-    padding: 0 max(var(--sp-4), var(--safe-r)) var(--safe-b) max(var(--sp-4), var(--safe-l));
+    /* The page's gutter, as the header: the first dot starts where the title and the panels do. */
+    padding: 0 max(var(--gutter), var(--safe-r)) var(--safe-b) max(var(--gutter), var(--safe-l));
     background: var(--bg-1);
     /* The top line is a shadow, not a border: the bar's content box stays the full 24 px, so a 24 px
        target in it (Security) does not push the document 1 px taller than the screen. */
@@ -150,6 +169,23 @@
 
 a.statusbar-item {
     min-height: 24px;
+}
+
+/* The bar's items take their state's colour (a degraded item is never grey beside a green one); healthy is
+   quiet. Scoped to the bar: the market header's FreshnessBadge keeps its own rules. */
+.statusbar .statusbar-item.stale-badge[data-state="live"] {
+    color: var(--text-1);
+}
+
+.statusbar .statusbar-item:has(> .dot[data-state="warn"]),
+.statusbar .statusbar-item.stale-badge[data-state="lagging"] {
+    color: var(--warn);
+}
+
+.statusbar .statusbar-item:has(> .dot[data-state="bad"]),
+.statusbar .statusbar-item.stale-badge[data-state="stale"],
+.statusbar .statusbar-item.stale-badge[data-state="down"] {
+    color: var(--danger);
 }
 
 /* The phone's one-line summary (hidden from 640 px up). */
@@ -189,16 +225,29 @@ a.statusbar-item {
         display: none;
     }
 
+    /* A mouse window from 640 px keeps the eight-item bar: a tighter gap fits it from ≈ 666 px (a 640–665 px
+       window still clips the end of "Security"; no device class, no gate viewport). A landscape phone gets
+       the phone's strip instead (the combined block below). */
     .statusbar-items {
-        gap: var(--sp-4);
+        gap: var(--sp-3);
         overflow: hidden;
+    }
+
+    /* The free space moves before the search: ⌕ and the wallet form the trailing group (DOM order unchanged). */
+    .search-toggle {
+        margin-left: auto;
+    }
+
+    .app-header > .header-spacer {
+        display: none;
     }
 }
 
 /* ---- shell: phone (< 640) ------------------------------------------------------------------ */
 @media (max-width: 639.98px) {
-    .app-main {
-        padding-bottom: calc(var(--sp-4) + var(--tabbar-h) + var(--statusbar-h) + var(--actionbar-h) + var(--safe-b));
+    /* The mark starts at the gutter, where the page's h1 does (the link keeps its 44 px box). */
+    .brand {
+        justify-content: flex-start;
     }
 
     /* The bottom tab bar: the same <nav>, fixed. */
@@ -212,11 +261,12 @@ a.statusbar-item {
         height: calc(var(--tabbar-h) + var(--safe-b));
         padding: 0 var(--safe-r) var(--safe-b) var(--safe-l);
         background: var(--bg-1);
-        border-top: 1px solid var(--line);
+        border-top: 1px solid var(--line-panel);
     }
 
     .nav a,
     .nav-more {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -228,21 +278,8 @@ a.statusbar-item {
         color: var(--text-1);
         background: transparent;
         border: 0;
-        border-top: 2px solid transparent;
-        border-bottom: 0;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
-    }
-
-    .nav a[aria-current="page"],
-    .nav a.active,
-    .nav-more[data-current] {
-        color: var(--text-0);
-        border-top-color: var(--accent);
-    }
-
-    .nav a[data-nav="status"] {
-        display: none;
     }
 
     .nav-icon {
@@ -250,13 +287,89 @@ a.statusbar-item {
         flex: none;
     }
 
-    /* The status bar folds into a strip above the tab bar: the worst state, a tap for the rest. */
+    /* The active tab: a 32 px gold bar at the cell's top edge, out of the flow (the cell keeps its 44 px height
+       and its tap area), gold text and a heavier icon — three cues. */
+    .nav a::before,
+    .nav-more::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: var(--tabbar-indicator-w);
+        height: 2px;
+        translate: -50%;
+        border-radius: 0 0 2px 2px;
+        background: transparent;
+        pointer-events: none;
+    }
+
+    .nav a[aria-current="page"],
+    .nav a.active,
+    .nav-more[data-current] {
+        color: var(--accent);
+    }
+
+    .nav a[aria-current="page"]::before,
+    .nav a.active::before,
+    .nav-more[data-current]::before {
+        background: var(--accent);
+    }
+
+    .nav-more[data-current] .nav-icon,
+    .nav a[aria-current="page"] .nav-icon,
+    .nav a.active .nav-icon {
+        stroke-width: 2;
+    }
+
+    .nav a[data-nav="status"] {
+        display: none;
+    }
+}
+
+/* Where the nav is in the header's flow, brand and badge read as one group with 24 px before the nav. Under
+   640 px the nav is the fixed tab bar: a margin there would shift it right and narrow it. */
+@media (min-width: 640px) {
+    .cluster-badge {
+        margin-left: calc(-1 * var(--sp-2));
+    }
+
+    .nav {
+        margin-left: var(--sp-3);
+    }
+}
+
+/* The phone's status strip: on a phone, and on a landscape phone (the tablet tier's width with a coarse
+   pointer, wider than tall), where the eight-item bar would clip (≈ 690 px at 12 px; a 667 px iPhone SE cut
+   half of "Security"). The bar folds into a strip above the tab bar: the worst state, a tap for the rest. */
+@media (max-width: 639.98px),
+    (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
+    .app-main {
+        padding-bottom: calc(var(--sp-4) + var(--tabbar-h) + var(--statusbar-h) + var(--actionbar-h) + var(--safe-b));
+    }
+
+    /* A bg-2 band (the surface of its own expanded list) over the bg-1 tab bar; the edge stays a shadow, not a
+       border, so the strip's box stays --statusbar-h tall. */
     .statusbar {
         position: fixed;
         inset: auto 0 calc(var(--tabbar-h) + var(--safe-b));
         z-index: var(--z-bars);
         height: var(--statusbar-h);
         padding: 0;
+        background: var(--bg-2);
+        border-top: 0;
+        box-shadow: 0 -1px 0 var(--line-panel);
+    }
+
+    /* A degraded state tints the whole band (text-0 on --warn-bg 12.0:1, on --danger-bg 13.1:1): the tint, the
+       weight and the words are three cues. */
+    .statusbar:has(.status-summary[data-state="warn"]) {
+        background: var(--warn-bg);
+        box-shadow: 0 -1px 0 var(--warn);
+    }
+
+    .statusbar:has(.status-summary[data-state="bad"]) {
+        background: var(--danger-bg);
+        box-shadow: 0 -1px 0 var(--danger);
     }
 
     .status-summary {
@@ -274,23 +387,46 @@ a.statusbar-item {
         cursor: pointer;
     }
 
+    .status-summary[data-state="warn"],
+    .status-summary[data-state="bad"] {
+        color: var(--text-0);
+        font-weight: var(--fw-medium);
+    }
+
+    /* The registry chevron (icons.tsx draws it pointing down): up while the list is folded, down while open. */
     .status-chevron {
+        width: var(--icon);
+        height: var(--icon);
+        color: var(--text-2);
+        transform: rotate(180deg);
         transition: transform var(--t);
     }
 
     .statusbar[data-expanded] .status-chevron {
-        transform: rotate(180deg);
+        transform: rotate(0);
     }
 
     .statusbar-items {
         display: none;
     }
 
+    /* The fixed footer is its own stacking context: the scrim sits at 0 and the list above it, both inside the
+       footer, which already paints over the header (z 20) and the action bar (z 30, earlier in the DOM). The
+       scrim stops at the strip's top edge so its toggle stays usable; a press on it folds the list. */
+    .status-scrim {
+        position: fixed;
+        inset: 0 0 calc(var(--tabbar-h) + var(--statusbar-h) + var(--safe-b));
+        z-index: 0;
+        background: var(--bg-overlay);
+    }
+
+    /* The open list: every item a full 44 px row, the two links side by side as bordered buttons at the end. */
     .statusbar[data-expanded] .statusbar-items {
         position: absolute;
         inset: auto 0 100%;
-        display: flex;
-        flex-direction: column;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         align-items: stretch;
         gap: 0;
         max-height: calc(100dvh - var(--header-h) - var(--tabbar-h) - var(--statusbar-h) - var(--safe-b));
@@ -298,7 +434,7 @@ a.statusbar-item {
         padding: var(--sp-2) 0;
         background: var(--bg-2);
         border-top: 1px solid var(--line-strong);
-        box-shadow: 0 -8px 24px rgb(0 0 0 / 50%);
+        box-shadow: var(--shadow-sheet);
     }
 
     .statusbar[data-expanded] .statusbar-item {
@@ -308,8 +444,33 @@ a.statusbar-item {
         border-bottom: 1px solid var(--line);
     }
 
-    .statusbar[data-expanded] .statusbar-item:last-child {
+    .statusbar[data-expanded] span.statusbar-item {
+        grid-column: 1 / -1;
+        background: var(--bg-2);
+    }
+
+    .statusbar[data-expanded] span.statusbar-item:last-of-type {
         border-bottom: 0;
+    }
+
+    .statusbar[data-expanded] .statusbar-item.muted {
+        color: var(--text-1);
+    }
+
+    .statusbar[data-expanded] a.statusbar-item {
+        justify-content: center;
+        margin: var(--sp-3) var(--sp-2) 0;
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius);
+    }
+
+    /* Their outer edges at the gutter, where the rows' text starts. */
+    .statusbar[data-expanded] a.statusbar-item:first-of-type {
+        margin-left: var(--gutter);
+    }
+
+    .statusbar[data-expanded] a.statusbar-item:last-of-type {
+        margin-right: var(--gutter);
     }
 
     .statusbar[data-expanded] .header-spacer {
@@ -321,21 +482,31 @@ a.statusbar-item {
     }
 }
 
-/* Under 400 px the wordmark goes (the mark and the link's name stay). The lone mark is 30 px in the
-   48 px bar: on the 24-unit grid its cap and baseline then land on whole pixels at every DPR. */
+/* Under 400 px the lone mark is 30 px in the 48 px bar: on the 24-unit grid its cap and baseline then land on
+   whole pixels at every DPR. The word yields only to the cluster badge: on mainnet "ShortWin" shows at every
+   width; with LOCALNET / DEVNET in the bar a connected wallet at 320 px would overflow (mark 30 + word + badge
+   + ⌕ 44 + wallet ≈ 328 px > 296). */
 @media (max-width: 399.98px) {
     .brand-mark {
         width: 30px;
         height: 30px;
     }
 
-    .brand-word {
+    .app-header:has(.cluster-badge) .brand-word {
         position: absolute;
         width: 1px;
         height: 1px;
         overflow: hidden;
         clip: rect(0 0 0 0);
         white-space: nowrap;
+    }
+
+    .app-header {
+        gap: var(--sp-2);
+    }
+
+    .cluster-badge {
+        padding-inline: var(--sp-1);
     }
 }
 
@@ -403,18 +574,27 @@ a.statusbar-item {
 }
 
 /* ---- layouts ----------------------------------------------------------------------------- */
+/* The page rhythm (FRONTEND.md §7.3): 12 px between boxes (--page-gap), 16 px under the page head; the page
+   stops growing at --page-max and centres. */
 .page {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: var(--page-gap);
     min-width: 0;
+    max-width: var(--page-max);
+    margin-inline: auto;
 }
 
-/* Wide screens: the page stops growing at 1680 px and centres. */
+/* Wide screens: the header, the status bar and the fallback banner start at the page column too. */
 @media (min-width: 1680px) {
-    .page {
-        width: 100%;
-        max-width: 1680px;
+    .app-header,
+    .statusbar {
+        padding-inline: max(var(--gutter), var(--safe-l), calc((100% - var(--page-max)) / 2))
+            max(var(--gutter), var(--safe-r), calc((100% - var(--page-max)) / 2));
+    }
+
+    .app-main > .banner {
+        max-width: var(--page-max);
         margin-inline: auto;
     }
 }
@@ -424,19 +604,26 @@ a.statusbar-item {
     flex-wrap: wrap;
     align-items: center;
     gap: var(--sp-3) var(--sp-4);
-    min-height: 32px;
+    min-height: 36px;
+    /* 16 px under the head: the page gap plus this. */
+    margin-bottom: calc(var(--page-head-gap) - var(--page-gap));
 }
 
+/* A page with a side column (the trade / Manage / create-market panel): --side-col is 360 px, 320 px under
+   1,180 px (tokens.css). .layout-trade is the market page's alias until P5 adopts the shared classes. */
+.layout-side,
 .layout-trade {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 360px;
-    gap: var(--sp-3);
+    grid-template-columns: minmax(0, 1fr) var(--side-col);
+    gap: var(--page-gap);
     align-items: start;
 }
 
-/* The trade panel stays in view under the sticky header while the document scrolls, and scrolls on
-   its own, so its submit button is never a page away from the inputs. */
+/* The side panel stays in view under the sticky header while the document scrolls, and scrolls on its own
+   behind a visible thin scrollbar, so its submit is never a page away from the inputs and a focused control
+   clears its sticky foot (scroll-padding). */
 @media (min-width: 1024px) {
+    .side-sticky,
     .layout-trade > .trade-panel {
         position: sticky;
         top: calc(var(--header-h) + var(--sp-3));
@@ -448,17 +635,21 @@ a.statusbar-item {
            ~15 px wider than the left (content and dividers stopping short of the right border). */
         scrollbar-gutter: stable both-edges;
         scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) transparent;
+        scroll-padding-top: var(--sp-3);
+        scroll-padding-bottom: calc(120px + var(--sp-3));
+    }
+
+    /* The sticky foot floats over the panel's scrolled content. */
+    .side-sticky .form-foot,
+    .layout-trade > .trade-panel .form-foot {
+        box-shadow: var(--shadow-up);
     }
 }
 
-@media (max-width: 1179.98px) {
-    .layout-trade {
-        grid-template-columns: minmax(0, 1fr) 320px;
-    }
-}
-
-/* Tablet and phone: one column (the trade panel becomes a sheet where a page wires it, §7.6). */
+/* Tablet and phone: one column (the side panel becomes a sheet where a page wires it, §7.6). */
 @media (max-width: 1023.98px) {
+    .layout-side,
     .layout-trade {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -468,6 +659,14 @@ a.statusbar-item {
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
+}
+
+/* Top-level stacks take the page gap; .stack itself keeps var(--sp-3): it is also the lend / Manage forms,
+   SettlementRisk, nested create-market stacks and the toast region. */
+.page > .stack,
+.layout-trade > .stack,
+.layout-side > .stack {
+    gap: var(--page-gap);
 }
 
 .row {
@@ -1636,6 +1835,12 @@ details > summary::-webkit-details-marker {
     display: none;
 }
 
+/* The header's ⌕ is a first-rank control (text-0), not a muted ghost; after the buttons section, so it
+   outranks the ghost variant's colour. */
+.app-header .search-toggle {
+    color: var(--text-0);
+}
+
 /* Tablet and phone: a Search button opens the box as a full-screen overlay. */
 @media (max-width: 1023.98px) {
     .search-toggle {
@@ -1687,6 +1892,8 @@ details > summary::-webkit-details-marker {
         background: var(--bg-0);
         border: 0;
         border-radius: 0;
+        /* The full-screen list is static and borderless: --shadow-pop would paint a band over the input row. */
+        box-shadow: none;
     }
 
     .search[data-open] .search-option {
@@ -1707,6 +1914,7 @@ details > summary::-webkit-details-marker {
     background: var(--bg-2);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
+    box-shadow: var(--shadow-pop);
 }
 
 .search-option {
@@ -1717,13 +1925,15 @@ details > summary::-webkit-details-marker {
     cursor: pointer;
 }
 
+/* The highlighted option: a bg-4 step over the bg-2 list, with a gold inset bar (the selected state's line). */
 .search-option[aria-selected="true"] {
-    background: var(--bg-3);
+    background: var(--bg-4);
+    box-shadow: inset 2px 0 0 var(--accent);
 }
 
 @media (hover: hover) {
     .search-option:hover {
-        background: var(--bg-3);
+        background: var(--bg-4);
     }
 }
 
@@ -1739,6 +1949,7 @@ details > summary::-webkit-details-marker {
     background: var(--bg-2);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
+    box-shadow: var(--shadow-pop);
 }
 
 .menu-item {
@@ -1758,13 +1969,14 @@ details > summary::-webkit-details-marker {
     min-height: max(32px, var(--tap-min));
 }
 
+/* Focus and hover: a bg-4 step over the bg-2 menu (never a disabled entry: a wallet while it connects). */
 .menu-item:focus-visible {
-    background: var(--bg-3);
+    background: var(--bg-4);
 }
 
 @media (hover: hover) {
     .menu-item:hover:not(:disabled) {
-        background: var(--bg-3);
+        background: var(--bg-4);
         text-decoration: none;
     }
 }
@@ -2114,7 +2326,10 @@ button.form-reason {
         height: 56px;
         padding: 5px max(var(--gutter), var(--safe-r)) 5px max(var(--gutter), var(--safe-l));
         background: var(--bg-1);
-        border-top: 1px solid var(--line);
+        /* A panel floating over the page (a shadow, no hairline): with the strip at bg-2 the three bars read as
+           panel / status band / tab bar, not one slab. */
+        border-top: 0;
+        box-shadow: var(--shadow-up);
     }
 
     .action-bar > .btn {
@@ -2223,20 +2438,42 @@ button.form-reason {
     margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)) 0;
 }
 
+/* A row: a leading 20 px icon spanning both lines, the title (an anonymous grid item, auto-placed in row 1,
+   column 2), its muted line under it, a trailing chevron pointing right (the registry's one glyph, rotated). */
 .more-row {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) 16px;
+    column-gap: var(--sp-3);
+    align-items: center;
+    align-content: center;
     min-height: 48px;
     padding: var(--sp-2) var(--sp-4);
     color: var(--text-0);
     font-weight: var(--fw-medium);
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-panel);
 }
 
-.more-row .muted {
+.more-row > .more-icon {
+    grid-row: 1 / span 2;
+    width: 20px;
+    height: 20px;
+    color: var(--text-1);
+}
+
+.more-row > .muted {
+    grid-column: 2;
     font-size: var(--fs-sm);
     font-weight: var(--fw-regular);
+}
+
+.more-row > .more-chevron {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    width: 16px;
+    height: 16px;
+    color: var(--text-2);
+    rotate: -90deg;
+    justify-self: center;
 }
 
 .more-network h3 {
@@ -2253,6 +2490,17 @@ button.form-reason {
     padding: var(--sp-2) var(--sp-3);
     font-size: var(--fs-xs);
     color: var(--text-2);
+}
+
+/* The balance is the identity block's one focal number: its label a notch up, the figure in text-0. */
+.menu-label:has(> .num) {
+    font-size: var(--fs-sm);
+    color: var(--text-1);
+}
+
+.menu-label > .num {
+    color: var(--text-0);
+    font-size: var(--fs-md);
 }
 
 .menu-note {
@@ -2294,12 +2542,13 @@ a.menu-item {
     display: none;
 }
 
-/* The wallet chooser without a wallet: text rows (no logos), the links a tap opens. */
+/* The wallet chooser without a wallet: text rows (no logos), the links a tap opens — one bordered list of
+   48 px rows, the cluster hint as an info note, the install links a quieter line. */
 .wallet-chooser {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
-    padding: var(--sp-2);
+    gap: var(--sp-4);
+    padding: var(--sp-4) var(--sp-3);
     font-size: var(--fs-sm);
 }
 
@@ -2314,15 +2563,42 @@ a.menu-item {
     padding: 0;
 }
 
+/* No overflow: hidden — it would clip the rows' focus rings. */
 .wallet-links {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-2);
+    gap: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
 }
 
 .wallet-links .btn {
     justify-content: space-between;
-    min-height: max(36px, var(--tap-min));
+    min-height: 48px;
+    border: 0;
+    border-radius: 0;
+}
+
+.wallet-links .btn:first-child {
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.wallet-links .btn:last-child {
+    border-radius: 0 0 var(--radius) var(--radius);
+}
+
+/* The ring sits inside the row (the list's border is the row's edge). */
+.wallet-links .btn:focus-visible {
+    outline-offset: -3px;
+}
+
+.wallet-links .btn + .btn {
+    border-top: 1px solid var(--line);
+}
+
+.wallet-note {
+    border-left: 3px solid var(--info);
+    padding-left: var(--sp-3);
 }
 
 /* The Mobile Wallet Adapter entry: "Use installed wallet" over its second line (O-6, §5.4 (6)). */
@@ -2344,7 +2620,8 @@ a.menu-item {
     margin: 0;
     padding: 0;
     list-style: none;
-    color: var(--text-2);
+    font-size: var(--fs-sm);
+    color: var(--text-1);
 }
 
 .wallet-install a {
@@ -2376,8 +2653,9 @@ a.menu-item {
         overflow-y: auto;
         padding: var(--sp-3) max(var(--sp-3), var(--safe-r)) calc(var(--sp-3) + var(--safe-b))
             max(var(--sp-3), var(--safe-l));
+        border-width: 1px 0 0;
         border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-        box-shadow: 0 -12px 32px rgb(0 0 0 / 60%);
+        box-shadow: var(--shadow-sheet);
     }
 
     .menu-scrim {
@@ -2399,10 +2677,16 @@ a.menu-item {
         display: flex;
         align-items: center;
         gap: var(--sp-3);
-        margin: calc(-1 * var(--sp-3)) 0 var(--sp-2);
+        margin: calc(-1 * var(--sp-3)) 0 var(--sp-3);
         padding: var(--sp-1) 0 var(--sp-1) var(--sp-3);
         background: var(--bg-2);
         border-bottom: 1px solid var(--line);
+    }
+
+    /* Air under the head: the identity block and the chooser start 8 px below it. */
+    .wallet-anchor > .menu > .menu-head + .menu-label,
+    .wallet-anchor > .menu .wallet-chooser {
+        padding-top: var(--sp-3);
     }
 
     .menu-title {

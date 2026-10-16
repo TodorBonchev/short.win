@@ -1,11 +1,29 @@
 /**
- * The phone tab bar's icons, and the small info mark (FRONTEND.md §7.6): 20 px inline SVG, stroked in `currentColor`,
- * presentation attributes only (CSP `style-src 'self'`: no style attributes), hidden from assistive
- * technology (the link text names the destination). `.nav-icon` is hidden from 640 px up.
+ * The icon registry (FRONTEND.md §7.6; design pass P2): the phone tab bar's icons, the small info mark and the
+ * glyphs every control shares (close, chevron, sort, copy, check, external, shield, plus). 20 px inline SVG,
+ * stroked 1.6 in `currentColor`, presentation attributes only (CSP `style-src 'self'`: no style attributes),
+ * hidden from assistive technology (the control's text or aria-label names it). The default class `.nav-icon`
+ * is hidden from 640 px up: every use outside the tab bar passes `.icon` (16 px), `.icon-sm` (14 px) or its
+ * own class. The brand mark is `Logo.tsx`, not an icon.
  */
 import type { ReactNode } from 'react';
 
-export type NavIconName = 'markets' | 'positions' | 'lend' | 'status' | 'more' | 'search' | 'info';
+export type NavIconName =
+    | 'markets'
+    | 'positions'
+    | 'lend'
+    | 'status'
+    | 'more'
+    | 'search'
+    | 'info'
+    | 'close'
+    | 'chevron'
+    | 'sort'
+    | 'copy'
+    | 'check'
+    | 'external'
+    | 'shield'
+    | 'plus';
 
 const PATHS: Record<NavIconName, ReactNode> = {
     // A list of rows (the markets table).
@@ -52,6 +70,27 @@ const PATHS: Record<NavIconName, ReactNode> = {
             <path d="M10 5.9v.2" strokeWidth="2.4" />
         </>
     ),
+    // A cross (close, dismiss).
+    close: <path d="M5 5l10 10M15 5L5 15" />,
+    // Points down; rotated for up (a folded list) and right (a row that opens a page).
+    chevron: <path d="M5 7.5l5 5 5-5" />,
+    // Both ways (a sortable column that is not the sort).
+    sort: <path d="M6 8l4-4 4 4M6 12l4 4 4-4" />,
+    // Two sheets (copy to the clipboard).
+    copy: (
+        <>
+            <rect x="7" y="7" width="9" height="9" rx="1.5" />
+            <path d="M4 13V5.5A1.5 1.5 0 0 1 5.5 4H13" />
+        </>
+    ),
+    // A tick (done, copied).
+    check: <path d="M4 10.5l4 4 8-8" />,
+    // An arrow out of a box (opens elsewhere: the explorer, a wallet app).
+    external: <path d="M8 4h8v8M16 4l-9 9M6 7H4v9h9v-2" />,
+    // The security policy.
+    shield: <path d="M10 2.5l6 2.5v5c0 3.5-2.6 6.2-6 7.5-3.4-1.3-6-4-6-7.5V5z" />,
+    // Create.
+    plus: <path d="M10 4v12M4 10h12" />,
 };
 
 export function NavIcon({ name, className = 'nav-icon' }: { name: NavIconName; className?: string }) {
