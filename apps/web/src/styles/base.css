@@ -32,6 +32,17 @@ html[data-sheet-open] {
     overflow: hidden;
 }
 
+/* From 1,280 px the document keeps its scrollbar gutter while a dialog or sheet locks scrolling (the
+   rule above), so opening the review no longer shifts the header, nav and trade panel by the scrollbar
+   width on classic-scrollbar platforms. Overlay-scrollbar platforms (macOS default, phones) are
+   unchanged. 1,024–1,279 px keeps today's behaviour: its tables are measured to the pixel and
+   screens.spec asserts the markets table fits at 1024 × 720. Never unconditional, never both-edges. */
+@media (min-width: 1280px) {
+    html {
+        scrollbar-gutter: stable;
+    }
+}
+
 body {
     margin: 0;
     background: var(--bg-0);
@@ -52,19 +63,23 @@ h4 {
     line-height: var(--lh-tight);
 }
 
+/* The page title: 20 px at every width (--fs-title), under the hero numbers (--fs-hero). */
 h1 {
-    font-size: var(--fs-xl);
+    font-size: var(--fs-title);
+    letter-spacing: -0.01em;
 }
 
 h2 {
     font-size: var(--fs-lg);
 }
 
+/* A section heading is the middle label tier (title > section > label, FRONTEND.md §7.2). */
 h3 {
-    font-size: var(--fs-md);
+    font-size: var(--section-fs);
+    font-weight: var(--section-fw);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--text-1);
+    letter-spacing: var(--section-ls);
+    color: var(--section-color);
 }
 
 p {
@@ -114,28 +129,36 @@ input[type="search"] {
 .btn,
 .tab,
 .nav a,
+.nav-more,
 .menu-item,
 .search-option,
 tr[data-interactive] {
     -webkit-tap-highlight-color: transparent;
 }
 
-.btn:active:not(:disabled),
-.tab:active,
-.nav a:active,
+/* A press on a bg-2 surface steps up to bg-4. The filled primary and short buttons are left out: they
+   take their own --accent-active / --loss-hover presses (components.css). */
+.btn:active:not(:disabled):not([data-variant="primary"]):not([data-variant="short"]),
 .menu-item:active,
-.search-option:active,
-tr[data-interactive]:active {
-    background: var(--bg-3);
+.search-option:active {
+    background: var(--bg-4);
 }
 
-/* A hit area larger than the visible control (WCAG 2.5.8 / 44 px under a coarse pointer). The
-   control keeps its look; the invisible ::after takes the touch. */
+/* A press on a bg-1 surface (tabs, the nav, the phone's More, interactive rows) steps up to bg-hover. */
+.tab:active,
+.nav a:active,
+.nav-more:active,
+tr[data-interactive]:active {
+    background: var(--bg-hover);
+}
+
 /* Text that must not break (a shortened id "8oBK…6cTC" inside a sentence). */
 .nowrap {
     white-space: nowrap;
 }
 
+/* A hit area larger than the visible control (WCAG 2.5.8 / 44 px under a coarse pointer). The
+   control keeps its look; the invisible ::after takes the touch. */
 .hit {
     position: relative;
 }

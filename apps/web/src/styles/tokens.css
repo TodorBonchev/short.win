@@ -24,32 +24,62 @@
 :root {
     color-scheme: dark;
 
-    /* Surfaces, darkest first */
-    --bg-0: #0b0e11; /* app background */
+    /* Surfaces, darkest first — one meaning each (FRONTEND.md §7.1) */
+    --bg-0: #0b0e11; /* app background, and the sunken well for read-only figures */
     --bg-1: #12161b; /* panels, table body */
-    --bg-2: #181d23; /* raised: table header, hovered row, menus */
+    --bg-2: #181d23; /* raised: table header, menus, notes (disclosure, banner, creator box) */
     --bg-3: #1f252c; /* inputs, selected row */
+    --bg-4: #242c35; /* hover / pressed / selected on a bg-2 surface: menus, search options, chips, default buttons.
+                        text-0 11.9, text-1 6.7, text-2 5.1, info 5.4, loss 4.7, gain 5.9, accent 7.8 : 1. Never
+                        behind an input border: line-strong is 2.88 on it */
+    --bg-hover: #1f252c; /* hover on an interactive bg-1 row, and the press colour of tabs, nav and rows. The same
+                            value as --bg-3 by design; a selected row, if one is ever introduced, takes --bg-4 */
     --bg-overlay: rgb(5 7 9 / 72%);
+    --surface-well: var(--bg-0); /* read-only figures: previews, tx steps, lend position */
+    --surface-note: var(--bg-2); /* disclosure, banner, menu, creator box */
+    --surface-nested: var(--bg-3); /* a box inside a note */
 
     /* Lines */
-    --line: #2a323b; /* hairlines between rows and panels (decorative) */
+    --line: #2a323b; /* hairlines between rows and inside panels (decorative) */
+    --line-panel: #363f4b; /* outer edge of panels, cards, wells, popovers (1.70:1 on bg-1); --line stays for in-panel hairlines */
     --line-strong: #66727f; /* input borders: ≥ 3:1 on --bg-3 */
+    --meter-track: #3d4753; /* the utilisation track: 1.92 on bg-1 */
+    --scrollbar-thumb: var(--line-strong);
+
+    /* Elevation: a panel's 1 px top highlight, and one shadow per floating layer */
+    --edge-highlight: inset 0 1px 0 rgb(255 255 255 / 3%);
+    /* The 1 px line first: the header keeps a hairline edge under its shadow. */
+    --shadow-header: 0 1px 0 var(--line-panel), 0 6px 16px rgb(0 0 0 / 35%);
+    --shadow-up: 0 -12px 20px -12px rgb(0 0 0 / 65%); /* action bar, sticky form foot */
+    --shadow-pop: 0 12px 32px rgb(0 0 0 / 55%); /* menus, popovers, search results */
+    --shadow-modal: 0 16px 48px rgb(0 0 0 / 60%);
+    --shadow-sheet: 0 -12px 32px rgb(0 0 0 / 60%);
+    --shadow-toast: 0 8px 24px rgb(0 0 0 / 50%);
 
     /* Text */
     --text-0: #e8ecf1; /* primary, 15–16:1 */
     --text-1: #aab4bf; /* secondary labels, ≥ 7.3:1 */
-    --text-2: #8a95a1; /* muted, ≥ 5:1 */
+    --text-2: #919cab; /* muted: 6.96 / 6.53 / 6.09 / 5.55 / 5.08 : 1 on bg-0 / bg-1 / bg-2 / bg-3 / bg-4 */
     --text-inverse: #0b0e11;
+    --icon-muted: #737e8a; /* resting glossary ⓘ and other icon-only marks: 4.68 / 4.39 / 4.10 / 3.74 on bg-0..bg-3
+                              (≥ 3:1 non-text). SVG icons stroked in currentColor only (the glossary ⓘ is NavIcon "info",
+                              an SVG in a button with an aria-label); never a text glyph: 4.39:1 on bg-2 and 4.10:1 on
+                              bg-3 fail AA for text, so the sort ↕ (.sort-hint), the ▸/⌄ chevrons and any other font
+                              glyph keep --text-1 / --text-2 until icons.tsx replaces them */
+    --tag: #b9c6d6; /* informational badges (9.03 on --tag-bg), so link blue is reserved for links */
+    --tag-bg: #1c242e;
 
-    /* Brand and interaction */
+    /* Brand and interaction: gold is the primary action and the selected state, nothing else */
     --accent: #f0b90b; /* primary action, active nav */
     --accent-hover: #ffd033;
+    --accent-active: #d9a60a; /* the primary button's press: text-inverse 8.67 on it */
     --focus: #8ab4ff; /* focus ring, ≥ 7:1 */
 
     /* P&L and price direction (gain = good for the user; for a short, a price fall) */
     --gain: #2ebd85;
     --gain-bg: #0f2e24;
     --loss: #ff5c6c;
+    --loss-hover: #ff7281; /* the Short button's hover / press: text-inverse 7.35 on it */
     --loss-bg: #3a1a20;
     --flat: var(--text-1);
 
@@ -66,7 +96,8 @@
     /* Status */
     --info: #5aa2ff;
     --info-bg: #14243a;
-    --warn: #f0b90b;
+    --warn: #ffa726; /* caution: amber, 9.35 on bg-1 and 7.39 on --warn-bg. --risk-watch, --tier-c and --accent keep
+                        #f0b90b: gold is the primary action and the selected state, amber is caution */
     --warn-bg: #33290a;
     --danger: #ff5c6c;
     --danger-bg: #3a1a20;
@@ -96,6 +127,26 @@
     --fw-medium: 500;
     --fw-bold: 650;
 
+    /* The three label tiers (FRONTEND.md §7.2): title > section > label. --title-fs is the 13 px panel
+       title; --fs-title below is the 20 px page h1 — mirror names for different things, never swapped. */
+    --title-fs: var(--fs-md);
+    --title-fw: var(--fw-bold);
+    --title-ls: 0.06em;
+    --title-color: var(--text-0);
+    --section-fs: var(--fs-sm);
+    --section-fw: var(--fw-bold);
+    --section-ls: 0.05em;
+    --section-color: var(--text-1);
+    --label-fs: var(--fs-xs);
+    --label-fw: var(--fw-medium);
+    --label-ls: 0.04em;
+    --label-color: var(--text-2);
+    --fs-title: 20px; /* the page h1; phones keep 20 px (set again in the phone block) */
+    --fs-hero: var(--fs-2xl); /* 22 px desktop / 24 px phone: the market head's EMA price and the position page's
+                                 CR hero, so a hero number always outranks the 20 px title */
+    --fs-prose: 14px; /* reading pages (How it works, Security); 15 px on a phone */
+    --lh-prose: 1.55; /* line-height of that prose */
+
     /* Spacing (4 px grid) and density */
     --sp-1: 2px;
     --sp-2: 4px;
@@ -111,6 +162,24 @@
     --radius-sm: 3px;
     --radius: 4px;
     --radius-lg: 6px;
+
+    /* Structural measures (FRONTEND.md §7.3): one grid for every package */
+    --page-gap: var(--sp-4); /* 12 px between boxes */
+    --page-head-gap: var(--sp-5); /* 16 px under the page head */
+    --kv-row-h: 28px; /* key / value rows (not --row-h: kv rows are not controls and must not become 44 px under coarse) */
+    --side-col: 360px; /* the trade / Manage / create-market side column; 320 px under 1,180 px */
+    --page-max: 1680px;
+    --sheet-head-h: calc(var(--header-h) + var(--sp-2));
+    --tabbar-indicator-w: 32px;
+    /* The .input-wrap box; 46 px under coarse so the inner 44 px input fits its 1 px border. */
+    --field-h: var(--control-h);
+    --select-arrow-w: 28px;
+    --check: 18px; /* checkbox / radio box; 20 px under coarse */
+    --icon: 16px;
+    --icon-sm: 14px;
+    --icon-btn: 32px; /* square icon buttons (close ✕); 44 px under coarse */
+    --form-measure: 64ch;
+    --field-narrow-w: 120px; /* slippage / tolerance boxes */
 
     /* Responsive shell (FRONTEND.md §7.6): set per breakpoint below */
     --gutter: var(--sp-3); /* page side padding: 8 px desktop */
@@ -140,10 +209,26 @@
     --z-toast: 80;
 }
 
+/* Laptop: the side column narrows before the one-column tier. */
+@media (max-width: 1179.98px) {
+    :root {
+        --side-col: 320px;
+    }
+}
+
 /* Tablet and phone: a taller header, a wider gutter. */
 @media (max-width: 1023.98px) {
     :root {
         --header-h: 48px;
+        --gutter: 12px;
+    }
+}
+
+/* From 1,280 px the gutter is 12 px as well (a desktop is never tighter than a tablet); 1,024–1,279 keeps
+   8 px, its tables are measured to the pixel. Measured at 1,280 and 1,440 px (design pass P1): no table
+   gains a sideways scroll. */
+@media (min-width: 1280px) {
+    :root {
         --gutter: 12px;
     }
 }
@@ -161,10 +246,20 @@
         --fs-lg: 16px;
         --fs-xl: 20px;
         --fs-2xl: 24px;
+        --fs-title: 20px; /* the page title stays 20 px: a hero number (--fs-hero, 24 px) still outranks it */
+        --fs-prose: 15px;
     }
 }
 
-/* A finger, at any width: 44 px controls and rows, 16 px inputs (no zoom on focus in iOS). */
+/* A landscape phone (a coarse pointer in the tablet tier, landscape): the phone's 28 px status strip. */
+@media (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
+    :root {
+        --statusbar-h: 28px;
+    }
+}
+
+/* A finger, at any width: 44 px controls and rows, 16 px inputs (no zoom on focus in iOS); a 52 px header
+   gives the 44 px controls 4 px of air (the nav height, scroll-padding and the sheet head follow --header-h). */
 @media (pointer: coarse) {
     :root,
     :root[data-density] {
@@ -173,6 +268,10 @@
         --tap-min: 44px;
         --tap-sm: 36px;
         --fs-input: 16px;
+        --header-h: 52px;
+        --field-h: calc(var(--control-h) + 2px);
+        --check: 20px;
+        --icon-btn: 44px;
     }
 }
 

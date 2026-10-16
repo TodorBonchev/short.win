@@ -240,7 +240,7 @@ code (`qrcode`, `@noble/curves/secp256k1`; mobile.md R10).
 
 ```
 ┌──────────────────────────────────┐ ← safe area
-│ W ShortWin [LOCALNET]  (⌕) [Connect] │ 48 sticky ("ShortWin" visually hidden < 400)
+│ W ShortWin [LOCALNET]  (⌕) [Connect] │ 48 (52 under a coarse pointer) sticky ("ShortWin" visually hidden < 400)
 │  page (document scroll)          │
 │ [ ▼ Short ]       [  Lend  ]     │ 56 action bar (pages that have one), fixed
 │ ● All live · RPC 3,012        ⌃  │ 28 status strip (status-summary), fixed
@@ -2010,17 +2010,21 @@ the text "▼" glyph and the falling-line favicon.
 
 ### 7.1 Colour tokens (`src/styles/tokens.css`)
 
+*Design pass P1 (2026-10-16, the tokens package):* the rows marked *P1* were added or changed by it; a row names
+the package that consumes the token where that package has not landed yet. Every ratio below was recomputed
+(WCAG 2.x relative luminance) when the row was written.
+
 | Token | Value | Use | Contrast (on `--bg-0` / `--bg-1` / `--bg-3`) |
 |---|---|---|---|
 | `--bg-0` | `#0b0e11` | app background | — |
 | `--bg-1` | `#12161b` | panels, table body | — |
-| `--bg-2` | `#181d23` | table header, hover, menus | — |
+| `--bg-2` | `#181d23` | table header, menus, notes (disclosure, banner, creator box); *P1:* hover and press states step to `--bg-hover` / `--bg-4` instead | — |
 | `--bg-3` | `#1f252c` | inputs, selected row | — |
 | `--line` | `#2a323b` | hairlines (decorative) | — |
 | `--line-strong` | `#66727f` | input borders | 3.94 / 3.70 / 3.15 (≥ 3:1) |
 | `--text-0` | `#e8ecf1` | primary text | 16.31 / 15.31 / 13.02 |
 | `--text-1` | `#aab4bf` | labels | 9.21 / 8.64 / 7.35 |
-| `--text-2` | `#8a95a1` | muted | 6.35 / 5.96 / 5.07 |
+| `--text-2` | `#919cab` (*P1*; was `#8a95a1`) | muted | 6.96 / 6.53 / 5.55 (6.09 on `--bg-2`, 5.08 on `--bg-4`) |
 | `--accent` | `#f0b90b` | primary action, active nav | 10.74 / 10.07 / 8.57 |
 | `--focus` | `#8ab4ff` | focus ring | 9.26 / 8.69 / 7.40 |
 | `--gain` | `#2ebd85` | P&L gain, healthy | 8.05 / 7.55 / 6.43 |
@@ -2028,6 +2032,25 @@ the text "▼" glyph and the falling-line favicon.
 | `--risk-safe` / `-watch` / `-danger` / `-critical` | `#2ebd85` / `#f0b90b` / `#ff8a3d` / `#ff5c6c` | position health | ≥ 5.15 on each tinted badge background |
 | `--info` | `#5aa2ff` | links, info banners | 7.42 / 6.96 / 5.92 |
 | `--tier-a` … `--tier-d` | `#36c5a0`, `#5aa2ff`, `#f0b90b`, `#ff6b8a` | tier badges (A safest → D riskiest) | ≥ 5.68 |
+| *P1* `--bg-4` | `#242c35` | hover / pressed / selected on a bg-2 surface (menus, search options, chips, default buttons); never behind an input border (`--line-strong` is 2.88 on it) | on it: `--text-0` 11.91, `--text-1` 6.72, `--text-2` 5.08, `--info` 5.41, `--loss` 4.71, `--gain` 5.87, `--accent` 7.84 |
+| *P1* `--bg-hover` | `#1f252c` (= `--bg-3` by design) | hover on an interactive bg-1 row; the press colour of tabs, the nav, the phone's More and interactive rows (`base.css`). A selected row, if one is ever introduced, takes `--bg-4` | 1.18 on `--bg-1`; retune here, no lighter than `#262d36` (so `--text-2` keeps 4.5:1 on it), never by pointing rows at `--bg-4` |
+| *P1* `--surface-well` / `--surface-note` / `--surface-nested` | `var(--bg-0)` / `var(--bg-2)` / `var(--bg-3)` | the three surface roles, one meaning each: read-only figures (previews, tx steps, the lend position) / a note (disclosure, banner, menu, creator box) / a box inside a note | as their values |
+| *P1* `--line-panel` | `#363f4b` | the outer edge of panels, cards, wells and popovers (`--line` stays for in-panel hairlines) | 1.70 on `--bg-1` (decorative) |
+| *P1* `--meter-track` | `#3d4753` | the utilisation track | 1.92 on `--bg-1` (decorative) |
+| *P1* `--scrollbar-thumb` | `var(--line-strong)` | panel scrollbars | — |
+| *P1* `--tag` / `--tag-bg` | `#b9c6d6` / `#1c242e` | informational badges, so link blue is reserved for links | 9.03 on `--tag-bg` |
+| *P1* `--icon-muted` | `#737e8a` | the resting glossary ⓘ and other icon-only marks — **SVG icons only**, stroked in `currentColor`, never a text glyph (below AA for text on bg-2 / bg-3) | 4.68 / 4.39 / 3.74 (4.10 on `--bg-2`): ≥ 3:1 as non-text |
+| *P1* `--warn` | `#ffa726` (was `#f0b90b`) | caution is amber: every `--warn` consumer is a caution surface (the binding size cap, "Coverage paused", a lagging badge, the status strip's ▲ state, the high-utilisation meter fill, the intro's "What can go wrong", caution left bars) and none puts `--text-inverse` on it; `--risk-watch`, `--tier-c` and `--accent` keep gold, so gold means the primary action or the selected state only | 9.96 / 9.35 / 7.95; 7.39 on `--warn-bg` (which stays `#33290a`) |
+| *P1* `--accent-active` | `#d9a60a` | the primary button's press (P3-3) | `--text-inverse` 8.67 on it |
+| *P1* `--loss-hover` | `#ff7281` | the Short button's hover / press (P3-3) | `--text-inverse` 7.35 on it |
+| *P1* `--edge-highlight` | `inset 0 1px 0 rgb(255 255 255 / 3%)` | a panel's 1 px top highlight | — |
+| *P1* `--shadow-header` / `--shadow-up` / `--shadow-pop` / `--shadow-modal` / `--shadow-sheet` / `--shadow-toast` | `0 1px 0 var(--line-panel), 0 6px 16px rgb(0 0 0 / 35%)` / `0 -12px 20px -12px rgb(0 0 0 / 65%)` / `0 12px 32px rgb(0 0 0 / 55%)` / `0 16px 48px rgb(0 0 0 / 60%)` / `0 -12px 32px rgb(0 0 0 / 60%)` / `0 8px 24px rgb(0 0 0 / 50%)` | one shadow per floating layer: the header (its 1 px line first, so it keeps a hairline edge), the action bar and the sticky form foot, menus / popovers / search results, the modal, a sheet, a toast | — |
+| *P1* `--title-fs` / `-fw` / `-ls` / `-color` | `var(--fs-md)` / `var(--fw-bold)` / `0.06em` / `var(--text-0)` | the panel-title tier: 13 px bold white uppercase (never confused with `--fs-title`, the 20 px page h1) | — |
+| *P1* `--section-fs` / `-fw` / `-ls` / `-color` | `var(--fs-sm)` / `var(--fw-bold)` / `0.05em` / `var(--text-1)` | the section tier: 12 px bold light grey uppercase (13 px on a phone) — the base `h3` | — |
+| *P1* `--label-fs` / `-fw` / `-ls` / `-color` | `var(--fs-xs)` / `var(--fw-medium)` / `0.04em` / `var(--text-2)` | the label tier: 12 px medium muted uppercase | — |
+| *P1* `--fs-title` | `20px` (every width) | the page `h1` (`base.css`, −0.01em; it was 18 px on a desktop) | — |
+| *P1* `--fs-hero` | `var(--fs-2xl)` (22 px; 24 on a phone) | a hero number — the market head's EMA price (P5-3) and the position page's CR (P6-2) — so a hero number always outranks the title | — |
+| *P1* `--fs-prose` / `--lh-prose` | `14px` (15 on a phone) / `1.55` | reading-page prose (How it works, Security; P8) | — |
 
 Semantics: **gain / loss are the user's P&L** (for a short, a price fall is a gain); price direction
 in charts uses the same pair with an arrow. Risk: `riskLevel(CR, CR_ema, cr_liq)` (§3.8) —
@@ -2072,10 +2095,26 @@ tables; tokens by their decimals (≤ 4 shown); tiny prices with subscript zeros
 plain value in `title` and for screen readers; P&L always signed with U+2212 and ▲ / ▼; numeric
 columns right-aligned; every number element carries `data-value` with the raw integer.
 
+*Design pass P1 (2026-10-16):* **three label tiers** do all the labelling (`tokens.css`, §7.1): a panel
+title (`--title-*`, 13 px bold `--text-0` uppercase, 0.06em) outranks a section heading (`--section-*`, 12 px
+bold `--text-1` uppercase, 0.05em — the base `h3`, one pixel smaller than before; 13 px on a phone) which
+outranks a label (`--label-*`, 12 px medium `--text-2` uppercase, 0.04em). The page `h1` is `--fs-title`
+(20 px at every width, −0.01em; it was 18 px on a desktop and a tablet) so it stands clear of the 15 px
+wordmark, and a hero number is `--fs-hero` (= `--fs-2xl`, 22 / 24 px), so a hero number outranks the title
+once P5-3 (the EMA price) and P6-2 (the CR) consume it; reading prose is `--fs-prose` 14 px (15 on a
+phone) at `--lh-prose` 1.55 once P8 consumes it. `h3` lands exactly on the 12 px floor on a desktop (the gate
+fails only below 12). **Press states** (`base.css`): a pressed default / danger / ghost button, menu item or
+search option steps to `--bg-4`; a pressed tab, nav link, the phone's More button (new: it had no press
+feedback) and an interactive row step to `--bg-hover`; the filled primary and short buttons are excluded
+and take their own presses (P3-3).
+
 ### 7.3 Density and layout
 
-Compact rows 28 px, controls 30 px; 4 px grid; header 44 px (48 under 1,024 px), status bar 24 px
-(a 28 px strip on a phone); *M10-RESP:* no minimum width (§7.6) and, under a coarse pointer at any
+Compact rows 28 px, controls 30 px; 4 px grid; header 44 px (48 under 1,024 px; *design pass P1:* 52 px
+under a coarse pointer at any width, so the 44 px controls get 4 px of air — the nav height, `scroll-padding`
+and the sheet head follow `--header-h`), status bar 24 px (a 28 px strip on a phone; *P1:* 28 px on a
+landscape phone too — `(min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation:
+landscape)` — so the 844 × 390 chrome is 52 + 56 + 28 = 136 px); *M10-RESP:* no minimum width (§7.6) and, under a coarse pointer at any
 width, 44 px controls and rows, 16 px inputs (the unused `data-density` block is gone; a density
 toggle is owner item O-4); `.page` stops at 1,680 px and centres; the trade layout is a fluid market column plus a
 360 px panel (320 px under 1,180 px). Panels: 6 px radius, hairline borders, uppercase 12 px titles.
@@ -2098,6 +2137,22 @@ risk now, rent and dates). The trade and Manage panels reserve their scrollbar g
 edges (`stable both-edges`, thin), so the insets are symmetric. The status bar's top line is a
 shadow, so a 24 px target in it never makes a short page 1 px taller than the screen. A
 `details` summary has a bordered chevron (right / down) in `--text-1`.
+
+*Design pass P1 (2026-10-16) — structural measures as tokens* (`tokens.css`; the later packages consume them):
+`--page-gap` 12 px between boxes and `--page-head-gap` 16 px under the page head; `--kv-row-h` 28 px (key /
+value rows are not controls: they stay 28 px under a coarse pointer, unlike `--row-h`); `--side-col` 360 px
+(320 px under 1,180 px, the `(max-width: 1179.98px)` block) for the trade / Manage / create-market column;
+`--page-max` 1,680 px; `--sheet-head-h` = `--header-h` + 4 px; `--tabbar-indicator-w` 32 px; `--field-h` =
+`--control-h` (46 px under coarse, so the 44 px input fits its 1 px border); `--select-arrow-w` 28 px;
+`--check` 18 px (20 under coarse); `--icon` 16 px and `--icon-sm` 14 px; `--icon-btn` 32 px (44 under coarse:
+`.modal-close` / `.sheet-close` are primary controls in the gate); `--form-measure` 64ch; `--field-narrow-w`
+120 px. **Gutter:** `--gutter` is 12 px from 1,280 px as well as under 1,024 px (a desktop is never tighter
+than a tablet); 1,024–1,279 px keeps 8 px because its tables are measured to the pixel. Measured before it
+landed (P1; the dev build in headless Chromium at 1,280 × 800 and 1,440 × 900, with §7.6's scrollbar gutter
+reserved, so the content is 1,241 / 1,401 px wide): the markets list, every market tab beside the trade panel
+(Overview, Positions, Lenders, Liquidations, Pools, Coverage, Events), the positions table, the lender
+dashboard (the claimer wallet), protocol status, the position page, create market, How it works and
+Security — 0 sideways scrollers and 0 px of document overflow before and after.
 
 ### 7.4 Components (`src/components`, scaffold; tracks compose them)
 
@@ -2234,6 +2289,19 @@ both on pc and phone", keeping the dark terminal. The rules every track follows:
   unmounts as it closes (the wallet popup) or has no opener (a deep link) returns focus to the
   opener or `#main`, never `<body>`; a shortened id ("8oBK…6cTC") in a review title or account
   label never splits across lines (`.nowrap`).
+- **Scrollbar gutter** (*design pass P1, 2026-10-16*). From 1,280 px, `html { scrollbar-gutter: stable }`
+  (`base.css`): the document keeps its scrollbar gutter while a dialog or sheet locks scrolling
+  (`html:has(dialog[open])`, `html[data-sheet-open]` → `overflow: hidden`), so opening the review no longer
+  shifts the header, nav and trade panel by the scrollbar width on classic-scrollbar platforms, and Cancel /
+  Sign stay under a pointer heading for them. Overlay-scrollbar platforms (macOS default, phones) are
+  unchanged. The cost is an empty `--bg-0` strip at the right of a short page with classic scrollbars — and
+  of every page from 1,280 px in headless Chromium, whose hidden scrollbars still reserve 15 px: the desktop
+  `screens` PNGs show it (they are written, never compared) and the responsive gate reads a document
+  15 px narrower than the screen, never wider. 1,024–1,279 px keeps the old behaviour: its tables are measured
+  to the pixel and `screens.spec` asserts the markets table fits at 1024 × 720. Never unconditional, never
+  `both-edges`; if the owner wants 1,024–1,279 covered too, the only safe form there is on the lock rule itself
+  (`scrollbar-gutter: stable` beside `overflow: hidden`), which costs nothing at rest but moves the jump to
+  short pages at open time.
 
 ### 7.7 Supported widths and the pages at each (M10-RESP, as built)
 
