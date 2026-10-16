@@ -16,6 +16,7 @@ import { useAppClient } from '../rpc/context.tsx';
 import { useRpcSlotTracker } from '../rpc/slot.ts';
 import { WalletButton } from '../wallet/WalletButton.tsx';
 import { NavIcon } from './icons.tsx';
+import { BrandMark } from './Logo.tsx';
 import { MoreSheet } from './MoreSheet.tsx';
 import { SearchBox } from './SearchBox.tsx';
 import { StatusBar } from './StatusBar.tsx';
@@ -43,9 +44,7 @@ export function AppShell() {
             </a>
             <header className="app-header" data-testid={T.header}>
                 <Link to="/markets" className="brand" aria-label="ShortWin home">
-                    <span className="brand-mark" aria-hidden="true">
-                        ▼
-                    </span>
+                    <BrandMark />
                     <span className="brand-word">ShortWin</span>
                 </Link>
                 {config.cluster !== 'mainnet' && (

@@ -212,7 +212,7 @@ code (`qrcode`, `@noble/curves/secp256k1`; mobile.md R10).
 
 ```
 ┌ header ─────────────────────────────────────────────────────────────────────────────────┐
-│ ▼ ShortWin [LOCALNET]  Markets  Positions  Lend  Status   [ search mint or ticker  / ]   [wallet] │
+│ W ShortWin [LOCALNET]  Markets  Positions  Lend  Status   [ search mint or ticker  / ]   [wallet] │
 ├─────────────────────────────────────────────────────────────────────────────────────────┤
 │ (indexer-down banner)                                                                    │
 │                                   routed page                                            │
@@ -240,7 +240,7 @@ code (`qrcode`, `@noble/curves/secp256k1`; mobile.md R10).
 
 ```
 ┌──────────────────────────────────┐ ← safe area
-│ ▼ ShortWin [LOCALNET]  (⌕) [Connect] │ 48 sticky ("ShortWin" visually hidden < 400)
+│ W ShortWin [LOCALNET]  (⌕) [Connect] │ 48 sticky ("ShortWin" visually hidden < 400)
 │  page (document scroll)          │
 │ [ ▼ Short ]       [  Lend  ]     │ 56 action bar (pages that have one), fixed
 │ ● All live · RPC 3,012        ⌃  │ 28 status strip (status-summary), fixed
@@ -1993,6 +1993,20 @@ flag and timer guards and the boost gate, which the facade does not export, stay
 title and the page description (`index.html`), and the start-up messages — `index.html`'s
 `<noscript>` ("ShortWin needs JavaScript."), `main.tsx`'s "ShortWin could not start." and
 `FrameGuard.tsx`'s "ShortWin does not run inside another page.". No string changed with the rule.
+
+**The brand mark** (`src/shell/Logo.tsx`, the design pass of 2026-10-16): the W of "Win" drawn as a
+price chart — a full-height fall and a small bounce in the text colour (the short) joined through a
+low, sharp apex to a check in the accent gold (the win). An inline 24 × 24 SVG with presentation
+attributes only (CSP): the fall half is `currentColor` (the `.brand` link's `--text-0`), the win half
+`.brand-mark-win { fill: var(--accent) }`; 24 px beside the wordmark (8 px gap), 30 px alone under
+400 px (cap and baseline on whole pixels at every DPR). Loss red stays with the numbers: the mark uses
+none. The same W on a `--bg-1` tile is the favicon (`public/favicon.svg`, rebuilt on the 16 px grid:
+a 4-unit stroke so the stems are two solid pixels at 16 px; `favicon-16.png` / `favicon-32.png` /
+`favicon.ico` for Safari and legacy browsers), the iOS home-screen icon (`apple-touch-icon.png`, 180 px)
+and the web app manifest's icons (`manifest.webmanifest`: `icon-{192,512}-any.png` and
+`icon-512-any.svg` with rounded transparent corners for surfaces that do not mask; full-bleed
+`icon-{192,512}-maskable.png` with the W inside the central 80 % for Android's masks). It replaced
+the text "▼" glyph and the falling-line favicon.
 
 ### 7.1 Colour tokens (`src/styles/tokens.css`)
 

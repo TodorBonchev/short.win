@@ -41,7 +41,7 @@
     justify-content: center;
     min-width: var(--tap-min);
     min-height: var(--tap-min);
-    gap: var(--sp-2);
+    gap: var(--sp-3);
     font-weight: var(--fw-bold);
     font-size: var(--fs-lg);
     color: var(--text-0);
@@ -54,8 +54,14 @@
     }
 }
 
+/* The mark (shell/Logo.tsx): the fall half in the link's text colour, the win half in the accent. */
 .brand-mark {
-    color: var(--loss);
+    flex: none;
+    display: block;
+}
+
+.brand-mark-win {
+    fill: var(--accent);
 }
 
 .cluster-badge {
@@ -315,8 +321,14 @@ a.statusbar-item {
     }
 }
 
-/* Under 400 px the wordmark goes (the ▼ mark and the link's name stay). */
+/* Under 400 px the wordmark goes (the mark and the link's name stay). The lone mark is 30 px in the
+   48 px bar: on the 24-unit grid its cap and baseline then land on whole pixels at every DPR. */
 @media (max-width: 399.98px) {
+    .brand-mark {
+        width: 30px;
+        height: 30px;
+    }
+
     .brand-word {
         position: absolute;
         width: 1px;
