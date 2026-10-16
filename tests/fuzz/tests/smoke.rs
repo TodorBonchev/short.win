@@ -166,9 +166,34 @@ fn corpus_replays() {
     assert!(n > 0, "an empty corpus");
 }
 
+/// The crowd's instructions on the live curve that landed (`fuzz:crowd-<ix>-landed`) and were
+/// refused, by pump instruction.
+fn crowd(s: &Stats, ix: &str) -> (u64, u64) {
+    let ev = |o: &str| {
+        s.events
+            .get(&format!("fuzz:crowd-{ix}-{o}"))
+            .copied()
+            .unwrap_or(0)
+    };
+    (ev("landed"), ev("refused"))
+}
+
+/// pump's v3 instructions the crowd trades since P7 (pump-final §12).
+const CROWD_V3: [&str; 3] = ["buy_v3", "buy_exact_quote_in_v3", "sell_v3"];
+
 #[test]
 fn smoke_curve() {
-    smoke(Profile::Curve);
+    let s = smoke(Profile::Curve);
+    // pump-final §12 (P7): the random smoke trades pump's v3 too (a sale may be refused there,
+    // for want of real SOL reserves, as v2's are: `crowd_v3_trades_land` checks the refusals).
+    for ix in CROWD_V3 {
+        let (landed, refused) = crowd(&s, ix);
+        println!("curve: crowd {ix} landed {landed}, refused {refused}");
+        assert!(
+            !FULL || landed > 0,
+            "no crowd {ix} landed in the smoke seeds"
+        );
+    }
 }
 
 #[test]
@@ -617,6 +642,172 @@ fn pswap_expire_cache_fuzz24d_a() {
     );
     assert!(
         ev("expire:pswap-differential-refused:NotExpired") > 0,
+        "{:?}",
+        o.stats.events
+    );
+}
+
+/// The actions of a scripted curve run (pump-final §12's checks below).
+fn script(lines: &[&str]) -> Vec<Action> {
+    lines.iter().map(|a| a.parse().expect("action")).collect()
+}
+
+/// A scripted curve run that must pass; its counters.
+fn curve_script(what: &str, lines: &[&str]) -> Stats {
+    let o = runner::run(
+        Profile::Curve,
+        SEED_BASE + 7,
+        Some(&script(lines)),
+        0,
+        Opts::default(),
+    );
+    if let Some(f) = &o.failure {
+        panic!("{what}: {}\n{}", f.signature, f.message);
+    }
+    println!("{what}: events {:?}", o.stats.events);
+    o.stats
+}
+
+/// pump-final §12 (P7): the crowd's v3 trades land. On the live curve `trade` picks pump's
+/// instruction from its size (`buy_v2`, `buy_v3` or `buy_exact_quote_in_v3`; `sell_v2` or
+/// `sell_v3`) and `shock` from its factor (one push in two on v3). A scripted run of buys, small
+/// sales and shocks must land every v3 instruction and have pump refuse none of them, so a crowd
+/// reverted to v2, or v3 trades pump refuses (`buy_exact_quote_in_v3` with `min_tokens_out` 0,
+/// `BuyZeroAmount`), fails here, not only in the counters of a long run.
+#[test]
+fn crowd_v3_trades_land() {
+    let mut lines = Vec::new();
+    for i in 0..9u32 {
+        lines.push(format!("trade 0 0 {}", 7 + 13 * i));
+    }
+    for i in 0..6u32 {
+        lines.push(format!("trade 0 1 {i}"));
+    }
+    for i in 0..4u32 {
+        lines.push(format!("shock 0 0 {}", 11 + 17 * i));
+        lines.push(format!("shock 0 1 {}", 11 + 17 * i));
+    }
+    let lines: Vec<&str> = lines.iter().map(String::as_str).collect();
+    let s = curve_script("the crowd's v2 and v3 trades", &lines);
+    for ix in CROWD_V3 {
+        let (landed, refused) = crowd(&s, ix);
+        assert!(landed > 0, "no crowd {ix} landed: {:?}", s.events);
+        assert_eq!(refused, 0, "crowd {ix} refused: {:?}", s.events);
+    }
+    for ix in ["buy_v2", "sell_v2"] {
+        assert!(crowd(&s, ix).0 > 0, "no crowd {ix} landed: {:?}", s.events);
+    }
+}
+
+/// pump-final §12 (P7): the `migrating_fv` oracle on an S3 after a synthetic completion. A
+/// position opens, the crowd overshoots `rT` with a `buy_v3` (`crowd_completes` with `a` even: δ
+/// = 25 % of the would-be pool), PumpSwap's `create_pool` is halted, and 20.69e12 tokens are
+/// donated to `curve_base_ata` after the completion (`donate` with `a = 25`). The wind-down leaves
+/// the market `PumpMigrating` and settles the position S3 after the pause: its FV, both box
+/// corners and the lenders' amount are §5.4's on `(X₁, Y₁)` = (the live `curve_base_ata`,
+/// donation included, `rQ − fee + pcQ`) with `P_ema` ρ-scaled, recomputed host-side
+/// (`migrating::check_s3`). The same run with every expected FV one lamport higher
+/// (`migrating::FV_SKEW`) fails the oracle.
+#[test]
+fn migrating_fv_after_a_synthetic_completion_and_a_donation() {
+    let lines = [
+        "open 0 0 6000",
+        "keeper_seconds 0 3 0",
+        "crowd_completes 0 0 249",
+        "graduation_halt 0 1 0",
+        "donate 0 25 99",
+        "keeper_seconds 0 5 0",
+    ];
+    let s = curve_script("S3 after a pool part", &lines);
+    let ev = |k: &str| s.events.get(k).copied().unwrap_or(0);
+    assert_eq!(ev("fuzz:crowd-completes-v3-overshoot-landed"), 1);
+    assert_eq!(ev("donate-curve-base-ata-after-completion"), 1);
+    assert!(ev("SolSettle(S3)") >= 1, "{:?}", s.events);
+    assert!(ev("fuzz:migrating-fv-pool-part") >= 1, "{:?}", s.events);
+
+    shortwin_fuzz::migrating::FV_SKEW.with(|c| c.set(1));
+    let o = runner::run(
+        Profile::Curve,
+        SEED_BASE + 7,
+        Some(&script(&lines)),
+        0,
+        Opts::default(),
+    );
+    shortwin_fuzz::migrating::FV_SKEW.with(|c| c.set(0));
+    let f = o
+        .failure
+        .expect("a 1-lamport FV difference fails the oracle");
+    assert!(f.message.contains("migrating_fv"), "{}", f.message);
+
+    // Without a pool part (`buy_v2` of exactly `rT`) the donation is ignored: FV on 206.9e12.
+    let s = curve_script(
+        "S3 after an exact completion",
+        &[
+            "open 0 0 6000",
+            "keeper_seconds 0 3 0",
+            "crowd_completes 0 1 0",
+            "donate 0 25 99",
+            "keeper_seconds 0 5 0",
+        ],
+    );
+    let ev = |k: &str| s.events.get(k).copied().unwrap_or(0);
+    assert_eq!(ev("fuzz:crowd-completes-v2-exact-landed"), 1);
+    assert!(ev("fuzz:migrating-fv-standard") >= 1, "{:?}", s.events);
+}
+
+/// pump-final §12 (P7): the `migrating_fv` oracle's second half. 103.45e12 tokens donated to
+/// `curve_base_ata` before the crowd's `buy_v3` overshoot (pump prices its pool part on the live
+/// balance), then `migrate_v2`: the pool it creates is `(X₁, Y₁)` — `X₁` the live
+/// `curve_base_ata`, donations included, `Y₁ = rQ − fee + pcQ` — as §5.4 priced the pause
+/// (`migrating::check_created_pool`); the market then graduates.
+#[test]
+fn migrate_v2_creates_the_priced_pool_after_a_donation() {
+    let s = curve_script(
+        "migrate after a donation and a pool part",
+        &[
+            "open 0 0 6000",
+            "keeper_seconds 0 3 0",
+            "donate 0 25 499",
+            "crowd_completes 0 0 99",
+            "keeper_seconds 0 3 0",
+            "migrate 0 0 0",
+            "keeper_seconds 0 20 0",
+        ],
+    );
+    let ev = |k: &str| s.events.get(k).copied().unwrap_or(0);
+    assert_eq!(ev("donate-curve-base-ata"), 1);
+    assert_eq!(ev("fuzz:crowd-completes-v3-overshoot-landed"), 1);
+    assert_eq!(
+        ev("fuzz:migrate-pool-checked:pool-part"),
+        1,
+        "{:?}",
+        s.events
+    );
+    assert_eq!(ev("fuzz:graduated"), 1);
+}
+
+/// FUZZ-M7D-1's reproducer on pump's v3 (P7): two `shock`s buy 98 % of `rT` around an open, so
+/// `Q > rT`; in the wind-down the keeper's liquidation of the position completes the curve by
+/// pump's synthetic migration in its own instruction (the wind-down completes no curve of its
+/// own any more): the curve differential oracle checks it, the completion included.
+#[test]
+fn fuzz_m7d_1_closes_by_synthetic_migration() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("corpus/fuzz-m7d-1-curve-straddle-wind-down.json");
+    let c = runner::read_crash(&path).expect("corpus file");
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    if let Some(f) = &o.failure {
+        panic!("{}\n{}", f.signature, f.message);
+    }
+    let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+    println!("FUZZ-M7D-1: events {:?}", o.stats.events);
+    assert!(
+        ev("fuzz:exit-completes-curve-synthetic") >= 1,
+        "{:?}",
+        o.stats.events
+    );
+    assert!(
+        ev("liquidate:curve-differential-completes-synthetic") >= 1,
         "{:?}",
         o.stats.events
     );

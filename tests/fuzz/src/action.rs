@@ -98,7 +98,8 @@ kinds! {
     /// seconds.
     WarpToDeadline = "warp_to_deadline",
     // ---- prices and liquidity ------------------------------------------------------------------
-    /// An honest random swap on the venue (either side, size from `b`).
+    /// An honest random swap on the venue (either side, size from `b`; on the live curve one of
+    /// pump's v2 or v3 trades, pump-final §12).
     Trade = "trade",
     /// A price shock ×`k` (up if `a` even, down otherwise; `k` from 1.05 to 10 from `b`), held,
     /// then `a mod 30` keeper seconds.
@@ -170,7 +171,9 @@ kinds! {
     RouteBrokenVenue = "route_broken_venue",
     /// A donation (`a mod 7`: trader, `trader_wsol` address, `ATA(trader, WSOL)`, boost ATA,
     /// tokens — to the pool vault, or on a pump venue with `a / 7` even to `trader_base_ata`
-    /// (M10) —, market vault, a position) of `b`-scaled lamports or tokens.
+    /// (M10), or on a curve not yet graduated with `a / 7 ≡ 3 (mod 4)` to its `curve_base_ata`
+    /// (pump-final §12: `(1 + b mod 1000)`‰ of 206.9e12 tokens, before or after a completion)
+    /// —, market vault, a position) of `b`-scaled lamports or tokens.
     Donate = "donate",
     // ---- governance and oracle ---------------------------------------------------------------
     /// An adversarial in-bound config change (a parameter at a bound, the EMA parameters or
@@ -187,8 +190,13 @@ kinds! {
     /// `execute_pool_switch` on the window's candidate.
     ExecuteSwitch = "execute_switch",
     // ---- the curve's graduation (M5 / M6) ------------------------------------------------------
-    /// Another user buys the curve's remaining real tokens (completion).
-    CompleteCurve = "complete_curve",
+    /// Another user completes the curve (pump-final §12): with `a` odd its `buy_v2` of exactly the
+    /// remaining real tokens `rT`, the action before P7; with `a` even a `buy_v3(rT + δ)` that
+    /// overshoots and completes the curve by pump's synthetic migration, `δ` = `(1 + b mod 500)`‰
+    /// of the would-be pool `X_s = curve_base_ata − rT` (up to 50 %). A crash file of an earlier
+    /// fuzzer names it `complete_curve` ([`LEGACY_COMPLETE_CURVE`]): parsed with `a` odd, so it
+    /// replays the `buy_v2` of `rT` it recorded whatever its `a`.
+    CrowdCompletes = "crowd_completes",
     /// pump `migrate_v2` by a third party.
     Migrate = "migrate",
     /// PumpSwap `disable_flags` bit 0 (`create_pool`, graduation halt) on (`a` odd) or off.
@@ -267,6 +275,10 @@ kinds! {
     StaleReceivable = "stale_receivable",
 }
 
+/// The crowd's completion's name before P7 ([`Kind::CrowdCompletes`]), still parsed: always
+/// pump's `buy_v2` of exactly `rT`, so it parses with `a` made odd and replays as recorded.
+pub const LEGACY_COMPLETE_CURVE: &str = "complete_curve";
+
 /// One action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Action {
@@ -289,7 +301,12 @@ impl FromStr for Action {
     fn from_str(s: &str) -> Result<Self, String> {
         let mut it = s.split_whitespace();
         let name = it.next().ok_or("empty action")?;
-        let kind = Kind::from_name(name).ok_or_else(|| format!("unknown action `{name}`"))?;
+        // `complete_curve`: the crowd's completion before P7 renamed it, always a `buy_v2` of
+        // exactly `rT` (it read neither number) — `crowd_completes` with `a` odd.
+        let legacy = name == LEGACY_COMPLETE_CURVE;
+        let kind = Kind::from_name(name)
+            .or_else(|| legacy.then_some(Kind::CrowdCompletes))
+            .ok_or_else(|| format!("unknown action `{name}`"))?;
         let mut num = |what: &str| -> Result<u32, String> {
             it.next()
                 .ok_or_else(|| format!("`{s}`: missing {what}"))?
@@ -297,7 +314,7 @@ impl FromStr for Action {
                 .map_err(|e| format!("`{s}`: {what}: {e}"))
         };
         let m = u8::try_from(num("m")?).map_err(|e| e.to_string())?;
-        let a = num("a")?;
+        let a = num("a")? | u32::from(legacy);
         let b = num("b")?;
         Ok(Self { kind, m, a, b })
     }
@@ -441,7 +458,7 @@ impl Profile {
                     0
                 };
             }
-            CompleteCurve | Migrate => return if self == Profile::Curve { 2 } else { 0 },
+            CrowdCompletes | Migrate => return if self == Profile::Curve { 2 } else { 0 },
             GraduationHalt => {
                 return if matches!(self, Profile::Curve | Profile::PumpSwap) {
                     1
@@ -530,6 +547,27 @@ mod tests {
             }
         }
         assert!("nope 0 0 0".parse::<Action>().is_err());
+        // The crowd's completion kept its old name (P7 renamed it), and its old action: the
+        // `buy_v2` of `rT` (`a` odd) whatever the recorded `a`.
+        for (old, new) in [
+            ("complete_curve 0 1 2", "crowd_completes 0 1 2"),
+            (
+                "complete_curve 0 1918102270 7",
+                "crowd_completes 0 1918102271 7",
+            ),
+            ("complete_curve 1 0 0", "crowd_completes 1 1 0"),
+        ] {
+            assert_eq!(
+                old.parse::<Action>().unwrap(),
+                new.parse::<Action>().unwrap(),
+                "{old}"
+            );
+        }
+        assert_eq!(
+            "crowd_completes 0 2 0".parse::<Action>().unwrap().a,
+            2,
+            "the new name keeps a"
+        );
         for k in Kind::ALL {
             assert_eq!(Kind::from_name(k.name()), Some(*k));
         }

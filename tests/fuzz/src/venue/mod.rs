@@ -121,6 +121,13 @@ pub trait Venue {
         Vec::new()
     }
 
+    /// Venue token accounts a token donation may target (pump-final §12: a curve's
+    /// `curve_base_ata` until the graduation, which pump prices a synthetic exit's pool part on
+    /// and `migrate_v2` seeds the pool with), with the amount a donation's number `b` gives.
+    fn token_donation(&self, _env: &Env, _b: u32) -> Option<(Pubkey, u64)> {
+        None
+    }
+
     /// The compute-unit limit of a keeper exit or a bundle on this venue (`None`: the default).
     fn exit_cu(&self) -> Option<u32> {
         None

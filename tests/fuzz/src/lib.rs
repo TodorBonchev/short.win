@@ -8,7 +8,9 @@
 //! prefix of a multi-instruction transaction) are checked after every action — plus the fuzzer's
 //! own oracles ([`world`]: I10 / I17 gates, the differential exit oracles — the mock's, AMM v4's
 //! and (M10's follow-ups) CPMM's for I9 / I11 / I12 / I13 / I-E11, the curve's and PumpSwap's
-//! ([`pswap_exit`]) for every decision and I-E11 —, I14 omissions and replacements, the JIT capture
+//! ([`pswap_exit`]) for every decision and I-E11, the curve's since pump-final §12 with its
+//! synthetic exits' completion —, the `migrating_fv` oracle on every S3 of a `PumpMigrating`
+//! market and every `migrate_v2` ([`migrating`]), I14 omissions and replacements, the JIT capture
 //! and claim-bundle oracles (M10), the deficit tripwire ([`shortfall`]), I4's coverage clause on
 //! every `set_coverage_pause` (O17; since 2026-10-01 the Emergency's clear-only power too,
 //! OWNER-M7-3 (b)), the mint filter on exits, governance's timelock and cancels, the oracle's
@@ -29,6 +31,7 @@
 
 pub mod action;
 pub mod curve_exit;
+pub mod migrating;
 pub mod pswap_exit;
 pub mod rng;
 pub mod runner;

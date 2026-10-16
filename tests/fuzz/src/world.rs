@@ -16,9 +16,15 @@
 //!   waterfall recomputed from `shortwin-math` on the pre-state);
 //! - **exits on the curve (I11, I-E11; M10)**: every keeper `liquidate` / `expire` on a live curve
 //!   market is predicted first ([`crate::curve_exit`]: every decision in the program's order, the
-//!   bound `B̂_live ≤ max_in`) and must land with the predicted `b_live`, `b_ref`, `max_in`, or be
-//!   refused with the predicted code — no `ExitBoundNotMet` once the bound is met; on PumpSwap
-//!   (M10's fuzz follow-ups) the same at the decision level ([`crate::pswap_exit`]);
+//!   bound `B̂_live ≤ max_in`, `B̂_v3` past `rT` since pump-final §6) and must land with the
+//!   predicted `b_live`, `b_ref`, `max_in`, or be refused with the predicted code — no
+//!   `ExitBoundNotMet` once the bound is met; one of `q ≥ rT` that lands must leave the market
+//!   `PumpMigrating` since now with the synthetic buy's `pcB` / `pcQ` (pump-final §12); on
+//!   PumpSwap (M10's fuzz follow-ups) the same at the decision level ([`crate::pswap_exit`]);
+//! - **`migrating_fv` (pump-final §12, G-7)**: every S3 of a `PumpMigrating` market settles at
+//!   §5.4's FV on the pool `migrate_v2` will create — `X₁` the live `curve_base_ata` after a pool
+//!   part, donations included, `P_ema` ρ-scaled —, its box corners too, and every `migrate_v2`
+//!   creates that pool ([`crate::migrating`]);
 //! - **I14**: an instruction with a remaining account omitted or replaced by a fresh key must
 //!   fail (the hooks check that nothing changed; since M10 `close_short` is among them and an
 //!   accepted replacement fails as an accepted omission does);
@@ -163,6 +169,10 @@ const MARKET_COVERAGE_CLEARED_AT_OFFSET: usize = 2_928;
 
 /// The whole VM state [`SNAPSHOT_OWNERS`] hold: key → (lamports, owner, data).
 pub type Snapshot = std::collections::BTreeMap<Pubkey, (u64, Pubkey, Vec<u8>)>;
+
+/// A `PumpMigrating` market's open positions before a transaction (key → position): the
+/// `migrating_fv` oracle's pre-state ([`crate::migrating::check_s3`]).
+type MigratingPre = std::collections::BTreeMap<Pubkey, shortwin::state::ShortPosition>;
 
 fn code(e: E) -> u32 {
     u32::from(e)
@@ -503,11 +513,91 @@ impl World {
             return self.cx().send(ixs, signers);
         }
         let pre = self.exit_pre();
+        let curves = self.curve_pre();
         let res = self.cx().send(ixs, signers);
         if let Ok(meta) = &res {
             self.observe_exits(pre, ixs, meta);
+            self.observe_curves(curves, meta);
         }
         res
+    }
+
+    /// What [`World::observe_curves`] reads before a transaction with an exit, per slot on a
+    /// curve not yet graduated: its venue kind and, on a `PumpMigrating` market, its open
+    /// positions as they stand (the `migrating_fv` oracle's pre-state, [`crate::migrating`]).
+    fn curve_pre(&self) -> Vec<(usize, Option<VenueKind>, MigratingPre)> {
+        (0..self.slots.len())
+            .filter(|&si| self.slots[si].venue.as_curve().is_some())
+            .map(|si| {
+                let market = self.market_key(si);
+                let kind = self.env.market(&market).venue_kind();
+                let positions = if kind == Some(VenueKind::PumpMigrating) {
+                    let keys = self.slots[si].positions.iter().map(|p| {
+                        pda::position(&market, &self.slots[si].borrowers[p.b].key(), p.nonce).0
+                    });
+                    crate::migrating::positions(&self.env, keys)
+                } else {
+                    MigratingPre::new()
+                };
+                (si, kind, positions)
+            })
+            .collect()
+    }
+
+    /// pump-final §12 on a landed transaction with an exit, per curve slot of `pre`
+    /// ([`World::curve_pre`]): every `SolSettle(S3)` of a market that was and still is
+    /// `PumpMigrating` goes through the `migrating_fv` oracle ([`crate::migrating::check_s3`]);
+    /// an exit that moved the market `PumpCurve → PumpMigrating` is counted, by whether the
+    /// completion had a pool part (a synthetic exit).
+    fn observe_curves(
+        &mut self,
+        pre: Vec<(usize, Option<VenueKind>, MigratingPre)>,
+        meta: &litesvm::types::TransactionMetadata,
+    ) {
+        for (si, kind, positions) in pre {
+            let market = self.market_key(si);
+            let now = self.env.market(&market).venue_kind();
+            let Some(pm) = self.slots[si].venue.as_curve() else {
+                continue;
+            };
+            let mut tags: Vec<String> = Vec::new();
+            if kind == Some(VenueKind::PumpCurve) && now == Some(VenueKind::PumpMigrating) {
+                let pcb = pm.curve.state(&self.env.svm).post_complete_base_out;
+                tags.push(
+                    if pcb > 0 {
+                        "fuzz:exit-completes-curve-synthetic"
+                    } else {
+                        "fuzz:exit-completes-curve-exact"
+                    }
+                    .into(),
+                );
+            }
+            if kind == Some(VenueKind::PumpMigrating) {
+                for ev in shortwin_litesvm_tests::events::of::<shortwin::events::SolSettle>(meta)
+                    .iter()
+                    .filter(|e| e.market == market && e.condition == 3)
+                {
+                    let Some(pos) = positions.get(&ev.position) else {
+                        tags.push("fuzz:migrating-fv-unchecked".into());
+                        continue;
+                    };
+                    if now != Some(VenueKind::PumpMigrating) {
+                        tags.push("fuzz:migrating-fv-unchecked".into());
+                        continue;
+                    }
+                    match crate::migrating::check_s3(&self.env, pm, pos, ev) {
+                        Ok(tag) => tags.push(tag.into()),
+                        Err(why) => panic!(
+                            "{ORACLE} migrating_fv (pump-final §5.4): {why}\nlogs:\n{}",
+                            meta.pretty_logs()
+                        ),
+                    }
+                }
+            }
+            for t in tags {
+                *self.stats.events.entry(t).or_default() += 1;
+            }
+        }
     }
 
     /// What [`World::observe_exits`] reads of the state before a transaction with an exit: per
@@ -1150,6 +1240,26 @@ impl World {
                     panic!("{ORACLE} curve differential exit (I11 / I-E11): {why}\nlogs:\n{logs}");
                 }
             }
+            // pump-final §12: a landed exit of `q ≥ rT` completed the curve in its own
+            // instruction, with the synthetic buy's post-complete fields.
+            if let Ok(meta) = &res {
+                let pm = self.slots[si].venue.as_curve().expect("the curve");
+                match crate::curve_exit::check_completion(&self.env, pm, &pred) {
+                    Ok(None) => {}
+                    Ok(Some(how)) => {
+                        *self
+                            .stats
+                            .events
+                            .entry(format!("{what}:curve-differential-completes-{how}"))
+                            .or_default() += 1;
+                    }
+                    Err(why) => panic!(
+                        "{ORACLE} curve differential exit (pump-final §12, the completion): \
+                         {why}\nlogs:\n{}",
+                        meta.pretty_logs()
+                    ),
+                }
+            }
         }
         if let Some(pred) = pswap_pred {
             let ctx = format!("prediction: {:?}\n{}", pred.decision, pred.detail);
@@ -1378,7 +1488,7 @@ impl World {
             | Kind::PlantCandidate
             | Kind::ProposePool
             | Kind::ExecuteSwitch
-            | Kind::CompleteCurve
+            | Kind::CrowdCompletes
             | Kind::Migrate
             | Kind::GraduationHalt
             | Kind::FeeBuckets => {
@@ -2436,7 +2546,18 @@ impl World {
             mv.front.clone()
         };
         let signer = mv.signer.insecure_clone();
-        self.send_bundle(si, &[ix], &[&signer]).0
+        let label = crate::venue::curve::crowd_ix_label(&ix);
+        let res = self.send_bundle(si, &[ix], &[&signer]).0;
+        // pump-final §12: the crowd's v2 and v3 trades on the curve, by instruction.
+        if let Some(l) = label {
+            let outcome = if res.is_ok() { "landed" } else { "refused" };
+            *self
+                .stats
+                .events
+                .entry(format!("fuzz:crowd-{l}-{outcome}"))
+                .or_default() += 1;
+        }
+        res
     }
 
     fn trade(&mut self, si: usize, a: u32, b: u32) -> bool {
@@ -3582,6 +3703,28 @@ impl World {
                     m.venue_kind(),
                     Some(VenueKind::PumpCurve | VenueKind::PumpSwap | VenueKind::PumpMigrating)
                 );
+                // pump-final §12: on a curve not yet graduated, one token donation in four to
+                // its `curve_base_ata` — before a completion the would-be pool a synthetic exit
+                // prices its pool part on, after one the pool `migrate_v2` seeds (§5.4).
+                if pump
+                    && (a / 7) % 4 == 3
+                    && let Some((to, amount)) = self.slots[si].venue.token_donation(&self.env, b)
+                {
+                    let complete = self.slots[si]
+                        .venue
+                        .as_curve()
+                        .is_some_and(|pm| pm.curve.curve_state(&self.env.svm).complete);
+                    let World { env, slots, .. } = self;
+                    slots[si].venue.top_up(env, &to, amount);
+                    self.env.assert_invariants();
+                    let when = if complete {
+                        "donate-curve-base-ata-after-completion"
+                    } else {
+                        "donate-curve-base-ata"
+                    };
+                    *self.stats.events.entry(when.into()).or_default() += 1;
+                    return true;
+                }
                 let base_ata = (pump && (a / 7).is_multiple_of(2))
                     .then_some(m.trader_base_ata)
                     .filter(|k| read::token_amount(&self.env.svm, k).is_some());
@@ -4322,7 +4465,10 @@ impl World {
                 break;
             }
             phase += 1;
-            let mut straddled: Vec<usize> = Vec::new();
+            // Since pump-final §6 a close of `Q > rT` on a live curve completes it by pump's
+            // synthetic migration in its own instruction (P7 removed the completion this loop
+            // made for a close that refused `CurveStraddle`, FUZZ-M7D-1): `CurveStraddle` is left
+            // only past what the would-be pool holds, which the per-market caps keep out of reach.
             for si in 0..self.slots.len() {
                 let mut k = 0;
                 while k < self.slots[si].positions.len() {
@@ -4334,11 +4480,6 @@ impl World {
                     );
                     let res = self.send(&ixs, &[&kp]);
                     self.check_exit_refusal("close_short (wind-down)", &ixs, &res);
-                    if shortwin_code(&ixs, &res) == Some(code(E::CurveStraddle))
-                        && !straddled.contains(&si)
-                    {
-                        straddled.push(si);
-                    }
                     self.prune();
                     let still = self.slots[si].positions.iter().any(|p| {
                         p.nonce == nonce && self.slots[si].borrowers[p.b].key() == borrower
@@ -4352,30 +4493,6 @@ impl World {
                     if !gone {
                         k += 1;
                     }
-                }
-            }
-            // A position the live curve's real token reserves cannot buy back (`Q > rT`: every
-            // exit refuses `CurveStraddle`, ARCH §5.1) leaves once the curve completes — the
-            // straddle's first step (§5.4: the in-house keeper's bundle, or anyone's buy of `rT`).
-            // The wind-down completes it and, as for any completed curve, does not migrate it: the
-            // market is left `PumpMigrating` and the S3 path below must settle it. The price
-            // restore above cannot always bring `rT` back above `Q` (one push moves the price at
-            // most 50×); as built the wind-down never completed such a curve, and the position
-            // stayed open (FUZZ-M7D-1).
-            for si in straddled {
-                let World {
-                    env, stats, slots, ..
-                } = self;
-                if slots[si]
-                    .venue
-                    .special(&mut Ctx { env, stats }, Kind::CompleteCurve, 0, 0)
-                    .is_some()
-                {
-                    *self
-                        .stats
-                        .events
-                        .entry("fuzz:wind-down-curve-completed".into())
-                        .or_default() += 1;
                 }
             }
             match phase {

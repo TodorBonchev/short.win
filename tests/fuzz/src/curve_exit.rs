@@ -21,6 +21,13 @@
 //! with a fresh bucket (I-E11's liveness clause, which the hooks cannot see on a refusal). Its
 //! domain is a market still on the live curve after the crank (a completion or a graduation in
 //! the crank moves it: not modelled, the exit goes out unchecked).
+//!
+//! An exit of `q ≥ rT` that lands completes the curve in its own instruction (pump-final §12,
+//! [`check_completion`]): the market is `PumpMigrating` with `migration_seen_at = now`, the curve
+//! complete, and pump's post-complete fields are the synthetic buy's — `pcB = q − rT` and `pcQ =
+//! ⌈Y_sᵖ·(q − rT)/(X_s − q + rT)⌉` on the would-be pool `X_s = curve_base_ata − rT`, `Y_sᵖ = rQ +
+//! n₁ᵖ − fee_m` (`n₁ᵖ = rQ' − rQ`, the curve part pump took: `⌈rT·vQ/(vT − rT)⌉`, or `⌊⌋ + 1` on an
+//! exact division; the pool part may take `⌊⌋ + 1` there too) — both 0 for `q = rT`.
 
 use anchor_lang::prelude::Pubkey;
 use shortwin::errors::ShortwinError as E;
@@ -54,6 +61,9 @@ pub struct Prediction {
     pub ema_warm: u8,
     pub q: u64,
     pub rt: u128,
+    /// What the curve's quotes read (the live state, `X_s`, `fee_m`): [`check_completion`]'s
+    /// pre-state.
+    pub ctx: Option<CurveCtx>,
 }
 
 /// An executing exit's bound (the event's figures).
@@ -194,7 +204,93 @@ fn decide(
         ema_warm: m.ema_warm,
         q,
         rt: live.rt,
+        ctx,
     })
+}
+
+/// The completion an exit predicted to execute with `q ≥ rT` must leave (module docs), checked
+/// after it landed. `Ok(None)` for an exit that does not complete the curve; `Ok(Some(tag))`
+/// names the case; `Err` describes a mismatch.
+pub fn check_completion(
+    env: &Env,
+    pm: &PumpMarket,
+    pred: &Prediction,
+) -> Result<Option<&'static str>, String> {
+    use shortwin_math::num::{Rounding, mul_div};
+    let q = u128::from(pred.q);
+    if pred.decision.is_err() || q < pred.rt {
+        return Ok(None);
+    }
+    let ctx = pred
+        .ctx
+        .as_ref()
+        .ok_or("a completing exit without the curve's context")?;
+    let m = env.market(&pm.market());
+    let c = pm.curve.state(&env.svm);
+    let now = env.now();
+    let (pcb, pcq) = (
+        u128::from(c.post_complete_base_out),
+        u128::from(c.post_complete_quote_in),
+    );
+    let msg = |what: String| {
+        format!(
+            "{what}\nq {q}, rT {}, live {:?}, X_s {}, fee_m {}; after: venue {:?}, \
+             migration_seen_at {} (now {now}), complete {}, rQ {}, pcB {pcb}, pcQ {pcq}",
+            pred.rt,
+            ctx.live,
+            ctx.live_pool_tokens,
+            ctx.migration_fee,
+            m.venue_kind(),
+            m.migration_seen_at,
+            c.complete,
+            c.real_quote_reserves
+        )
+    };
+    if m.venue_kind() != Some(VenueKind::PumpMigrating) || m.migration_seen_at != now || !c.complete
+    {
+        return Err(msg(
+            "a completing exit did not leave the market PumpMigrating since now on a complete \
+             curve"
+                .into(),
+        ));
+    }
+    let q2 = q - pred.rt;
+    if q2 == 0 {
+        return if (pcb, pcq) == (0, 0) {
+            Ok(Some("exact"))
+        } else {
+            Err(msg("an exact completion wrote post-complete fields".into()))
+        };
+    }
+    let (live, x_s) = (ctx.live, ctx.live_pool_tokens);
+    // The curve part pump took, n₁ᵖ = rQ' − rQ: ⌈rT·vQ/(vT − rT)⌉, ⌊⌋ + 1 on an exact division.
+    let rest = live.vt - live.rt;
+    let ceil1 = mul_div(live.rt, live.vq, rest, Rounding::Ceil).map_err(|e| format!("{e:?}"))?;
+    let floor1 = mul_div(live.rt, live.vq, rest, Rounding::Floor).map_err(|e| format!("{e:?}"))?;
+    let n1 = u128::from(c.real_quote_reserves)
+        .checked_sub(live.rq)
+        .ok_or_else(|| msg("rQ fell".into()))?;
+    if n1 != ceil1 && n1 != floor1 + 1 {
+        return Err(msg(format!(
+            "the curve part's n₁ {n1}, not ⌈⌉ {ceil1} or ⌊⌋ + 1 {}",
+            floor1 + 1
+        )));
+    }
+    let y_s = (live.rq + n1)
+        .checked_sub(u128::from(ctx.migration_fee))
+        .ok_or_else(|| msg("rQ + n₁ below the migration fee".into()))?;
+    if q2 >= x_s {
+        return Err(msg("a synthetic exit past the would-be pool landed".into()));
+    }
+    let n2 = mul_div(y_s, q2, x_s - q2, Rounding::Ceil).map_err(|e| format!("{e:?}"))?;
+    let exact2 = mul_div(y_s, q2, x_s - q2, Rounding::Floor).map_err(|e| format!("{e:?}"))? == n2;
+    if pcb != q2 || !(pcq == n2 || (exact2 && pcq == n2 + 1)) {
+        return Err(msg(format!(
+            "pump's post-complete fields are not the synthetic buy's (pcB {q2}, pcQ ⌈⌉ {n2}{})",
+            if exact2 { " or ⌊⌋ + 1" } else { "" }
+        )));
+    }
+    Ok(Some("synthetic"))
 }
 
 /// Compares the exit's outcome `res` (`code`: its short.win error code, if it failed in

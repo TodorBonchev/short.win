@@ -1,8 +1,13 @@
 //! The pump curve on the fork (M5) and its graduation (M6): a live curve (the `fresh` fixture
 //! taken to a random progress by a real `buy_v2`, or `legacy115` / `t22_115` / `near`), other
-//! users moving it with `buy_v2` / `sell_v2`, the completion (another user buys the remaining
-//! real tokens), pump's real `migrate_v2`, the graduation halt (PumpSwap `disable_flags` bit 0,
-//! M6-SEC-3) — and, once a crank moves the market `→ PumpSwap`, the PumpSwap venue of
+//! users moving it with pump's v2 and — since pump-final §12 (P7) — v3 trades (`buy_v2` /
+//! `sell_v2`, `buy_v3` / `sell_v3` / `buy_exact_quote_in_v3`), the completion (another user buys
+//! the remaining real tokens with `buy_v2`, or overshoots them with a `buy_v3` that completes the
+//! curve by pump's synthetic migration), token donations to `curve_base_ata` (the would-be pool a
+//! synthetic buy prices its pool part on and `migrate_v2` seeds), pump's real `migrate_v2` —
+//! checked against the pool short.win prices the pause on (pump-final §5.4, the fuzzer's
+//! `migrating_fv` oracle's second half) —, the graduation halt (PumpSwap `disable_flags` bit 0,
+//! M6-SEC-3) and, once a crank moves the market `→ PumpSwap`, the PumpSwap venue of
 //! [`super::pswap`] on the pool `migrate_v2` created.
 
 use anchor_lang::prelude::Pubkey;
@@ -14,6 +19,7 @@ use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpV2};
 use shortwin_litesvm_tests::pamm::{self, PammMarket};
 use shortwin_litesvm_tests::pump::{self, CurveUser, PumpMarket, PumpSpec};
 use shortwin_litesvm_tests::{Env, errors, read};
+use shortwin_math::quote::STANDARD_POOL_TOKENS;
 use solana_keypair::Keypair;
 use solana_signer::Signer;
 
@@ -22,9 +28,10 @@ use super::pswap::{
 };
 use super::{Move, Venue, factor};
 use crate::action::Kind;
+use crate::migrating;
 use crate::rng::Rng;
 use crate::stats::Ctx;
-use crate::world::Slot;
+use crate::world::{ORACLE, Slot};
 
 /// pump `Global`'s initial reserves (the `fresh` fixture undone to `at_progress(0)`).
 const PUMP_VT0: u64 = 1_073_000_000_000_000;
@@ -32,6 +39,47 @@ const PUMP_VS0: u64 = 30_000_000_000;
 const PUMP_RT0: u64 = 793_100_000_000_000;
 /// `migrate_v2`'s compute budget (graduation_support's).
 const MIGRATE_CU: u32 = 600_000;
+/// The crowd's SOL is topped up to [`CROWD_TOP_UP`] before a completing buy when it holds less
+/// than this (a `buy_v3` overshoot of half the would-be pool costs about its quote reserve).
+const CROWD_MIN_SOL: u64 = 500_000_000_000;
+const CROWD_TOP_UP: u64 = 1_000_000_000_000;
+
+/// Which of pump's instructions a crowd trade uses (pump-final §12: the crowd trades v2 and v3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Leg {
+    V2,
+    V3,
+    /// `buy_exact_quote_in_v3` (a buy only).
+    ExactQuoteIn,
+}
+
+impl Leg {
+    /// A buy's instruction from a trade's size, a sale's (no exact-quote-in sale) otherwise.
+    fn of(n: u64, buy: bool) -> Self {
+        match (buy, n % 3) {
+            (_, 0) => Leg::V2,
+            (false, _) | (true, 1) => Leg::V3,
+            (true, _) => Leg::ExactQuoteIn,
+        }
+    }
+}
+
+/// The name of a crowd instruction on the curve (`fuzz:crowd-…` counters), from its
+/// discriminator; `None` for any other instruction.
+pub fn crowd_ix_label(ix: &Instruction) -> Option<&'static str> {
+    if ix.program_id != shortwin::constants::PUMP_PROGRAM_ID || ix.data.len() < 8 {
+        return None;
+    }
+    let d: [u8; 8] = ix.data[..8].try_into().ok()?;
+    Some(match d {
+        fork::PUMP_BUY_V2 => "buy_v2",
+        fork::PUMP_SELL_V2 => "sell_v2",
+        fork::PUMP_BUY_V3 => "buy_v3",
+        fork::PUMP_SELL_V3 => "sell_v3",
+        fork::PUMP_BUY_EXACT_QUOTE_IN_V3 => "buy_exact_quote_in_v3",
+        _ => return None,
+    })
+}
 
 /// A curve market as the fuzzer drives it, before and after its graduation.
 pub struct CurveVenue {
@@ -66,10 +114,42 @@ impl CurveVenue {
         )
     }
 
+    /// The crowd's buy of `q` tokens (`max_sol_cost` unbounded) on `leg`; on `buy_exact_quote_in_v3`
+    /// the spend is pump's charge for `q` on the curve (`PumpCurve::charge_buy`), so the tokens
+    /// out stay at `q` (up to rounding): never a completion, which is its own action. Its
+    /// `min_tokens_out` is 1 (pump refuses 0: `BuyZeroAmount`, 6020).
+    fn buy_ix(&self, env: &Env, leg: Leg, q: u64) -> Option<Instruction> {
+        let c = &self.pm.curve;
+        Some(match leg {
+            Leg::V2 => self.v2(env, PumpV2::Buy, q, u64::MAX),
+            Leg::V3 => self.crowd.buy_v3_ix(&env.svm, c, q, u64::MAX),
+            Leg::ExactQuoteIn => {
+                let spend = c.charge_buy(&env.svm, q)?.cost;
+                self.crowd.buy_exact_quote_in_v3_ix(&env.svm, c, spend, 1)
+            }
+        })
+    }
+
+    /// The crowd's sale of `q` tokens (no minimum) on `leg` (v3's `sell_v3` for both v3 legs).
+    fn sell_ix(&self, env: &Env, leg: Leg, q: u64) -> Instruction {
+        match leg {
+            Leg::V2 => self.v2(env, PumpV2::Sell, q, 0),
+            Leg::V3 | Leg::ExactQuoteIn => self.crowd.sell_v3_ix(&env.svm, &self.pm.curve, q, 0),
+        }
+    }
+
     fn ensure_tokens(&self, env: &mut Env, q: u64) {
         let have = read::token_amount(&env.svm, &self.crowd.ata).unwrap_or(0);
         if have < q {
             fork::set_token_amount(&mut env.svm, &self.crowd.ata, q);
+        }
+    }
+
+    /// The crowd's SOL topped up before a completing buy ([`CROWD_MIN_SOL`]).
+    fn ensure_sol(&self, env: &mut Env) {
+        let who = self.crowd.kp.pubkey();
+        if read::lamports(&env.svm, &who) < CROWD_MIN_SOL {
+            env.fund(&who, CROWD_TOP_UP);
         }
     }
 
@@ -148,6 +228,8 @@ impl Venue for CurveVenue {
         let k = factor(k_ppm).sqrt();
         let vt = s.vt as f64;
         let signer = self.crowd.kp.insecure_clone();
+        // pump-final §12: one push in two trades v3 (`buy_v3` / `sell_v3`), the rest v2.
+        let leg = if k_ppm % 2 == 1 { Leg::V3 } else { Leg::V2 };
         if up {
             // A buy of `vT·(1 − 1/√k)` tokens, never the whole `rT` (completion is its own
             // action).
@@ -156,8 +238,8 @@ impl Venue for CurveVenue {
                 return None;
             }
             Some(Move {
-                front: self.v2(env, PumpV2::Buy, q, u64::MAX),
-                back: Some(self.v2(env, PumpV2::Sell, q, 0)),
+                front: self.buy_ix(env, leg, q)?,
+                back: Some(self.sell_ix(env, leg, q)),
                 signer,
             })
         } else {
@@ -167,8 +249,8 @@ impl Venue for CurveVenue {
             }
             self.ensure_tokens(env, q);
             Some(Move {
-                front: self.v2(env, PumpV2::Sell, q, 0),
-                back: Some(self.v2(env, PumpV2::Buy, q, u64::MAX)),
+                front: self.sell_ix(env, leg, q),
+                back: Some(self.buy_ix(env, leg, q)?),
                 signer,
             })
         }
@@ -183,18 +265,23 @@ impl Venue for CurveVenue {
             return None;
         }
         let signer = self.crowd.kp.insecure_clone();
+        // pump-final §12: the crowd trades v2 and v3 (one in three each, from the size).
+        let leg = Leg::of(size, buy);
         if buy {
             let q = (s.vt * u128::from(size) / (s.vq + u128::from(size))) as u64;
             let q = q.min((s.rt as u64).saturating_mul(98) / 100);
-            (q > 0).then(|| Move {
-                front: self.v2(env, PumpV2::Buy, q, u64::MAX),
+            if q == 0 {
+                return None;
+            }
+            Some(Move {
+                front: self.buy_ix(env, leg, q)?,
                 back: None,
                 signer,
             })
         } else {
             self.ensure_tokens(env, size);
             Some(Move {
-                front: self.v2(env, PumpV2::Sell, size, 0),
+                front: self.sell_ix(env, leg, size),
                 back: None,
                 signer,
             })
@@ -229,14 +316,38 @@ impl Venue for CurveVenue {
 
     fn special(&mut self, cx: &mut Ctx, kind: Kind, a: u32, b: u32) -> Option<()> {
         match kind {
-            Kind::CompleteCurve => {
+            Kind::CrowdCompletes => {
                 let s = self.state(cx.env)?;
                 if s.complete || s.rt == 0 {
                     return None;
                 }
-                let ix = self.v2(cx.env, PumpV2::Buy, s.rt as u64, u64::MAX);
+                let rt = u64::try_from(s.rt).ok()?;
+                let (ix, how) = if a % 2 == 1 {
+                    // `buy_v2` of exactly `rT` (the action before P7).
+                    (self.v2(cx.env, PumpV2::Buy, rt, u64::MAX), "v2-exact")
+                } else {
+                    // A `buy_v3` past `rT` (pump-final §12): the curve completes and the buyer
+                    // takes `δ` more from the would-be pool `X_s = curve_base_ata − rT`, donations
+                    // included, δ up to half of it.
+                    let ata = read::token_amount(&cx.env.svm, &self.pm.curve.curve_base_ata)?;
+                    let x_s = ata.checked_sub(rt)?;
+                    let delta = (u128::from(x_s) * u128::from(1 + b % 500) / 1_000) as u64;
+                    if delta == 0 {
+                        return None;
+                    }
+                    self.ensure_sol(cx.env);
+                    let ix =
+                        self.crowd
+                            .buy_v3_ix(&cx.env.svm, &self.pm.curve, rt + delta, u64::MAX);
+                    (ix, "v3-overshoot")
+                };
                 let kp = self.crowd.kp.insecure_clone();
-                cx.send(&[pump::cu_limit_ix(pump::CURVE_TRADE_CU), ix], &[&kp]);
+                let res = cx.send(&[pump::cu_limit_ix(pump::CURVE_TRADE_CU), ix], &[&kp]);
+                let outcome = if res.is_ok() { "landed" } else { "refused" };
+                *cx.stats
+                    .events
+                    .entry(format!("fuzz:crowd-completes-{how}-{outcome}"))
+                    .or_default() += 1;
                 Some(())
             }
             Kind::Migrate => {
@@ -244,9 +355,20 @@ impl Venue for CurveVenue {
                 if !s.complete || s.vt == 0 {
                     return None;
                 }
+                // pump-final §12's `migrating_fv` oracle, its second half: the pool short.win
+                // prices the pause on (§5.4: `X₁` the live `curve_base_ata` after a pool part,
+                // `Y₁ = rQ − fee + pcQ`) is the pool `migrate_v2` creates.
+                let priced = migrating::priced_pool(cx.env, &self.pm);
                 let migrator = cx.env.funded_keypair();
                 let ix = pump::migrate_v2_ix(&cx.env.svm, &migrator.pubkey(), &self.pm.curve);
-                cx.send(&[pump::cu_limit_ix(MIGRATE_CU), ix], &[&migrator]);
+                let res = cx.send(&[pump::cu_limit_ix(MIGRATE_CU), ix], &[&migrator]);
+                if res.is_ok() {
+                    let tag = migrating::check_created_pool(cx.env, &self.pm, priced.as_ref())
+                        .unwrap_or_else(|why| {
+                            panic!("{ORACLE} migrating_fv (pump-final §5.4): {why}")
+                        });
+                    *cx.stats.events.entry(tag.into()).or_default() += 1;
+                }
                 Some(())
             }
             // The graduated pool's buckets (PUMP-2026-10-1): its PumpSwap venue's.
@@ -277,6 +399,18 @@ impl Venue for CurveVenue {
         self.grad
             .as_ref()
             .map_or_else(Vec::new, Venue::donation_targets)
+    }
+
+    /// pump-final §12: until the graduation, tokens to the curve's `curve_base_ata` —
+    /// `(1 + b mod 1000)`‰ of the standard 206.9e12 (T-MIG-DONATION's sizes, up to the review's
+    /// edge `D = 206.9e12`) — before a completion (a synthetic buy prices its pool part on it) or
+    /// after one (`migrate_v2` seeds it; after a pool part §5.4 prices FV on it).
+    fn token_donation(&self, _env: &Env, b: u32) -> Option<(Pubkey, u64)> {
+        if self.grad.is_some() {
+            return None;
+        }
+        let amount = STANDARD_POOL_TOKENS * u128::from(1 + b % 1_000) / 1_000;
+        Some((self.pm.curve.curve_base_ata, u64::try_from(amount).ok()?))
     }
 
     fn exit_cu(&self) -> Option<u32> {
