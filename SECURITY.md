@@ -68,5 +68,5 @@ Please include:
 
 No audit has been published yet: a full private audit, then a public audit contest, is
 planned before mainnet (M10 owner decision Q2). Reports will be listed on
-`https://short.win/security` once published, and the programs' `security.txt` will gain its
+`https://short.win/security` once published, and short.win's `security.txt` will gain its
 `auditors` field then. The audit package for reviewers is [`docs/AUDIT.md`](docs/AUDIT.md).

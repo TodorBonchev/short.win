@@ -51,7 +51,8 @@ to build and test the code, what the code relies on, and what we already know ab
   is retired (D2: **an audit-scope change the auditors must be told of**, with this addendum).
   The build's hashes (§0) are a **local build, not verified**: no verifiable build (its tools are
   not installed on the machine that built them, and that session's rules allowed no network
-  beyond read-only Solana RPC to fetch them: §0) and no CI run.
+  beyond read-only Solana RPC to fetch them: §0) and no CI run; a local run of every CI job that
+  runs on that machine passed on 2026-10-16 (§10 "The pump v3 gate").
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -83,7 +84,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | Toolchain | Anchor CLI and `anchor-lang` 1.2.0; Agave CLI 4.1.2; platform-tools v1.57 (rustc 1.95), SBPF v3; host Rust 1.98.1 (`docs/DEVELOPMENT.md` "Pins") |
 | Build | `anchor build --tools-version v1.57 --arch v3 --ignore-keys` (never a bare `cargo build-sbf`; never `anchor keys sync`, which would rewrite `declare_id!` and so the hashes below) |
 | Verifiable build | solana-verify 0.5.2, image `solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f`, `--arch v3 --cargo-build-sbf-args="--tools-version v1.57"`: `scripts/verifiable-build.sh` (Docker, or `--local`: a bubblewrap shim running the same digest-pinned image) and CI's `verifiable-build` job, which fail unless each output is byte-identical to the `anchor build` artifact (ARCH §1.1) |
-| Contacts | Security reports: `security@short.win`; policy page `https://short.win/security` (`SECURITY.md`; the same values are in both programs' `security.txt` and the web's `/.well-known/security.txt`; owner decision Q3 of 2026-10-02). The auditors' point of contact is named at the engagement (§12) |
+| Contacts | Security reports: `security@short.win`; policy page `https://short.win/security` (`SECURITY.md`; the same values are in the program's `security.txt` (and were in `complete_curve`'s until 1.0.0) and the web's `/.well-known/security.txt`; owner decision Q3 of 2026-10-02). The auditors' point of contact is named at the engagement (§12) |
 
 **Retired after the tag: `complete_curve`** (design pump-final §11, owner decision D2 of
 2026-10-13; the auditors are to be told of this scope change). Since pump's v3 build a
@@ -677,7 +678,7 @@ design `pump-final`; its row below; §13): a program change, built as 1.0.1.
 | The seventh and eighth rounds' web wording | **Decided (2026-10-08, ninth round): approved as written** — `lender.potSyncs`, `lender.potSyncsDeferred`, `lender.claimCloses` and `lender.subUnitConversion` (FRONTEND §4.2) | As written in FRONTEND §4.2 | Web only |
 | The web on phones and the thirteenth round's UX items (M10-RESP; O-1 … O-6; FRONTEND §13) | **Decided (2026-10-10, thirteenth round): the M10-RESP redesign approved as built** (the twelfth round's request of 2026-10-09: phones, tablets and desktops in the dark terminal style), with **O-1** the lend deposit order, **O-2** the coverage notice once, **O-3** newcomer help (the intro strip, the glossary, How it works), **O-4** a 12 px text floor and **O-5** the Claim wording to build, and **O-6** the Mobile Wallet Adapter after the audit, off by default (the "Open in Backpack / Phantom / Solflare" links stay). **Decided (2026-10-11): the round's 143 new or changed strings approved word for word** (FRONTEND §4.3), with recommendations 6–10 (Tier C as How it works' example, the risk texts there without tick boxes, "short.win" in running text and "ShortWin" as the brand mark, the glossary cuts, "Lending page") approved; **`borrower.liquidation` ¶3 amended** (the expiry fee made conditional: "Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty."; SPEC §5.3, `expire.rs`'s `UseLiquidate`; FRONTEND §4.2); and the round's questions: a Claim shortfall under 10,000 lamports counts as none (`CLAIM_DUST_LAMPORTS`), the Lending page's Claim is the market panel's claim with its pot syncs, and a Claim is enabled with something claimable now or syncs that can pay, the short-phone breakpoint approved, the lone header ⓘ accepted until a design pass after the audit | Built (`acbe323`, `7a64dcd`); O-6 lifted 2026-10-13 (its own row) | Web only |
 | **O-6, the Mobile Wallet Adapter** (FRONTEND §5.4 (6), §9.3, §13 FE-32) | **Decided (2026-10-13): O-6 lifted.** Built now and switched on (default on; `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false` keeps an off switch). `@solana-mobile/wallet-standard-mobile` 0.7.0, with the protocol pinned to 3.0.0 through pnpm overrides; Kit stays 8.3.0. The mobile UX fixes ship with their strings as drafted. No WalletConnect / Reown. The security review's safeguards taken as decided: the adapter signs only through `solana:signTransaction`, a repo-wide 14-day `minimumReleaseAge` (the two packages excluded until 2026-10-21), Disconnect local only, the `ws://localhost` CSP residual accepted. This replaces the decision of 2026-10-10 (after the audit, off by default). | Built, on by default; **the owner's real-device test pending** (it precedes the release; DEVELOPMENT "Mobile wallets on a real device") | No. Web only: CSP `connect-src` + `ws://localhost:*`, `http://localhost` and two style hashes, in flag-on builds |
-| **pump v3** (the design `pump-final`; known-issues KI-77, PUMP-2026-10-13-1 … -6; §13) | **Decided (2026-10-13):** change the program — `PumpMigrating` priced on the post-completion fields, v3 for every curve leg; **D1 (a)** refuse live cashback curves (`CurveCashbackCoin` 6109); **D2** retire `complete_curve` and the 3-transaction straddle bundle (an audit-scope change: **the auditors must be told**, with this addendum); **D3** `B̂_v3` is the risk and exit price above `rT`; **D4** the two strings (6109's and 6031's) as drafted; every residual of the design's §16 / §17 accepted; the release order keeper (both TradeExtras formats) → program upgrade → web; version **1.0.1**; the re-pin to pump's 2026-10-13 build (slot 456,494,698). The live-supply synthetic fee `φ_s` (a burn can raise it under a multi-tier curve `FeeConfig`) and the fee gates' 10¹⁵ `φ` disclosed beside KI-72 and accepted under its decision (KI-77); no code change | Built (P0 … P8, `pump-v3`); hashes §0 (local, not verified) | **Program** (built: 1.0.1; the `complete_curve` program removed) |
+| **pump v3** (the design `pump-final`; known-issues KI-77, PUMP-2026-10-13-1 … -6; §13) | **Decided (2026-10-13):** change the program — `PumpMigrating` priced on the post-completion fields, v3 for every curve leg; **D1 (a)** refuse live cashback curves (`CurveCashbackCoin` 6109); **D2** retire `complete_curve` and the 3-transaction straddle bundle (an audit-scope change: **the auditors must be told**, with this addendum); **D3** `B̂_v3` is the risk and exit price above `rT`; **D4** the two strings (6109's and 6031's) as drafted; every residual of the design's §16 / §17 accepted; the release order keeper (both TradeExtras formats) → program upgrade → web; version **1.0.1**; the re-pin to pump's 2026-10-13 build (slot 456,494,698). **Decided after P1 (which introduced `φ_s` on 2026-10-14; the date of the owner's direction is not recorded here and is the owner's to confirm, TODO.md):** the live-supply synthetic fee `φ_s` (a burn can raise it under a multi-tier curve `FeeConfig`) and the fee gates' 10¹⁵ `φ` disclosed beside KI-72 and accepted under KI-72's decision of 2026-10-12 (AI review decision 3; KI-77); no code change | Built (P0 … P8, `pump-v3`); hashes §0 (local, not verified) | **Program** (built: 1.0.1; the `complete_curve` program removed) |
 | Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6); whether to publish the private audit report (recommended, before the beta) | As built; publication undecided | No |
 | Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign; add them to the RFQ if the owner wants them reviewed | Out of scope (§2) | No |
 
@@ -710,7 +711,7 @@ are historical: where they disagree with ARCH §12 or the code, ARCH §12 and th
 | U15, U30 | VQR drift; pump's announced upgrade | Third-party LP explains the drift. The upgrade **was deployed on 2026-10-02** (the `pump-rust-client` 0.2.0 release; what its added `.text` does is UNVERIFIED, coverage is behavioural); re-dumped as `pump_programs_2026_10`, every pump suite and the T-LATCH replay re-run on it, the fee buckets read since batch 4 (PUMP-2026-10-1). **Successors** (pump-final, §13): pump and PumpSwap 2026-10-08, pump-fees 2026-10-12, pump 2026-10-13, through the addendum's steps 1–4 — re-dumped (`pump_programs_2026_10_13`, `_13b`, `pump_state_2026_10_13`), interface-diffed, gates G0 / G0b on the ELFs, and the adapter moved to v3 (1.0.1); what the new `.text` does beyond the paths short.win and its tests exercise stays UNVERIFIED (behavioural coverage) | Closed for 1.0.1; a later pump upgrade goes through the addendum again (§12) |
 | U16 | The per-writable-account limit | **Desk-checked:** 40 M CU on mainnet in Agave master and Firedancer (below); other clients not checked | monitoring |
 | U17 | CPI'd memo satisfies Token-2022 MemoTransfer | **VERIFIED on the mainnet build** (Token-2022 v11.0.0 `7ea94a02…`, spl-memo v3) | a mainnet transaction (M11, TMEMO-10) |
-| U18 | `declare_program!`, the lockfile resolution, solana-verify vs `anchor build` | **RESOLVED:** byte-identical for both programs (§0) | CI on this tree (§10) |
+| U18 | `declare_program!`, the lockfile resolution, solana-verify vs `anchor build` | **RESOLVED** for 1.0.0: byte-identical for both programs (§0). 1.0.1: not yet run (a local build only; §0, §13) | CI and the verifiable build on `pump-v3` (TODO.md) |
 | U19, U23 | Surfpool template fidelity; the Switchboard shutdown | **Closed: not relied on** | — |
 | U20, U21, U28 | Arbitrage of held pumps; gap frequencies; price noise | Uncalibrated. U21: method and public-RPC crawl since 2026-10-02, results pending | ≥ 30 days of tapes (O9); U28 from production |
 | U26 | The latch's reaction time | Monitoring; LiteSVM cannot model it | — |
@@ -881,6 +882,45 @@ The full gate (G-full in the M10 plan; CI's `ci.yml`) also runs fmt and clippy w
   `4497ea6`; `air-followups`): no CI run; the owner asked for the branch to be pushed with
   `[skip ci]` (2026-10-13). Their local gates: the review's README "Local gate", and the integrated
   branch's below.
+- **`pump-v3`** (short.win 1.0.1, pump v3 and the Mobile Wallet Adapter, 2026-10-13 … 16; §13):
+  no CI run (not pushed). Its local gate follows.
+
+**The pump v3 gate** (2026-10-16, a local run, not CI; `pump-v3` at `0879185`, the P8 docs head;
+the m2-cu figures it re-wrote are committed in `b44908b`; WSL Ubuntu 24.04 on a 6 GB machine,
+test binaries at 4 threads; a stand-in for every CI job that can run there; the logs are not
+committed). The SBF builds ran in place, and every test loaded them (`SHORTWIN_SO`,
+`SHORTWIN_TEST_VENUE_SO`, `MOCK_CPAMM_SO`):
+
+| Step (CI job) | Result |
+|---|---|
+| anchor build + `scripts/build-test-venue.sh` | `shortwin.so` `72c82879…1429` (executable `0610d419…2dfc`, 1,635,424 B), test-venue `shortwin.so` `fd46da2c…9db7` (1,666,464 B), `mock_cpamm.so` `4cf17007…7ab9` (281,240 B): §0's 1.0.1 table; the IDL equals the committed copy |
+| SBPF v3; A49; security.txt | `e_flags` 0x3 on `shortwin.so`, `mock_cpamm.so` and the test-venue build; A49 ok (the release ELF is free of the mock id; `mock_cpamm.so` and the test-venue build carry it); `check-security-txt.py --forbid-placeholders --source-release v1.0.1` ok |
+| fmt (with cu-math's); `shortwin-math`'s deny lints, `no_std`, no runtime dependency; clippy `-D warnings` on `-p shortwin-math`, the workspace and `-p shortwin` (the release feature set) | clean |
+| `cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix` (`PROPTEST_CASES=2000`) | 399 passed, 0 failed |
+| vectors; T-CONFIG; wasm; T-LAYOUT | every `gen_*.py` regenerates the committed vectors with no diff; `config_check.py` OK, `test_config_gate.py` 8 tests; the math crates build for `wasm32-unknown-unknown`, and `cargo check -p shortwin` there |
+| fixtures; `cargo test -p shortwin` (the release feature set) | `SHA256SUMS` OK, `dump-fixtures.py check` 340 entries; 80 passed |
+| **program-tests: `cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests`** | **1,289 passed, 0 failed, 5 ignored** (79 result groups: 76 test binaries and 3 doc-test runs) |
+| T-SIZE; `build-alt.sh print` | `tx_size_raydium` 3, `tx_size_pump_it` 5, `tx_size_pumpswap_it` 4 passed; the ALT's static part 49 addresses |
+| T-POT (`SHORTWIN_TRACES=full`, release) | 5 passed (stranding table: 40 seeds, 15,044 lamports, worst 435) |
+| **fuzz-smoke** (`cargo test --release --locked -p shortwin-fuzz`, LTO off and 16 codegen units as CI) | 32 passed |
+| benches cu-math, m1, m2, m3, m5, m6 (after the CPI wrappers' SBF builds, v1.57, SBPF v3) | 2 / 2 / 4 / 5 / 7 / 3 passed, every figure within its budget; fmt and clippy clean. cu-math, m3 and m5 re-write their committed files unchanged. m2's re-written `results.md` / `trace.md` are committed in `b44908b`: the version bump moved five stable rows by 9–10 CU, the rest is key noise (a second run compared). m1's and m6's differ from the committed files by the documented noise only (m6's second run equals them), so they are not committed |
+| **services**: fmt, clippy (the workspace; the keeper alone); tests | clean; **264 passed, 0 failed, 3 ignored** (keeper scenarios 146, 2 ignored: the release measurements; T-OPS `gov_e2e` 2; `rpc_local` ignored); keeper A49 (the scenario binary embeds the mock id, the release keeper does not) |
+| m7-keeper-bench (cost, PumpSwap ALT, cascade; release, the WRITE switches) | 3 passed. The re-written figures differ from `1710890`'s by run-to-run noise only (wall-clock times, the mock `expire`'s 19 CU, the cascade's per-exit requested-CU ranges, e.g. the mock `liquidate` 104,739–111,212 → 104,737–111,208); `keeper_cost.py` reproduces `out/keeper_cost.txt` on both, so they are not committed |
+| **indexer** (embedded PostgreSQL as uid 1 through `unshare`: it refuses root) | `pg_fixture` 2; `shortwin-indexer` **127 passed, 3 ignored** (`ingest_sessions` 8, `api_replayed` 1, `security_ingest` 11 among them; the 3 ignored are `ingest_rpc_validator`'s); the replay harness **8 passed** on nine sessions (2,371 transactions; the projections equal the chain at all 178 checkpoints); `ingest_rpc_validator --ignored` against `solana-test-validator` 3 passed; the production indexer links no embedded Postgres |
+| codama; client check | the IDL equals the build's; `generate` leaves no diff; typecheck; 29 client tests |
+| web: `pnpm install --frozen-lockfile --offline`, the math-wasm build, the facade's Node smoke test, lint, typecheck, Vitest, the build | install ok; smoke ok; Biome 358 files clean; typecheck clean; **1,021 passed, 1 skipped** (87 files, 1 skipped); built |
+| **web-e2e** (Playwright on `solana-test-validator`, the test-venue build) | the whole suite (projects chain, chain-phone, chain-android) **122 passed, 2 skipped** (18.3 min); the Mobile Wallet Adapter built off (`SHORTWIN_E2E_MWA=0`, chain-android) 8 passed, 19 skipped; the responsive gate (`SHORTWIN_RESPONSIVE_GATE=1`) **96 passed** |
+
+Not run: CI (nothing pushed); `cargo deny` and `cargo audit` (not installed, and the advisory
+database needs a download; since v1.0.0 the Cargo lockfiles change only workspace packages,
+`complete-curve` removed and `shortwin` 1.0.1, and `pnpm-lock.yaml` gained the Mobile Wallet
+Adapter's npm packages, which neither tool covers; CI's online `pnpm install --frozen-lockfile`
+still has to pass the 14-day release-age policy); the verifiable build (§0, §13); `rpc_local`
+(manual); `mutants`; a ≥ 24 h fuzz run (§13).
+
+After this gate: `b44908b` (the m2 figures, above), then the final review's fixes (2026-10-16:
+the indexer, the tests and the docs; no program, IDL or web change), each with its own runs in
+its commit message (TODO.md names them).
 
 **The AI review follow-ups' gate** (2026-10-13, a local run, not CI; `air-followups` at
 `621f8e1`: the AI review's fixes and their follow-ups `cb756ca` … `621f8e1`, the program from
@@ -1477,7 +1517,7 @@ updates the register in the same commit.
 
 **Publication.** Open (§7): we recommend publishing the private audit's report after the
 fixes and before the beta. The public contest follows the fixes; the bug bounty starts at the
-beta (M11). Published reports are listed on `https://short.win/security`, and both programs'
+beta (M11). Published reports are listed on `https://short.win/security`, and short.win's
 `security.txt` then gains its `auditors` field (a program upgrade).
 
 ---
@@ -1556,8 +1596,10 @@ in `venues/mod.rs` rewords three comment lines and changes no byte); `programs/c
   IDL's 17 accounts, exactly 24 data bytes (never `partial_fill`), no pump-fees CPI, no creator
   vault, the trader PDA the only signer. A buyback past `rT` buys `rT` on the curve and the rest
   from the would-be pool in one instruction; `sync_after_leg` moves the market to `PumpMigrating`
-  in it. `CurveStraddle` (6031, D4's message) is now only a close beyond what the curve and its
-  would-be pool hold, unreachable under the caps; keeper exits there get `UseSolSettle`.
+  in it. `CurveStraddle` (6031, D4's message) is now only a close past `rT` that the curve and
+  its would-be pool cannot deliver (unreachable under the caps) or on a curve with no synthetic
+  route (`φ_s` not resolved on the mint's supply; `close_venue_checks`); keeper exits there get
+  `UseSolSettle`.
 - **Pricing past `rT` (D3):** `B̂_v3`, the curve leg and the would-be pool's leg at the fee pump
   charges, the curve tier at its market cap on the mint's **live** supply (`φ_s`, KI-77), `+1`
   on both legs; `B̂_str` only for a `PumpMigrating` market's states.
@@ -1597,11 +1639,18 @@ crate's properties over the full domain, the 11 mainnet synthetic completions); 
 T-OPEN-V3, T-SYNTH-1 … -6, T-SIGMA, T-MIG-PRICE / -S3 / -HALT / -DONATION / -GUARD,
 T-LIVE-PC-GUARD, T-LISTING, T-LISTING-CASHBACK, T-WIPE-GATE (AIR-05, AIR-08, M5-SEC-1 and
 M6-SEC-5's tests re-expressed on a non-cashback curve, names and assertions kept), T-SIZEOF,
-T-LATCH, T-REPLAY, T-CU / -TRACE / -SIZE / -DEPTH; the whole LiteSVM suite at P6 (79 binaries,
-1,289 passed); the keeper's `upgrade_window` scenarios (the keeper liquidates on 1.0.0 with the
-20-key list and on the upgraded build with the 10-key one, no failed send); the fuzzer's v3 crowd
-and `migrating` oracle (P7: 10-minute smokes and ≈ 1 h each of the curve and PumpSwap profiles,
-0 failures, 0 anomalies).
+T-LATCH, T-REPLAY, T-CU / -TRACE / -SIZE / -DEPTH; the whole LiteSVM suite at P6 (79 result
+groups: 76 test binaries and 3 doc-test runs; 1,289 passed, 5 ignored); the keeper's
+`upgrade_window` scenarios (the keeper liquidates on 1.0.0 with the 20-key list and on the
+upgraded build with the 10-key one, no failed send); the fuzzer's v3 crowd and `migrating` oracle
+(P7: 10-minute smokes and ≈ 1 h each of the curve and PumpSwap profiles, 0 failures, 0
+anomalies). **The final local gate on 1.0.1** (2026-10-16, every CI job that runs on the
+machine, web-e2e and the indexer's PostgreSQL and validator tests included; not CI): §10 "The
+pump v3 gate". Since the final review: T-PUMP-MATH-V3 (b″) (both synthetic parts under the
+curve's own `creator_fee_bps`, `Global.creator_fee_configurable` on and off, and for a default
+creator: pump charges `φ_s`'s creator rule on both, and `B̂_v3` covers the charge by 2–3), KI-77
+(c)'s step pinned (`quotes_synthetic_g0`), and the indexer stores no pump `TradeEvent` of a curve
+quoted in another token (INDEXER §7.2).
 
 **T-SELF-UPGRADE's 1.0.0 fixture.** `tests/fixtures/shortwin/shortwin_1_0_0.so` is the `v1.0.0`
 tag (`e4895c2` = `audit-1`) built on 2026-10-15 in a worktree of its own with the pinned

@@ -2356,8 +2356,9 @@ than a year, ahead, so other builds never fail because the date nears; the unit 
 file on a clock pinned 90 days before its own Expires. `dist/_headers` (`csp.ts` `headersFile`,
 pinned by `csp.test.ts`) serves it as `text/plain; charset=utf-8`. `Policy` is the app's own
 `/security` page (§3.2; `SecurityPolicyPage`: scope, how to report, response, safe harbour,
-audits; the repository's `SECURITY.md` carries the same values). Both programs embed their own
-security.txt with the same contact and policy (ARCH §8.5).
+audits; the repository's `SECURITY.md` carries the same values). The program embeds its own
+security.txt with the same contact and policy (ARCH §8.5; the retired `complete_curve` helper
+carried one too until 1.0.0).
 
 ### 9.4 Secrets
 

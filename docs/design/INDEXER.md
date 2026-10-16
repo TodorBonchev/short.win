@@ -1418,13 +1418,14 @@ track reads (§9.2's read model, §6's projections) needs that track's agreement
   runs the contract on replayed sessions; `shortwin-indexer run` stops at its first failing role
   (`try_join!`, so a dead ingest cannot leave a stale API serving).
 - *"Replays an E2E session into correct DB state":* `cargo test -p shortwin-indexer-litesvm` —
-  `every_session_replays_into_the_chain_state` passes §11.4 items 1–13 on all eight sessions
-  (1,369 transactions; the projections equal the chain at all 159 checkpoints; idempotent
-  re-ingest, rebuild, out-of-order delivery, rollback with the rollups), plus `the_contract_rules_equal_the_chain_at_every_checkpoint`,
+  `every_session_replays_into_the_chain_state` passes §11.4 items 1–13 on all nine sessions
+  (2,371 transactions; the projections equal the chain at all 178 checkpoints; re-measured
+  locally on `pump-v3`, 2026-10-16, AUDIT §10 "The pump v3 gate"; 1,369 / 159 on eight sessions
+  at M8, before AIR-07's `590e724` gave `mock_lifecycle` M5–M7 and pump-final P6 added
+  `pump_synthetic_exit`; idempotent re-ingest, rebuild, out-of-order delivery, rollback with the
+  rollups), plus `the_contract_rules_equal_the_chain_at_every_checkpoint`,
   `the_assertions_hold_on_a_faithful_database_and_catch_tampering`, the analytics reproductions
-  and catalog coverage (8 tests; *AIR-07, `590e724`:* `mock_lifecycle` gained M5–M7, so these
-  totals change; they stay as measured at M8 until CI's PostgreSQL run, which has not run on
-  the AI review's follow-ups, re-measures them);
+  and catalog coverage (8 tests; CI's PostgreSQL run has not yet run on these totals);
   `cargo test -p shortwin-indexer --test ingest_sessions` — INGEST's thirteen fixtures and
   REPLAY's committed two, each matching the chain, with ordering, rebuild, rollback and
   single-writer tests (6; 8 since pump-final P6: the synthetic exit's rows and a retired helper
