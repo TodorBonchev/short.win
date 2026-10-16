@@ -68,10 +68,10 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
       telling the auditors.
 - [ ] **Tell the auditors** of the addendum (AUDIT.md §13) and of D2's scope change
       (`complete_curve` leaves the tagged `audit-1` scope) — the owner's step.
-- [ ] **The date of the owner's `φ_s` direction** (accept the live-supply synthetic fee under
-      KI-72's decision of 2026-10-12; KI-77): given after P1 introduced `φ_s` on 2026-10-14, and
-      not recorded in the docs. The owner confirms it; then SPEC §14 (fifteenth round), AUDIT.md
-      §7's pump v3 row and KI-77's Decision column carry it.
+- [x] **The owner's `φ_s` direction** (accept the live-supply synthetic fee under KI-72's
+      decision of 2026-10-12; KI-77): given after P1 introduced `φ_s` on 2026-10-14, confirmed by
+      the owner on 2026-10-16; SPEC §14 (fifteenth round), AUDIT.md §7's pump v3 row and KI-77
+      carry it.
 - [ ] **The owner's real-device MWA test** before the release (FE-32; DEVELOPMENT "Mobile wallets
       on a real device"), and who hosts the HTTPS devnet and mainnet builds it needs (P1, P2).
 - [ ] **Remove the two `@solana-mobile` release-age exclusions** in `pnpm-workspace.yaml` after
