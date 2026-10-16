@@ -169,8 +169,8 @@ cargo build -p shortwin-math-wasm --target wasm32-unknown-unknown --release
 cargo check -p shortwin --target wasm32-unknown-unknown   # T-LAYOUT wasm32 leg
 cargo test -p squads-v4-ix                           # M10: the Squads v4 encoders against the vendored IDL
 anchor build --tools-version v1.57 --arch v3
-python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.0 \
-  target/deploy/shortwin.so "short.win"              # M10 SECTXT-1: the release gate
+python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.1 \
+  target/deploy/shortwin.so "short.win"              # M10 SECTXT-1: the release gate (1.0.1)
 python3 scripts/test_check_security_txt.py           # the checker's own tests
 cargo deny check
 cargo audit --deny warnings --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 \
