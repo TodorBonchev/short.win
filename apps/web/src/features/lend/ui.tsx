@@ -3,8 +3,23 @@ import { type ReactNode, useEffect, useId, useRef } from 'react';
 import { Field } from '../../components/Field.tsx';
 import { T } from '../../config/testids.ts';
 import { formatTokens, shortAddress } from '../../lib/format.ts';
+import { formatUtc } from '../../lib/time.ts';
 import type { TokenAccountInfo } from '../../tx/tokenAccount.ts';
 import type { Refusal } from './previews.ts';
+
+/**
+ * A UTC stamp in a key / value row ("2026-10-25 00:00 UTC"): its date and its time with the zone each stay on
+ * one line (`.lend-nowrap`), so a narrow value column breaks it only between them — never at a hyphen, never
+ * "UTC" alone on a line (design pass P11). The text is `formatUtc`'s, unchanged.
+ */
+export function UtcStamp({ ts }: { ts: number | bigint }) {
+    const [day, ...rest] = formatUtc(ts).split(' ');
+    return (
+        <>
+            <span className="lend-nowrap">{day}</span> <span className="lend-nowrap">{rest.join(' ')}</span>
+        </>
+    );
+}
 
 /** Why an action is refused now (`data-code` = the program error name). */
 export function Blocked({ code, children }: { code: string; children: ReactNode }) {

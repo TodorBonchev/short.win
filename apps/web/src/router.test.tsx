@@ -75,7 +75,9 @@ describe('routes', () => {
         ['/security', T.page('security')],
         ['/how-it-works', T.page('how-it-works')],
         [`/positions/${POSITION}`, T.page('position')],
-        [`/m/${MINT}`, T.shortPanel],
+        // The trade panel's default (Short or Lend) waits for the market's view (MarketPage.tsx); an explicit
+        // ?panel= mounts at once.
+        [`/m/${MINT}`, T.page('market')],
         [`/m/${MINT}?panel=lend&action=withdraw`, T.lendPanel],
     ])('%s renders inside the shell', async (path, testId) => {
         const { queryClient } = await renderAt(path);

@@ -1,6 +1,6 @@
 /**
  * The icon registry (FRONTEND.md §7.6; design pass P2): the phone tab bar's icons, the small info mark and the
- * glyphs every control shares (close, chevron, sort, copy, check, external, shield, plus). 20 px inline SVG,
+ * glyphs every control shares (close, chevron, arrow, sort, copy, check, external, shield, plus). 20 px inline SVG,
  * stroked 1.6 in `currentColor`, presentation attributes only (CSP `style-src 'self'`: no style attributes),
  * hidden from assistive technology (the control's text or aria-label names it). The default class `.nav-icon`
  * is hidden from 640 px up: every use outside the tab bar passes `.icon` (16 px), `.icon-sm` (14 px) or its
@@ -18,6 +18,7 @@ export type NavIconName =
     | 'info'
     | 'close'
     | 'chevron'
+    | 'arrow'
     | 'sort'
     | 'copy'
     | 'check'
@@ -74,6 +75,9 @@ const PATHS: Record<NavIconName, ReactNode> = {
     close: <path d="M5 5l10 10M15 5L5 15" />,
     // Points down; rotated for up (a folded list) and right (a row that opens a page).
     chevron: <path d="M5 7.5l5 5 5-5" />,
+    // Points down (the card sort bar's order: descending; turned for ascending) — an arrow, not a second chevron
+    // beside the sort select's own (design pass P11).
+    arrow: <path d="M10 4v12M5 11l5 5 5-5" />,
     // Both ways (a sortable column that is not the sort).
     sort: <path d="M6 8l4-4 4 4M6 12l4 4 4-4" />,
     // Two sheets (copy to the clipboard).

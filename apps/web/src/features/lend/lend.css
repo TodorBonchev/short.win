@@ -18,9 +18,9 @@
 }
 
 /* The lender's position: a sunken well (bg-0, edged like a panel) for read-only figures — the same
-   surface as the Short preview beside it, never a raised note (design pass P7). */
+   surface and inset (8 / 12 px) as the Short preview beside it, never a raised note (design pass P7). */
 .lend-position {
-    padding: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
     background: var(--surface-well);
     border: 1px solid var(--line-panel);
     border-radius: var(--radius);
@@ -75,7 +75,8 @@
     color: var(--text-1);
 }
 
-/* A date stays on one line ("until 2026-10-18 00:00 UTC" never splits at its hyphen). */
+/* A date, and a time with its zone, each stay on one line ("2026-10-18" · "00:00 UTC": never split at a hyphen or
+   before "UTC"; a value breaks only between them — lend/ui.tsx UtcStamp). */
 .lend-nowrap {
     white-space: nowrap;
 }
@@ -90,22 +91,20 @@
     max-width: var(--field-narrow-w);
 }
 
-.lend-form .kv dd {
-    white-space: nowrap;
+/* The key / value rows share their width (labels 1fr, values 1.2fr) and a long value ("0.0095 until 2026-10-25
+   00:00 UTC", "198,100,013.5722 E2EMAIN") wraps at its spaces rather than squeeze its label to a word a line —
+   in the 360 px desktop column as in a phone's sheet (the nowrap values above 640 px left "Locked shares after"
+   three lines tall beside one; design pass P11). A date stays whole (.lend-nowrap); the position well's short
+   figures keep .num's one line, only its "until …" note wraps. */
+.lend-form .kv,
+.lend-position .kv {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
 }
 
-/* A phone's sheet is narrow: a long value ("1,000 until 2026-10-16 10:45 UTC") wraps at its spaces
-   rather than squeezing its label to a word a line. */
-@media (max-width: 639.98px) {
-    .lend-form .kv,
-    .lend-position .kv {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-    }
-
-    .lend-form .kv dd,
-    .lend-form .kv dd .num {
-        white-space: normal;
-    }
+/* `:where()` keeps these at (0,2,0), under the file's `.lend-unpaid … .num` (biome noDescendingSpecificity). */
+.lend-form .kv :where(dd, dd .num),
+.lend-position .kv :where(dd) {
+    white-space: normal;
 }
 
 /* The deposit's part of the pool's unpaid rent once it is material (lender.unpaidRent). */
@@ -117,9 +116,9 @@
     margin-left: var(--sp-2);
 }
 
-/* The KPI strip spans the page like the table under it (no width cap: the strip's own rules split four
-   cells equally from a tablet up, two by two on a phone). The strip's one hero is SOL claimable — the
-   number the page's only primary action repeats (Stat `hero`, components.css). */
+/* A KPI cell's second line (the SOL value's ≈ USD, the credited total's "so far"): 12 px, quiet, under the
+   figure. The strip itself is the shared .stat-strip (components.css: four equal cells from a tablet up, two by
+   two on a phone; its one hero, SOL claimable, is the number the page's only primary action repeats). */
 .lend-kpi-note {
     display: block;
     font-size: var(--fs-xs);

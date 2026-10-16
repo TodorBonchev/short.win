@@ -62,6 +62,12 @@
     .short-inputs > .field + .field {
         margin-top: var(--sp-2);
     }
+
+    /* Slippage is the shared narrow-field measure here too (120 px, like the Lend tolerance box at every width):
+       a full-width box for a two-digit percentage read as a second amount field (design pass P11). */
+    .short-inputs > .field:last-child > .input-wrap {
+        max-width: var(--field-narrow-w);
+    }
 }
 
 /* The preview is the well for read-only figures (bg-0 in the bg-1 panel: the surface tiers of

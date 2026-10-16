@@ -7,7 +7,7 @@ import { RiskBadge, riskLevel, TierBadge } from './Badge.tsx';
 import { DataTable } from './DataTable.tsx';
 import { Disclosure } from './Disclosure.tsx';
 import { AmountInput } from './Field.tsx';
-import { Pnl, Price, Sol } from './Num.tsx';
+import { Pnl, Price, Sol, Tokens } from './Num.tsx';
 
 describe('number cells', () => {
     it('render raw values in data-value and signed P&L with sign, arrow and words', () => {
@@ -25,6 +25,27 @@ describe('number cells', () => {
         expect(pnl.textContent).toContain('▼');
         expect(pnl.textContent).toContain('loss 0.45');
         expect(screen.getByTestId('price').textContent).toContain('0.000000028 SOL per token');
+    });
+
+    it('mute an amount by its displayed digits: dust that rounds to zero is as quiet as an exact zero', () => {
+        render(
+            <>
+                <Sol lamports={0n} testId="zero" />
+                <Sol lamports={1n} testId="dust" />
+                <Sol lamports={1n} frac={9} testId="dust-shown" />
+                <Sol lamports={1_000_000n} pad testId="dust-pad" />
+                <Tokens raw={1n} decimals={6} frac={4} pad testId="dust-tokens" />
+            </>,
+        );
+        expect(screen.getByTestId('zero').dataset.zero).toBe('');
+        // The raw value stays on the cell; only the quiet colour follows the digits shown.
+        expect(screen.getByTestId('dust').dataset.zero).toBe('');
+        expect(screen.getByTestId('dust').dataset.value).toBe('1');
+        expect(screen.getByTestId('dust-shown').dataset.zero).toBeUndefined();
+        expect(screen.getByTestId('dust-pad').textContent).toBe('0.0010SOL');
+        expect(screen.getByTestId('dust-pad').dataset.zero).toBeUndefined();
+        expect(screen.getByTestId('dust-tokens').textContent).toBe('0.0000');
+        expect(screen.getByTestId('dust-tokens').dataset.zero).toBe('');
     });
 });
 
@@ -95,6 +116,27 @@ describe('DataTable', () => {
         expect(onSort).toHaveBeenCalledWith('tvl');
         fireEvent.keyDown(screen.getByTestId('row-b'), { key: 'Enter' });
         expect(onRow).toHaveBeenCalledWith({ id: 'b' });
+    });
+
+    it('marks the sorted column on data rows only: a loading skeleton row carries no data-sorted', () => {
+        const { container } = render(
+            <DataTable
+                caption="Rows"
+                columns={[
+                    { key: 'name', header: 'Name', render: (r: { id: string }) => r.id },
+                    { key: 'tvl', header: 'TVL', sortable: true, align: 'right', render: () => '1' },
+                ]}
+                rows={undefined}
+                loading
+                rowKey={(r) => r.id}
+                sort={{ key: 'tvl', order: 'desc' }}
+                onSort={() => undefined}
+            />,
+        );
+        expect(container.querySelectorAll('tbody .skeleton').length).toBeGreaterThan(0);
+        expect(container.querySelectorAll('tbody td[data-col="tvl"]').length).toBeGreaterThan(0);
+        expect(container.querySelectorAll('tbody td[data-sorted]').length).toBe(0);
+        expect(container.querySelector('th[aria-sort="descending"]')).not.toBeNull();
     });
 });
 

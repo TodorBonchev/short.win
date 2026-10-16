@@ -265,6 +265,21 @@ h2.mk-intro-title {
         line-height: var(--lh-tight);
         white-space: normal;
     }
+
+    /* The token cell is two lines, symbol over mint, as in a card: on one line it took 140 of the 742 px a 768 px
+       tablet has, and with the header-bound Open interest and Positions columns the table ran 51 px past its
+       frame (design pass P11). In a 44 px touch row the two lines fit without growing it. */
+    .mk-markets-tbl .mk-token {
+        flex-wrap: wrap;
+        column-gap: var(--sp-2);
+        row-gap: 0;
+        max-width: none;
+    }
+
+    .mk-markets-tbl .mk-token-symbol {
+        max-width: 100%;
+        overflow-wrap: normal;
+    }
 }
 
 /* The markets list as cards (its table under 560 px): symbol and mint, then venue and tier at the
@@ -703,6 +718,13 @@ h2.mk-intro-title {
     }
 }
 
+/* …and its press is the grey family's step (bg-4), not the red button's: `.btn[data-variant="short"]:active`
+   (components.css) won by cascade order (design pass P11). */
+.btn.mk-action[data-variant="short"][data-unavailable]:active:not(:disabled) {
+    background: var(--bg-4);
+    border-color: var(--line-strong);
+}
+
 /* The stat strip: the "More stats" toggle exists for a phone only. */
 .mk-stats-wrap {
     display: flex;
@@ -788,13 +810,6 @@ h2.mk-intro-title {
     inset: 0;
 }
 
-/* A market link in a status card: at least 24 px tall. */
-.mk-tbl td[data-col="token"] > a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 24px;
-}
-
 /* Hairline key / value rows: one unbroken line under the key and its value. */
 .mk-kv {
     column-gap: 0;
@@ -826,6 +841,11 @@ h2.mk-intro-title {
 .mk-tabs-body.flush > .mk-note {
     margin: 0;
     padding: 0 var(--sp-4) var(--sp-3);
+}
+
+/* A failed read in a flush tab body keeps the body's inset (components.css does the same for a flush panel body). */
+.mk-tabs-body.flush > .error-state {
+    margin: var(--sp-4);
 }
 
 .mk-creator-share {

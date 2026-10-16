@@ -7,7 +7,7 @@
  *
  * - the bottom tab bar reaches Markets, Positions and Lend (`aria-current` follows), More reaches
  *   Status and the security policy;
- * - the status strip expands to every status item;
+ * - the status strip expands to every status item, and a tap on the page under its scrim only folds it;
  * - the search overlay keeps a mixed-case mint as typed and its result opens the market;
  * - without a wallet, the wallet popup offers the three open-in-wallet links for this very page
  *   (hrefs only: never followed) — on the iPhone as a dialog without a menu; on Android with the
@@ -130,6 +130,25 @@ test.describe('phone shell', { tag: '@scaffold' }, () => {
         await page.keyboard.press('Escape');
         await expect(app.id(T.statusIndexer)).toBeHidden();
         await expect(summary).toBeFocused();
+    });
+
+    test('a tap on the page under the expanded strip only folds it', async ({ app, page }) => {
+        await app.goto('/markets', 'markets');
+        const summary = app.id(T.statusSummary);
+        await summary.tap();
+        await expect(app.id(T.statusIndexer)).toBeVisible();
+        // "Create market" is a link under the scrim (the page head, on the first screen). The scrim folds the list
+        // on its click, so the tap's click never reaches the link: folding on pointerdown unmounted the scrim first
+        // and the same tap opened the page underneath (the P2 shell review's ghost tap; FRONTEND.md §7.6).
+        const box = await app.id(T.marketsCreateLink).boundingBox();
+        if (!box) throw new Error('the Create market link has no box');
+        const url = page.url();
+        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        await expect(app.id(T.statusIndexer)).toBeHidden();
+        await expect(summary).toHaveAttribute('aria-expanded', 'false');
+        await expect(page).toHaveURL(url);
+        await expect(app.id(T.page('markets'))).toBeVisible();
+        await expect(app.id(T.page('create-market'))).toHaveCount(0);
     });
 
     test('the search overlay keeps a mint as typed and opens its market', async ({ app, page, state }) => {

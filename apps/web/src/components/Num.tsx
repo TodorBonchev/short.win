@@ -2,10 +2,15 @@
  * Number cells (FRONTEND.md §7.2): every amount renders through one of these, so formatting,
  * tabular figures, `data-value` (the raw integer, for tests) and the screen-reader text (the plain
  * value with its unit; the visual subscript notation and arrows are hidden from it) are uniform.
- * A zero carries `data-zero` (quiet, never hidden: `.num[data-zero]`, design pass P4); `pad` keeps
- * every fraction digit so a SOL column's decimal points align.
+ * An amount that reads as zero carries `data-zero` (quiet, never hidden: `.num[data-zero]`, design pass
+ * P4) — by its displayed digits, so a dust amount that rounds to "0.0000" is as quiet as the exact zeros
+ * beside it (design pass P11; `data-value` keeps the raw integer); `pad` keeps every fraction digit so a SOL
+ * column's decimal points align.
  */
 import { formatBps, formatPnlSol, formatPriceSol, formatSol, formatTokens, MINUS } from '../lib/format.ts';
+
+/** "0", "0.0000", "0,000.00": nothing but zeros, separators and a point. */
+const readsZero = (text: string): boolean => /^[0.,]+$/.test(text);
 
 interface Common {
     readonly testId?: string;
@@ -26,7 +31,7 @@ export function Sol({
             className={`num ${className ?? ''}`.trim()}
             data-testid={testId}
             data-value={lamports.toString()}
-            data-zero={lamports === 0n ? '' : undefined}
+            data-zero={readsZero(text) ? '' : undefined}
         >
             {text}
             {unit ? <span className="unit">SOL</span> : <span className="visually-hidden"> SOL</span>}
@@ -49,7 +54,7 @@ export function Tokens({
             className={`num ${className ?? ''}`.trim()}
             data-testid={testId}
             data-value={raw.toString()}
-            data-zero={raw === 0n ? '' : undefined}
+            data-zero={readsZero(text) ? '' : undefined}
         >
             {text}
             {symbol && (

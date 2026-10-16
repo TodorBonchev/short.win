@@ -159,8 +159,9 @@ const MARKET_COLUMNS: readonly Column<MarketSummary>[] = [
         key: 'token',
         header: 'Token',
         card: 'title',
+        // A target on its own (24 px; 36 under a finger), like the markets list's token link.
         render: (m) => (
-            <Link to="/m/$mint" params={{ mint: m.mint as Address }}>
+            <Link to="/m/$mint" params={{ mint: m.mint as Address }} className="target-link">
                 <TokenLabel mint={m.mint} symbol={m.symbol} name={m.name} />
             </Link>
         ),

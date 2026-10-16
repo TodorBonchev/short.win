@@ -9,13 +9,15 @@
 }
 
 /* The lede a step up from the prose (15 px, text-1: 8.6:1 on bg-0) on a 60ch measure: the one
-   introductory sentence outranks the body it introduces and sits under the 20 px title. */
+   introductory sentence outranks the body it introduces and sits under the 20 px title. `text-wrap: pretty`
+   (a hint: browsers without it wrap as before) keeps its last line from being one word ("sign."). */
 .guide-lede {
     max-width: 60ch;
     margin: var(--sp-3) 0 var(--sp-4);
     font-size: var(--fs-lg);
     line-height: var(--lh);
     color: var(--text-1);
+    text-wrap: pretty;
 }
 
 /* The table of contents: a bg-1 box edged like a panel (--line-panel). */
@@ -162,7 +164,8 @@ h2.guide-toc-title {
 }
 
 /* Phone: the contents wrap into two or three rows of 44 px links (a column of six filled the first
-   screen; the rows touch but do not overlap); lists indent a step less. */
+   screen; the rows touch but do not overlap); lists indent a step less; a section heading is 18 px, under the
+   20 px page title (the phone scale's --fs-xl is the title's 20 px; design pass P11). */
 @media (max-width: 639.98px) {
     .guide-list {
         padding-left: var(--sp-4);
@@ -171,6 +174,10 @@ h2.guide-toc-title {
     .guide-toc ul {
         flex-wrap: wrap;
         gap: 0 var(--sp-5);
+    }
+
+    .guide-body h2 {
+        font-size: calc(var(--fs-xl) - 2px);
     }
 }
 

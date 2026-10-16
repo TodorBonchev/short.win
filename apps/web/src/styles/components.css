@@ -412,7 +412,8 @@ a.statusbar-item {
 
     /* The fixed footer is its own stacking context: the scrim sits at 0 and the list above it, both inside the
        footer, which already paints over the header (z 20) and the action bar (z 30, earlier in the DOM). The
-       scrim stops at the strip's top edge so its toggle stays usable; a press on it folds the list. */
+       scrim stops at the strip's top edge so its toggle stays usable; its click folds the list (StatusBar.tsx: the
+       click, not the pointerdown, so a tap cannot fall through to the page once the scrim is gone). */
     .status-scrim {
         position: fixed;
         inset: 0 0 calc(var(--tabbar-h) + var(--statusbar-h) + var(--safe-b));
@@ -479,6 +480,20 @@ a.statusbar-item {
 
     .statusbar-cluster {
         display: inline-flex;
+    }
+}
+
+/* A landscape phone's open list is wider than tall: two items a row (DOM order, left to right), so the six items
+   and the two links fit the ≈ 310 px between the header and the strip without scrolling (one a row they were
+   324 px tall at 844 × 390 and clipped the links until the list scrolled; design pass P11). The last row's two
+   cells both drop their hairline. */
+@media (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
+    .statusbar[data-expanded] span.statusbar-item {
+        grid-column: auto;
+    }
+
+    .statusbar[data-expanded] span.statusbar-item:nth-last-of-type(2) {
+        border-bottom: 0;
     }
 }
 
@@ -645,9 +660,10 @@ a.statusbar-item {
         scroll-padding-bottom: calc(120px + var(--sp-3));
     }
 
-    /* The sticky foot floats over the panel's scrolled content. */
-    .side-sticky .form-foot,
-    .layout-trade > .trade-panel .form-foot {
+    /* The sticky foot floats over the panel's scrolled content — the panel's last form's: the Manage panel's Add
+       margin foot sits mid-panel, and its shadow fell on the Close form under it (design pass P11). */
+    .layout-trade > .trade-panel .form-foot,
+    .side-sticky section:last-of-type .form-foot {
         box-shadow: var(--shadow-up);
     }
 }
@@ -1451,9 +1467,11 @@ input[type="radio"]:checked::before {
         color: var(--text-1);
     }
 
-    /* An interactive row answers the pointer: bg-hover is P1's token for exactly this (the press is the same step;
-       the focus ring below is the second cue). */
-    .tbl tbody tr:hover {
+    /* An interactive row (DataTable `onRowActivate`: the markets list, the positions tables) answers the pointer:
+       bg-hover is P1's token for exactly this (the press is the same step; the focus ring below is the second cue).
+       A read-only row — a status Venue program, a market's lenders, pools or fees, the security Scope — does not:
+       nothing static looks clickable (design pass P11). `:where()` keeps it under the selected row's (0,2,2). */
+    .tbl tbody :where(tr[data-interactive="true"]):hover {
         background: var(--bg-hover);
     }
 }
@@ -1779,6 +1797,10 @@ input[type="radio"]:checked::before {
 }
 
 .unit {
+    /* An atomic inline: a line may break between a number and its unit ("198,100,013.5722" / "E2EMAIN"), never
+       inside the unit — Tokens writes no space before it, and a key / value's overflow-wrap: anywhere broke
+       "E2EMAIN" as "E2" / "EMAIN" in a 320 px sheet (design pass P11). */
+    display: inline-block;
     margin-left: 0.3em;
     color: var(--text-2);
     font-family: var(--font-ui);
@@ -1860,9 +1882,10 @@ input[type="radio"]:checked::before {
     outline: none;
 }
 
+/* …and never under the 24 px floor (WCAG 2.5.8): --check + 4 is 22 px with a mouse, 24 under a finger. */
 .disclosure .checkbox input {
-    width: calc(var(--check) + 4px);
-    height: calc(var(--check) + 4px);
+    width: max(24px, calc(var(--check) + 4px));
+    height: max(24px, calc(var(--check) + 4px));
     margin-top: 0;
 }
 
@@ -2026,6 +2049,20 @@ details > summary::-webkit-details-marker {
     }
 }
 
+/* A landscape phone (the tablet tier's width, a touch screen, 390 px tall): the review's body had 186 px between
+   a 68 px head and a 68 px foot. The dialog takes all but 24 px of the height, and head and foot keep 8 px of
+   block padding around their 44 px controls — 242 px of body (design pass P11). */
+@media (min-width: 640px) and (max-width: 1023.98px) and (pointer: coarse) and (orientation: landscape) {
+    .modal {
+        max-height: calc(100dvh - 2 * var(--sp-4));
+    }
+
+    .modal-head,
+    .modal-foot {
+        padding-block: var(--sp-3);
+    }
+}
+
 /* ---- review: the plan's instructions ------------------------------------------------------ */
 /* The instructions are read-only figures: a sunken well edged like a panel, not another bg-2 note among the
    bg-2 disclosures below it. */
@@ -2167,6 +2204,15 @@ details > summary::-webkit-details-marker {
         flex: 1 0 100%;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+}
+
+/* A tablet's side sheet (--sheet-w at the right edge) with a toast at the bottom left: the toast column ends
+   12 px short of the sheet instead of running 44 px under it at 768 px (design pass P11); a landscape phone's
+   844 px keeps the full 360. */
+@media (min-width: 640px) and (max-width: 1023.98px) {
+    html[data-sheet-open] .toast-region {
+        width: min(360px, calc(100vw - var(--sheet-w) - var(--sp-4) - var(--gutter)));
     }
 }
 
@@ -2460,6 +2506,12 @@ details > summary::-webkit-details-marker {
 /* Retry is data-size="sm": it keeps the 24 px floor with a mouse and 44 px under a finger. */
 .error-state .btn {
     min-height: var(--tap-min);
+}
+
+/* In a flush panel body (the status page's scan panel) the note keeps the body's 12 px inset instead of sitting
+   on the panel's edge (design pass P11; markets.css does the same for a flush tab body). */
+.panel-body.flush > .error-state {
+    margin: var(--sp-4);
 }
 
 /* An empty state with a title and a way out (Empty title / action): one framed bg-1 block edged like

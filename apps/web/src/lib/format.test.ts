@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    formatAge,
     formatBps,
     formatCompact,
     formatDuration,
@@ -7,6 +8,7 @@ import {
     formatPnlSol,
     formatPriceSol,
     formatSignificant,
+    formatSlot,
     formatSol,
     formatTokens,
     MINUS,
@@ -58,5 +60,40 @@ describe('format', () => {
         expect(formatCompact(999n, 0)).toBe('999');
         expect(formatCompact(12_500_000_000n, 9)).toBe('12.5');
         expect(shortAddress('5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK')).toBe('5yvy…VpKK');
+    });
+
+    // The dense-table helpers of design pass P4 (ported from the pass's scratch tests in P11).
+    it('formats slots grouped, with a dash for none, bigint and number alike', () => {
+        expect(formatSlot(53_422)).toBe('53,422');
+        expect(formatSlot(449_280_566n)).toBe('449,280,566');
+        expect(formatSlot(0)).toBe('0');
+        expect(formatSlot(null)).toBe('—');
+    });
+
+    it('formats an age: seconds under a minute, then minutes only, then h + mm, then d + h', () => {
+        expect(formatAge(45)).toBe('45s');
+        expect(formatAge(59.9)).toBe('59s');
+        expect(formatAge(60)).toBe('1m');
+        expect(formatAge(11 * 60 + 40)).toBe('11m');
+        expect(formatAge(3 * 3600 + 12 * 60 + 7)).toBe('3h 12m');
+        // The minutes after an hour are zero-padded, as formatDuration pads its seconds.
+        expect(formatAge(3 * 3600 + 5 * 60)).toBe('3h 05m');
+        expect(formatAge(2 * 86400 + 4 * 3600 + 59 * 60)).toBe('2d 4h');
+        expect(formatAge(-3)).toBe('0s');
+        expect(formatAge(0n)).toBe('0s');
+        expect(formatAge(90n)).toBe('1m');
+        expect(formatAge(Number.NaN)).toBe('0s');
+    });
+
+    it('pads every fraction digit when asked, so a column’s decimal points align; defaults unchanged', () => {
+        expect(formatTokens(1_000_000_000_000n, 6, 4, true)).toBe('1,000,000.0000');
+        expect(formatTokens(1_500_000n, 6, 4, true)).toBe('1.5000');
+        expect(formatTokens(0n, 6, 4, true)).toBe('0.0000');
+        expect(formatTokens(-1_500_000n, 6, 4, true)).toBe(`${MINUS}1.5000`);
+        expect(formatTokens(5n, 0, 0, true)).toBe('5');
+        expect(formatSol(60_000_000_000n, 2, 2)).toBe('60.00');
+        expect(formatSol(301_140_000_000n, 2, 2)).toBe('301.14');
+        expect(formatSol(10_100_000_000n, 2, 2)).toBe('10.10');
+        expect(formatSol(0n, 4, 4)).toBe('0.0000');
     });
 });

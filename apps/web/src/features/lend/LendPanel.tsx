@@ -20,7 +20,6 @@ import { TokenId } from '../../components/TokenId.tsx';
 import { T } from '../../config/testids.ts';
 import { cleanSymbol } from '../../lib/displayText.ts';
 import { shortAddress } from '../../lib/format.ts';
-import { formatUtc } from '../../lib/time.ts';
 import { useMath } from '../../math/useMath.ts';
 import type { LendAction } from '../../router.tsx';
 import { useAppClient } from '../../rpc/context.tsx';
@@ -35,7 +34,7 @@ import { type LendCtx, type LoadedChain, lendEnvOf, lendStateOf, nowFor } from '
 import { DepositForm } from './deposit/DepositForm.tsx';
 import { useLendState, useNowSeconds } from './hooks.ts';
 import { previewPosition, standingOf } from './previews.ts';
-import { Blocked } from './ui.tsx';
+import { Blocked, UtcStamp } from './ui.tsx';
 import { WithdrawForm } from './withdraw/WithdrawForm.tsx';
 
 const TABS = [
@@ -192,7 +191,12 @@ function PositionSummary({ ctx }: { ctx: LendCtx }) {
                         'Locked',
                         <span key="l">
                             <Tokens raw={v.lock} decimals={decimals} testId={T.lendPosition('lock')} />
-                            {v.lock > 0n && <span className="muted"> until {formatUtc(v.lockUntil)}</span>}
+                            {v.lock > 0n && (
+                                <span className="muted">
+                                    {' '}
+                                    until <UtcStamp ts={v.lockUntil} />
+                                </span>
+                            )}
                         </span>,
                     ],
                 ]}

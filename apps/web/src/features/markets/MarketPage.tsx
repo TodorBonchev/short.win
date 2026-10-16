@@ -95,9 +95,12 @@ export function MarketPage({ mint }: { mint: Address }) {
     const search = useSearch({ from: '/m/$mint' });
     const navigate = useNavigate({ from: '/m/$mint' });
     const data = useMarketData(mint);
-    // A market that cannot be shorted opens on Lend (design pass P5-2); an explicit ?panel= still wins.
+    // A market that cannot be shorted opens on Lend (design pass P5-2); an explicit ?panel= still wins. The
+    // default waits for the market's view (its flags): decided on the loading state's empty flags, the Short
+    // panel mounted and then flipped to Lend (design pass P11). A failed read decides on what it has.
     const canShort = !data.flags.some((f) => SHORT_BLOCKED.has(f));
-    const panel = search.panel ?? (canShort ? 'short' : 'lend');
+    const settled = data.view !== null || data.status !== 'loading';
+    const panel = search.panel ?? (settled ? (canShort ? 'short' : 'lend') : null);
     useLiveChannels([`market:${mint}`]);
     const sheet = useSheetParam('/m/$mint');
     const tradeRef = useRef<HTMLElement>(null);
@@ -255,7 +258,7 @@ export function MarketPage({ mint }: { mint: Address }) {
                     <Tabs
                         label="Trade"
                         idPrefix="trade"
-                        value={panel}
+                        value={panel ?? 'short'}
                         onChange={(p) =>
                             void navigate({
                                 search: (s) => ({ ...s, panel: p }),
@@ -275,8 +278,14 @@ export function MarketPage({ mint }: { mint: Address }) {
                             Explorer) whole. */}
                         <TxDoneContext.Provider value={inSheet ? sheet.closeSheet : null}>
                             <PageBannersContext.Provider value={banners}>
-                                <TabPanel idPrefix="trade" tabKey={panel}>
-                                    {panel === 'short' ? (
+                                <TabPanel idPrefix="trade" tabKey={panel ?? 'short'}>
+                                    {panel === null ? (
+                                        <div className="stack" aria-busy="true">
+                                            <Skeleton width={200} />
+                                            <Skeleton width={260} />
+                                            <Skeleton width={180} />
+                                        </div>
+                                    ) : panel === 'short' ? (
                                         <ShortPanel mint={mint} />
                                     ) : (
                                         <LendPanel mint={mint} action={search.action} />

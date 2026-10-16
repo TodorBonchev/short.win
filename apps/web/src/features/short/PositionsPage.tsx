@@ -100,7 +100,7 @@ function Totals({ rows, status }: { rows: readonly PositionRowData[]; status: St
             </span>
             {t.open > 0 && (
                 <span>
-                    Vault <Sol lamports={t.vault} />
+                    Vault <Sol lamports={t.vault} pad />
                 </span>
             )}
             <span>
@@ -109,7 +109,7 @@ function Totals({ rows, status }: { rows: readonly PositionRowData[]; status: St
             </span>
             {t.open > 0 && (
                 <span>
-                    Rent due <Sol lamports={t.rent} frac={6} />
+                    Rent due <Sol lamports={t.rent} frac={6} pad />
                 </span>
             )}
         </p>

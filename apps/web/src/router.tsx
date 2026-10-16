@@ -95,7 +95,14 @@ export const marketsRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/markets',
     validateSearch: (s: Record<string, unknown>): MarketsSearch => ({
-        q: typeof s.q === 'string' && s.q.length <= 64 ? s.q : undefined,
+        // A hand-typed `?q=123` reaches here as the number 123 (the router's search parser reads JSON): a digits-only
+        // filter is still a filter.
+        q:
+            typeof s.q === 'number' && Number.isFinite(s.q)
+                ? String(s.q)
+                : typeof s.q === 'string' && s.q.length <= 64
+                  ? s.q
+                  : undefined,
         venue: pick(s.venue, VENUES),
         tier: pick(s.tier, TIERS),
         sort: pick(s.sort, SORTS),

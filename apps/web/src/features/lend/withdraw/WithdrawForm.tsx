@@ -18,7 +18,6 @@ import { Kv } from '../../../components/States.tsx';
 import { T } from '../../../config/testids.ts';
 import { parseAmount } from '../../../lib/amount.ts';
 import { formatSol, formatTokens } from '../../../lib/format.ts';
-import { formatUtc } from '../../../lib/time.ts';
 import { ConnectCta } from '../../../wallet/ConnectCta.tsx';
 import { withdrawPlanFrom } from '../build.ts';
 import {
@@ -40,6 +39,7 @@ import {
     type Reason,
     RefusalLine,
     ToleranceInput,
+    UtcStamp,
 } from '../ui.tsx';
 
 /** The quick shares of the holding (chips); Max — what may be withdrawn now — sits in the field. */
@@ -252,7 +252,14 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                         ),
                     ],
                     ...(lim && lim.lock > 0n
-                        ? ([['Current lock ends', <span key="cur">{formatUtc(lim.lockUntil)}</span>]] as const)
+                        ? ([
+                              [
+                                  'Current lock ends',
+                                  <span key="cur">
+                                      <UtcStamp ts={lim.lockUntil} />
+                                  </span>,
+                              ],
+                          ] as const)
                         : []),
                     [
                         'Locked shares after',
@@ -266,10 +273,8 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                             >
                                 {view.value.lockAfter > 0n ? (
                                     <>
-                                        {formatTokens(view.value.lockAfter, decimals)}{' '}
-                                        <span className="lend-nowrap">
-                                            until {formatUtc(view.value.lockUntilAfter)}
-                                        </span>
+                                        {formatTokens(view.value.lockAfter, decimals)} until{' '}
+                                        <UtcStamp ts={view.value.lockUntilAfter} />
                                     </>
                                 ) : (
                                     'none'
@@ -288,9 +293,11 @@ export function WithdrawForm({ ctx, onCoverDeficit }: { ctx: LendCtx; onCoverDef
                                 data-testid={T.withdrawPreview('lock-until')}
                                 data-value={chain.market.borrowedQ > 0n ? lim.lockUntilIfLocked.toString() : '0'}
                             >
-                                {chain.market.borrowedQ > 0n
-                                    ? formatUtc(lim.lockUntilIfLocked)
-                                    : 'no lock: nothing is borrowed'}
+                                {chain.market.borrowedQ > 0n ? (
+                                    <UtcStamp ts={lim.lockUntilIfLocked} />
+                                ) : (
+                                    'no lock: nothing is borrowed'
+                                )}
                             </span>
                         ) : (
                             '—'

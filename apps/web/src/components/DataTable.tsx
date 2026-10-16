@@ -14,9 +14,10 @@
  * header text — outside the sort button, which it must not nest in (FRONTEND.md §4.3).
  *
  * The sort marks are the registry's icons (design pass P4): `sort` (both ways) on a sortable column
- * that is not the sort, `chevron` on the sort and in the card sort bar (down for descending, turned
- * by CSS for ascending) — ▲ / ▼ stay P&L's. The sorted column's cells carry `data-sorted` (a card's
- * hero figure).
+ * that is not the sort, `chevron` on the sort, `arrow` in the card sort bar (down for descending, turned
+ * by CSS for ascending; the sort select beside it has a chevron of its own) — ▲ / ▼ stay P&L's. The
+ * sorted column's cells carry `data-sorted` (a card's hero figure); a skeleton row's do not, so a loading
+ * card's placeholders are one height.
  */
 /* biome-ignore-all lint/a11y/noRedundantRoles: CSS display change; roles restore semantics */
 import { type KeyboardEvent, type MouseEvent, type ReactNode, useId, useRef } from 'react';
@@ -167,7 +168,7 @@ export function DataTable<T>({
                         }}
                     >
                         <span className="visually-hidden">Order: </span>
-                        <NavIcon name="chevron" className="sort-dir" />
+                        <NavIcon name="arrow" className="sort-dir" />
                         {sort?.order === 'asc' ? 'Ascending' : 'Descending'}
                     </button>
                 </div>
@@ -215,7 +216,7 @@ export function DataTable<T>({
                               // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
                               <tr key={i} role="row">
                                   {columns.map((c) => (
-                                      <td key={c.key} role="cell" {...cellAttrs(c, sort)} data-align={c.align}>
+                                      <td key={c.key} role="cell" {...cellAttrs(c, undefined)} data-align={c.align}>
                                           <span className="skeleton" />
                                       </td>
                                   ))}
