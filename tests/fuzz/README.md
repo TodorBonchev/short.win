@@ -409,7 +409,7 @@ that class.
 
 The M10 fuzz follow-ups add no finding (nor do their review fixes: every `credited` cross-check matched to the lamport). Their checks reproduce on the corpus. FUZZ-M7-24H-3's reproducer covers a 1,028.408-SOL deficit (1,044.467 SOL at 99.9998 % before its AIR-07 revision) at 999,998 ppm of the tripwire's bound, and the seeding lender's positive balance, short in the first pass, is paid by the second claim pass. In the 10-minute cpmm and amm-v4 runs, no CPMM or AMM v4 differential exit, no deficit and no second-pass claim disagreed with the program. PumpSwap's decision-level oracle ran only in the smoke (`smoke_pumpswap`), where it found no disagreement.
 
-## Runs so far (M7, M10)
+## Runs so far (M7, M10, pump-final P7)
 
 | run | build | wall | jobs | runs | actions | transactions | hook checkpoints | failures | anomalies |
 |---|---|---|---|---|---|---|---|---|---|
@@ -449,6 +449,12 @@ The M10 fuzz follow-ups add no finding (nor do their review fixes: every `credit
 | FUZZ-M10-24H-D-B's fix (harness only; the program of run D, `55b3e23`, release `4d19c582…`), `--profile curve`, `--seed 72500000` | the never-returns bound: surplus moves + the absent lenders' deficits + the pot − their own needs | 1,207 s | 3 | 355 | 61,473 | 825,698 | 1,535,486 | 0 | 0 |
 | the same, `--profile all`, `--seed 72600000` | the same | 1,215 s | 3 | 347 | 65,859 | 850,200 | 1,644,098 | 0 | 0 |
 | 24 h run E (the final program bytes, the fixed fuzzer), `--seed 75000000`, `--actions 400` | `9861c5a` (the program bytes of `55b3e23`, release `4d19c582…`; run D's two findings fixed) | 86,415 s | 4 | 44,988 | 8,773,451 | 114,792,804 | 221,932,740 | 0 | 0 |
+| P7 smoke, `--profile curve`, `--seed 77100000`, `--actions 400` (10 minutes) | `3e3b43b` (pump-final P2–P6 program, release `b3130ae2…`, test-venue `1f10334c…`; pump's 2026-10-13 ELFs; the v3 crowd and the `migrating_fv` oracle; run on its build before the P7 review's fixes, which change no generated action) | 657 s | 4 | 314 | 55,849 | 715,787 | 1,288,544 | 0 | 0 |
+| the same, `--profile pumpswap`, `--seed 77200000` | the same | 668 s | 4 | 104 | 21,842 | 366,276 | 683,304 | 0 | 0 |
+| the same, `--profile all`, `--seed 77300000` | the same | 615 s | 4 | 213 | 41,479 | 535,957 | 1,026,097 | 0 | 0 |
+| P7, `--profile curve`, `--seed 77400000`, `--actions 400` (1 h) | the same | 3,605 s | 4 | 1,804 | 312,131 | 4,048,870 | 7,359,413 | 0 | 0 |
+| P7, `--profile pumpswap`, `--seed 77500000`, `--actions 400` (1 h) | the same | 3,678 s | 4 | 1,121 | 221,011 | 3,241,966 | 6,015,979 | 0 | 0 |
+| P7 review fixes, `--profile curve`, `--seed 77600000`, `--actions 400` (10 minutes) | `3e3b43b` as committed (the legacy `complete_curve` parsed with `a` odd; `crowd_v3_trades_land`) | 652 s | 4 | 327 | 58,948 | 779,003 | 1,414,529 | 0 | 0 |
 
 In the M10 fuzz follow-ups' final runs: on `cpmm`, 180 liquidations and 337 expiries landed through
 the CPMM differential oracle (every lamport; 25 / 31 more through AMM v4's on adopted candidates),
@@ -550,6 +556,39 @@ runs 2 and 4 each adds coverage:
 
 **M10's "fuzz clean ≥ 24 h" on the final program bytes is met** by run E (and by run C with the
 earlier fuzzer); run D's program invariants held, and its two findings were the fuzzer's.
+
+**pump-final P7 (§12; the curve adapter on pump's v3, release `b3130ae2…`).** The fuzzer at `3e3b43b`
+(the crowd's v2 and v3 trades and synthetic completions, the donations to `curve_base_ata`, the
+completion check of the curve's differential oracle and the `migrating_fv` oracle; these runs used
+its build before the P7 review's fixes, which change only how the legacy name `complete_curve`
+parses and add smoke tests, so every generated action stream is the same) ran a 10-minute
+smoke of the curve, PumpSwap and all six profiles, then an hour each of the curve and PumpSwap
+profiles on 4 jobs, `--minimize` (the table above): **0 failures, 0 anomalies**, no oracle failure.
+In the hour on the curve (1,804 runs, every one ending in the wind-down): the crowd landed 10,864
+`buy_v3`, 726 `buy_exact_quote_in_v3` and 11,592 `sell_v3` beside 11,516 `buy_v2` and 10,100
+`sell_v2`, and completed 1,536 curves (773 by a `buy_v2` of `rT`, 763 by a `buy_v3` overshoot);
+212 short.win exits completed a curve in their own instruction (192 by synthetic migration), 65 of
+them keeper exits whose completion — `PumpMigrating` since now, `pcB`, `pcQ` — the curve oracle
+checked (24 liquidations, 41 expiries); 125 token donations reached `curve_base_ata` (77 after a
+completion); the `migrating_fv` oracle checked 210 S3 settlements of a `PumpMigrating` market (111
+after a pool part, 99 without) and 1,436 `migrate_v2` pools (775 after a pool part, 627 standard,
+34 with a donation seeded but not priced); 1,436 markets graduated to PumpSwap. `CurveStraddle`
+was never returned (C8: past the would-be pool only). The PumpSwap hour (1,121 runs) checked 942
+liquidations and 1,889 expiries through its differential oracle and 86 S3 settlements. Earlier
+runs of the P7 fuzzer: a 4-minute curve trial (137 runs, 19 S3 and 115 `migrate_v2` checks) and
+the smoke (`cargo test --release -p shortwin-fuzz`: 12 + 19 passed, among them
+`migrating_fv_after_a_synthetic_completion_and_a_donation` — a 1-lamport FV skew fails it —,
+`migrate_v2_creates_the_priced_pool_after_a_donation` and
+`fuzz_m7d_1_closes_by_synthetic_migration`). After the P7 review the smoke is 12 + 20:
+`crowd_v3_trades_land` requires a scripted run to land `buy_v3`, `buy_exact_quote_in_v3` and
+`sell_v3` with none refused (it fails with `min_tokens_out` 0, or with the crowd on v2 only), and
+`smoke_curve` requires each to land in its seeds. The review's 10-minute curve run on `3e3b43b`
+as committed (the table): 327 runs, 779,003 transactions, **0 failures, 0 anomalies**; the crowd
+landed 2,247 `buy_v3`, 136 `buy_exact_quote_in_v3` (none refused) and 1,710 `sell_v3`, and 141
+`buy_v3` overshoots completed a curve; 33 short.win exits completed a curve by synthetic migration
+(16 keeper exits checked by the curve oracle); 26 token donations reached `curve_base_ata` (13
+after a completion); the `migrating_fv` oracle checked 50 S3 settlements (27 after a pool part)
+and 271 `migrate_v2` pools; `CurveStraddle` was never returned.
 
 **Mutation testing (M7-SEC-6).** `scripts/mutants.sh` builds this checkout's tests and fuzzer once
 (the oracle) and each of the review's seven one-line mutants of the program (D4 without its EMA
