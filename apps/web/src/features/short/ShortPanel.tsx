@@ -53,28 +53,39 @@ import { BlockedNotice, CAP_TEXT, CrValue, errorByName, plainAmount, TierTerms }
 import { useTradeFlow } from './useTradeFlow.ts';
 import './short.css';
 
+/**
+ * One preview row: the dt, the value dd (its testid and `data-value` are what the e2e specs read) and,
+ * when the value has an explanatory sub-line, a second dd spanning the row under it (a dt may have
+ * several dd). `emph` marks a decisive figure (`.kv dd[data-emph]`, design pass P4); `groupStart` puts
+ * a hairline over the row (`[data-group-start]`, short.css). The wrapper is `.kv-row` (display:
+ * contents): a valid <div> in a <dl> that does not break the grid.
+ */
 function Row({
     label,
     sub,
     children,
     testId,
     value,
+    emph = false,
+    groupStart = false,
 }: {
     label: string;
     sub?: ReactNode;
     children: ReactNode;
     testId: string;
     value?: string | undefined;
+    emph?: boolean;
+    groupStart?: boolean;
 }) {
     return (
-        <div style={{ display: 'contents' }}>
-            <dt>
+        <div className="kv-row">
+            <dt data-group-start={groupStart ? '' : undefined}>
                 <Term>{label}</Term>
             </dt>
-            <dd data-testid={testId} data-value={value}>
+            <dd data-testid={testId} data-value={value} data-emph={emph ? '' : undefined}>
                 {children}
-                {sub && <span className="short-preview-sub">{sub}</span>}
             </dd>
+            {sub && <dd className="short-preview-sub">{sub}</dd>}
         </div>
     );
 }
@@ -357,6 +368,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                     label="Total cost"
                                     testId={T.shortPreview('total-cost')}
                                     value={totalCost?.toString()}
+                                    emph
                                     sub="margin, fee and account rent (rent returns on close); network fee in the review"
                                 >
                                     {totalCost === null ? '—' : <Sol lamports={totalCost} />}
@@ -365,6 +377,8 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                     label="CR at open (spot)"
                                     testId={T.shortPreview('cr-open')}
                                     value={preview.crOpenBps.toString()}
+                                    emph
+                                    groupStart
                                 >
                                     <CrValue bps={preview.crOpenBps} liqBps={preview.terms.crLiqBps} />
                                 </Row>
@@ -372,6 +386,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                     label="CR at open (EMA)"
                                     testId={T.shortPreview('cr-ema')}
                                     value={preview.crEmaBps?.toString()}
+                                    emph
                                 >
                                     <CrValue bps={preview.crEmaBps} liqBps={preview.terms.crLiqBps} />
                                 </Row>
@@ -379,6 +394,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                     label="Liquidation price"
                                     testId={T.shortPreview('liq-price')}
                                     value={preview.liqPriceWad?.toString()}
+                                    emph
                                     sub={`where CR falls below ${formatBps(preview.terms.crLiqBps, 0)}`}
                                 >
                                     {preview.liqPriceWad === null ? (
@@ -391,6 +407,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                     label="Rent rate (APR)"
                                     testId={T.shortPreview('rent-rate')}
                                     value={String(preview.rentRateBps)}
+                                    groupStart
                                     sub={
                                         <>
                                             ≈ <Sol lamports={preview.rentPerDay} frac={6} unit={false} /> SOL per day at
@@ -437,7 +454,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                         if (v === null) return null;
                                         const binding = caps.binding === k ? 'true' : undefined;
                                         return (
-                                            <div key={k} style={{ display: 'contents' }}>
+                                            <div key={k} className="kv-row">
                                                 <dt data-binding={binding}>
                                                     {/* One string: a wrapped label keeps its ⓘ on its last word. */}
                                                     <Term id={glossaryFor(CAP_TEXT[k])}>

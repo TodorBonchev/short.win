@@ -31,6 +31,25 @@
     align-self: end;
 }
 
+/* Phone: Size takes the sheet's width and Slippage is a short box under it (the Lend form's own
+   pattern; the subgrid rows keep working with one column, as the ≥ 1024 block below proves). Beside
+   the 96 px slippage box the size digits had ≈ 138 px at 390 px, ≈ 105 at 360 and ≈ 67 at 320, while
+   Max writes a 12-character value that scrolled out of its own box (design pass P6). The 640–1023 side
+   sheet keeps the two side by side; max-width on the wrap never reduces the input's 44 px height. */
+@media (max-width: 639.98px) {
+    .short-inputs {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .short-inputs > .field + .field {
+        margin-top: var(--sp-2);
+    }
+
+    .short-inputs > .field:last-child > .input-wrap {
+        max-width: var(--field-narrow-w);
+    }
+}
+
 /* The desktop's side panel (320–338 px) leaves the size box too little room beside Slippage once
    its unit and Max take their share: at 1,024 px the field cut the first digit of "250000" (the
    second approval pass's review). There Slippage goes under Size and the size box takes the
@@ -45,25 +64,53 @@
     }
 }
 
+/* The preview is the well for read-only figures (bg-0 in the bg-1 panel: the surface tiers of
+   FRONTEND.md §7.2), edged like a panel; the Lend summary in the same panel is the same well. */
 .short-preview {
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius);
-    background: var(--bg-0);
+    background: var(--surface-well);
     padding: var(--sp-3) var(--sp-4);
 }
 
+/* No column gap — a group separator is one unbroken line under the key and its value, as .mk-kv —
+   and the key's right padding keeps the geometry. */
 .short-preview .kv {
     grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 0;
     row-gap: var(--sp-2);
 }
 
 .short-preview .kv dt {
     white-space: nowrap;
+    padding-right: var(--sp-4);
 }
 
 .short-preview .kv dd {
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+/* A value's explanatory sub-line ("at least …", "where CR falls below …") is a second dd spanning
+   the row (ShortPanel's Row, CloseForm): it stays right-aligned under the number it bounds, and three
+   ragged lines in the value column become two balanced ones. */
+.short-preview .kv dd.short-preview-sub,
+.manage-panel .kv dd.short-preview-sub {
+    grid-column: 1 / -1;
+    margin-top: calc(-1 * var(--sp-1));
+    color: var(--text-2);
+    font-size: var(--fs-xs);
+    text-wrap: balance;
+}
+
+/* A hairline over the risk group (CR at open) and the terms group (Rent rate): on the dt and its
+   value dd, so it spans the row — not under the heading (Borrow), where a line gains nothing. :where()
+   keeps the dd half at (0,2,1), the file's ceiling for a `dd` rule (biome noDescendingSpecificity). */
+.short-preview .kv dt[data-group-start],
+.short-preview .kv :where(dt[data-group-start]) + dd {
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--line);
 }
 
 .short-preview-head {
@@ -83,6 +130,7 @@
     display: none;
 }
 
+/* The sub-line on its own, outside a .kv (CapsSummary, inside the market's stat strip). */
 .short-preview-sub {
     display: block;
     color: var(--text-2);
@@ -117,9 +165,24 @@
     margin: var(--sp-2) 0 0;
 }
 
+/* The caps are a separate <dl>: their hairline sits on the list. */
+.short-preview .short-caps {
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--line);
+}
+
 .short-cap-value {
     margin: 0;
     text-align: right;
+}
+
+/* The caps demoted to a grouped grey block — every cap stays exact (the preview is the designated
+   place for the exact maximum; the stat strip is compact because of it). data-binding sits on the dt
+   and the dd themselves (a :has() would grey the binding dd too), so the binding row keeps its amber. */
+.short-caps dt:not([data-binding="true"]),
+.short-caps dd:not([data-binding="true"]) {
+    color: var(--text-2);
 }
 
 .short-caps [data-binding="true"] {
@@ -187,39 +250,9 @@
     justify-content: flex-end;
 }
 
-.position-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 360px;
-    gap: var(--sp-3);
-    align-items: start;
-}
-
-@media (max-width: 1179.98px) {
-    .position-layout {
-        grid-template-columns: minmax(0, 1fr) 320px;
-    }
-}
-
-/* Tablet and phone: one column; Manage is a sheet the action bar opens (`.sheet-host`). */
-@media (max-width: 1023.98px) {
-    .position-layout {
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-/* From 1024 px the Manage panel stays in view beside the position while the page scrolls. */
-@media (min-width: 1024px) {
-    .manage-panel {
-        position: sticky;
-        top: calc(var(--header-h) + var(--sp-3));
-        max-height: calc(100dvh - var(--header-h) - var(--statusbar-h) - 2 * var(--sp-3));
-        overflow-x: hidden;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-        scrollbar-gutter: stable both-edges;
-        scrollbar-width: thin;
-    }
-}
+/* The page's two-column grid and the Manage panel's sticky, self-scrolling column are the shared
+   `.layout-side` / `.side-sticky` (components.css: the trade panel's recipe; one column under 1024 px,
+   where Manage is the sheet the action bar opens, `.sheet-host`). Only Manage's own pieces live here. */
 
 /* In the sheet its own title row (SheetHead) replaces the panel's. */
 .manage-panel[data-sheet="open"] > .panel-head {
@@ -239,15 +272,34 @@
     outline: 2px solid var(--focus);
 }
 
-/* A hairline between the two forms. */
+/* The two forms read as two: a hairline with 32 px of air around it (the stack's 8 px gap, 8 px above
+   the line, 16 px under it), so the disabled "Add margin" never looks like it belongs to the slippage
+   field below it. */
 .manage-panel #close {
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-5);
     border-top: 1px solid var(--line);
-    padding-top: var(--sp-4);
 }
 
 .position-head h1 {
     min-width: 0;
     overflow-wrap: anywhere;
+}
+
+/* The position's id in the title: a 12 px regular grey sub-element of "Short E2EMAIN" (the title's size
+   and weight stay with the words; title= keeps the full id), on its own line under them on a phone. */
+.position-head .position-id {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-regular);
+    letter-spacing: 0;
+    color: var(--text-1);
+}
+
+@media (max-width: 639.98px) {
+    .position-head .position-id {
+        display: block;
+        margin-top: var(--sp-1);
+    }
 }
 
 /* The figures that matter first: CR (in its risk colour), P&L, time left. */
@@ -256,7 +308,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     margin: 0;
     background: var(--bg-1);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius-lg);
     overflow: hidden;
 }
@@ -269,11 +321,13 @@
         0 1px 0 var(--line);
 }
 
+/* The label tier (12 px medium muted uppercase, FRONTEND.md §7.2). */
 .position-hero-label {
-    font-size: var(--fs-xs);
-    color: var(--text-2);
+    font-size: var(--label-fs);
+    font-weight: var(--label-fw);
+    letter-spacing: var(--label-ls);
+    color: var(--label-color);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
 }
 
 .position-hero-value {
@@ -281,8 +335,10 @@
     font-size: var(--fs-lg);
 }
 
+/* The CR — the number that decides a liquidation — is the largest thing on the page: --fs-hero (22 px
+   desktop / 24 phone) over the 20 px title. */
 .position-hero-cr .cr {
-    font-size: var(--fs-xl);
+    font-size: var(--fs-hero);
     font-weight: var(--fw-bold);
 }
 
@@ -311,20 +367,17 @@
     column-gap: var(--sp-6);
 }
 
+/* On the 28 px grid (--kv-row-h), like every key / value row (design pass P4): the pair centred in the
+   row above its hairline. Read-only rows do not answer the pointer: nothing static looks clickable. */
 .position-facts .kv-row {
     break-inside: avoid;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    align-items: baseline;
+    align-items: center;
     gap: var(--sp-3);
-    padding: var(--sp-2) 0;
+    min-height: var(--kv-row-h);
+    padding: 0;
     border-bottom: 1px solid var(--line);
-}
-
-@media (hover: hover) {
-    .position-facts .kv-row:hover {
-        background: var(--bg-2);
-    }
 }
 
 .timeline {
@@ -334,10 +387,13 @@
     font-size: var(--fs-sm);
 }
 
+/* On the 28 px grid too. */
 .timeline li {
     display: grid;
     grid-template-columns: 150px 110px minmax(0, 1fr);
+    align-items: center;
     gap: var(--sp-3);
+    min-height: var(--kv-row-h);
     padding: var(--sp-2) 0;
     border-bottom: 1px solid var(--line);
 }
@@ -365,14 +421,65 @@
     flex-wrap: wrap;
 }
 
+/* The totals as a KPI strip spanning the table's width (the lender strip's pair): a label over a 15 px
+   number per cell, hairlines between the cells, the first cell "1 OPEN" inline with its number large
+   (DOM and copy untouched: casing only). margin: 0 — base.css gives every <p> a bottom margin. */
 .positions-totals {
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: var(--sp-1) var(--sp-5);
     margin: 0;
-    font-size: var(--fs-sm);
-    color: var(--text-1);
+    background: var(--bg-1);
+    border: 1px solid var(--line-panel);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    font-size: var(--label-fs);
+}
+
+.positions-totals > span {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+    padding: var(--sp-3) var(--sp-4);
+    box-shadow:
+        1px 0 0 var(--line),
+        0 1px 0 var(--line);
+    font-weight: var(--label-fw);
+    letter-spacing: var(--label-ls);
+    text-transform: uppercase;
+    color: var(--label-color);
+}
+
+.positions-totals > span:first-child {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--sp-2);
+}
+
+/* A long vault figure wraps at 320 px instead of being clipped by the strip. */
+.positions-totals .num {
+    font-size: var(--fs-lg);
+    text-transform: none;
+    letter-spacing: 0;
+    overflow-wrap: anywhere;
+}
+
+/* White numbers — scoped: an unscoped colour would beat .pnl[data-sign] by source order and flatten the
+   P&L total, and a quiet zero (data-zero) stays quiet. */
+.positions-totals .num:not(.pnl, [data-zero]) {
+    color: var(--text-0);
+}
+
+.positions-totals .num .unit {
+    font-size: var(--fs-xs);
+}
+
+/* Phone: 2 × 2 (two cells under the Closed / Liquidated / Expired filters: one row). */
+@media (max-width: 639.98px) {
+    .positions-totals {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 .positions-empty {
@@ -387,6 +494,15 @@
 .positions-tbl > .tbl > thead > tr > th:is([data-col="risk"], [data-col="actions"]),
 .positions-tbl > .tbl > tbody > tr > td:is([data-col="risk"], [data-col="actions"]) {
     width: 1%;
+}
+
+/* RISK on one line from 1,280 px (its ⓘ fell to a second line and made the whole header 44 px for one
+   glyph): the column is width: 1%, nowrap widens it ≈ 26 px, and 1,024 is the width where the tables are
+   tightest (§7.3: every table fits at 1,024). */
+@media (min-width: 1280px) {
+    .positions-tbl > .tbl > thead th[data-col="risk"] {
+        white-space: nowrap;
+    }
 }
 
 /* Values on one line; headers wrap like every table's (components.css), so the header ⓘ do not
@@ -511,10 +627,6 @@
 
 .risk-legend .risk-legend-row > dd {
     margin: 0;
-}
-
-.exit-badge {
-    text-transform: capitalize;
 }
 
 /* A form's sticky foot spans its panel's padding, so nothing scrolls past at its sides. */

@@ -112,7 +112,7 @@ function ClosedSummary({ p, decimals, symbol }: { p: Position; decimals: number 
             rows={[
                 [
                     'Status',
-                    <Badge key="s" tone={p.status === 'closed' ? 'neutral' : 'danger'}>
+                    <Badge key="s" tone={p.status === 'closed' ? 'neutral' : 'danger'} className="badge-status">
                         {p.status}
                         {e?.settle_condition ? ` ${e.settle_condition}` : ''}
                     </Badge>,
@@ -189,7 +189,7 @@ export function PositionDetailPage({ position }: { position: Address }) {
                         ) : (
                             'Position'
                         )}{' '}
-                        <span className="muted num" title={position}>
+                        <span className="muted num position-id" title={position}>
                             {shortAddress(position, 6, 6)}
                         </span>
                     </h1>
@@ -198,7 +198,13 @@ export function PositionDetailPage({ position }: { position: Address }) {
                             Market <TokenId symbol={null} mint={mint} />
                         </Link>
                     )}
-                    {open ? <Badge tone="info">open</Badge> : api ? <Badge>{api.status}</Badge> : null}
+                    {open ? (
+                        <Badge tone="info" className="badge-status">
+                            open
+                        </Badge>
+                    ) : api ? (
+                        <Badge className="badge-status">{api.status}</Badge>
+                    ) : null}
                     {open && risk && <RiskBadge level={risk} />}
                     {open && <ReadAgeView age={age} />}
                 </div>
@@ -299,7 +305,7 @@ export function PositionDetailPage({ position }: { position: Address }) {
                                 </dd>
                             </div>
                         </dl>
-                        <div className="position-layout">
+                        <div className="position-layout layout-side">
                             <div className="stack">
                                 <Panel title="Position">
                                     <Facts
@@ -449,7 +455,7 @@ export function PositionDetailPage({ position }: { position: Address }) {
                             </div>
                             <Panel
                                 title="Manage"
-                                className="sheet-host manage-panel"
+                                className="sheet-host manage-panel side-sticky"
                                 ref={manage}
                                 head={
                                     <SheetHead

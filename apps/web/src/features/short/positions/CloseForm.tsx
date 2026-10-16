@@ -131,32 +131,30 @@ export function CloseForm({
                     </div>
                 )}
             </Field>
+            {/* A value's sub-line is a second dd spanning the row (a dt may have several dd; the value dd
+                keeps its testid and data-value); the decisive figures carry data-emph (design pass P4). */}
             <dl className="kv">
                 <dt>Buyback cost (SOL)</dt>
                 <dd data-testid={T.closePreview('buyback')} data-value={preview?.buyback.toString()}>
-                    {preview ? (
-                        <>
-                            <Sol lamports={preview.buyback} />
-                            <span className="short-preview-sub">
-                                buys back <Tokens raw={pos.q} decimals={snapshot.decimals} symbol={symbol} /> · at most{' '}
-                                <Sol lamports={preview.maxBuybackCost} unit={false} /> SOL
-                            </span>
-                        </>
-                    ) : (
-                        '—'
-                    )}
+                    {preview ? <Sol lamports={preview.buyback} /> : '—'}
                 </dd>
+                {preview && (
+                    <dd className="short-preview-sub">
+                        buys back <Tokens raw={pos.q} decimals={snapshot.decimals} symbol={symbol} /> · at most{' '}
+                        <Sol lamports={preview.maxBuybackCost} unit={false} /> SOL
+                    </dd>
+                )}
                 <dt>Rent</dt>
                 <dd data-testid={T.closePreview('rent')} data-value={(preview?.rent ?? mx.rentDue).toString()}>
                     <Sol lamports={preview?.rent ?? mx.rentDue} frac={6} />
                 </dd>
                 <dt>You receive</dt>
-                <dd data-testid={T.closePreview('payout')} data-value={preview?.payout.toString()}>
+                <dd data-testid={T.closePreview('payout')} data-value={preview?.payout.toString()} data-emph="">
                     {preview ? <Sol lamports={preview.payout} /> : '—'}
-                    <span className="short-preview-sub">plus the position account’s rent back</span>
                 </dd>
+                <dd className="short-preview-sub">plus the position account’s rent back</dd>
                 <dt>P&amp;L</dt>
-                <dd data-testid={T.closePreview('pnl')} data-value={preview?.pnl.toString()}>
+                <dd data-testid={T.closePreview('pnl')} data-value={preview?.pnl.toString()} data-emph="">
                     {preview ? <Pnl lamports={preview.pnl} /> : '—'}
                 </dd>
             </dl>

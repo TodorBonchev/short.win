@@ -209,7 +209,7 @@ function columns(labels: Labels, withStatus: boolean): Column<PositionRowData>[]
             header: 'Vault',
             align: 'right',
             priority: 2,
-            render: (r) => <Sol lamports={r.chain?.v ?? big(r.api?.v)} testId={cell('vault')} />,
+            render: (r) => <Sol lamports={r.chain?.v ?? big(r.api?.v)} pad testId={cell('vault')} />,
         },
         {
             key: 'cr',
@@ -269,7 +269,7 @@ function columns(labels: Labels, withStatus: boolean): Column<PositionRowData>[]
                         —
                     </span>
                 ) : (
-                    <Sol lamports={rent} frac={6} testId={cell('rent')} />
+                    <Sol lamports={rent} frac={6} pad testId={cell('rent')} />
                 );
             },
         },
@@ -317,7 +317,7 @@ function columns(labels: Labels, withStatus: boolean): Column<PositionRowData>[]
             priority: withStatus ? 2 : 3,
             render: (r) => (
                 <span data-testid={cell('status')} data-value={r.status}>
-                    <Badge tone={STATUS_TONE[r.status] ?? 'neutral'}>
+                    <Badge tone={STATUS_TONE[r.status] ?? 'neutral'} className="badge-status">
                         {r.status === 'settled' && r.api?.exit?.settle_condition
                             ? `Settled ${r.api.exit.settle_condition}`
                             : r.status}
