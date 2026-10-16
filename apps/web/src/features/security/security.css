@@ -28,9 +28,20 @@
     }
 }
 
+/* The lede a step up from the prose (15 px, text-1) on a 60ch measure, as on How it works. */
 .sec-lede {
-    color: var(--text-1);
+    max-width: 60ch;
     margin: 0;
+    font-size: var(--fs-lg);
+    color: var(--text-1);
+}
+
+/* The prose tier (14 px at 1.55; 15 px on a phone) for the panels' paragraphs and lists; the Scope
+   panel's 12 px note keeps its size (`.panel-body > p` would otherwise outrank `.sec-note`). */
+.sec-page .panel-body > p:not(.sec-note),
+.sec-list {
+    font-size: var(--fs-prose);
+    line-height: var(--lh-prose);
 }
 
 .sec-list {
@@ -51,8 +62,9 @@
     color: var(--text-2);
 }
 
+/* A sub-heading (the section tier) with 16 px above, so it groups with the list under it. */
 .sec-page h3 {
-    margin: var(--sp-3) 0 var(--sp-2);
+    margin: var(--sp-5) 0 var(--sp-2);
 }
 
 /* Links inside prose are underlined: colour alone does not set them apart (WCAG 1.4.1, axe

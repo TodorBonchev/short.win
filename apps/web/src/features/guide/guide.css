@@ -1,26 +1,29 @@
 /* How it works (`/how-it-works`, FRONTEND.md §3.11): readable prose on the terminal's surfaces,
    centred at 760 px on a wide screen (a reading measure, not the table width); full width on a
-   phone. The embedded disclosures keep their own styles. */
+   phone. The embedded disclosures keep their own styles. From 1,280 px the table of contents is a
+   sticky 200 px rail beside the prose (design pass P8). */
 .guide-page {
     width: 100%;
     max-width: 760px;
     margin-inline: auto;
 }
 
-/* The lede at the body's size, a step quieter: the section headings outrank it. */
+/* The lede a step up from the prose (15 px, text-1: 8.6:1 on bg-0) on a 60ch measure: the one
+   introductory sentence outranks the body it introduces and sits under the 20 px title. */
 .guide-lede {
-    max-width: 68ch;
+    max-width: 60ch;
     margin: var(--sp-3) 0 var(--sp-4);
-    font-size: var(--fs-md);
+    font-size: var(--fs-lg);
     line-height: var(--lh);
     color: var(--text-1);
 }
 
+/* The table of contents: a bg-1 box edged like a panel (--line-panel). */
 .guide-toc {
     margin: 0 0 var(--sp-5);
     padding: var(--sp-3) var(--sp-4);
     background: var(--bg-1);
-    border: 1px solid var(--line);
+    border: 1px solid var(--line-panel);
     border-radius: var(--radius-lg);
 }
 
@@ -61,10 +64,25 @@ h2.guide-toc-title {
     color: var(--text-0);
 }
 
+/* The prose tier (14 px at 1.55; 15 px on a phone) on the paragraphs and lists only, so the embedded
+   disclosures keep --lh. */
+.guide-body > p,
+.guide-body > ul,
+.guide-list {
+    font-size: var(--fs-prose);
+    line-height: var(--lh-prose);
+}
+
 /* A reading measure for the prose (about 70 characters a line); the disclosures keep the column. */
 .guide-body > p,
 .guide-body > ul {
     max-width: 68ch;
+}
+
+/* The risk boxes read at the prose size: the same box, bar and title (the trade panels' disclosures
+   are unaffected). */
+.guide-body .disclosure {
+    font-size: var(--fs-prose);
 }
 
 .guide-error {
@@ -76,14 +94,25 @@ h2.guide-toc-title {
     color: var(--text-1);
 }
 
+/* A section: 18 px bold under a hairline, with 32 px above so it groups downward (title 20 > h2 18 >
+   prose 14 > the 12 px section tier). */
 .guide-body h2 {
-    margin-top: var(--sp-5);
-    padding-top: var(--sp-4);
+    margin-top: var(--sp-7);
+    padding-top: var(--sp-5);
     border-top: 1px solid var(--line);
+    font-size: var(--fs-xl);
 }
 
+/* The first section's hairline sits on the body's top edge: level with the rail's top from 1,280 px,
+   28 px under the contents box on narrower screens (the 32 px above belongs between sections). */
+.guide-body > h2:first-child {
+    margin-top: 0;
+}
+
+/* The section tier from base (uppercase 12 px bold), with air above so it groups with what follows. */
 .guide-body h3 {
-    margin-top: var(--sp-3);
+    margin-top: var(--sp-5);
+    margin-bottom: var(--sp-2);
 }
 
 .guide-body h2:focus,
@@ -132,9 +161,42 @@ h2.guide-toc-title {
     text-decoration: underline;
 }
 
+/* Phone: the contents wrap into two or three rows of 44 px links (a column of six filled the first
+   screen; the rows touch but do not overlap); lists indent a step less. */
 @media (max-width: 639.98px) {
     .guide-list {
         padding-left: var(--sp-4);
+    }
+
+    .guide-toc ul {
+        flex-wrap: wrap;
+        gap: 0 var(--sp-5);
+    }
+}
+
+/* From 1,280 px the contents are a sticky 200 px rail right of the prose, beside the body they index.
+   DOM order (head, lede, toc, [error], body, foot) is kept: the children stack in column 1 in order and
+   nothing is pinned to a row; the toc's span keeps its sticky area over error + body + foot. */
+@media (min-width: 1280px) {
+    .guide-page {
+        display: grid;
+        grid-template-columns: minmax(0, 760px) 200px;
+        column-gap: var(--sp-7);
+        justify-content: center;
+        max-width: none;
+    }
+
+    .guide-page > * {
+        grid-column: 1;
+    }
+
+    .guide-page > .guide-toc {
+        grid-column: 2;
+        grid-row: 3 / span 3;
+        align-self: start;
+        position: sticky;
+        top: calc(var(--header-h) + var(--sp-4));
+        margin: 0;
     }
 
     .guide-toc ul {

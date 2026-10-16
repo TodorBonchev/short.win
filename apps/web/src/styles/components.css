@@ -2381,28 +2381,49 @@ details > summary::-webkit-details-marker {
 }
 
 /* ---- states ------------------------------------------------------------------------------ */
-.empty,
-.error-state {
+/* A table's or a list's empty line: centred and muted, in place of the rows. */
+.empty {
     padding: var(--sp-6);
     text-align: center;
     color: var(--text-2);
 }
 
+/* A failed read: a left-bar note in the danger tint (text-0 on --danger-bg, 13:1) with Retry beside
+   the message, not a red sentence; an unbroken token in an API error (a URL, a signature) wraps
+   instead of pushing the box past 320 px. */
 .error-state {
-    color: var(--danger);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+    min-width: 0;
+    padding: var(--sp-3) var(--sp-4);
+    overflow-wrap: anywhere;
+    text-align: left;
+    color: var(--text-0);
+    background: var(--danger-bg);
+    border-left: 3px solid var(--danger);
+    border-radius: var(--radius);
 }
 
+/* Retry is data-size="sm": it keeps the 24 px floor with a mouse and 44 px under a finger. */
 .error-state .btn {
     min-height: var(--tap-min);
 }
 
-/* An empty state with a title and a way out (Empty title / action). */
+/* An empty state with a title and a way out (Empty title / action): one framed bg-1 block edged like
+   a panel, at least 200 px tall with its lines centred, never a sentence floating on the page. */
 .empty[data-layout="block"] {
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: var(--sp-3);
+    min-height: 200px;
     padding: var(--sp-7) var(--sp-5);
+    background: var(--bg-1);
+    border: 1px solid var(--line-panel, var(--line));
+    border-radius: var(--radius-lg);
 }
 
 .empty-title {
@@ -2420,6 +2441,18 @@ details > summary::-webkit-details-marker {
     flex-wrap: wrap;
     justify-content: center;
     gap: var(--sp-3);
+}
+
+/* The action row spans the block, so a Connect CTA (and the chooser it opens) gets a usable width,
+   centred: 360 px, the whole row on a narrower phone. `:where()` keeps the rule at the base
+   `.connect-cta`'s specificity (the wallet section, later in this file, sets no width or margin). */
+.empty[data-layout="block"] > .empty-action {
+    align-self: stretch;
+}
+
+.empty-action > :where(.connect-cta) {
+    width: min(360px, 100%);
+    margin-inline: auto;
 }
 
 .skeleton {
