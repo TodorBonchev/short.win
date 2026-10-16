@@ -48,7 +48,8 @@
 //! migration — `buy_v3(rT + δ)` charged `F(n₁) + F(n₂)` on the live `X_s = curve_base_ata − rT`,
 //! the events `TradeEvent`, `CompleteEvent`, `PostCompleteBuyEvent`, short.win's `B̂_v3` within
 //! the spec's bound of the charge; (b′) the same after a token donation to `curve_base_ata`;
-//! (c) `buy_exact_quote_in_v3` past `rT`; (d) `migrate_v2` seeding exactly the live
+//! (b″) the same with the curve's own `creator_fee_bps` (the flag on and off) and with a default
+//! creator, so that both parts follow `φ_s`'s creator rule; (c) `buy_exact_quote_in_v3` past `rT`; (d) `migrate_v2` seeding exactly the live
 //! `curve_base_ata` and `rQ + pcQ − fee`; (e) the pool part's fee-tier tripwire; (f) the cashback
 //! refusal 6094; (g) no synthetic path on the 2026-10-02 build. Since P1, `B̂_v3` is
 //! `shortwin_math::quote::curve_synthetic` at the synthetic fee `fees::pump_curve_at_supply` (the
@@ -2382,6 +2383,13 @@ fn synthetic_buy(
         "{ctx}: the curve part's TradeEvent"
     );
     assert!(ev.is_buy && ev.ix_name == "buy", "{ctx}: {ev:?}");
+    // A coin without a creator pays no creator fee (`fees.creator` = 0 in the model); its events
+    // may still name the tier's bps (as `v3_buy`'s), so the bps are checked on the others only.
+    let creator_set = !st.creator_is_default();
+    assert_eq!(ev.fee_basis_points, fees.protocol, "{ctx}");
+    if creator_set {
+        assert_eq!(ev.creator_fee_basis_points, fees.creator, "{ctx}");
+    }
     let post = fork::pump_post_complete_buy_events(&meta);
     assert_eq!(post.len(), 1, "{ctx}");
     let post = &post[0];
@@ -2401,11 +2409,15 @@ fn synthetic_buy(
         (delta, m.n2, m.fees2.0, m.fees2.1, bb2),
         "{ctx}: the pool part"
     );
-    assert_eq!(
-        (post.fee_basis_points, post.creator_fee_basis_points),
-        (fees.protocol, fees.creator),
-        "{ctx}"
-    );
+    assert_eq!(post.fee_basis_points, fees.protocol, "{ctx}");
+    if creator_set {
+        assert_eq!(post.creator_fee_basis_points, fees.creator, "{ctx}");
+    } else {
+        println!(
+            "{ctx}: a default creator; the events name creator bps {} and {}, charge 0",
+            ev.creator_fee_basis_points, post.creator_fee_basis_points
+        );
+    }
     assert_eq!(
         (
             post.pool_base_reserves_before,
@@ -2475,11 +2487,22 @@ fn synthetic_buy(
         "{ctx}: post_complete_base_out / quote_in"
     );
     assert_eq!(ivqr1, ivqr);
-    assert_eq!(
-        after.virtual_quote_reserves - after.real_quote_reserves,
-        ivqr,
-        "{ctx}: vQ − rQ = ivqr"
-    );
+    if ivqr != 0 {
+        assert_eq!(
+            after.virtual_quote_reserves - after.real_quote_reserves,
+            ivqr,
+            "{ctx}: vQ − rQ = ivqr"
+        );
+    } else {
+        // A legacy curve pump grew to 166 bytes leaves `ivqr` 0 (never backfilled): the
+        // invariant is vacuous (`BondingCurve::quote_offset_consistent`); the offset is kept.
+        assert_eq!(
+            after.virtual_quote_reserves - after.real_quote_reserves,
+            st.virtual_quote_reserves - st.real_quote_reserves,
+            "{ctx}: vQ − rQ kept"
+        );
+    }
+    assert!(after.quote_offset_consistent(), "{ctx}");
     // §5.2: short.win's B̂_v3 covers the charge, by at most the bound.
     let b = b_hat_v3(&st, s0.curve_tokens, fee_m, delta, &phi_s);
     let bound = v3_bound(delta, m.x_s, &fees);
@@ -2733,6 +2756,64 @@ fn v3_synthetic_buy_prices_a_donated_curve_base_ata() {
     assert_eq!((pcb, pcq), (0, 0), "no pool part");
     migrate_and_check(&mut env, &c, "(d) D 2e12, no pool part");
     println!("T-PUMP-MATH-V3 (b′): exact divisions {ed:?}");
+}
+
+/// T-PUMP-MATH-V3 (b″), the creator-fee rule on both parts. `B̂_v3 ≥` pump's charge assumes pump
+/// prices the pool part, as the curve part, with `fees::pump_curve_at_supply`'s creator rule (`φ_s`,
+/// `PumpCurve::synthetic_fees`): the curve's own `creator_fee_bps` when `Global.creator_fee_
+/// configurable` is set, the tier's otherwise, and no creator fee for a default creator. Every
+/// SOL fixture curve (b) runs on carries `creator_fee_bps` 0 and a creator, and `creator_fee_rules`
+/// checks the override on v2 only. Here, as (b) checks it: `near166` patched to 200 bps with the
+/// flag on (`φ_s`'s creator 200) and off (the tier's 30), and `legacy115` (no creator; a first
+/// `buy_v3` grows it to 166 bytes, its `ivqr` left 0, then it is moved near completion) — each at
+/// a small and a large pool part. One lamport under the model fails 6002, both parts' events name
+/// the bps charged (a default creator's name the tier's 30 and charge 0), and `B̂_v3` at `φ_s`
+/// covers the charge within §5.2's bound.
+#[test]
+fn v3_synthetic_buy_follows_the_creator_fee_rules() {
+    let mut ed = ExactDivision::default();
+    for configurable in [true, false] {
+        for delta in [1_000_000_000_000, 100_000_000_000_000] {
+            let (mut env, c, u) = near166_user();
+            assert!(!c.state(&env.svm).creator_is_default());
+            assert_eq!(c.state(&env.svm).creator_fee_bps, 0, "the fixture's");
+            fork::set_curve_creator_fee_bps(&mut env.svm, &c.curve, 200);
+            fork::set_global_creator_fee_configurable(&mut env.svm, configurable);
+            let want = if configurable { 200 } else { 30 };
+            let phi_s = c.synthetic_fees(&env.svm).expect("φ_s");
+            assert_eq!(
+                phi_s,
+                FeeBps::new(0, 95, want),
+                "configurable {configurable}"
+            );
+            let m = synthetic_buy(&mut env, &c, &u, delta, None, &mut ed);
+            assert_eq!(
+                (m.fees1.1, m.fees2.1),
+                (fee_up(m.n1, want), fee_up(m.n2, want)),
+                "configurable {configurable}: both parts at creator bps {want}"
+            );
+        }
+    }
+    for delta in [1_000_000_000_000, 100_000_000_000_000] {
+        let (mut env, c) = Env::fork_pump_coin(PumpCoin::Legacy115);
+        assert!(c.state(&env.svm).creator_is_default());
+        let u = CurveUser::new(&mut env, &c);
+        env.fund(&u.kp.pubkey(), 2_000_000_000_000);
+        let ix = u.buy_v3_ix(&env.svm, &c, 1_000_000_000, u64::MAX);
+        ok(u.send(&mut env, ix), "legacy115: a first buy_v3");
+        assert_eq!(c.data_len(&env.svm), fork::CURVE_LEN_2026_10_08);
+        assert_eq!(pc_fields(&env.svm, &c).1, 0, "the growth leaves ivqr 0");
+        set_state(&mut env, &c, 30_000_000_000_000, None);
+        let phi_s = c.synthetic_fees(&env.svm).expect("φ_s");
+        assert_eq!(phi_s, FeeBps::new(0, 95, 0), "no creator");
+        let m = synthetic_buy(&mut env, &c, &u, delta, None, &mut ed);
+        assert_eq!(
+            (m.fees1.1, m.fees2.1),
+            (0, 0),
+            "no creator fee on either part"
+        );
+    }
+    println!("T-PUMP-MATH-V3 (b″): exact divisions {ed:?}");
 }
 
 /// T-PUMP-MATH-V3 (c) and (d): `buy_exact_quote_in_v3` with more than the curve's remainder buys
