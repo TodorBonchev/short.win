@@ -55,8 +55,7 @@ Please include:
   funds or pause exits.
 - **Disclosure:** coordinated, on a best-effort timeline agreed with the reporter. We publish
   an advisory after the fix is deployed, crediting the reporter unless they ask otherwise.
-- **Rewards:** no bug bounty yet. A bounty programme is planned for the beta, after the audit
-  and the public audit contest; its terms will be published on the policy page.
+- **Rewards:** no bug bounty yet.
 - **Safe harbour:** we will not pursue or support legal action against research done in good
   faith under this policy: research that avoids privacy violations, the loss or destruction of
   data and the interruption or degradation of the service; that never moves or puts at risk

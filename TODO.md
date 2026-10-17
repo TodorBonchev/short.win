@@ -29,53 +29,6 @@ asked for what it had found, for the auditors. Everything is in
 - [ ] Pass 2's 330 unjudged agent blocks (`pass-2-unjudged.md`; 34 of 84 agents ran), pass 3, the
       PoC of finding 1, and the keeper core, which the scan left out
 
-## Licensing (2026-10-17; on `main`)
-
-The owner asked for the recommended licence on every file (the research of 2026-10-11, with its
-sources, is in `~/.cache/shortwin-work/publish-research/result.json`). This repository is public
-since 2026-10-17 (below).
-
-**Done**
-- [x] `LICENSE`: the Business Source License 1.1 for the protocol. Licensor Todor Bonchev; Licensed
-      Work short.win 1.0.1; an Additional Use Grant for production use that interacts with the
-      official deployment (keepers, liquidators, indexers, front ends, wallets, CPI integrations;
-      deploying the code as another program excluded; `GRANTS.md`); Change Date 2030-10-01; Change
-      License Apache-2.0
-- [x] `REUSE.toml` assigns every file: Apache-2.0 for `clients/js` (with its own `LICENSE` and
-      `package.json` field) and `openapi.yaml`; CC BY-NC-ND 4.0 for the documentation; all rights
-      reserved for `apps/web`, `packages/math-wasm` and the logo; third-party files under their
-      own licences (`THIRD_PARTY_NOTICES.md`, texts in `LICENSES/`). `reuse lint` (5.0.2): every
-      file covered, REUSE 3.3 compliant. No source file was edited, so the program bytes are
-      unchanged
-- [x] **This repository is public** since 2026-10-17, with its full history (the owner's decision;
-      it replaces the one-commit public copy `TodorBonchev/shortwin`, `e035f2e`, of the same day).
-  - Checked before the switch:
-    - a scan of every blob on `main` and the tags found no key, token or secret;
-    - none of the 1,076 64-byte base58 strings in them is an ed25519 keypair;
-    - there are no repository secrets, deploy keys, PRs or issues;
-    - the four deleted branches are all merged into `main`;
-    - the local `refs/archive/audit-evidence/*` refs are not pushed, and stay private.
-  - Public with it, as the owner accepted:
-    - the author e-mail on 113 commits;
-    - the ten pump ELFs, which have no licence;
-    - `apps/web` and `packages/math-wasm`, still all rights reserved;
-    - TODO.md, the design-pass docs, the RFQ shortlist and the Jupiter quotes;
-    - the Actions logs, and AI review 2's proofs of concept.
-  - On: private vulnerability reporting, and secret scanning with push protection.
-  - The copy `TodorBonchev/shortwin` was deleted on 2026-10-18; GitHub can restore it for 90 days. Its
-    one later commit (`04c8816`, the README's Discord badge) is now in this repository's README.
-
-**Still open**
-- [ ] A lawyer's review of the Additional Use Grant and the Licensor (the code is public since
-      2026-10-17; Bulgarian copyright law's defaults for an author's licence; a company as Licensor)
-- [ ] Once a company holds the IP: a written assignment, then the company as Licensor in the next
-      version's `LICENSE`
-- [ ] At each release, the Licensed Work's version in `LICENSE` and `LICENSES/BUSL-1.1.txt` (the two
-      files stay identical)
-- [ ] Cargo `license` fields in the crates' manifests at the next program batch (in-scope files)
-- [ ] At the next program batch: `security.txt`'s `source_code` can name the public repository
-      (a program change)
-
 ## Design polish: the logo and the web app's look (2026-10-16; on `main`)
 
 A new brand mark and favicon set, and a nine-package polish of the web app at phone and desktop widths inside
@@ -94,13 +47,9 @@ branch. The full record is in [`docs/design/design-pass-2026-10/`](docs/design/d
       gate (96 passed) and the web E2E on desktop and phone green
 
 **Still open**
-- [ ] The owner's review of the new look and six owner decisions: the logo concept (the W shipped; the judges'
-      totals favoured "fall-to-check"), the compact markets intro on every phone, the scrollbar gutter at
-      1,024–1,279 px, the lend KPI hero at 390 px, "3h 05m" against "3h 5m", a 48 px demoted submit
-      (`STATUS.md` has each one's change)
 - [ ] **CI on GitHub** for the design pass (nothing in it has run in CI)
 - [ ] 14 Android tests of `mobile-mwa.spec.ts` time out on the local machine, with or without the design pass
-      (untouched `d805c19` fails the same 14); the owner's own gate had them green
+      (untouched `d805c19` fails the same 14); find out why (another gate had them green)
 
 ## pump v3 and the Mobile Wallet Adapter (2026-10-13 … 16; branch `pump-v3`)
 
@@ -158,16 +107,6 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
       known-issues, ARCH, FRONTEND, INDEXER, SPEC, SECURITY.md and the RFQ notes (`c48336c`)
 
 **Still open**
-- [ ] **G2: the owner's review** of the P8 docs and the release evidence (pump-final §15), before
-      telling the auditors.
-- [ ] **Tell the auditors** of the addendum (AUDIT.md §13) and of D2's scope change
-      (`complete_curve` leaves the tagged `audit-1` scope) — the owner's step.
-- [x] **The owner's `φ_s` direction** (accept the live-supply synthetic fee under KI-72's
-      decision of 2026-10-12; KI-77): given after P1 introduced `φ_s` on 2026-10-14, confirmed by
-      the owner on 2026-10-16; SPEC §14 (fifteenth round), AUDIT.md §7's pump v3 row and KI-77
-      carry it.
-- [ ] **The owner's real-device MWA test** before the release (FE-32; DEVELOPMENT "Mobile wallets
-      on a real device"), and who hosts the HTTPS devnet and mainnet builds it needs (P1, P2).
 - [ ] **Remove the two `@solana-mobile` release-age exclusions** in `pnpm-workspace.yaml` after
       2026-10-21, then `pnpm install --frozen-lockfile` again.
 - [ ] **CI on GitHub** for `pump-v3` (nothing here has run in CI).
@@ -176,41 +115,15 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
       machine, and network for them, the image, the crates and platform-tools, which that
       session's rules did not allow (read-only Solana RPC only); or Docker mode, or CI's
       `verifiable-build` job), then the 1.0.1 hashes in AUDIT.md §0 as verified ones.
-- [ ] **R-PFEE before pinning pump-fees on mainnet:** re-read `withdraw`'s accounts and authority
-      on the build to be pinned (done for the 10-12 build, the stop rule did not trigger), then
-      `initialize_config` or Emergency's `revalidate_venue` (PUMP-2026-10-13-5).
-- [ ] **The release order:** the keeper (both TradeExtras formats) first, then the Governance
-      program upgrade, then the web; at the upgrade the PumpCurve `VenueExtras` sets must be empty
-      (release checklist); on a non-mainnet deployment, exit or settle cashback-curve positions
-      first. **The next release deletes the keeper's V2 builder** (`pump_trade_extras_v2`).
+- [ ] **R-PFEE on a new pump-fees build:** re-read `withdraw`'s accounts and authority on any
+      pump-fees build after the 10-12 one (done for the 10-12 build; the stop rule did not
+      trigger; PUMP-2026-10-13-5).
+- [ ] **Delete the keeper's V2 builder** (`pump_trade_extras_v2`) in the release after 1.0.1.
 - [ ] The Surfpool fork run of a synthetic close (pump-final §14 "Fork",
       `tests/litesvm/tests/graduation_surfpool.rs`, which still names the 2026-10-02 builds): not
       run (no Surfpool here).
-- [ ] A ≥ 24 h fuzz run on 1.0.1 (AUDIT.md §12's fix policy), or the owner's waiver as for the
-      AI review's batch; P7 ran 10-minute smokes and ≈ 1 h per profile.
-- [ ] An external review of the adapter change (with the AI review's fixes, below).
-
-## Decisions (owner)
-
-The owner decided these on 2026-10-12 (the review's README, "Decisions for the owner", `63b673c`;
-the register's rows in `18b65e2`).
-
-- [x] **AIR-22**: keep the lower-median growth (liquidations no longer blocked by flat steps; the
-      held sandwich gets cheaper, +2.839 vs +1.981 SOL in the sim), or revert `6c39e58`,
-      `03b7762`, `8a4df78` and regenerate the vectors. **Kept** (known-issues KI-76).
-- [x] **AIR-07**: keep the drained-pool deposit gate (`PoolDrained`, 6108; refuses a small share of
-      honest deposits), or revert `00d3772` and regenerate the vectors. **Kept** (KI-71).
-- [x] **AIR-10**: accept the burn residual (known-issues row) or add a per-second supply snapshot.
-      **Accepted** (KI-72; no snapshot).
-- [x] **AIR-18**: pre-extend shortwin's ProgramData to 10 MiB at deploy (~45 SOL) or accept the
-      bounded `ExtendProgram` griefing (keeper retries next slot; correct KI-63). **Accepted**: no
-      pre-extension; KI-63 corrected and KI-73 added (`18b65e2`, figures recomputed in
-      `72103a5`); the keeper retries at its next tick (`8945087`).
-- [x] **AIR-19**: accept the conservative `min_open_hard_cap_bps` mark or track caps exactly.
-      **Accepted** (KI-74).
-- [x] **AIR-04, AIR-11, AIR-20**: no code change; add the known-issues rows / doc wording
-      (AIR-20 has an optional code fix in `docs/audit/ai-review/leads.md`). **Done**: KI-70, KI-13's
-      lock-decay sentence, KI-75 (`18b65e2`); AIR-20's optional fix not taken, its residual pinned.
+- [ ] A ≥ 24 h fuzz run on 1.0.1 (AUDIT.md §12's fix policy); P7 ran 10-minute smokes and ≈ 1 h
+      per profile.
 
 ## Code and tooling
 
@@ -265,8 +178,7 @@ the register's rows in `18b65e2`).
       hash for pump-fees, AMM v4, CPMM and Jupiter; request ≥ 0.6 M CU after an extension, or a
       limit sized by simulation (≈ 0.48 M estimated near the 10 MiB cap; KI-69 (e)). `f6e25be`;
       the CU ask raised from 0.5 M in `72103a5`, `eeee640`, `7a92078`.
-- [ ] Full CI run on the fixed code and new hashes in `docs/AUDIT.md` §0 (the ≥ 24 h fuzz run of
-      AUDIT.md §12 is waived for this batch: approved by the owner 2026-10-13).
+- [ ] Full CI run on the fixed code and new hashes in `docs/AUDIT.md` §0.
   - [x] A local run of every CI job that can run here, on the integrated branch (2026-10-13,
         `621f8e1`; AUDIT.md §10, the review's README "Local gate"). `11d359b`. The final
         review's fixes after it (`ed014ce`, `b1d86d4`, `33491a3`: the web, the WASM facade and
@@ -275,42 +187,10 @@ the register's rows in `18b65e2`).
         verifiable build, no CI). `11d359b`
   - [ ] CI on GitHub: the owner asked for the branch to be pushed with `[skip ci]`
         (2026-10-13), so CI has not run.
-  - [x] A ≥ 24 h fuzz run: **waived** for the AI-review batch, not deferred (approved by the
-        owner 2026-10-13; the owner did not ask for one on 2026-10-12). No such run was made.
-        `255ce60`
 
 ## What remains
 
 Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-13.
-
-**Owner** (all approved by the owner 2026-10-13)
-- [x] SPEC §14 (fourteenth round) asks the owner to confirm three changes, drafted from the code
-      and the sims, not from an owner decision: AIR-21 changes the B2-2 decision (an S1 now vests
-      its take above market value; a genuine S1 loss still vests only its rent top-up); AIR-09
-      counts the tokens at 0 on a venue that cannot execute, so of an S3 there only `R_due` stays
-      immediate (KI-24, accepted on the behaviour before it); and AIR-14 widens §2.6 residual 10,
-      which O18 accepted on the `9aade3e` figures (a held drain now forces 181 levels instead of
-      69; known-issues KI-23, KI-52; AUDIT.md §7). **Approved by the owner 2026-10-13:** AIR-21
-      and AIR-09 confirmed, AIR-14's widening accepted; SPEC §14, known-issues, AUDIT.md §6/§7,
-      the review's README (decision 9), ECON and ARCH say so. `255ce60`; the changelog rows
-      (ECON #118, ARCH 79) `4b4041d`
-- [x] FE-31: approve the `lender.residuals` copy (≈ 3.34 SOL fresh, ≈ 4.54 SOL aged, from 2.06 /
-      8.02); then `apps/web/src/config/disclosures.ts`, `ux.test.tsx` and FRONTEND.md change
-      together. **Approved by the owner 2026-10-13;** the three changed together, the figures
-      checked against `sim/out/attacks/sandwich.out` (Tier A, no reserve: +3.340 / +4.543).
-      `43aa127` (the decision recorded in `255ce60`)
-- [x] "No 24 h fuzz run" (2026-10-12): if it waives the release evidence rather than only this
-      stage, the "not yet through CI, a ≥ 24 h fuzz run or a fix review" qualifiers change
-      together: known-issues' status definition and §7 lead-in, AUDIT.md's after-the-tag status
-      bullet and §6 "Fixed" bullet, and the review's README caveat. **Approved by the owner
-      2026-10-13: waived** for the AI-review batch (not deferred). The qualifiers now read "not
-      yet through CI or an external fix review", with the waiver dated; AUDIT.md §12 and
-      `findings.md` carry a dated note, their rule unchanged. `255ce60`
-- [x] The indexer embeds the IDL, so it can no longer decode the two-argument `revalidate_venue`
-      of a build before AIR-01 (a backfill would quarantine it). This matters only if such a
-      build was ever deployed and its history must be indexed. **Approved by the owner
-      2026-10-13:** accepted, no legacy decoder (INDEXER §3.6; the review's README decision 12).
-      `255ce60`
 
 **Release evidence (needs CI or tools not on the local machine)**
 - [ ] CI on GitHub: the owner asked for the branch to be pushed with `[skip ci]` (2026-10-13),
@@ -320,7 +200,7 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       which deny and audit do not cover) and `verifiable-build` (Docker). `web-e2e` and the
       indexer's PostgreSQL and validator tests ran locally on `pump-v3` (2026-10-16, AUDIT.md
       §10).
-- [ ] `rpc_local` (manual, no CI job runs it): `SHORTWIN_RPC_URL=http://127.0.0.1:8899 cargo test
+- [ ] `rpc_local` (no CI job runs it): `SHORTWIN_RPC_URL=http://127.0.0.1:8899 cargo test
       --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored`
       against `solana-test-validator`; last run by the keeper track at `8945087` (1 passed),
       `services/common` unchanged since.
@@ -332,9 +212,6 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
 - [ ] `scripts/mutants.sh` (CI's opt-in `mutants` job, nightly or `workflow_dispatch`): run on
       every earlier batch, not on the AI review's fixes nor on 1.0.1 (it builds into target
       directories of its own, which this machine's disk budget does not allow).
-- [ ] An external fix review (`docs/audit/findings.md`).
-- [x] A ≥ 24 h fuzz run on the fixed program (AUDIT.md §12): **waived** for this batch
-      (approved by the owner 2026-10-13); no such run was made. `255ce60`
 - [x] The PostgreSQL indexer tests on the migrated and re-recorded inputs: `ingest_sessions`,
       `api_replayed`, `security_ingest`, and the replay harness's
       `every_session_replays_into_the_chain_state`,
@@ -371,6 +248,8 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       extensions. Its bit is in no v1.0 latch mask, so this blocks nothing before v1.1.
 
 **Code and tooling (optional)**
+- [ ] At the next program batch: `security.txt`'s `source_code` can name this repository (a program
+      change).
 - [ ] `shortwin-gov`: a `--compute-unit-limit` option (`services/ops/src/send.rs`). It sets none,
       so a hashed revalidation after an extension (pump-fees 438,358 CU) cannot be executed with
       it today.

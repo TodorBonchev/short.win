@@ -19,7 +19,7 @@ widths, inside the existing dark-terminal design system. On `main`, with freshly
 - 14 Android wallet-adapter tests fail. Untouched `main` without the design pass fails the same 14 on this
   machine, so they are not caused by this work.
 
-What is left is the owner's review and decisions, a CI run on GitHub, and a look at those Android tests.
+What is left is a CI run on GitHub and a look at those Android tests.
 
 ## Done
 
@@ -37,7 +37,7 @@ What is left is the owner's review and decisions, a CI run on GitHub, and a look
   - `icon-192.png`, the mobile wallet adapter's app icon, re-rendered from the new favicon (`1011177`).
 - **How it was chosen.** Six concepts were rendered at every real size and scored by three judges, then the
   finalist was refined and measured pixel by pixel. The judges' totals slightly favoured another concept; see
-  "Owner decisions" below and the logo section of the summary file.
+  the logo section of the summary file.
 
 ### Design polish
 
@@ -124,24 +124,10 @@ The cause was the stale local program build, as suspected; `target/` now holds f
 
 ## Left to do
 
-1. **The owner's review** of the result. The reference screenshots are in `apps/web/e2e/screenshots/` (desktop),
-   `phone/` and `android/`. The pre-design versions are in the git history before `5ac926d`.
-2. **CI on GitHub.** Nothing in this pass has run in CI, like the pump v3 work before it (TODO.md lists that too).
-   Run the `ci` workflow when the owner wants it.
-3. **The 14 Android wallet-adapter tests** fail on this machine with or without the design pass. Find out what
+1. **CI on GitHub.** Nothing in this pass has run in CI, like the pump v3 work before it (TODO.md lists that too).
+   Run the `ci` workflow.
+2. **The 14 Android wallet-adapter tests** fail on this machine with or without the design pass. Find out what
    differs from the owner's green run.
-4. **The owner decisions** below.
-
-### Owner decisions, not implemented
-
-| Decision | Today | To apply |
-|---|---|---|
-| Logo concept | The W ("wordmark-first") is shipped. The judges' totals favoured "fall-to-check", 110 to 106, with two of three first places. | Its files are in `artifacts/logo/runner-up-fall-to-check/`. Switching means replacing the paths in `Logo.tsx`, the icons in `apps/web/public/`, and regenerating `icon-192.png` with `node scripts/icon-192.ts`. |
-| Compact markets intro on every phone (P5-1) | Only short phones (≤ 399.98 × ≤ 699.98 px) and landscape phones get the compact intro strip. | Add `(max-width: 639.98px)` as a further query to the compact-strip prelude in `apps/web/src/features/markets/markets.css`. Keep the short-phone query, which `breakpoints.test.ts` requires. Update the comments there and in `src/styles/breakpoints.ts`, and FRONTEND.md §3.3 and §7.6. |
-| Scrollbar gutter at 1,024 to 1,279 px | Reserved only from 1,280 px (`base.css`), so the page can shift when a dialog opens at those widths. | Put `scrollbar-gutter: stable` on the dialog and sheet scroll-lock rule. |
-| Lend KPI hero on a 390 px phone | 16 px under 400 px, so a 2-up cell never clips at 320 px. The plan expected 18 px at 390. | Narrow or remove the under-400 rule in `lend.css` after checking 320 px. |
-| Ages format | "3h 05m" (`formatAge`, pinned by `format.test.ts`). | Change `formatAge` and the test if "3h 5m" is preferred. |
-| Demoted submit height under a finger (P3-2) | 44 px. | `@media (pointer: coarse) { .form-foot:has(.connect-cta) > .btn:disabled { min-height: 48px; } }` in `components.css`. |
 
 ### Known minor issues, reviewed and not fixed
 

@@ -29,8 +29,8 @@ to build and test the code, what the code relies on, and what we already know ab
   the first push's run failed only the web lint, which `7b2121d` fixed; the commits after it are
   docs only; §10).
 - **Tagged `audit-1` / `v1.0.0` on `e4895c2`** (2026-10-11, owner decision; §0). What is still
-  pending is named where it applies: the owner's review of this package (§0), the open owner
-  items (§7), the calibration results (KI-14) and the external audit itself (§12).
+  pending is named where it applies: the open owner items (§7) and the calibration results
+  (KI-14).
 - **After the tag, the AI review of v1.0.0** ([`audit/ai-review/`](audit/ai-review/README.md);
   not a formal audit): 17 issues and 7 confirmed leads (AIR-01 … AIR-24), fixed by a program
   batch after the tag (with the math crate, the normative sims and vectors, the keeper and the
@@ -48,7 +48,7 @@ to build and test the code, what the code relies on, and what we already know ab
   three times after the tag; the curve adapter now trades pump's v3 instructions, a position past
   the curve's `rT` exits in one instruction by pump's synthetic migration, a stuck synthetic
   migration is priced on the pool `migrate_v2` creates, and the straddle helper `complete_curve`
-  is retired (D2: **an audit-scope change the auditors must be told of**, with this addendum).
+  is retired (D2: **an audit-scope change**, described in this addendum).
   The build's hashes (§0) are a **local build, not verified**: no verifiable build (its tools are
   not installed on the machine that built them, and that session's rules allowed no network
   beyond read-only Solana RPC to fetch them: §0) and no CI run; a local run of every CI job that
@@ -72,7 +72,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | [`docs/audit/ai-review/`](audit/ai-review/README.md) | the AI-assisted review of v1.0.0 (not a formal audit): its issues and leads (AIR-01 … AIR-24), their fixes and regression tests, and the owner's decisions of 2026-10-12 and 2026-10-13 |
 | [`docs/audit/ai-review-2/`](audit/ai-review-2/README.md) | AI review 2, of short.win 1.0.1 (not a formal audit; stopped after pass 1 of 3): its report, proofs of concept, pass 2's unjudged agent reports and what it did not cover |
 | [`docs/audit/findings.md`](audit/findings.md) | the findings tracker (the auditors' findings and their resolution) |
-| [`docs/audit/README.md`](audit/README.md) | the folder index and the RFQ log |
+| [`docs/audit/README.md`](audit/README.md) | the folder index |
 | [`SECURITY.md`](../SECURITY.md) | the vulnerability disclosure policy |
 
 ---
@@ -640,8 +640,7 @@ within the compiled bounds; O18's residuals KI-16 … KI-21 and KI-25 accepted a
 deferred to a 1.0.x batch after the audit tag; the web on phones (2026-10-09, twelfth round: the
 M10-RESP redesign); in the thirteenth round (2026-10-10) the redesign approved as built and
 O-1 … O-6 decided (O-1 … O-5 built in the round-13 UX batch; O-6, the Mobile Wallet Adapter, deferred
-until after the audit, off by default; **lifted by the owner on 2026-10-13: built and on by default,
-the owner's real-device test before the release** (its own row below)), and on 2026-10-11 the round's 143 strings approved word for
+until after the audit, off by default; **lifted by the owner on 2026-10-13: built and on by default** (its own row below)), and on 2026-10-11 the round's 143 strings approved word for
 word, `borrower.liquidation` ¶3 amended and the copy review's questions decided (its ten items and
 one follow-up; the table below). All the program-affecting ones are built (batches 2, 3 and 4, the
 KI-65 batch, its follow-up, the KI-66 batch and the KI-66 full / KI-67 batch); the deferred IX-1 /
@@ -682,10 +681,10 @@ design `pump-final`; its row below; §13): a program change, built as 1.0.1.
 | FE-30 (FRONTEND §13; KI66-R4) | **Decided (2026-10-08, ninth round): prefer behind and chained lenders.** The claim-time candidates were the indexer's first page of active lenders, largest raw share count first (not comparable across share epochs: a large current lender could push an absent surplus holder out of the 24). Built: the indexer's lenders behind the share epoch first (its new additive `epoch=behind` / `current` filter of `/v1/markets/{mint}/lenders`; a lender with a forward chain is behind, except one whose owner's own conversion reached the share epoch inside the chain: that one is current and comes with the current lenders), then the current ones, 50 a page, paged further until the best ≤ 4 cover the shortfall, at most 4 pages (≤ 200 lenders: three sequential reads a page while the review waits), ranked by `previewTouchPot`'s gain, every row of either list read whatever its epoch (an indexer lagging or leading the RPC's share epoch only reorders the reads); the size trim stays the conservative bound (no lookup tables). A sync target or the claimant's own position closed meanwhile fails the review's simulation with 3012 — or, once someone funded the closed address, short.win's `AccountOwnedByWrongProgram` (3007) on the `lender` account — and the review's Retry rebuilds both. **Confirmed by the owner (2026-10-09, tenth round):** the builder's choices under the "Web only" decision, the indexer's `epoch` parameter (a client-side scan of the raw-share list would have no bound) and the bound of 4 pages × 50 lenders; the indexer also refuses to start with `max_page_limit` below 200, the web's largest page request (`WEB_MIN_PAGE_LIMIT`, INDEXER §9.1) | Built (FRONTEND §3.6, §13 FE-30); confirmed | Web, indexer (an additive query parameter; the page-limit floor) |
 | The seventh and eighth rounds' web wording | **Decided (2026-10-08, ninth round): approved as written** — `lender.potSyncs`, `lender.potSyncsDeferred`, `lender.claimCloses` and `lender.subUnitConversion` (FRONTEND §4.2) | As written in FRONTEND §4.2 | Web only |
 | The web on phones and the thirteenth round's UX items (M10-RESP; O-1 … O-6; FRONTEND §13) | **Decided (2026-10-10, thirteenth round): the M10-RESP redesign approved as built** (the twelfth round's request of 2026-10-09: phones, tablets and desktops in the dark terminal style), with **O-1** the lend deposit order, **O-2** the coverage notice once, **O-3** newcomer help (the intro strip, the glossary, How it works), **O-4** a 12 px text floor and **O-5** the Claim wording to build, and **O-6** the Mobile Wallet Adapter after the audit, off by default (the "Open in Backpack / Phantom / Solflare" links stay). **Decided (2026-10-11): the round's 143 new or changed strings approved word for word** (FRONTEND §4.3), with recommendations 6–10 (Tier C as How it works' example, the risk texts there without tick boxes, "short.win" in running text and "ShortWin" as the brand mark, the glossary cuts, "Lending page") approved; **`borrower.liquidation` ¶3 amended** (the expiry fee made conditional: "Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty."; SPEC §5.3, `expire.rs`'s `UseLiquidate`; FRONTEND §4.2); and the round's questions: a Claim shortfall under 10,000 lamports counts as none (`CLAIM_DUST_LAMPORTS`), the Lending page's Claim is the market panel's claim with its pot syncs, and a Claim is enabled with something claimable now or syncs that can pay, the short-phone breakpoint approved, the lone header ⓘ accepted until a design pass after the audit | Built (`acbe323`, `7a64dcd`); O-6 lifted 2026-10-13 (its own row) | Web only |
-| **O-6, the Mobile Wallet Adapter** (FRONTEND §5.4 (6), §9.3, §13 FE-32) | **Decided (2026-10-13): O-6 lifted.** Built now and switched on (default on; `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false` keeps an off switch). `@solana-mobile/wallet-standard-mobile` 0.7.0, with the protocol pinned to 3.0.0 through pnpm overrides; Kit stays 8.3.0. The mobile UX fixes ship with their strings as drafted. No WalletConnect / Reown. The security review's safeguards taken as decided: the adapter signs only through `solana:signTransaction`, a repo-wide 14-day `minimumReleaseAge` (the two packages excluded until 2026-10-21), Disconnect local only, the `ws://localhost` CSP residual accepted. This replaces the decision of 2026-10-10 (after the audit, off by default). | Built, on by default; **the owner's real-device test pending** (it precedes the release; DEVELOPMENT "Mobile wallets on a real device") | No. Web only: CSP `connect-src` + `ws://localhost:*`, `http://localhost` and two style hashes, in flag-on builds |
-| **pump v3** (the design `pump-final`; known-issues KI-77, PUMP-2026-10-13-1 … -6; §13) | **Decided (2026-10-13):** change the program — `PumpMigrating` priced on the post-completion fields, v3 for every curve leg; **D1 (a)** refuse live cashback curves (`CurveCashbackCoin` 6109); **D2** retire `complete_curve` and the 3-transaction straddle bundle (an audit-scope change: **the auditors must be told**, with this addendum); **D3** `B̂_v3` is the risk and exit price above `rT`; **D4** the two strings (6109's and 6031's) as drafted; every residual of the design's §16 / §17 accepted; the release order keeper (both TradeExtras formats) → program upgrade → web; version **1.0.1**; the re-pin to pump's 2026-10-13 build (slot 456,494,698). **Decided after P1 (which introduced `φ_s` on 2026-10-14), confirmed by the owner on 2026-10-16:** the live-supply synthetic fee `φ_s` (a burn can raise it under a multi-tier curve `FeeConfig`) and the fee gates' 10¹⁵ `φ` disclosed beside KI-72 and accepted under KI-72's decision of 2026-10-12 (AI review decision 3; KI-77); no code change | Built (P0 … P8, `pump-v3`); hashes §0 (local, not verified) | **Program** (built: 1.0.1; the `complete_curve` program removed) |
-| Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6); whether to publish the private audit report (recommended, before the beta) | As built; publication undecided | No |
-| Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign; add them to the RFQ if the owner wants them reviewed | Out of scope (§2) | No |
+| **O-6, the Mobile Wallet Adapter** (FRONTEND §5.4 (6), §9.3, §13 FE-32) | **Decided (2026-10-13): O-6 lifted.** Built now and switched on (default on; `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false` keeps an off switch). `@solana-mobile/wallet-standard-mobile` 0.7.0, with the protocol pinned to 3.0.0 through pnpm overrides; Kit stays 8.3.0. The mobile UX fixes ship with their strings as drafted. No WalletConnect / Reown. The security review's safeguards taken as decided: the adapter signs only through `solana:signTransaction`, a repo-wide 14-day `minimumReleaseAge` (the two packages excluded until 2026-10-21), Disconnect local only, the `ws://localhost` CSP residual accepted. This replaces the decision of 2026-10-10 (after the audit, off by default). | Built, on by default | No. Web only: CSP `connect-src` + `ws://localhost:*`, `http://localhost` and two style hashes, in flag-on builds |
+| **pump v3** (the design `pump-final`; known-issues KI-77, PUMP-2026-10-13-1 … -6; §13) | **Decided (2026-10-13):** change the program — `PumpMigrating` priced on the post-completion fields, v3 for every curve leg; **D1 (a)** refuse live cashback curves (`CurveCashbackCoin` 6109); **D2** retire `complete_curve` and the 3-transaction straddle bundle (an audit-scope change, described in this addendum); **D3** `B̂_v3` is the risk and exit price above `rT`; **D4** the two strings (6109's and 6031's) as drafted; every residual of the design's §16 / §17 accepted; the release order keeper (both TradeExtras formats) → program upgrade → web; version **1.0.1**; the re-pin to pump's 2026-10-13 build (slot 456,494,698). **Decided after P1 (which introduced `φ_s` on 2026-10-14), confirmed by the owner on 2026-10-16:** the live-supply synthetic fee `φ_s` (a burn can raise it under a multi-tier curve `FeeConfig`) and the fee gates' 10¹⁵ `φ` disclosed beside KI-72 and accepted under KI-72's decision of 2026-10-12 (AI review decision 3; KI-77); no code change | Built (P0 … P8, `pump-v3`); hashes §0 (local, not verified) | **Program** (built: 1.0.1; the `complete_curve` program removed) |
+| Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6) | As built | No |
+| Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign | Out of scope (§2) | No |
 
 **Closed since the skeleton:** the M10 plan's corrections (WP10-PLAN-Q2) and the four items
 tagged M10 without a work package: FE-15 is done in M10 (frontend only, no program bytecode);
@@ -1471,13 +1470,6 @@ These are where we would look first. They are not limits on the scope.
 
 ## 12. Logistics and change policy
 
-**Engagement** (owner decision Q2 of 2026-10-02): one full private audit, then a public
-contest (Sherlock or Cantina) on the fixed code, then a bug bounty at the beta. The owner
-sends the requests for quotes to OtterSec, Neodyme, Zellic and Offside Labs; the RFQ log is
-[`docs/audit/README.md`](audit/README.md). The firm, the dates, the 2 h kickoff walkthrough
-and the communication channel are recorded there and in
-[`docs/audit/findings.md`](audit/findings.md) when booked.
-
 **Freeze:**
 - The audit commit is the tag named in §0.
 - Between the tag and the report, the in-scope files change only through fix batches.
@@ -1496,8 +1488,7 @@ in a program batch, one commit per finding where practical. Each fix comes with:
 - the auditors' fix review.
 
 *(2026-10-13: the owner waived the ≥ 24 h fuzz run for the AI review's fix batch, AIR-01 …
-AIR-24; no such run was made on its program. The rule stands for the audit's findings. That
-batch still needs CI and an external fix review.)*
+AIR-24; no such run was made on its program. The rule stands for the audit's findings.)*
 
 A finding may instead be acknowledged with a written rationale; it then becomes a row in
 `known-issues.md`.
@@ -1520,11 +1511,6 @@ adapter change is short.win 1.0.1, and §13 is its addendum.
 **Doc changes.** A change to ARCH, ECON or SPEC that alters a bound in `known-issues.md`
 updates the register in the same commit.
 
-**Publication.** Open (§7): we recommend publishing the private audit's report after the
-fixes and before the beta. The public contest follows the fixes; the bug bounty starts at the
-beta (M11). Published reports are listed on `https://short.win/security`, and short.win's
-`security.txt` then gains its `auditors` field (a program upgrade).
-
 ---
 
 ## 13. Addendum: pump v3 (short.win 1.0.1)
@@ -1537,8 +1523,7 @@ message). **Not yet through CI, a verifiable build or an external review.**
 **For the auditors (owner decision D2):** this addendum changes the audit scope. The
 `complete_curve` helper of the tagged `audit-1` scope (§0, §1, §2) is retired: removed from the
 workspace, the release, Governance's upgrade set and `scope.txt` (4 lines out, 2 reworded); it
-was never deployed. The curve adapter is rewritten (below). The owner is to tell the auditors of
-both together with this addendum.
+was never deployed. The curve adapter is rewritten (below).
 
 ### 13.1 Steps 1–3: the re-pin
 
@@ -1574,8 +1559,7 @@ both together with this addendum.
   lamports (not 594,360).
 - **R-PFEE** (read from the 10-12 ELF): `withdraw` writes only its signer `user`, the
   `referral_vault` PDA derived from it, that PDA's ATA and an ATA `user` owns — never a
-  `FeeConfig`, a pool or a curve; the stop rule does not trigger (PUMP-2026-10-13-5). Pinning or
-  revalidating pump-fees' 10-12 build on mainnet stays the owner's step.
+  `FeeConfig`, a pool or a curve; the stop rule does not trigger (PUMP-2026-10-13-5).
 
 ### 13.2 Step 4: the adapter change (1.0.1)
 

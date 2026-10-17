@@ -25,7 +25,7 @@ Two later requests in the same session:
 The session ran at maximum effort with multi-agent workflows switched on for the design work. Claude acted as the lead: it scouted
 the code itself, wrote each workflow script, delegated design and implementation to subagents, checked their
 output, ran the gates and made every commit decision. The owner was not consulted during the work. Every choice
-that the plan marked as the owner's was left undone and is listed in STATUS.md.
+that the plan marked as the owner's was left undone.
 
 ## What happened, in order
 
@@ -222,8 +222,8 @@ Several of these are enforced by tests.
 ## How to continue
 
 1. Work from `main`, the only branch. `git log --oneline d805c19..main` lists the design pass.
-2. Do the "Left to do" items in STATUS.md: the owner's review and decisions, a CI run on GitHub when wanted, and
-   the 14 Android wallet-adapter tests that fail on this machine.
+2. Do the "Left to do" items in STATUS.md: a CI run on GitHub, and the 14 Android wallet-adapter tests that fail
+   on this machine.
 3. For more visual work, use the loop below and judge every change at phone and desktop width, 320 px included.
 
 ### The visual loop

@@ -107,8 +107,7 @@ export function SecurityPolicyPage() {
                             they ask otherwise.
                         </li>
                         <li>
-                            <strong>Rewards:</strong> no bug bounty yet. A bounty programme is planned for the beta,
-                            after the audit and the public audit contest; its terms will be published here.
+                            <strong>Rewards:</strong> no bug bounty yet.
                         </li>
                     </ul>
                 </Panel>

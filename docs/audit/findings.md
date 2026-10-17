@@ -20,21 +20,13 @@ belongs to the audit package ([`docs/AUDIT.md`](../AUDIT.md) §12). The M10 exit
 
   *2026-10-13:* the owner waived the ≥ 24 h fuzz run for the AI review's fix batch (AIR-01 …
   AIR-24, [`ai-review/README.md`](ai-review/README.md)); no such run was made on its program.
-  That batch still needs CI and an external fix review. The rule above is unchanged for the
-  audit's findings.
+  The rule above is unchanged for the audit's findings.
 - **Acknowledged** means not fixed, with a written rationale and the owner's sign-off. The
   finding then gets a row in [`known-issues.md`](known-issues.md), with its bound.
 - **Duplicate of KI-n** means the finding restates a known issue within its stated bound.
   Answer it by pointing to the row. If the finding exceeds the bound, it is a new finding.
 - **A fix that changes a bound** in `known-issues.md` or the design documents updates them in
   the same commit.
-
-## Engagement
-
-| Firm | Commit / tag audited | Start | End | Report | Fix review |
-|---|---|---|---|---|---|
-| the private audit's firm (booked by the owner; RFQ log in [`README.md`](README.md)) | `audit-1` / `v1.0.0`, `e4895c2` (AUDIT.md §0) | | | `docs/audit/<firm>-<date>.pdf` | |
-| the public contest (Sherlock or Cantina) | the 1.0.x tag after the audit's fixes | | | | |
 
 ## Tracker
 

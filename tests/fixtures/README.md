@@ -251,8 +251,7 @@ ELFs, with short.win's adapter unchanged:
   CPIs). T-PFEE-CPI shows the 2026-10-08 PumpSwap does not: it calls only `get_fees` /
   `get_fees_with_quote_mint`, read-only. Were one to, `withdraw` could only credit the trader
   PDA's own ATA from its own referral vault. So R-PFEE's stop rule does not trigger on these
-  builds; pinning pump-fees' 2026-10-12 build on mainnet (`initialize_config`, or Emergency's
-  `revalidate_venue`) stays the owner's step.
+  builds.
 
 ## pump 2026-10-13 redeploy: what changed and gate G0b
 
