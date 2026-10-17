@@ -1,0 +1,29 @@
+{
+ "profile": "mixed",
+ "seed": 101000024,
+ "step": 13,
+ "signature": "tests/fuzz/src/world.rs:3403 | FUZZ-ORACLE R#B-# JIT capture: [deposit #, sol_settle, withdraw # of # minted shares] gained # lamports over the exit without the deposit (bound #: the minted shares' part of the ",
+ "minimized": true,
+ "differential": true,
+ "avoid_known": true,
+ "actions": [
+  "attacker_seconds 0 1249502108 534288827",
+  "deposit 0 4101775233 1945462772",
+  "shock 0 1009806430 616193720",
+  "silence 1 3257237471 2229129735",
+  "withdraw 0 1050251217 2695983196",
+  "deposit_wrapped_open 0 2453420746 2291929037",
+  "lenders_out 0 2108852697 386214097",
+  "shock 0 2948519556 170589339",
+  "ramp 1 4274408516 1515584328",
+  "deposit 0 1711758527 978432704",
+  "open_near_cap 0 4188907269 4294098531",
+  "shock 0 426724296 144478448",
+  "push_then_freeze 0 2432338009 4269662849",
+  "jit_deposit 0 289075501 598034439"
+ ],
+ "finding": "FUZZ-101-24H-A (run-101, the 24 h run on 1.0.1 at eb84737, `run --profile all --duration 24h --jobs 4 --actions 400 --minimize --seed 101000000`, mixed seed 101000024 in its first minute; harness, not program): the JIT capture oracle (R3B-2) computed the shares the deposit minted as the lender's share count after the probe less its count before, but the JIT lender sat behind a 1/1,000^3 rebase record: its `LenderPosition` still held its epoch-0 count (384,861,812,513,869, worth 384,861 epoch-1 shares) and the deposit's own touch converted it, so the difference undercounted the minted shares by 0.8255 % (0.8565 % in the 178-action original) and the bound shrank with them. The gain, 8,258,145,419 lamports, is exactly the token part 35,030,568,738 times the shares the `Deposit` event minted over S: an S1 settlement with lump 0, the JIT paying for its SOL with its pro-rata part of the extinguished tokens (ECON §9.4).",
+ "message": "tests/fuzz/src/world.rs:3403\nFUZZ-ORACLE R3B-2 JIT capture: [deposit 241654579181, sol_settle, withdraw 46237676976550912 of 46237676976550912 minted shares] gained 8258145419 lamports over the exit without the deposit (bound 8189975714: the minted shares' part of the token part 35030568738, + 2; the rent top-up 561322 = min(principal 35031217208, rent 648470) − credited Some(87148) vests, S 197770076302941142) and took back 113974735658 tokens for the 241654579181 its shares were worth at the deposit",
+ "status": "fixed",
+ "resolution": "Resolved in the fuzzer, no program change: `minted` is the probe's `Deposit` event's `shares`, and `others` compares S with the lender's shares converted to the current epoch. The reproducer passes with a margin of exactly the bound's 2 lamports. This file replays as a regression: the run must pass (`corpus_replays`, `jit_behind_rebase_fuzz101_24h_a`)."
+}

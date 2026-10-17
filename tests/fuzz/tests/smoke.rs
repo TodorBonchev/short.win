@@ -647,6 +647,24 @@ fn pswap_expire_cache_fuzz24d_a() {
     );
 }
 
+/// FUZZ-101-24H-A (run-101): the JIT capture oracle counts the shares the deposit minted from its
+/// `Deposit` event. The reproducer's JIT lender sits behind a rebase record (its stored count is
+/// its old epoch's) and the deposit's own touch converts it; the oracle must run on the
+/// settlement and pass.
+#[test]
+fn jit_behind_rebase_fuzz101_24h_a() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("corpus/fuzz-101-24h-a-mixed-jit-behind-rebase.json");
+    let c = runner::read_crash(&path).expect("corpus file");
+    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    if let Some(f) = &o.failure {
+        panic!("{}\n{}", f.signature, f.message);
+    }
+    let ev = |k: &str| o.stats.events.get(k).copied().unwrap_or(0);
+    assert!(ev("jit-behind-epoch") > 0, "{:?}", o.stats.events);
+    assert!(ev("jit-capture-checked:settle") > 0, "{:?}", o.stats.events);
+}
+
 /// The actions of a scripted curve run (pump-final §12's checks below).
 fn script(lines: &[&str]) -> Vec<Action> {
     lines.iter().map(|a| a.parse().expect("action")).collect()

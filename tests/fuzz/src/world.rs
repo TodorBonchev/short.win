@@ -3256,8 +3256,26 @@ impl World {
         let dep = ix::with_remaining(ix::deposit(&k, amount, 0), &epochs);
         let market = self.market_key(si);
         let pre_shares = self.env.lender(&market, &k.owner).map_or(0, |l| l.shares);
-        let others = self.market(si).total_shares.get() > pre_shares;
         let epoch_before = self.market(si).pool().share_epoch;
+        // A lender behind the share epoch stores its old epoch's count until a touch converts it
+        // (the deposit's own touch does), so `S` is compared with its shares converted
+        // (FUZZ-101-24H-A).
+        if self
+            .env
+            .lender(&market, &k.owner)
+            .is_some_and(|l| l.epoch != epoch_before)
+        {
+            *self
+                .stats
+                .events
+                .entry("jit-behind-epoch".into())
+                .or_default() += 1;
+        }
+        let pre_cur = self
+            .touched_lender(si, &k.owner)
+            .filter(|l| l.epoch == epoch_before)
+            .map_or(0, |l| l.shares);
+        let others = self.market(si).total_shares.get() > pre_cur;
         let lender = self.slots[si].lenders[li].kp.insecure_clone();
         let keeper = self.keeper.insecure_clone();
         let mut signers: Vec<&Keypair> = vec![&lender, &keeper];
@@ -3272,11 +3290,13 @@ impl World {
         // and the exit alone (the control).
         let saved = self.env.svm.clone();
         let (probe, _) = self.send_bundle_quiet(si, &[dep.clone(), exit.clone()], &signers);
-        let minted = self
-            .env
-            .lender(&market, &k.owner)
-            .map_or(0, |l| l.shares)
-            .saturating_sub(pre_shares);
+        // The shares the deposit minted, from its own event: the difference of the lender's share
+        // counts mixes epochs for a lender behind the share epoch (FUZZ-101-24H-A).
+        let minted = probe.as_ref().ok().map_or(0, |meta| {
+            shortwin_litesvm_tests::events::of::<shortwin::events::Deposit>(meta)
+                .first()
+                .map_or(0, |e| e.shares)
+        });
         let allowed = self.allowance_shares(si, &k.owner).unwrap_or(0);
         self.env.svm = saved.clone();
         let w = minted.min(allowed);
