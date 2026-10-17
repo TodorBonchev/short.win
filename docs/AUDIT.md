@@ -53,6 +53,10 @@ to build and test the code, what the code relies on, and what we already know ab
   not installed on the machine that built them, and that session's rules allowed no network
   beyond read-only Solana RPC to fetch them: §0) and no CI run; a local run of every CI job that
   runs on that machine passed on 2026-10-16 (§10 "The pump v3 gate").
+- **AI review 2 of short.win 1.0.1** ([`audit/ai-review-2/`](audit/ai-review-2/README.md);
+  2026-10-17; not a formal audit; stopped by the owner after pass 1 of 3): 13 findings and 85
+  leads, not triaged; 3 of the 4 findings at confidence 90 have a CONFIRMED proof of concept.
+  Pass 2's unjudged agent reports and the list of what the scan did not cover are in the folder.
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -66,6 +70,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | [`docs/audit/scope.txt`](audit/scope.txt) | the in-scope files, generated from `git ls-files` (`scripts/audit_scope.py`) |
 | [`docs/audit/known-issues.md`](audit/known-issues.md) | the known-issues register (KI-01 …): accepted and disclosed residuals, each with its bound |
 | [`docs/audit/ai-review/`](audit/ai-review/README.md) | the AI-assisted review of v1.0.0 (not a formal audit): its issues and leads (AIR-01 … AIR-24), their fixes and regression tests, and the owner's decisions of 2026-10-12 and 2026-10-13 |
+| [`docs/audit/ai-review-2/`](audit/ai-review-2/README.md) | AI review 2, of short.win 1.0.1 (not a formal audit; stopped after pass 1 of 3): its report, proofs of concept, pass 2's unjudged agent reports and what it did not cover |
 | [`docs/audit/findings.md`](audit/findings.md) | the findings tracker (the auditors' findings and their resolution) |
 | [`docs/audit/README.md`](audit/README.md) | the folder index and the RFQ log |
 | [`SECURITY.md`](../SECURITY.md) | the vulnerability disclosure policy |

@@ -10,6 +10,7 @@ The audit package for short.win's external security review (M10). The entry poin
 | [`known-issues.md`](known-issues.md) | The known-issues register: accepted and disclosed residuals, each with its bound, decision and status | whenever a design doc changes a bound |
 | [`findings.md`](findings.md) | The findings tracker and the resolution of each finding | during the engagement |
 | [`ai-review/`](ai-review/README.md) | An AI-assisted review of v1.0.0 (not a formal audit): its findings, the triage of its leads, and the proposed fixes on the `ai-review-fixes` branch | 2026-10-12 |
+| [`ai-review-2/`](ai-review-2/README.md) | AI review 2, of short.win 1.0.1 (not a formal audit; stopped after pass 1 of 3): the report, the proofs of concept, pass 2's unjudged agent reports, and what it did not cover | 2026-10-17 |
 | `README.md` | This index and the RFQ log below (one private audit, one contest) | per RFQ |
 | `<firm>-<date>.pdf` | The final report(s) | after the fix review |
 

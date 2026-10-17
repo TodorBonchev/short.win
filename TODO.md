@@ -8,6 +8,27 @@ The follow-ups are done on the branch `air-followups` (2026-10-12/13; the owner 
 be pushed with `[skip ci]`, so it has not been through CI). Each ticked item names its commits;
 what is still open is under [What remains](#what-remains).
 
+## AI review 2 of short.win 1.0.1 (2026-10-17; stopped after pass 1)
+
+The owner asked for a rust-auditor scan of 1.0.1 (Claude Opus 5.5; 3 passes; the program and its
+two crates, 109 files; proofs of concept for confidence ≥ 90), then stopped it after pass 1 and
+asked for what it had found, for the auditors. Everything is in
+[`docs/audit/ai-review-2/`](docs/audit/ai-review-2/README.md) (not a formal audit).
+
+**Done**
+- [x] Pass 1 of 3: 84 agents (12 specialties × 7 slices of the code), judged: 13 findings (4 at
+      confidence 90, 8 at 75–89, 1 below 75) and 85 leads (`report.md`)
+- [x] Proofs of concept for the 4 findings at confidence 90: 3 CONFIRMED (`open_short` and a stale
+      `P_ema`, the PumpSwap price start, a deposit after a halted-venue S3), 1 UNVERIFIED
+      (`convert_steps`: a safety classifier stopped its PoC agent before it wrote a test)
+
+**Still open**
+- [ ] Triage: each finding and lead against `known-issues.md` and `ai-review/`, results into
+      `findings.md` (finding 6 is KI-70 / AIR-04, accepted)
+- [ ] Fixes for the confirmed findings, in a 1.0.x program batch (the audit freeze)
+- [ ] Pass 2's 330 unjudged agent blocks (`pass-2-unjudged.md`; 34 of 84 agents ran), pass 3, the
+      PoC of finding 1, and the keeper core, which the scan left out
+
 ## Licensing (2026-10-17; on `main`)
 
 The owner asked for the recommended licence on every file (the research of 2026-10-11, with its
