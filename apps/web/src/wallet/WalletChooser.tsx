@@ -2,9 +2,10 @@
  * The wallet chooser (FRONTEND.md §5.4, §7.6), shared by the header's wallet menu and a page's
  * ConnectCta — one at a time (`walletUi.ts`), so its test ids stay unique.
  *
- * - Wallets discovered: one entry per registered Wallet Standard wallet. Two with the same name are
- *   told apart by registration rank and feature set, and a wallet that can only sign-and-send is
- *   labelled (M9-SEC-8, M9-SEC-1).
+ * - Wallets discovered: one entry per registered Wallet Standard wallet, drawn as a button (a bordered
+ *   row with the wallet's logo and a trailing chevron; the owner's request of 2026-10-18). Two with the
+ *   same name are told apart by registration rank and feature set, and a wallet that can only
+ *   sign-and-send is labelled (M9-SEC-8, M9-SEC-1).
  * - The Mobile Wallet Adapter (O-6, §5.4 (6); registered by the app on Android browsers): its
  *   entry reads "Use installed wallet" over "Opens your wallet app on this phone" (when it is the
  *   only wallet of that name), asks Chrome's local-network permission from the tap first
@@ -318,6 +319,7 @@ export function WalletOptions({
                                     sends itself · checked after landing
                                 </span>
                             )}
+                            <NavIcon name="chevron" className="wallet-option-go" />
                         </button>
                     );
                 })}

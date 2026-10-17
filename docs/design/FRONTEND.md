@@ -3134,6 +3134,9 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `status-ws` | `T.statusWs` | `data-state` ∈ idle, connecting, open, reconnecting, closed |
 | `status-sol-usd` | `T.statusSolUsd` | SOL/USD from `/v1/stats` |
 | `status-math` | `T.statusMath` | `data-state` ∈ loading, ready, error (the WASM math module) |
+| `status-github` | `T.statusGithub` | *2026-10-18 (owner):* the status bar's GitHub icon (tablet and desktop) → the source repository, a new tab |
+| `status-discord` | `T.statusDiscord` | *2026-10-18 (owner):* the status bar's Discord icon (tablet and desktop) → the community Discord, a new tab |
+| `status-x` | `T.statusX` | *2026-10-18 (owner):* the status bar's X icon (tablet and desktop) → @short_dot_win on X, a new tab |
 | `stale-badge` | `T.staleBadge` | per-panel freshness badge; `data-state` as statusIndexer |
 | `fallback-banner` | `T.fallbackBanner` | shown while the indexer is unreachable (RPC fallback) |
 | `toast-region` | `T.toastRegion` | live regions container |
@@ -3163,6 +3166,9 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `more-status` | `T.moreStatus` | *M10-RESP:* More → `/status` |
 | `more-security` | `T.moreSecurity` | *M10-RESP:* More → `/security` |
 | `more-create-market` | `T.moreCreateMarket` | *M10-RESP:* More → `/markets/new` |
+| `more-github` | `T.moreGithub` | *2026-10-18 (owner):* More → the source repository on GitHub, a new tab |
+| `more-discord` | `T.moreDiscord` | *2026-10-18 (owner):* More → the community Discord, a new tab |
+| `more-x` | `T.moreX` | *2026-10-18 (owner):* More → @short_dot_win on X, a new tab |
 | `more-sol-usd` | `T.moreSolUsd` | *M10-RESP:* More's network block: SOL/USD |
 | `search-toggle` | `T.searchToggle` | *M10-RESP:* under 1024 px, the header's Search button; opens the search overlay; `aria-expanded` |
 | `search-close` | `T.searchClose` | *M10-RESP:* the overlay's Cancel (focus returns to `search-toggle`) |

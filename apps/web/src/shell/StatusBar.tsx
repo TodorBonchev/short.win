@@ -6,7 +6,8 @@
  * words and a shape (● ok, ▲ warn, ✕ bad — never colour alone) that expands to every item over a
  * scrim (a tap on it folds the list — on its click, so the tap cannot fall through to the page once
  * the scrim is gone; the strip itself stays clear of it). Tablet and desktop show the items, as
- * before. The summary is not a live region: the pages' banners announce a degradation.
+ * before, and end with the GitHub, Discord and X icons (the phone has them in More). The summary is not
+ * a live region: the pages' banners announce a degradation.
  */
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
@@ -17,13 +18,14 @@ import type { WsState } from '../api/ws.ts';
 import { GlossaryTip } from '../components/Glossary.tsx';
 import { NAV_COPY } from '../config/copyNav.ts';
 import { config } from '../config/env.ts';
+import { DISCORD_URL, SOURCE_URL, X_HANDLE, X_URL } from '../config/links.ts';
 import { T } from '../config/testids.ts';
 import type { Freshness } from '../lib/staleness.ts';
 import { useStore } from '../lib/store.ts';
 import { useMath } from '../math/useMath.ts';
 import { rpcSlot } from '../rpc/slot.ts';
 import { useIndexerFreshness } from './freshness.tsx';
-import { NavIcon } from './icons.tsx';
+import { BrandIcon, NavIcon } from './icons.tsx';
 
 export type SummaryState = 'ok' | 'warn' | 'bad';
 
@@ -166,6 +168,43 @@ export function StatusBar() {
                 >
                     Security
                 </Link>
+                {/* The source, the community and X, as icons (a div: the phone's open list places its spans and links
+                    by type, and hides this; the phone reaches them through More). */}
+                <div className="statusbar-social">
+                    <a
+                        href={SOURCE_URL}
+                        className="statusbar-item statusbar-icon"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="GitHub"
+                        title="GitHub"
+                        data-testid={T.statusGithub}
+                    >
+                        <BrandIcon name="github" />
+                    </a>
+                    <a
+                        href={DISCORD_URL}
+                        className="statusbar-item statusbar-icon"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="Discord"
+                        title="Discord"
+                        data-testid={T.statusDiscord}
+                    >
+                        <BrandIcon name="discord" />
+                    </a>
+                    <a
+                        href={X_URL}
+                        className="statusbar-item statusbar-icon"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`X (@${X_HANDLE})`}
+                        title={`X · @${X_HANDLE}`}
+                        data-testid={T.statusX}
+                    >
+                        <BrandIcon name="x" />
+                    </a>
+                </div>
             </div>
         </footer>
     );

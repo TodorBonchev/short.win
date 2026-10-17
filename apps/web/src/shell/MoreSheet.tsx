@@ -1,7 +1,7 @@
 /**
  * The phone tab bar's "More" (FRONTEND.md §7.6): the destinations that do not fit four tabs —
  * How it works (the owner's thirteenth round, O-3), protocol status, the security policy, create a
- * market — and the network facts the desktop status
+ * market, then GitHub, Discord and X (new tabs) — and the network facts the desktop status
  * bar shows on its right (SOL/USD, math version, cluster). A bottom sheet on the native `<dialog>`.
  */
 import { useQuery } from '@tanstack/react-query';
@@ -11,9 +11,10 @@ import { Term } from '../components/Glossary.tsx';
 import { Modal } from '../components/Modal.tsx';
 import { NAV_COPY } from '../config/copyNav.ts';
 import { config } from '../config/env.ts';
+import { DISCORD_URL, SOURCE_URL, X_HANDLE, X_URL } from '../config/links.ts';
 import { T } from '../config/testids.ts';
 import { useMath } from '../math/useMath.ts';
-import { NavIcon } from './icons.tsx';
+import { BrandIcon, NavIcon } from './icons.tsx';
 
 export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     const stats = useQuery({ ...indexerQueries.stats(), enabled: open });
@@ -47,6 +48,44 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                     <span className="muted">List a token for lending and shorting</span>
                     <NavIcon name="chevron" className="more-chevron" />
                 </Link>
+                {/* The source, the community and X: other sites, so the trailing glyph is the arrow out of a box. */}
+                <a
+                    href={SOURCE_URL}
+                    className="more-row"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={T.moreGithub}
+                    onClick={onClose}
+                >
+                    <BrandIcon name="github" className="more-icon" />
+                    GitHub
+                    <span className="muted">The source code</span>
+                    <NavIcon name="external" className="more-external" />
+                </a>
+                <a
+                    href={DISCORD_URL}
+                    className="more-row"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={T.moreDiscord}
+                    onClick={onClose}
+                >
+                    <BrandIcon name="discord" className="more-icon" />
+                    Discord
+                    <span className="muted">Talk with the community</span>
+                    <NavIcon name="external" className="more-external" />
+                </a>
+                <a
+                    href={X_URL}
+                    className="more-row"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={T.moreX}
+                    onClick={onClose}
+                >
+                    <BrandIcon name="x" className="more-icon" />X<span className="muted">@{X_HANDLE}</span>
+                    <NavIcon name="external" className="more-external" />
+                </a>
             </nav>
             <section aria-label="Network" className="more-network">
                 <h3>Network</h3>

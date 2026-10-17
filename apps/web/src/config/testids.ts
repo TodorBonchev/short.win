@@ -44,6 +44,10 @@ export const T = {
     statusWs: 'status-ws',
     statusSolUsd: 'status-sol-usd',
     statusMath: 'status-math',
+    /** The status bar's GitHub, Discord and X icons (tablet and desktop; `config/links.ts`). */
+    statusGithub: 'status-github',
+    statusDiscord: 'status-discord',
+    statusX: 'status-x',
     staleBadge: 'stale-badge',
     fallbackBanner: 'fallback-banner',
     toastRegion: 'toast-region',
@@ -68,6 +72,10 @@ export const T = {
     moreStatus: 'more-status',
     moreSecurity: 'more-security',
     moreCreateMarket: 'more-create-market',
+    /** More's rows to GitHub, Discord and X (new tabs). */
+    moreGithub: 'more-github',
+    moreDiscord: 'more-discord',
+    moreX: 'more-x',
     moreSolUsd: 'more-sol-usd',
     /** Under 1024 px: the header's Search button, and the overlay's Cancel. */
     searchToggle: 'search-toggle',

@@ -171,6 +171,30 @@ a.statusbar-item {
     min-height: 24px;
 }
 
+/* GitHub and Discord at the bar's end: 16 px marks in 24 px targets, a notch closer together than the items.
+   The phone's open list hides them (they are in More). */
+.statusbar-social {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+
+.statusbar-icon {
+    justify-content: center;
+    min-width: 24px;
+    color: var(--text-1);
+}
+
+@media (hover: hover) {
+    .statusbar-icon:hover {
+        color: var(--text-0);
+    }
+}
+
+.statusbar[data-expanded] .statusbar-social {
+    display: none;
+}
+
 /* The bar's items take their state's colour (a degraded item is never grey beside a green one); healthy is
    quiet. Scoped to the bar: the market header's FreshnessBadge keeps its own rules. */
 .statusbar .statusbar-item.stale-badge[data-state="live"] {
@@ -3092,6 +3116,16 @@ button.form-reason {
     justify-self: center;
 }
 
+/* A row that opens another site (GitHub, Discord): the arrow out of a box, upright, in the chevron's place. */
+.more-row > .more-external {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    width: 16px;
+    height: 16px;
+    color: var(--text-2);
+    justify-self: center;
+}
+
 .more-network h3 {
     margin-bottom: var(--sp-3);
 }
@@ -3217,6 +3251,56 @@ a.menu-item {
     padding-left: var(--sp-3);
 }
 
+/* A wallet entry reads as a button (the owner's request of 2026-10-18): a bordered bg-3 row over the bg-2
+   menu, the wallet's logo at 24 px, its name in medium, a chevron pointing right at the end (the registry's
+   glyph, rotated). Scoped to the wallet list: the connected menu's rows stay plain. */
+.wallet-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    /* The chooser's inset: on a phone the buttons line up with the sheet's title and the open-in list. */
+    padding-inline: var(--sp-3);
+}
+
+.wallet-options .menu-item {
+    min-height: max(40px, var(--tap-min));
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--bg-3);
+    color: var(--text-0);
+    font-weight: var(--fw-medium);
+}
+
+.wallet-options .menu-item img {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+}
+
+.wallet-option-go {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-left: auto;
+    color: var(--text-1);
+    rotate: -90deg;
+}
+
+.wallet-options .menu-item:focus-visible {
+    background: var(--bg-4);
+}
+
+@media (hover: hover) {
+    .wallet-options .menu-item:hover:not(:disabled) {
+        border-color: var(--text-1);
+    }
+}
+
+.wallet-options .menu-item:disabled {
+    cursor: progress;
+}
+
 /* The Mobile Wallet Adapter entry: "Use installed wallet" over its second line (O-6, §5.4 (6)). */
 .menu-item-text {
     display: flex;
@@ -3299,8 +3383,9 @@ a.menu-item {
         border-bottom: 1px solid var(--line);
     }
 
-    /* Air under the head: the identity block and the chooser start 8 px below it. */
+    /* Air under the head: the identity block, the wallet buttons and the chooser start 8 px below it. */
     .wallet-anchor > .menu > .menu-head + .menu-label,
+    .wallet-anchor > .menu .wallet-options,
     .wallet-anchor > .menu .wallet-chooser {
         padding-top: var(--sp-3);
     }
