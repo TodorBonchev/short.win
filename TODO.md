@@ -32,7 +32,8 @@ asked for what it had found, for the auditors. Everything is in
 ## Licensing (2026-10-17; on `main`)
 
 The owner asked for the recommended licence on every file (the research of 2026-10-11, with its
-sources, is in `~/.cache/shortwin-work/publish-research/result.json`). Nothing is public yet.
+sources, is in `~/.cache/shortwin-work/publish-research/result.json`). This repository is public
+since 2026-10-17 (below).
 
 **Done**
 - [x] `LICENSE`: the Business Source License 1.1 for the protocol. Licensor Todor Bonchev; Licensed
@@ -46,38 +47,32 @@ sources, is in `~/.cache/shortwin-work/publish-research/result.json`). Nothing i
       own licences (`THIRD_PARTY_NOTICES.md`, texts in `LICENSES/`). `reuse lint` (5.0.2): every
       file covered, REUSE 3.3 compliant. No source file was edited, so the program bytes are
       unchanged
-- [x] **The public copy**: <https://github.com/TodorBonchev/shortwin>, public since 2026-10-17 (the
-      owner's choice: publish now, on the personal account). One commit (`e035f2e`, authored with
-      the GitHub no-reply address) from this repository's `d7c5a48` tree.
-  - Left out: `apps/web`, `packages/math-wasm`, FRONTEND.md, `docs/design/design-pass-2026-10/`,
-    TODO.md, `.github/`, the ten pump ELFs.
-  - Changed in the copy only:
-    - the RFQ log and firm shortlist removed (`docs/audit/README.md`, AUDIT.md §12, ARCH's Q2 row);
-    - two private CI links made plain run numbers;
-    - jupiter-cpi.md §7.1's quotes summarised, with links pinned to their commits;
-    - a README section on what the copy is;
-    - the JS workspace cut to `clients/js`, its lockfile pruned (its entries are identical).
-  - Verified:
-    - `reuse lint` passes;
-    - both Cargo workspaces resolve `--locked --offline`;
-    - the client's typecheck and 29 tests pass;
-    - `anchor build` of the copy gives `shortwin.so` `72c82879…1429` (1,635,424 B, AUDIT.md §0's 1.0.1);
-    - a secret scan of the copy is clean;
-    - GitHub's tree equals the commit, path for path.
-  - On: private vulnerability reporting, and secret scanning with push protection. The staging,
-    the scan script and the commit message are in `~/.cache/shortwin-work/public-snapshot/`.
+- [x] **This repository is public** since 2026-10-17, with its full history (the owner's decision;
+      it replaces the one-commit public copy `TodorBonchev/shortwin`, `e035f2e`, of the same day).
+  - Checked before the switch:
+    - a scan of every blob on `main` and the tags found no key, token or secret;
+    - none of the 1,076 64-byte base58 strings in them is an ed25519 keypair;
+    - there are no repository secrets, deploy keys, PRs or issues;
+    - the four deleted branches are all merged into `main`;
+    - the local `refs/archive/audit-evidence/*` refs are not pushed, and stay private.
+  - Public with it, as the owner accepted:
+    - the author e-mail on 113 commits;
+    - the ten pump ELFs, which have no licence;
+    - `apps/web` and `packages/math-wasm`, still all rights reserved;
+    - TODO.md, the design-pass docs, the RFQ shortlist and the Jupiter quotes;
+    - the Actions logs, and AI review 2's proofs of concept.
+  - On: private vulnerability reporting, and secret scanning with push protection.
+  - The copy `TodorBonchev/shortwin` was deleted on 2026-10-18; GitHub can restore it for 90 days. Its
+    one later commit (`04c8816`, the README's Discord badge) is now in this repository's README.
 
 **Still open**
-- [ ] A lawyer's review of the Additional Use Grant and the Licensor before anything is published
-      (Bulgarian copyright law's defaults for an author's licence; a company as Licensor)
+- [ ] A lawyer's review of the Additional Use Grant and the Licensor (the code is public since
+      2026-10-17; Bulgarian copyright law's defaults for an author's licence; a company as Licensor)
 - [ ] Once a company holds the IP: a written assignment, then the company as Licensor in the next
       version's `LICENSE`
 - [ ] At each release, the Licensed Work's version in `LICENSE` and `LICENSES/BUSL-1.1.txt` (the two
       files stay identical)
 - [ ] Cargo `license` fields in the crates' manifests at the next program batch (in-scope files)
-- [ ] Updating the public copy (at the contest's 1.0.x tag, say): cut it again from `main` with the
-      same exclusions and changes as above; a script for it would make this repeatable. Never push
-      this repository's history there
 - [ ] At the next program batch: `security.txt`'s `source_code` can name the public repository
       (a program change)
 
