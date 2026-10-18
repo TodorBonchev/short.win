@@ -1,6 +1,7 @@
 # AI3-FR01: quarantine legacy empty-pool carry
 
 Date: 2026-10-19. Base: `7c5ae42978a32cd7463c6cef991031485c39abb2`.
+Fix commit: **`e1d66caa64d076a43618f437c2de9ac9127166b4`**, pushed to `main`.
 This is a further **unreleased 1.0.3** fix, superseding the earlier candidate's deposit
 behavior and program hashes. The finding remains **in progress** under AUDIT §12;
 this record is not a release, 24-hour fuzz result, or owner acceptance of historical loss.
@@ -87,6 +88,18 @@ that narrower behavior and its availability bound.
 These local checks are distinct from full CI and the required ≥24 h zero-failure run.
 The previous main CI run is on `7c5ae429` and therefore cannot certify this new guard.
 Any CI/fuzz evidence must identify the new source revision and program/fuzzer bytes.
+
+### CI checks recorded after push
+
+| Run | Exact revision / event | Last checked result |
+|---|---|---|
+| [Full fix CI 39169016016](https://github.com/TodorBonchev/short.win/actions/runs/39169016016) | `e1d66caa64d076a43618f437c2de9ac9127166b4`, workflow_dispatch | Started successfully on the exact fix commit; in progress, not yet a green-gate claim. Explicit dispatch includes mutation checks. No long fuzz duration was supplied. |
+| [Predecessor main CI 39166689873](https://github.com/TodorBonchev/short.win/actions/runs/39166689873) | `7c5ae42978a32cd7463c6cef991031485c39abb2`, push | 23 jobs passed, zero failed; program-tests still running. Fuzz-nightly and mutants intentionally skipped by push-event conditions. The run was left intact. |
+
+These are observed snapshots, not final conclusions. The source fix uses `[skip ci]`
+for its push because the full workflow was explicitly dispatched on that same SHA:
+this runs the workflow_dispatch-only mutation gate and preserves the predecessor run.
+Subsequent documentation-only evidence updates do not change the program/fuzzer bytes.
 
 The separate accounting reviewer independently inspected the root-authored guard and
 error mapping, reran all nine carry cases and found no blocking issue with the narrow
