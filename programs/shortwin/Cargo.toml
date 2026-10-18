@@ -5,7 +5,13 @@ description = "short.win: permissionless P2P token lending for shorting memecoin
 edition = "2021"
 # Built by the platform-tools rustc (v1.57 = 1.95) through `anchor build` (ARCHITECTURE §1.1).
 rust-version = "1.89"
-publish = false
+license-file = "../../LICENSE"
+repository = "https://github.com/TodorBonchev/short.win"
+homepage = "https://short.win"
+readme = "README.md"
+keywords = ["solana", "anchor", "defi", "lending", "cpi"]
+categories = ["cryptography::cryptocurrencies"]
+include = ["/src/**", "/Cargo.toml", "/README.md"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -40,8 +46,11 @@ anchor-spl = { version = "=1.2.0", default-features = false, features = ["token"
 bytemuck = { version = "1.25", features = ["derive", "min_const_generics"] }
 # sha256 of a pending config change for `ConfigProposed` / `ConfigApplied` (ARCH §3.10).
 solana-sha256-hasher = "3"
-shortwin-math = { path = "../../crates/shortwin-math" }
-shortwin-venue-state = { path = "../../crates/shortwin-venue-state" }
+shortwin-math = { version = "0.1.0", path = "../../crates/shortwin-math" }
+shortwin-venue-state = { version = "0.1.0", path = "../../crates/shortwin-venue-state" }
+
+[package.metadata.docs.rs]
+features = ["no-entrypoint"]
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

@@ -4,7 +4,8 @@
     "name": "shortwin",
     "version": "1.0.2",
     "spec": "0.1.0",
-    "description": "short.win: permissionless P2P token lending for shorting memecoins (Anchor program)"
+    "description": "short.win: permissionless P2P token lending for shorting memecoins (Anchor program)",
+    "repository": "https://github.com/TodorBonchev/short.win"
   },
   "instructions": [
     {

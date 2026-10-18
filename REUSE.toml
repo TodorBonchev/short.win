@@ -96,3 +96,10 @@ path = "services/vendor/postgresql_archive/**"
 precedence = "override"
 SPDX-FileCopyrightText = ["2023 Theseus contributors", "2026 Todor Bonchev", "The PostgreSQL Global Development Group", "The Regents of the University of California"]
 SPDX-License-Identifier = "(Apache-2.0 OR MIT) AND PostgreSQL"
+
+# The Apache-2.0 licence text shipped in the published shortwin-math crate.
+[[annotations]]
+path = "crates/shortwin-math/LICENSE-APACHE"
+precedence = "override"
+SPDX-FileCopyrightText = "The Apache Software Foundation"
+SPDX-License-Identifier = "Apache-2.0"
