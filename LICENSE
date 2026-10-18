@@ -9,10 +9,14 @@ Parameters
 
 Licensor:             Todor Bonchev
 
-Licensed Work:        short.win 1.0.1
+Licensed Work:        short.win 1.0.x and the crates published from this
+                      repository (shortwin, shortwin-math and
+                      shortwin-venue-state).
                       The Licensed Work is (c) 2026 Todor Bonchev.
                       It consists of the files in this repository that
-                      REUSE.toml marks as BUSL-1.1.
+                      REUSE.toml marks as BUSL-1.1, and of the files of
+                      those published crates other than the parts that
+                      their NOTICE files place under another licence.
 
 Additional Use Grant: You may make production use of the Licensed Work,
                       provided that the use is solely to interact with the
@@ -37,7 +41,8 @@ Additional Use Grant: You may make production use of the Licensed Work,
                       5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK, and any
                       further program addresses that the Licensor lists in
                       the GRANTS.md file published with a version of the
-                      Licensed Work; a listing applies to that version and to
+                      Licensed Work (https://github.com/TodorBonchev/short.win/
+                      blob/main/GRANTS.md); a listing applies to that version and to
                       every later version.
                       This grant is worldwide and lasts for the full term of
                       copyright in the Licensed Work.
