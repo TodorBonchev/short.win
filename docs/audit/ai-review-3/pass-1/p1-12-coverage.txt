@@ -1,0 +1,152 @@
+Specialist 12: flow-gap; pass 1
+Frozen audited commit: b815269224ba0f5d946f49de7e113220c4067041
+Auditor revision: commit6c41e1d46386de7fd9b1fa48c847e876ac8b2676
+Source: .audit-mZFuf8/agent-12-bundle.md and source-index.tsv
+Method: plain static review; bounded source reads; no builds, tests, runtime reproductions, or repository writes.
+Result: 0 FINDING blocks; 1 LEAD block (context-supported, with an out-of-bundle root cause).
+Coverage below distinguishes full production reads, bounded reads, searches, and unread files. Metadata indexing is not source review. No claim that all 58,914 source-bundle lines were reviewed.
+
+FULL PRODUCTION READS (18 files):
+crates/shortwin-math/src/bounds.rs: source 1-355; bundle 405-759; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/engine/lender.rs: source 1-244; bundle 24636-24879; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/engine/mod.rs: source 1-32; bundle 25036-25067; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/engine/prologue.rs: source 1-271; bundle 26696-26966; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/engine/route.rs: source 1-127; bundle 27115-27241; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/engine/trader.rs: source 1-506; bundle 27420-27925; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/engine/waterfall.rs: source 1-140; bundle 27931-28070; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/errors.rs: source 1-423; bundle 28076-28498; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/events.rs: source 1-609; bundle 28575-29183; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/instructions/close_short.rs: source 1-356; bundle 29635-29990; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/instructions/execute_pool_switch.rs: source 1-276; bundle 31634-31909; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/instructions/mod.rs: source 1-80; bundle 33299-33378; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/instructions/sol_settle.rs: source 1-551; bundle 35147-35697; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/instructions/sweep_trader.rs: source 1-415; bundle 35802-36216; all production before the trailing cfg(test) module, if any.
+programs/shortwin/src/lib.rs: source 1-325; bundle 36809-37133; all production before the trailing cfg(test) module, if any.
+services/keeper/src/decide.rs: source 1-540; bundle 52006-52545; all production before the trailing cfg(test) module, if any.
+services/keeper/src/graduation.rs: source 1-470; bundle 52806-53275; all production before the trailing cfg(test) module, if any.
+services/keeper/src/sweep.rs: source 1-377; bundle 56584-56960; all production before the trailing cfg(test) module, if any.
+
+Full production-read total: 6097 physical source lines (comments and blank lines included).
+Required closure explicitly complete: errors.rs, events.rs, instructions/mod.rs, engine/mod.rs.
+
+BOUNDED PRODUCTION READS:
+programs/shortwin/src/venues/mod.rs: source 989-1269; bundle 42500-42780. Remaining source unread except search matches.
+programs/shortwin/src/venues/pump_amm.rs: source 454-594; bundle 43905-44045. Remaining source unread except search matches.
+programs/shortwin/src/venues/pump_curve.rs: source 673-893; bundle 45500-45720. Remaining source unread except search matches.
+services/keeper/src/venue.rs: source 396-496; bundle 57580-57680. Remaining source unread except search matches.
+
+SEARCH-ONLY IN-SCOPE FILES:
+services/common/src/chain.rs: function/error/retry/send-related symbol matches only; no full production read.
+services/common/src/tx.rs: function/error/retry/send-related symbol matches only; no full production read.
+
+OUT-OF-BUNDLE CONTEXT:
+services/keeper/src/keeper.rs: bounded live working-tree context read 2190-2335 only; full-file searches for pamm_ready, curve_ready, prepare_tried, 3012, VenueAccountMismatch, TraderStateInvalid and preparation entrypoints. No claim of full-file review or frozen-bundle inclusion.
+
+MANIFEST / REVIEW INSTRUCTIONS:
+Build context and crate/workspace manifests: bundle 1-401 read.
+Specialty, scan rules, report-language rules and selected exploit/account-map material were read. Some initial large policy/map outputs were truncated; they are not counted as production-source coverage. The full 61,413-line bundle was not read.
+
+UNREAD IN-SCOPE SOURCE FILES:
+crates/shortwin-math/src/caps.rs
+crates/shortwin-math/src/consts.rs
+crates/shortwin-math/src/error.rs
+crates/shortwin-math/src/fees.rs
+crates/shortwin-math/src/lib.rs
+crates/shortwin-math/src/num/mod.rs
+crates/shortwin-math/src/num/u256.rs
+crates/shortwin-math/src/observe.rs
+crates/shortwin-math/src/params.rs
+crates/shortwin-math/src/persist.rs
+crates/shortwin-math/src/pool.rs
+crates/shortwin-math/src/pool_select.rs
+crates/shortwin-math/src/quote/cpmm.rs
+crates/shortwin-math/src/quote/mod.rs
+crates/shortwin-math/src/quote/pricing.rs
+crates/shortwin-math/src/quote/ray_v4.rs
+crates/shortwin-math/src/quote/reprice.rs
+crates/shortwin-math/src/quote/sol_leg.rs
+crates/shortwin-math/src/quote/straddle.rs
+crates/shortwin-math/src/rent.rs
+crates/shortwin-math/src/risk.rs
+crates/shortwin-math/src/settle.rs
+crates/shortwin-math/src/tier.rs
+crates/shortwin-math/src/waterfall.rs
+crates/shortwin-venue-state/src/bytes.rs
+crates/shortwin-venue-state/src/lib.rs
+crates/shortwin-venue-state/src/mint.rs
+crates/shortwin-venue-state/src/program_data.rs
+crates/shortwin-venue-state/src/pump.rs
+crates/shortwin-venue-state/src/pump_amm.rs
+crates/shortwin-venue-state/src/pyth.rs
+crates/shortwin-venue-state/src/raydium_cpmm.rs
+crates/shortwin-venue-state/src/raydium_v4.rs
+crates/shortwin-venue-state/src/token_account.rs
+programs/shortwin/src/constants.rs
+programs/shortwin/src/engine/arming.rs
+programs/shortwin/src/engine/bounds.rs
+programs/shortwin/src/engine/caps.rs
+programs/shortwin/src/engine/guard.rs
+programs/shortwin/src/engine/observe.rs
+programs/shortwin/src/engine/pool_select.rs
+programs/shortwin/src/engine/tier.rs
+programs/shortwin/src/instructions/add_margin.rs
+programs/shortwin/src/instructions/apply_config.rs
+programs/shortwin/src/instructions/cancel_config.rs
+programs/shortwin/src/instructions/claim_sol.rs
+programs/shortwin/src/instructions/cover_deficit.rs
+programs/shortwin/src/instructions/crank_price.rs
+programs/shortwin/src/instructions/crank_sol_usd.rs
+programs/shortwin/src/instructions/create_market.rs
+programs/shortwin/src/instructions/deposit.rs
+programs/shortwin/src/instructions/disable_venue.rs
+programs/shortwin/src/instructions/expire.rs
+programs/shortwin/src/instructions/flag_unsafe_mint.rs
+programs/shortwin/src/instructions/flag_venue_upgraded.rs
+programs/shortwin/src/instructions/initialize_config.rs
+programs/shortwin/src/instructions/liquidate.rs
+programs/shortwin/src/instructions/open_short.rs
+programs/shortwin/src/instructions/propose_config.rs
+programs/shortwin/src/instructions/propose_pool.rs
+programs/shortwin/src/instructions/revalidate_venue.rs
+programs/shortwin/src/instructions/set_coverage_pause.rs
+programs/shortwin/src/instructions/set_pause.rs
+programs/shortwin/src/instructions/set_route_broken.rs
+programs/shortwin/src/instructions/set_venue_extras.rs
+programs/shortwin/src/instructions/sweep_protocol_fees.rs
+programs/shortwin/src/instructions/sync_lender.rs
+programs/shortwin/src/instructions/withdraw.rs
+programs/shortwin/src/lamports.rs
+programs/shortwin/src/mint_filter.rs
+programs/shortwin/src/state/config.rs
+programs/shortwin/src/state/epoch.rs
+programs/shortwin/src/state/exposure.rs
+programs/shortwin/src/state/layout_asserts.rs
+programs/shortwin/src/state/lender.rs
+programs/shortwin/src/state/market.rs
+programs/shortwin/src/state/mod.rs
+programs/shortwin/src/state/oracle.rs
+programs/shortwin/src/state/pod.rs
+programs/shortwin/src/state/position.rs
+programs/shortwin/src/state/vault.rs
+programs/shortwin/src/state/venue_extras.rs
+programs/shortwin/src/state/venue_guard.rs
+programs/shortwin/src/venues/detect.rs
+programs/shortwin/src/venues/raydium.rs
+programs/shortwin/src/venues/raydium_cpmm.rs
+programs/shortwin/src/venues/raydium_v4.rs
+services/keeper/src/budget.rs
+services/keeper/src/coverage.rs
+services/keeper/src/fees.rs
+services/keeper/src/ixs.rs
+services/keeper/src/monitor.rs
+services/keeper/src/pda.rs
+services/keeper/src/pool_monitor.rs
+services/keeper/src/view.rs
+
+TRACES CLOSED WITHOUT A CONFIRMED FINDING:
+sol_settle keeps the prologue on no-op outcomes, skips settlement evaluation on its own graduation, creates share-epoch PDAs with pre-funding handling, and closes position/exposure after accounting.
+close_short normalizes trader balances before funding, checks adapter result bounds and the live post-CPI vault amount, books repayment, updates aggregates, and checks pool/vault floors before closure.
+engine::trader sweeps pre-funded PDAs, creates ephemeral WSOL with allocate/assign, closes the account per leg, and checks remaining balances and authorities.
+execute_pool_switch cancels unsuitable or latched candidates, rechecks the failure chain, and delegates adoption to engine::pool_select::adopt (the helper was not read in this lens).
+Cashback recovery depends on public external claims; the source explicitly documents the upgrade/interface residual in keeper/sweep.rs, so that stated residual was not emitted as a new finding.
+Keeper decisions project the program prologue and preserve the separate S3 route predicate. Graduation creation/transition builders were traced; the readiness-cache trail is retained as the one lead.

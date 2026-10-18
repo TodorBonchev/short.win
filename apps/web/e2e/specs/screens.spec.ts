@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import { E2E_DIR, WEB_DIR } from '../env.ts';
 import { type App, expect, need, requireTrading, requireVenueFixtures, T, test } from '../fixtures.ts';
-import { accrue } from '../validator/actions.ts';
+import { accrue, freshOpenPrice } from '../validator/actions.ts';
 
 const DIR =
     process.env.SHORTWIN_E2E_SCREENSHOTS === 'update'
@@ -155,6 +155,9 @@ test.describe('screens: short', { tag: ['@screens', '@short'] }, () => {
     test('the short panel with a preview, and its review', async ({ app, page, state }) => {
         requireTrading(state);
         const main = state.markets.main;
+        // Screens run after long lender scenarios; complete a current price bucket before
+        // capturing the enabled open flow.
+        await freshOpenPrice(main);
         await app.goto(`/m/${main.mint}?panel=short`, 'market');
         await app.connectWallet();
         const panel = app.id(T.shortPanel);

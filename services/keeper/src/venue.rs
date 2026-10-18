@@ -58,8 +58,8 @@ use anyhow::{Context, anyhow, bail};
 use shortwin::state::pump_swap_cache;
 use shortwin::state::{
     ENTRY_FIXED, ENTRY_TEMPLATE, EXTRAS_MAX_SEEDS, ExtraEntry, ExtrasSet, Market,
-    PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_MINT, PLACEHOLDER_POOL, PLACEHOLDER_TRADER, SEED_CONST,
-    SEED_PLACEHOLDER, VenueExtras, VenueKind,
+    PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_COIN_CREATOR, PLACEHOLDER_MINT, PLACEHOLDER_POOL,
+    PLACEHOLDER_TRADER, SEED_CONST, SEED_PLACEHOLDER, VenueExtras, VenueKind,
 };
 use shortwin::venues::{
     EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel, pump_amm, pump_curve,
@@ -672,7 +672,9 @@ fn resolve_entry(entry: &ExtraEntry, kind: VenueKind, market: &Market) -> Option
                             PLACEHOLDER_POOL => pool_placeholder(kind, market),
                             PLACEHOLDER_TRADER => Some(market.trader),
                             PLACEHOLDER_BONDING_CURVE => Some(market.bonding_curve),
-                            // The coin creator is not resolvable from the market cache.
+                            PLACEHOLDER_COIN_CREATOR if kind == VenueKind::PumpSwap => Some(
+                                pump_amm::cached(market, pump_swap_cache::CACHED_COIN_CREATOR),
+                            ),
                             _ => None,
                         }?;
                         owned.push(key.to_bytes().to_vec());
@@ -754,6 +756,54 @@ mod tests {
     use shortwin::state::raydium_cache::{
         RAY_AMM_CONFIG, RAY_LP_MINT, RAY_OBSERVATION, RAY_POOL, RAY_VAULT_SOL, RAY_VAULT_TOK,
     };
+
+    #[test]
+    fn pumpswap_creator_templates_resolve_for_every_extras_set() {
+        use bytemuck::Zeroable;
+        use shortwin::state::EXTRAS_IX_BUY;
+
+        let mut m = Market::zeroed();
+        let creator = Pubkey::new_unique();
+        m.pool_cache[pump_swap_cache::CACHED_COIN_CREATOR] = creator;
+        let program = Pubkey::new_unique();
+        let mut entry = ExtraEntry::zeroed();
+        entry.kind = ENTRY_TEMPLATE;
+        entry.key = program;
+        entry.writable = 1;
+        entry.n_seeds = 1;
+        entry.seeds[0].kind = SEED_PLACEHOLDER;
+        entry.seeds[0].len = PLACEHOLDER_COIN_CREATOR;
+        let mut extras = VenueExtras::zeroed();
+        let ix = &mut extras.sets[EXTRAS_IX_BUY];
+        for set in [&mut ix.current, &mut ix.previous, &mut ix.stable] {
+            set.count = 1;
+            set.entries[0] = entry;
+        }
+        let (expected, bump) = Pubkey::find_program_address(&[creator.as_ref()], &program);
+        let choices = extras_candidates(VenueKind::PumpSwap, EXTRAS_IX_BUY, &m, Some(&extras));
+        assert_eq!(
+            choices.iter().map(|c| c.sel.set).collect::<Vec<_>>(),
+            vec![
+                EXTRAS_SET_CURRENT,
+                ExtrasSel::NONE.set,
+                EXTRAS_SET_PREVIOUS,
+                EXTRAS_SET_STABLE
+            ]
+        );
+        for choice in [&choices[0], &choices[2], &choices[3]] {
+            assert_eq!(choice.sel.bumps, [bump, 0, 0, 0]);
+            assert_eq!(choice.metas[1], AccountMeta::new(expected, false));
+        }
+        // Changing the cache must change the derived account, with no stale creator retained.
+        m.pool_cache[pump_swap_cache::CACHED_COIN_CREATOR] = Pubkey::new_unique();
+        assert_ne!(
+            resolve_entry(&entry, VenueKind::PumpSwap, &m).unwrap().0,
+            expected
+        );
+        // The on-chain parser provides the cached creator only for PumpSwap.
+        assert!(resolve_entry(&entry, VenueKind::RaydiumCpmm, &m).is_none());
+        assert!(resolve_entry(&entry, VenueKind::PumpCurve, &m).is_none());
+    }
 
     fn market(sol_first: bool, token_program: Pubkey) -> Market {
         let mut m: Market = bytemuck::Zeroable::zeroed();

@@ -9,6 +9,8 @@ test-ledger/
 # The invariant fuzzer's local output (tests/fuzz: `shortwin-fuzz run --out fuzz-out`, crash files
 # and summary.json).
 /fuzz-out/
+# Local audit working state; immutable review evidence is archived in docs/audit/.
+/.rust-auditor/
 
 # Program-id keypairs are never committed (address squatting); see docs/DEVELOPMENT.md.
 /keys/

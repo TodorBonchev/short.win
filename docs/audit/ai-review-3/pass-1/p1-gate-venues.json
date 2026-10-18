@@ -1,0 +1,605 @@
+{
+  "items": [
+    {
+      "program": "shortwin",
+      "function": "pricing_inputs",
+      "bug_class": "hardening-fixed-supply-fee-tier",
+      "kind": "LEAD",
+      "title": "The curve adapter uses a fixed supply for fees.",
+      "description": "The curve adapter selects the wrong fee after burns if Pump adds tiers; this review does not verify such a current schedule.",
+      "source_ids": [
+        "p1-a01-b01"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS: the conditional tier mismatch follows from pricing_inputs calling fees::pump_curve at 454 and 481.",
+          "reachability": "DEMOTE: fees.rs:45-50 says the deployed curve has one threshold-zero tier; no live multi-tier curve or unprivileged schedule update is proved.",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: fee-config keys and FEE_PROGRAM ownership block a caller-supplied schedule.",
+          "Init/admin: a venue-admin schedule change is required for the example.",
+          "Deposit/swap/withdraw/liquidate/close: no later gate evaluated after reachability demotion."
+        ],
+        "proof_limit": "The integer example proves a future-configuration mismatch, not a current venue charge; hardening remains a lead."
+      },
+      "known_issue_comparison": "Related to KI-77(b), which explicitly accepts retaining the ordinary 10^15 supply basis; the distinct ordinary-quote mismatch is conditional on multiple tiers.",
+      "code_smells": "The adapter uses fixed supply for ordinary and EMA fees, live supply for synthetic fees, and a parser that accepts several tiers."
+    },
+    {
+      "program": "shortwin-venue-state",
+      "function": "read_base",
+      "bug_class": "hardening-mint-type-unchecked",
+      "kind": "LEAD",
+      "title": "The base mint reader omits account type checks.",
+      "description": "A future caller that skips mint identity checks can accept token-account bytes as mint supply; current callers use constrained keys.",
+      "source_ids": [
+        "p1-a06-b01"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "BLOCKS current substitution: named mint identity and the pool LP-mint key bind read_base inputs; a caller cannot write a token-program-owned mint.",
+          "reachability": "NOT_EVALUATED",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: program mint keys are constrained, and pump_amm::check_read:408-412 binds the LP key to pool.lp_mint.",
+          "Init: authoritative mint checks and venue creation establish the account identity; runtime ownership prevents arbitrary replacement bytes.",
+          "Later stages: not evaluated after the current substitution path fails."
+        ],
+        "proof_limit": "The raw 166-byte counterexample is a parser counterexample only; no accepted Token-2022-owned account with those bytes is proved."
+      },
+      "known_issue_comparison": "No matching known issue identified; the defensive parser gap remains a hardening lead.",
+      "code_smells": "read_base checks the owner and minimum length but omits the Token-2022 account type and padding checks."
+    },
+    {
+      "program": "shortwin",
+      "function": "parse",
+      "bug_class": "hardening-vault-authority-unchecked",
+      "kind": "LEAD",
+      "title": "The Raydium readers omit vault authority checks.",
+      "description": "A future venue authority change can make the readers accept vaults that the swap authority cannot spend; no current transition is proved.",
+      "source_ids": [
+        "p1-a06-b02",
+        "p1-a09-b02"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "BLOCKS current substitution: adoption verifies the constant venue authority, subsequent reads pin the vault keys, and an outsider cannot change a venue PDA authority.",
+          "reachability": "NOT_EVALUATED",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: raydium_v4::parse:154-163 and raydium_cpmm::parse:178-189 bind vault keys, programs, and mints.",
+          "Init/adoption: v4::verify:304-310 and cpmm::verify:393-403 require the constant venue authority.",
+          "Swap: token authority validation prevents unauthorized spending; no public authority mutation is proved.",
+          "Later gates: not evaluated."
+        ],
+        "proof_limit": "Both raw reports identify the same two missing read-time checks; they do not establish an attacker-controlled authority transition."
+      },
+      "known_issue_comparison": "No matching known issue identified; both reporters raise only hardening, so agreement does not promote the lead.",
+      "code_smells": "Both parse functions check vault keys, token programs, and mints but omit the authorities that their verify functions check."
+    },
+    {
+      "program": "shortwin",
+      "function": "math_tiers",
+      "bug_class": "unbounded-tier-allocation",
+      "kind": "LEAD",
+      "title": "The adapters copy every fee tier into the heap.",
+      "description": "A fee-config expansion can exhaust the program heap before a reader returns no route; this pass does not prove a failing tier count.",
+      "source_ids": [
+        "p1-a06-b03"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "DEMOTE: the raw report proves allocation proportional to count but supplies neither a reachable count nor an instruction allocation trace that exhausts the heap.",
+          "reachability": "NOT_EVALUATED",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: fee-config ownership, discriminator, and fixed keys prevent arbitrary attacker vectors.",
+          "Init/admin: an external fee-config expansion is required; its setter bound is unverified.",
+          "Later gates: not evaluated after the execution proof is incomplete."
+        ],
+        "proof_limit": "The account capacity and default heap size alone do not prove exhaustion; no tests, builds, or runtime reproduction ran."
+      },
+      "known_issue_comparison": "No matching known issue identified; this is an unresolved availability lead rather than a compute micro-optimization.",
+      "code_smells": "Both math_tiers functions collect every parsed tier into a Vec, while tiers_at limits the count only by account length."
+    },
+    {
+      "program": "shortwin",
+      "function": "elf_fingerprint_of",
+      "bug_class": "hardening-truncated-elf-digest",
+      "kind": "LEAD",
+      "title": "The guard keeps twelve bytes of the ELF hash.",
+      "description": "A venue authority can seek two ELF files with one fingerprint; this review does not prove a practical collision.",
+      "source_ids": [
+        "p1-a06-b04",
+        "p1-a11-b06"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS conditionally: is_upgrade accepts a grown account whose trimmed ELF has the stored prefix.",
+          "reachability": "DEMOTE: neither report provides colliding executable ELFs or establishes a feasible reachable collision; the generic bound alone is not an exploit.",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: constant ProgramData keys and loader owner prevent substitution.",
+          "Init/admin: revalidate_venue records elf_fingerprint_of of the reviewed hash.",
+          "Flag: is_upgrade compares only the stored prefix after a length change.",
+          "Trigger/impact: not evaluated after reachability demotion."
+        ],
+        "proof_limit": "Chosen-pair work is generically about 2^48 hashes; replacing a fixed reviewed ELF is about 2^96; neither estimate supplies an actual pair."
+      },
+      "known_issue_comparison": "KI-69(b) discloses the 96-bit fingerprint; AIR2-07 explicitly leaves the chosen-pair/full-digest migration issue open; disclosure does not prove exploitation or closure.",
+      "code_smells": "elf_fingerprint_of retains 12 SHA-256 bytes, and is_upgrade compares that prefix after ProgramData grows."
+    },
+    {
+      "program": "shortwin",
+      "function": "exit_risk_cap_bps",
+      "bug_class": "live-supply-risk-fee",
+      "kind": "LEAD",
+      "title": "A supply burn can raise the PumpSwap risk fee.",
+      "description": "A holder can burn tokens before liquidation and raise the risk fee; this pass does not prove a profitable liquidation.",
+      "source_ids": [
+        "p1-a06-b05"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS the fee change: pump_amm::read_state:702-722 passes the live supply into both tier resolutions.",
+          "reachability": "ALLOWS: a holder can burn its own tokens and cross an existing PumpSwap fee tier.",
+          "trigger": "ALLOWS: a holder can compose a burn with a permissionless liquidation.",
+          "impact": "DEMOTE: no concrete healthy position, complete assessment trace, or profitable harmful liquidation is independently proved."
+        },
+        "guard_trace": [
+          "Accounts/init: named mint and venue fee-config identity remain constrained.",
+          "Swap: a burn changes actual mint supply without requiring a forged account.",
+          "Liquidate: exit_risk_cap_bps:824-825 limits the quote by the EMA-price fee, but that fee still uses the live supply."
+        ],
+        "proof_limit": "The source proves the mutable fee input; existing disclosure and referenced tests are comparison context, not reproduced harm proof."
+      },
+      "known_issue_comparison": "Matches KI-72 and its explicitly accepted supply-burn residual; retain the narrower source-supported lead without importing the disclosure's liquidation result.",
+      "code_smells": "PumpSwap resolves both live and EMA fee tiers from the current mint supply, so the EMA price does not fix this input."
+    },
+    {
+      "program": "shortwin",
+      "function": "pricing_inputs",
+      "bug_class": "live-supply-synthetic-risk-fee",
+      "kind": "LEAD",
+      "title": "A burn can raise the curve synthetic risk fee.",
+      "description": "A holder can raise the synthetic risk fee after a burn under multiple tiers; this pass does not prove a liquidation.",
+      "source_ids": [
+        "p1-a06-b06"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS conditionally: pricing_inputs:470-472 uses live supply for the synthetic fee, which the risk quote retains.",
+          "reachability": "DEMOTE: the documented curve schedule is flat; no current multi-tier schedule or full tier-boundary liquidation is proved.",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: the fixed fee-config key and FEE_PROGRAM owner block user-supplied tiers.",
+          "Init/admin: a fee schedule change must precede the conditional burn path.",
+          "Later gates: not evaluated."
+        ],
+        "proof_limit": "This affects synthetic quotes past rT and does not establish a live flat-schedule exploit."
+      },
+      "known_issue_comparison": "Matches KI-77(a), explicitly accepted and conditional on multiple curve fee tiers; the source evidence does not reproduce a liquidation.",
+      "code_smells": "pricing_inputs resolves synthetic_fees from the current supply, and risk quotes retain it under the position hard cap."
+    },
+    {
+      "program": "shortwin",
+      "function": "pricing_inputs",
+      "bug_class": "synthetic-fee-gate-basis-mismatch",
+      "kind": "LEAD",
+      "title": "The curve fee gates use a different supply basis.",
+      "description": "The curve fee gates can admit a lower fee than a synthetic exit pays; this requires a tier boundary between the supply bases.",
+      "source_ids": [
+        "p1-a06-b07"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS conditionally: pricing_inputs:454 uses ordinary fees while :470-472 resolves synthetic fees separately; cap_fee_ppm uses the ordinary fee.",
+          "reachability": "DEMOTE: the pinned flat curve schedule makes the fees equal; no current multi-tier open and exit trace is proved.",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: fee-config identity and owner prevent substitution.",
+          "Init/admin: activating distinct tiers requires a venue fee-config change.",
+          "Later gates: not evaluated."
+        ],
+        "proof_limit": "A supply snapshot alone does not align the gate with all admitted buyback routes, so this remains separate from the synthetic-risk-supply lead."
+      },
+      "known_issue_comparison": "Matches the separately accepted KI-77(b) gate-versus-synthetic basis difference; its old numerical example is not independent proof here.",
+      "code_smells": "Ordinary fee gates use the fixed 10^15 supply, while synthetic exits resolve their fee from the live supply."
+    },
+    {
+      "program": "shortwin",
+      "function": "read_state_boxed_for_exit",
+      "bug_class": "curve-risk-fee-at-spot",
+      "kind": "LEAD",
+      "title": "Curve risk quotes retain the fee resolved at spot.",
+      "description": "A keeper can raise the curve risk fee with a sale under multiple tiers; this pass does not prove a liquidation.",
+      "source_ids": [
+        "p1-a06-b08"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS conditionally: read_state_boxed_for_exit:1085 excludes the curve and exit_risk_cap_bps gives it only the hard cap.",
+          "reachability": "DEMOTE: the current documented curve fee is flat; the raw report lacks a reachable tiered-schedule liquidation through all assessment checks.",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: fixed fee-config owner and key reject fabricated tiers.",
+          "Init/admin: a curve fee-config change is required.",
+          "Later gates: not evaluated."
+        ],
+        "proof_limit": "This is the ordinary fee at the reserve ratio, distinct from the live-supply synthetic fee; no complete harmful liquidation is proved."
+      },
+      "known_issue_comparison": "Related to AIR-10 and KI-77 but not the same fix: the ordinary curve risk view needs its own EMA fee resolution; no exact known issue match identified.",
+      "code_smells": "read_state_boxed_for_exit enables the EMA fee only for PumpSwap, and ordinary curve risk quotes retain the fee from live reserves."
+    },
+    {
+      "program": "shortwin",
+      "function": "sweep_trader",
+      "bug_class": "external-cashback-recovery-dependency",
+      "kind": "LEAD",
+      "title": "Cashback cleanup depends on external claim instructions.",
+      "description": "A venue upgrade can leave donated cashback unclaimable and keep deposits closed; the current claim interfaces still work.",
+      "source_ids": [
+        "p1-a07-b04"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS conditionally: a funded UVA or cashback ATA keeps rewards_clear false; the required rewards bit then blocks deposit_in.",
+          "reachability": "DEMOTE: a changed or removed external claim interface is required, and no deployed failing interface is proved.",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts/init: legitimate canonical cashback accounts can receive third-party donations.",
+          "Admin: the unavailable-interface state depends on a venue upgrade, not a demonstrated current public action.",
+          "Deposit: pool::deposit_in:2027-2033 requires the reward-source bit.",
+          "Close/sweep: sweep_trader:248-261 and :334-346 leave that bit clear while cashback remains.",
+          "Trigger/impact: not evaluated after reachability demotion."
+        ],
+        "proof_limit": "The keeper source explicitly notes this interface dependency; no current lasting lock is established, and old-lender cashback needs an explicit recovery policy."
+      },
+      "known_issue_comparison": "Related to AIR2-05 and KI-10 sweep accounting, but distinct from AIR2-12 noncanonical cashback: this candidate concerns unavailable external claims.",
+      "code_smells": "sweep_trader sets the rewards bit only when external cashback balances reach zero, and the keeper relies on venue claim instructions."
+    },
+    {
+      "program": "shortwin",
+      "function": "deposit",
+      "bug_class": "hardening-pool-vault-fields-unchecked",
+      "kind": "LEAD",
+      "title": "Pool vault loads omit token field constraints.",
+      "description": "A future vault importer can admit the wrong asset because the loaders omit checks of the vault mint, authority, and token program.",
+      "source_ids": [
+        "p1-a09-b01"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "BLOCKS current substitution: pool_vault is the market-specific PDA and stored key, initialized by create_pool_vault with the selected mint, token program, and market authority.",
+          "reachability": "NOT_EVALUATED",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: every listed instruction pins the vault PDA; the Market has_one relationships pin the stored account and token program.",
+          "Init: create_pool_vault:281-349 signs creation or allocation with the PDA, then initializes the mint and authority.",
+          "Deposit/swap/withdraw: token CPIs validate program and authority and roll back on failure.",
+          "Later gates: not evaluated after substitution is blocked."
+        ],
+        "proof_limit": "No current account substitution, authority change, or false balance-credit path is proved; missing redundant checks remain hardening."
+      },
+      "known_issue_comparison": "No matching known issue identified; the creation invariant is a real current guard, not assumed operator behavior.",
+      "code_smells": "The canonical vault PDA and stored key are checked, but deposit, withdraw, open_short, close_short, liquidate, and expire omit explicit token field constraints."
+    },
+    {
+      "program": "shortwin",
+      "function": "init_uva",
+      "bug_class": "hardening-existing-uva-validation",
+      "kind": "LEAD",
+      "title": "Existing Pump UVAs skip full validation at listing.",
+      "description": "A future venue layout change can let a caller list a market with an existing UVA that later fails the stricter trade checks.",
+      "source_ids": [
+        "p1-a09-b03"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "BLOCKS current hostile bytes: init_uva pins the derived venue PDA and owner; an outside caller cannot write arbitrary bytes to that account.",
+          "reachability": "NOT_EVALUATED",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts/init: pump_curve::init_uva:1041-1048 and pump_amm::init_uva:1155-1162 pin the UVA and owner before the early return.",
+          "Swap: pump_curve::check_uva:766-780 and pump_amm::uva_ok:469-478 decode the account and compare its user to the trader.",
+          "Later gates: not evaluated after the hostile-state path fails."
+        ],
+        "proof_limit": "No current unauthorized venue write or signer bypass is proved; the helpers are internal listing helpers, not public initialization dispatches."
+      },
+      "known_issue_comparison": "No matching known issue identified; a future venue layout incompatibility remains a hardening lead.",
+      "code_smells": "Both init_uva helpers accept a nonempty account with the correct venue owner before decoding its discriminator or stored user."
+    },
+    {
+      "program": "shortwin-math",
+      "function": "pump_curve",
+      "bug_class": "hardening-fixed-supply-fee-basis",
+      "kind": "LEAD",
+      "title": "Normal curve quotes use the original mint supply.",
+      "description": "A token holder gets inaccurate curve quotes after a burn if Pump adds fee tiers; the source says its current single tier prevents this.",
+      "source_ids": [
+        "p1-a10-b01"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS the conditional arithmetic mismatch: fees::pump_curve:164-165 calls curve_fees_at with 10^15 rather than the live supply.",
+          "reachability": "DEMOTE: the documented deployed curve has one flat tier, and fee-config ownership prevents a caller from supplying the hypothetical schedule.",
+          "trigger": "NOT_EVALUATED",
+          "impact": "NOT_EVALUATED"
+        },
+        "guard_trace": [
+          "Accounts: the venue fee-config owner, discriminator, and key bind the schedule.",
+          "Init/admin: a multi-tier fee schedule change is required for unequal supply bases to select different fees.",
+          "Later gates: not evaluated."
+        ],
+        "proof_limit": "Pure arithmetic supports the hypothetical quote difference; no real multi-tier curve configuration or deployed exploit is proved."
+      },
+      "known_issue_comparison": "Related to the explicitly accepted fixed-basis part of KI-77; retained separately from the adapter function because the raw primary site is fees::pump_curve.",
+      "code_smells": "pump_curve resolves fees with PUMP_CURVE_MCAP_SUPPLY, while the synthetic resolver receives the live supply."
+    },
+    {
+      "program": "shortwin",
+      "function": "flag_venue_upgraded",
+      "bug_class": "unhashed-slot-upgrade-latch",
+      "kind": "FINDING",
+      "title": "Hashless venue guards let outsiders block new opens.",
+      "description": "An outsider can extend a growable venue without a stored ELF hash, then block new opens until Emergency revalidation.",
+      "source_ids": [
+        "p1-a11-b05"
+      ],
+      "gate_evidence": {
+        "gates": {
+          "execution": "ALLOWS: legitimate ProgramData satisfies the fixed key, loader owner, and tag checks; an extension moves its slot, and absent fingerprints skip is_upgrade.",
+          "reachability": "ALLOWS: initialize_config enables unflagged venues with zero fingerprint lengths; exact-slot revalidate_venue also accepts a zero hash and clears the fingerprint.",
+          "trigger": "ALLOWS: an outsider pays the extension rent and calls permissionless flag_venue_upgraded; no venue upgrade signature is needed.",
+          "impact": "CONFIRMED bounded interruption: open_short and candidate adoption fail while latched until Emergency revalidation; exits, add_margin, and withdrawals do not consult this latch."
+        },
+        "guard_trace": [
+          "Accounts: FlagVenueUpgraded checks the canonical VenueGuard PDA, index, constant ProgramData key, and loader owner; it has no signer role.",
+          "Init: initialize_config:156-160 writes upgraded = 0 and guard_slot without a fingerprint.",
+          "Admin: revalidate_venue:72-83 permits a zero hash at the exact slot; :104-108 clears the fingerprint and bit. A hashed review remains an available recovery.",
+          "Deposit: no guard path creates a permanent deposit or withdrawal lock in this candidate.",
+          "Swap/open: flag_venue_upgraded:126-137 records the changed slot with no fingerprint; open_short:291 and engine::guard::latch:110-115 reject every open under the venue mask. Both Raydium kinds share the mask; candidate_latch uses the candidate program bit.",
+          "Withdraw/liquidate/close: these exit paths do not read VenueGuard; the claim is bounded to new opens and affected listing/adoption paths."
+        ],
+        "runtime_support": "Installed solana-bpf-loader-program 4.2.2 dispatches ExtendProgram with check_authority=false; common_extend_program requires a writable matching upgradeable ProgramData, capacity, a later slot, and rent funding, then grows data and writes clock_slot. Use 10 KiB, or the remaining capacity if smaller, to satisfy the optional minimum-size feature.",
+        "confidence_basis": "100 - 15 bounded/recoverable interruption - 10 specific achievable hashless, still-growable venue state = 75. Initialization already creates this state, so no separate honest-admin-call deduction applies.",
+        "proof_limit": "Static source proof only. No deployment query established present lengths or fingerprint state. The claim applies to source-identified growable venues with headroom and a hashless guard; pump and PumpSwap at the 10 MiB cap are excluded. It does not claim locked existing funds or an unavailable Emergency recovery."
+      },
+      "known_issue_comparison": "Exact match to accepted KI-69(a): the runbook calls for hashed revalidations after init, and the owner accepted the residual. This acceptance is reported, but the client/runbook is not an on-chain guard. The unprivileged extension is the amplifier; this is distinct from AIR2-07 collision hardening.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "Require a hash before enabling growable venues",
+          "diff": "--- a/programs/shortwin/src/instructions/initialize_config.rs\n+++ b/programs/shortwin/src/instructions/initialize_config.rs\n@@ -156,7 +156,8 @@\n         let mut g = ctx.accounts.venue_guard.load_init()?;\n         g.version = VENUE_GUARD_VERSION;\n         g.bump = ctx.bumps.venue_guard;\n-        g.upgraded = 0;\n+        g.upgraded = ((1u32 << crate::state::GUARD_ELF_VENUES) - 1)\n+            << crate::state::GUARD_ELF_FIRST;\n         g.guard_slot = args.guard_slot;\n     }\n     let extras = [\n--- a/programs/shortwin/src/instructions/revalidate_venue.rs\n+++ b/programs/shortwin/src/instructions/revalidate_venue.rs\n@@ -72,6 +72,7 @@\n     let slot = read_deploy_slot(&ctx.accounts.program_data)?;\n     let hashed = expected_elf_hash != [0u8; 32];\n     let fingerprinted = VenueGuard::elf_index(venue).is_some();\n+    require!(!fingerprinted || hashed, ShortwinError::InvalidParams);\n     if slot != expected_slot {\n         // AIR-01: the reviewed deploy, only extended since, still holds the reviewed ELF.\n         require!(hashed && fingerprinted, ShortwinError::VenueSlotMismatch);"
+        }
+      ]
+    }
+  ],
+  "dispositions": [
+    {
+      "raw_id": "p1-a01-b01",
+      "verdict": "LEAD",
+      "key": "shortwin|pricing-inputs|hardening-fixed-supply-fee-tier",
+      "reason": "The integer example proves a future-configuration mismatch, not a current venue charge; hardening remains a lead.",
+      "gates": {
+        "execution": "ALLOWS: the conditional tier mismatch follows from pricing_inputs calling fees::pump_curve at 454 and 481.",
+        "reachability": "DEMOTE: fees.rs:45-50 says the deployed curve has one threshold-zero tier; no live multi-tier curve or unprivileged schedule update is proved.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a06-b01",
+      "verdict": "LEAD",
+      "key": "shortwin-venue-state|read-base|hardening-mint-type-unchecked",
+      "reason": "The raw 166-byte counterexample is a parser counterexample only; no accepted Token-2022-owned account with those bytes is proved.",
+      "gates": {
+        "execution": "BLOCKS current substitution: named mint identity and the pool LP-mint key bind read_base inputs; a caller cannot write a token-program-owned mint.",
+        "reachability": "NOT_EVALUATED",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a06-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|parse|hardening-vault-authority-unchecked",
+      "reason": "Both raw reports identify the same two missing read-time checks; they do not establish an attacker-controlled authority transition.",
+      "gates": {
+        "execution": "BLOCKS current substitution: adoption verifies the constant venue authority, subsequent reads pin the vault keys, and an outsider cannot change a venue PDA authority.",
+        "reachability": "NOT_EVALUATED",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a09-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|parse|hardening-vault-authority-unchecked",
+      "reason": "Both raw reports identify the same two missing read-time checks; they do not establish an attacker-controlled authority transition.",
+      "gates": {
+        "execution": "BLOCKS current substitution: adoption verifies the constant venue authority, subsequent reads pin the vault keys, and an outsider cannot change a venue PDA authority.",
+        "reachability": "NOT_EVALUATED",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a06-b03",
+      "verdict": "LEAD",
+      "key": "shortwin|math-tiers|unbounded-tier-allocation",
+      "reason": "The account capacity and default heap size alone do not prove exhaustion; no tests, builds, or runtime reproduction ran.",
+      "gates": {
+        "execution": "DEMOTE: the raw report proves allocation proportional to count but supplies neither a reachable count nor an instruction allocation trace that exhausts the heap.",
+        "reachability": "NOT_EVALUATED",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a06-b04",
+      "verdict": "LEAD",
+      "key": "shortwin|elf-fingerprint-of|hardening-truncated-elf-digest",
+      "reason": "Same helper and truncated-prefix mechanism; retain the hardening label and lead status, with no collision claimed.",
+      "gates": {
+        "execution": "ALLOWS conditionally: is_upgrade accepts a grown account whose trimmed ELF has the stored prefix.",
+        "reachability": "DEMOTE: neither report provides colliding executable ELFs or establishes a feasible reachable collision; the generic bound alone is not an exploit.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a11-b06",
+      "verdict": "LEAD",
+      "key": "shortwin|elf-fingerprint-of|hardening-truncated-elf-digest",
+      "reason": "Same helper and truncated-prefix mechanism; retain the hardening label and lead status, with no collision claimed.",
+      "gates": {
+        "execution": "ALLOWS conditionally: is_upgrade accepts a grown account whose trimmed ELF has the stored prefix.",
+        "reachability": "DEMOTE: neither report provides colliding executable ELFs or establishes a feasible reachable collision; the generic bound alone is not an exploit.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a06-b05",
+      "verdict": "LEAD",
+      "key": "shortwin|exit-risk-cap-bps|live-supply-risk-fee",
+      "reason": "The source proves the mutable fee input; existing disclosure and referenced tests are comparison context, not reproduced harm proof.",
+      "gates": {
+        "execution": "ALLOWS the fee change: pump_amm::read_state:702-722 passes the live supply into both tier resolutions.",
+        "reachability": "ALLOWS: a holder can burn its own tokens and cross an existing PumpSwap fee tier.",
+        "trigger": "ALLOWS: a holder can compose a burn with a permissionless liquidation.",
+        "impact": "DEMOTE: no concrete healthy position, complete assessment trace, or profitable harmful liquidation is independently proved."
+      }
+    },
+    {
+      "raw_id": "p1-a06-b06",
+      "verdict": "LEAD",
+      "key": "shortwin|pricing-inputs|live-supply-synthetic-risk-fee",
+      "reason": "This affects synthetic quotes past rT and does not establish a live flat-schedule exploit.",
+      "gates": {
+        "execution": "ALLOWS conditionally: pricing_inputs:470-472 uses live supply for the synthetic fee, which the risk quote retains.",
+        "reachability": "DEMOTE: the documented curve schedule is flat; no current multi-tier schedule or full tier-boundary liquidation is proved.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a06-b07",
+      "verdict": "LEAD",
+      "key": "shortwin|pricing-inputs|synthetic-fee-gate-basis-mismatch",
+      "reason": "A supply snapshot alone does not align the gate with all admitted buyback routes, so this remains separate from the synthetic-risk-supply lead.",
+      "gates": {
+        "execution": "ALLOWS conditionally: pricing_inputs:454 uses ordinary fees while :470-472 resolves synthetic fees separately; cap_fee_ppm uses the ordinary fee.",
+        "reachability": "DEMOTE: the pinned flat curve schedule makes the fees equal; no current multi-tier open and exit trace is proved.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a06-b08",
+      "verdict": "LEAD",
+      "key": "shortwin|read-state-boxed-for-exit|curve-risk-fee-at-spot",
+      "reason": "This is the ordinary fee at the reserve ratio, distinct from the live-supply synthetic fee; no complete harmful liquidation is proved.",
+      "gates": {
+        "execution": "ALLOWS conditionally: read_state_boxed_for_exit:1085 excludes the curve and exit_risk_cap_bps gives it only the hard cap.",
+        "reachability": "DEMOTE: the current documented curve fee is flat; the raw report lacks a reachable tiered-schedule liquidation through all assessment checks.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a07-b04",
+      "verdict": "LEAD",
+      "key": "shortwin|sweep-trader|external-cashback-recovery-dependency",
+      "reason": "The keeper source explicitly notes this interface dependency; no current lasting lock is established, and old-lender cashback needs an explicit recovery policy.",
+      "gates": {
+        "execution": "ALLOWS conditionally: a funded UVA or cashback ATA keeps rewards_clear false; the required rewards bit then blocks deposit_in.",
+        "reachability": "DEMOTE: a changed or removed external claim interface is required, and no deployed failing interface is proved.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a09-b01",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "reason": "No current account substitution, authority change, or false balance-credit path is proved; missing redundant checks remain hardening.",
+      "gates": {
+        "execution": "BLOCKS current substitution: pool_vault is the market-specific PDA and stored key, initialized by create_pool_vault with the selected mint, token program, and market authority.",
+        "reachability": "NOT_EVALUATED",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a09-b03",
+      "verdict": "LEAD",
+      "key": "shortwin|init-uva|hardening-existing-uva-validation",
+      "reason": "No current unauthorized venue write or signer bypass is proved; the helpers are internal listing helpers, not public initialization dispatches.",
+      "gates": {
+        "execution": "BLOCKS current hostile bytes: init_uva pins the derived venue PDA and owner; an outside caller cannot write arbitrary bytes to that account.",
+        "reachability": "NOT_EVALUATED",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a10-b01",
+      "verdict": "LEAD",
+      "key": "shortwin-math|pump-curve|hardening-fixed-supply-fee-basis",
+      "reason": "Pure arithmetic supports the hypothetical quote difference; no real multi-tier curve configuration or deployed exploit is proved.",
+      "gates": {
+        "execution": "ALLOWS the conditional arithmetic mismatch: fees::pump_curve:164-165 calls curve_fees_at with 10^15 rather than the live supply.",
+        "reachability": "DEMOTE: the documented deployed curve has one flat tier, and fee-config ownership prevents a caller from supplying the hypothetical schedule.",
+        "trigger": "NOT_EVALUATED",
+        "impact": "NOT_EVALUATED"
+      }
+    },
+    {
+      "raw_id": "p1-a11-b05",
+      "verdict": "FINDING",
+      "key": "shortwin|flag-venue-upgraded|unhashed-slot-upgrade-latch",
+      "reason": "Retain the concrete bounded outsider path with the accepted KI-69(a) disclosure and present-deployment limits explicit; only one raw minimal diff exists.",
+      "gates": {
+        "execution": "ALLOWS: legitimate ProgramData satisfies the fixed key, loader owner, and tag checks; an extension moves its slot, and absent fingerprints skip is_upgrade.",
+        "reachability": "ALLOWS: initialize_config enables unflagged venues with zero fingerprint lengths; exact-slot revalidate_venue also accepts a zero hash and clears the fingerprint.",
+        "trigger": "ALLOWS: an outsider pays the extension rent and calls permissionless flag_venue_upgraded; no venue upgrade signature is needed.",
+        "impact": "CONFIRMED bounded interruption: open_short and candidate adoption fail while latched until Emergency revalidation; exits, add_margin, and withdrawals do not consult this latch."
+      }
+    }
+  ],
+  "dedup_notes": [
+    "16 raw candidates produce 14 items: 1 finding and 13 leads; 0 raw candidates rejected. Every raw ID has one disposition.",
+    "Merged p1-a06-b02 and p1-a09-b02: both quote the same Raydium parse checks in both loaders and request the same authority checks; both are hardening leads.",
+    "Merged p1-a06-b04 and p1-a11-b06: both quote elf_fingerprint_of and the same 12-byte comparison. The hardening label is retained so no hardening item becomes a normal finding.",
+    "Do not merge p1-a01-b01 with p1-a10-b01: adapter pricing_inputs and library pump_curve are different primary functions in different canonical programs; related helper citations alone do not license renaming or cross-function lead folding.",
+    "Keep pricing_inputs synthetic-risk supply and synthetic-fee gate mismatch separate: a supply snapshot does not align fee gates, while route-aware gates do not fix mutable risk supply.",
+    "Keep ordinary curve spot-risk fees separate from the synthetic live-supply risk fee: the former needs the ordinary EMA risk view; the latter needs supply handling.",
+    "Only p1-a11-b05 supplies raw diff ADD lines among these candidates. Its sole diff is preserved verbatim; there are no distinct alternative raw diffs to omit or synthesize.",
+    "Initial ledger is empty. Existing issue rows and prejudgment context are comparison context only, and no referenced test was treated as reproduced proof.",
+    "No build, test, runtime reproduction, deployment query, or source edit ran. Guards were judged once in Accounts -> init -> admin -> deposit -> swap -> withdraw -> liquidate -> close order; later gates are marked not evaluated after a failure."
+  ]
+}

@@ -297,7 +297,6 @@ export function ShortPanel({ mint }: { mint: Address }) {
                                 {trade.buildError}
                             </div>
                         )}
-                        {!connected && <ConnectCta surface="short" />}
                         <Button
                             disabled={refreshReason !== null}
                             busy={refreshing && trade.building}

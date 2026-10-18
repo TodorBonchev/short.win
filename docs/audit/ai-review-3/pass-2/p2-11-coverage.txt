@@ -1,0 +1,163 @@
+Pass 2 specialist 11: trust-gap. Completed bounded static review.
+Frozen commit: b815269224ba0f5d946f49de7e113220c4067041.
+No repository edits, builds, tests, runtime reproduction, live interaction, or subagents.
+Output: 1 FINDING and 1 LEAD, both independently confirmed or re-encountered under exact known labels.
+
+Coverage method: production reads came from agent-11-bundle.md; source-index.tsv supplied boundaries.
+The complete 58,914-line source bundle was NOT read. No claim of complete repository coverage.
+Line intervals below are actual read ranges, including adjacent comments and limited test context.
+
+Full production code read (tests were not exhaustively read):
+./programs/shortwin/src/instructions/crank_sol_usd.rs
+./programs/shortwin/src/instructions/set_coverage_pause.rs
+./programs/shortwin/src/instructions/set_venue_extras.rs
+./services/keeper/src/coverage.rs
+./services/keeper/src/decide.rs
+./services/keeper/src/monitor.rs
+./services/keeper/src/venue.rs
+./services/keeper/src/view.rs
+
+All bounded source reads, with exact bundle intervals and corresponding source line offsets:
+./crates/shortwin-venue-state/src/pyth.rs: bundle 20865-21141 / source 121-397
+./programs/shortwin/src/instructions/crank_sol_usd.rs: bundle 30388-30525 / source 1-138
+./programs/shortwin/src/instructions/set_coverage_pause.rs: bundle 34648-34760 / source 1-113
+./programs/shortwin/src/instructions/set_venue_extras.rs: bundle 34939-35140 / source 1-202
+./programs/shortwin/src/state/venue_extras.rs: bundle 40740-40830 / source 1-91
+./programs/shortwin/src/venues/mod.rs: bundle 41512-41890 / source 1-379; bundle 42735-42865 / source 1224-1354
+./programs/shortwin/src/venues/pump_amm.rs: bundle 43452-43530 / source 1-79; bundle 43700-43855 / source 249-404
+./services/keeper/src/budget.rs: bundle 48673-49180 / source 1-508
+./services/keeper/src/coverage.rs: bundle 50449-51350 / source 1-902
+./services/keeper/src/decide.rs: bundle 52006-52545 / source 1-540
+./services/keeper/src/monitor.rs: bundle 53796-54569 / source 1-774
+./services/keeper/src/venue.rs: bundle 57185-58155 / source 1-971
+./services/keeper/src/view.rs: bundle 58523-58911 / source 1-389
+
+Additional cross-file search and context:
+- Bundle-wide headings, cfg(test) boundaries, extras placeholders, resolve_entry, choice_of, extras_candidates, parse/check_entry, decode_zc, load_with_positions, and coin_creator references were searched with rg.
+- services/keeper/src/keeper.rs was search context and read only at lines 2830-2910 to trace attempt_trading callers; it is not in the assigned source bundle.
+- Original source was not re-read for the initial scan. Bundle snippets were line-numbered for exact evidence.
+- Build context/manifests: bundle lines 1-300 were read; services/Cargo.toml beyond the opening was not fully read. Release overflow context came from the assignment and bundle header.
+- Specialist, shared rules, and report language: bundle lines 58915-59320.
+- Catalogue: 59335-59558, 59612-59621, 59699-59713, 59758-59798, 59840-59883, 59936-60030; other catalogue entries were search-only or not read.
+- Account-map review table and known-finding appendix were inspected; one combined output was truncated, and relevant catalogue/lead areas were read again with bounded output. No complete account-map instruction-detail review is claimed.
+- Known appendix 61411-61542 was available and read.
+
+Trust transitions examined:
+- Keeper observations, foreign extreme detection, recovery, and the constrained on-chain coverage pause authority.
+- ProgramData/header/hash monitor facts and pool administration alerts; reviewed functions alone do not prove an external upgrade attack.
+- Keeper liquidation/expiry projections, live venue input construction, and extras template authority-to-client behavior.
+- Pyth owner/address/feed/full-verification/time/step checks and the cached price update.
+- Keeper account owner/discriminator decoding versus on-chain layout version checks.
+- Global budget value-at-risk classification and early entitlement/ranking code only; remaining budget logic was unread.
+
+Unread source files (except bundle-wide search hits, when present):
+./crates/shortwin-math/src/bounds.rs
+./crates/shortwin-math/src/caps.rs
+./crates/shortwin-math/src/consts.rs
+./crates/shortwin-math/src/error.rs
+./crates/shortwin-math/src/fees.rs
+./crates/shortwin-math/src/lib.rs
+./crates/shortwin-math/src/num/mod.rs
+./crates/shortwin-math/src/num/u256.rs
+./crates/shortwin-math/src/observe.rs
+./crates/shortwin-math/src/params.rs
+./crates/shortwin-math/src/persist.rs
+./crates/shortwin-math/src/pool.rs
+./crates/shortwin-math/src/pool_select.rs
+./crates/shortwin-math/src/quote/cpmm.rs
+./crates/shortwin-math/src/quote/mod.rs
+./crates/shortwin-math/src/quote/pricing.rs
+./crates/shortwin-math/src/quote/ray_v4.rs
+./crates/shortwin-math/src/quote/reprice.rs
+./crates/shortwin-math/src/quote/sol_leg.rs
+./crates/shortwin-math/src/quote/straddle.rs
+./crates/shortwin-math/src/rent.rs
+./crates/shortwin-math/src/risk.rs
+./crates/shortwin-math/src/settle.rs
+./crates/shortwin-math/src/tier.rs
+./crates/shortwin-math/src/waterfall.rs
+./crates/shortwin-venue-state/src/bytes.rs
+./crates/shortwin-venue-state/src/lib.rs
+./crates/shortwin-venue-state/src/mint.rs
+./crates/shortwin-venue-state/src/program_data.rs
+./crates/shortwin-venue-state/src/pump.rs
+./crates/shortwin-venue-state/src/pump_amm.rs
+./crates/shortwin-venue-state/src/raydium_cpmm.rs
+./crates/shortwin-venue-state/src/raydium_v4.rs
+./crates/shortwin-venue-state/src/token_account.rs
+./programs/shortwin/src/constants.rs
+./programs/shortwin/src/engine/arming.rs
+./programs/shortwin/src/engine/bounds.rs
+./programs/shortwin/src/engine/caps.rs
+./programs/shortwin/src/engine/guard.rs
+./programs/shortwin/src/engine/lender.rs
+./programs/shortwin/src/engine/mod.rs
+./programs/shortwin/src/engine/observe.rs
+./programs/shortwin/src/engine/pool_select.rs
+./programs/shortwin/src/engine/prologue.rs
+./programs/shortwin/src/engine/route.rs
+./programs/shortwin/src/engine/tier.rs
+./programs/shortwin/src/engine/trader.rs
+./programs/shortwin/src/engine/waterfall.rs
+./programs/shortwin/src/errors.rs
+./programs/shortwin/src/events.rs
+./programs/shortwin/src/instructions/add_margin.rs
+./programs/shortwin/src/instructions/apply_config.rs
+./programs/shortwin/src/instructions/cancel_config.rs
+./programs/shortwin/src/instructions/claim_sol.rs
+./programs/shortwin/src/instructions/close_short.rs
+./programs/shortwin/src/instructions/cover_deficit.rs
+./programs/shortwin/src/instructions/crank_price.rs
+./programs/shortwin/src/instructions/create_market.rs
+./programs/shortwin/src/instructions/deposit.rs
+./programs/shortwin/src/instructions/disable_venue.rs
+./programs/shortwin/src/instructions/execute_pool_switch.rs
+./programs/shortwin/src/instructions/expire.rs
+./programs/shortwin/src/instructions/flag_unsafe_mint.rs
+./programs/shortwin/src/instructions/flag_venue_upgraded.rs
+./programs/shortwin/src/instructions/initialize_config.rs
+./programs/shortwin/src/instructions/liquidate.rs
+./programs/shortwin/src/instructions/mod.rs
+./programs/shortwin/src/instructions/open_short.rs
+./programs/shortwin/src/instructions/propose_config.rs
+./programs/shortwin/src/instructions/propose_pool.rs
+./programs/shortwin/src/instructions/revalidate_venue.rs
+./programs/shortwin/src/instructions/set_pause.rs
+./programs/shortwin/src/instructions/set_route_broken.rs
+./programs/shortwin/src/instructions/sol_settle.rs
+./programs/shortwin/src/instructions/sweep_protocol_fees.rs
+./programs/shortwin/src/instructions/sweep_trader.rs
+./programs/shortwin/src/instructions/sync_lender.rs
+./programs/shortwin/src/instructions/withdraw.rs
+./programs/shortwin/src/lamports.rs
+./programs/shortwin/src/lib.rs
+./programs/shortwin/src/mint_filter.rs
+./programs/shortwin/src/state/config.rs
+./programs/shortwin/src/state/epoch.rs
+./programs/shortwin/src/state/exposure.rs
+./programs/shortwin/src/state/layout_asserts.rs
+./programs/shortwin/src/state/lender.rs
+./programs/shortwin/src/state/market.rs
+./programs/shortwin/src/state/mod.rs
+./programs/shortwin/src/state/oracle.rs
+./programs/shortwin/src/state/pod.rs
+./programs/shortwin/src/state/position.rs
+./programs/shortwin/src/state/vault.rs
+./programs/shortwin/src/state/venue_guard.rs
+./programs/shortwin/src/venues/detect.rs
+./programs/shortwin/src/venues/pump_curve.rs
+./programs/shortwin/src/venues/raydium.rs
+./programs/shortwin/src/venues/raydium_cpmm.rs
+./programs/shortwin/src/venues/raydium_v4.rs
+./services/common/src/chain.rs
+./services/common/src/tx.rs
+./services/keeper/src/fees.rs
+./services/keeper/src/graduation.rs
+./services/keeper/src/ixs.rs
+./services/keeper/src/pda.rs
+./services/keeper/src/pool_monitor.rs
+./services/keeper/src/sweep.rs
+
+Partly read files listed above retain unread ranges outside the stated intervals.
+Tests were context only. No unit test, integration test, dependency/framework implementation, or deployment behavior was executed.
+The proposed finding diff is text only, unapplied and uncompiled.

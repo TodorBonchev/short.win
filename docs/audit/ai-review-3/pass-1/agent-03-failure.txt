@@ -1,0 +1,8 @@
+The economic-security agent errored before a final report with: This content was flagged for possible cybersecurity risk.
+No retry was attempted. Count this as a lost specialty, not a clean result.
+Partial progress messages mentioned an unjudged pool carry / zero-share-transition candidate and review of lender/trade paths. Those messages do not establish a completed review or confirmed finding.
+
+Partial reviewer message (not a final finding, reachability and impact not judged):
+Candidate found in pool.rs: last lender burns S to zero without resetting carry/carry_r. With initial deposit 10^19 raw tokens (S=10^22), a 9,000-lamport realized credit stays entirely in the two carries. Last lender exits for 0 SOL; after sweep+new 1-token deposit, a 1-lamport vest flush divides those old carries by S=1,000 and pays the newcomer 9,001 lamports. Checking source reachability and exclusion as rounding dust; this exceeds the stated one-base-unit exception.
+
+The orchestrator requested production reachability, allowed-input bounds, and payer/victim clarification. No final answer or artifact was returned after that request.

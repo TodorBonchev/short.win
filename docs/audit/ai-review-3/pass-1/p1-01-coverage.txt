@@ -1,0 +1,54 @@
+Pass 1 specialist 1: math precision
+Frozen source: b815269224ba0f5d946f49de7e113220c4067041
+Source used: .audit-mZFuf8/agent-1-bundle.md and source-index.tsv. In-scope working-tree source was not reread.
+Result: 0 FINDING blocks; 2 LEAD blocks.
+No builds, cargo/Anchor tests, executable Rust PoCs, repository edits, or subagents. A Python integer calculator reproduced the two lead traces; it did not execute audited code.
+
+FULL PRODUCTION-SECTION READS (test modules were context only):
+./crates/shortwin-math/src/bounds.rs: default, ref_liquidity, guarded_ema_liquidity, spot_liquidity, ref_depth_cap, kappa_eff, liq_reference, above_u128, expiry_reference, pi_ref, scaled, s1_budget, max_in_liq, max_in_exp
+./crates/shortwin-math/src/caps.rs: isqrt_ratio, max_q_position, max_total_q, fee_cap, fee_size_cap, fee_oi_cap, oi_cap, util_ok, curve_gamma_ok, curve_gamma_max_q, wallet_ok, notional_ok, conservative_x0, spot_near_ema, position_cap, carried_q_bound, open_fee_mark, carried_phi, fits, carried_fit
+./crates/shortwin-math/src/consts.rs: 
+./crates/shortwin-math/src/fees.rs: saturating_u32, exceeds_cap, above_cap, new, ppm, oneway_ppm, oneway_bps, capped, fee_tier, pump_curve, pump_curve_at_supply, curve_fees_at, pump_amm, apply_cap, ray_v4, cpmm
+./crates/shortwin-math/src/num/mod.rs: flip, bump, div, div_floor, div_ceil, div_u64, div_i128, mul_div, mul_div_u64, mul_div_u256, mul_div_i128, mul_wad, div_wad, mul_bps, mul_bps_u64, mul_ppm, mul_ppm_u64, sqrt_u128, sqrt_u256, mul_le, saturating_u64, overflow_to_max, cast, to_u64, to_u128, to_i128, i128_to_u128
+./crates/shortwin-math/src/num/u256.rs: widen, lo64, hi64, join, significant, shl_small, shr_small, mul_limbs, div_rem_limbs, first4, from_limbs, to_limbs, from_u64, from_u128, from_parts, low_u128, high_u128, to_u128, to_u64, from_product, to_le_bytes, from_le_bytes, is_zero, leading_zeros, bits, overflowing_add, overflowing_sub, checked_add, checked_sub, mul_wide, checked_mul, div_rem, checked_div, checked_rem, div_rem_u128, checked_div_u128, checked_rem_u128, mul_div_floor, shl_bits, shr_bits, checked_shl, checked_shr, shl_exact, isqrt, cmp, partial_cmp, from, try_from, write_str, fmt, from_str
+./crates/shortwin-math/src/observe.rs: is_open, clear, is_set, is_fresh, new, mark_restart, warmed, reprojected, check, len, is_empty, slot, get, newest, iter, push, validate, default, new_raydium, roll, record, rewrite_liquidity, nonzero, integrate, price_up_bound, price_down_bound, steady_step, warm_step, guard_clears, lows_median_after, lower_median, ring_liq_lower_median, ring_liq_upper_median, coverage_gap, elapsed, aggregate, weighted, robust_spot, sustained_growth, ring_medians
+./crates/shortwin-math/src/persist.rs: liq_ema_leg
+./crates/shortwin-math/src/pool.rs: bit, sweep_destination, new, is_wipe_live, token_claims, default, buckets, clear_fwd, is_full_wipe, den, ratio, ovf, add_u128, sub_u128, add_u64, sub_u64, add_i128, sub_i128, add_i64, den_of, to_unsigned, to_i64, diff_u128, accrued, divmod_floor, ceil_div_i64, day_of, slot, claims_va, shares_vs, record_idx, get, set_rem, converted, convert_shares, cal_advance, norm_at, live_slot, cal_add, cal_sub, lock_until_for, release_in, release, vest_in, vest, commit_record, credit_pos, credit_in, credit, top_up, credit_r_in, credit_r, convert_in, convert_steps, to_pot, lag_part, accrued_r, fwd_part, fwd_walk, touch_in, touch_tail, convert, commit_rems, touch, touch_pot, closable, tokens_for_shares, shares_for_tokens, token_value, lock_of, locked_total, allowance, allowance_view, withdraw_in, withdraw, resolve_in, resolve, deposit_in, deposit, claim, cover, accrue, sweep, borrow, close_pos, rent_top_up, true_up, repay, settle, flush_vest_in, maybe_roll_in, maybe_roll
+./crates/shortwin-math/src/pool_select.rs: lambda_bps, locked_depth, lock_share_ok, locked_floor_ok, position_floor_ok, depth_at_lambda, eligible, eligible_with_positions, dominates, fast_path_qualifies, at_least_bps
+./crates/shortwin-math/src/quote/cpmm.rs: pre, split_creator, shares_ok, carved, buy_exact_out, sell_exact_in
+./crates/shortwin-math/src/quote/mod.rs: muldiv, fee_up, to_u64
+./crates/shortwin-math/src/quote/pricing.rs: buy, sell, buy_repriced, capped, oneway_ppm, oneway_bps, liquidation_price
+./crates/shortwin-math/src/quote/ray_v4.rs: buy_exact_out, sell_exact_in
+./crates/shortwin-math/src/quote/reprice.rs: liquidity, reprice, reprice_token, of, curve_reprice
+./crates/shortwin-math/src/quote/sol_leg.rs: buy_exact_out, curve_charge_exact_out, pre_fee, with_fees, sell_exact_in
+./crates/shortwin-math/src/quote/straddle.rs: migrated_pool, migration_boost, curve_straddle, curve_synthetic, curve_two_leg, migrating_fv_price, migrating_fv
+./crates/shortwin-math/src/rent.rs: coefficients, folded, add, sub, check_util, check_share, utilization_bps, rate_x1e4, rate_bps, bps_part_ceil, accrue, div_to_u64, dot_div, delta_since, q_coef, accrued, due, credited_for, lender_credit, lender_credit_carried, min_rent
+./crates/shortwin-math/src/risk.rs: exceeded_by, v_eff, cr_bps, cr_below, ring_below, liquidation_price, spot_leg, liquidatable, buyback_allowed, price_wad, sigma, sigma_xy, margin_d4, open_fee, fv_rate_bps, fair_value, k_s, k_e
+./crates/shortwin-math/src/settle.rs: point, is_point, contains, box_of, box_of_capped, cost, sigma, fv_cost, s1_legs, s2_legs, refuted, not_liquidatable, pprime, amount_at, amount_ok, s3_due, is_live, expired, v_eff, evaluate, settlement, s3_no_route, pool_fail, chain_step
+./crates/shortwin-math/src/tier.rs: index, from_u8, defaults, locked_sol, liquidity_lamports, below_threshold, below_threshold_wide, assign
+./crates/shortwin-math/src/waterfall.rs: validate, total, conserved, check_bps, bps_of, split_rent, after_buyback_and_rent, close, base, liquidate, expire, settle, immediate_cap
+
+OTHER BOUNDED READS:
+crates/shortwin-venue-state/src/pyth.rs: production reader, confidence/exponent/freshness checks, common_scale, step_ok, check and encode (lines 1-396).
+programs/shortwin/src/instructions/withdraw.rs: full production section, Accounts, requires_memo and handler; checked LastSharesBorrowed, min_tokens, min_sol and state/transfer order.
+programs/shortwin/src/instructions/sync_lender.rs: full production section, Accounts and handler; owner-signature branch versus touch_pot and persistence.
+programs/shortwin/src/engine/arming.rs: full production section, RiskQuotes, BoxQuotes implementation, terms, s3_chain, inputs and create_pda_account.
+programs/shortwin/src/engine/prologue.rs: lines 1-245, through the beginning of refresh_locked_depth; market_now, sync_market_params, accrue and run were read.
+programs/shortwin/src/engine/lender.rs: lines 1-220, through pay_sol documentation; load_records, store_records, reads_rebase, init_if_new, rewards_required and tracked were read. pay_sol implementation was not read.
+programs/shortwin/src/venues/pump_curve.rs: lines 425-678 approximately (bundle lines 45252-45505); pricing_inputs, read_state, sync, graduation_anchor and exit_venue_checks. Other adapter/CPI code was not read.
+programs/shortwin/src/instructions/crank_price.rs: lines 1-115 approximately (bundle lines 30113-30230), Accounts and handler through the scratch-vault invariant; the remainder was not read.
+services/keeper/src/sweep.rs: lines 1-126 approximately, rent_minimum and initial sweep predicates; the remainder was not read.
+crates/shortwin-math/src/params.rs: cross-file search hits for FvDevBps and fv_dev_bps only; not a full review.
+
+SEARCH-ONLY COVERAGE:
+Production prefixes across programs/, services/ and shortwin-venue-state were searched in the bundle for narrow integer casts, wrapping operations, f64 and literal divisions. This was a candidate search, not a review of every matching file. Prefix scans stopped at the first cfg(test), so files with interleaved test-only items can have unsearched production tails.
+Cross-file searches traced pump_curve fee resolution, live supply, fee tiers, sigma callers and fv_dev_bps bounds. Tests encountered by search or section boundaries were context only.
+
+ARITHMETIC AREAS EXAMINED:
+WAD/lamport/raw-token units; bps/ppm conversion; signed floors and ceilings; U256 products, division, shifts and roots; fee component rounding; quote inverse directions; curve migration legs; conservative repricing; proportional shares and virtual assets; lock/calendar rounding; vest release and end weighting; rent basis indices, carried aggregate credit and per-position true-up; settlement budgets, fee bases, box checks and timers; price/exponent scaling; cap products and square-root boundaries; locked LP depth; checked lamport accounting.
+
+MATERIAL COVERAGE LIMITS:
+This specialist did not read all 58,914 source-bundle lines. It reviewed the numerical core and the bounded callers listed above. Most instruction handlers, account/state adapters, venue CPI builders, keeper modules and common service code were not reviewed line by line. params.rs, error.rs and lib.rs in shortwin-math were not fully read. Account-map entries were leads/context, not proof or a complete account-validation review.
+The long first rules read was truncated; shared output/language rules and the specialty were subsequently read in bounded chunks. The complete account-map table and all exploit-catalogue entries were not read. Core math patterns P4/P5/P8/B10 and the visible L4/L5/L6/L9 lessons informed this pass.
+No framework dependency behavior, live venue deployment/configuration, mainnet execution, external simulator or prior audit report was used as proof. Quote-to-venue equivalence remains a source-documented assumption here; dedicated venue/integration review is required.
+No candidate described as a current FINDING met both a concrete unguarded path and a material impact proof in this pass. This is not a security assurance for unread paths.

@@ -24,6 +24,7 @@ import type { Freshness } from '../lib/staleness.ts';
 import { useStore } from '../lib/store.ts';
 import { useMath } from '../math/useMath.ts';
 import { rpcSlot } from '../rpc/slot.ts';
+import { COMPACT, useMedia } from '../styles/breakpoints.ts';
 import { useIndexerFreshness } from './freshness.tsx';
 import { BrandIcon, NavIcon } from './icons.tsx';
 
@@ -66,6 +67,7 @@ export function StatusBar() {
     const bar = useRef<HTMLElement>(null);
     const summaryButton = useRef<HTMLButtonElement>(null);
     const summary = statusSummary({ rpcOk: slot.ok, slot: slot.slot, fresh, lagS: lag, ws, mathError: !!mathError });
+    const compact = useMedia(COMPACT);
 
     // The expanded list closes on Escape and on a tap outside the strip.
     useEffect(() => {
@@ -113,7 +115,14 @@ export function StatusBar() {
                 <span className="visually-hidden">, network status details</span>
                 <NavIcon name="chevron" className="status-chevron" />
             </button>
-            <div id="statusbar-items" className="statusbar-items">
+            {/* biome-ignore lint/a11y/useSemanticElements: this scroll group contains links and status text, not form fields. */}
+            <div
+                id="statusbar-items"
+                className="statusbar-items"
+                role="group"
+                aria-label="Network status details"
+                tabIndex={compact ? 0 : undefined}
+            >
                 <span className="statusbar-item" data-testid={T.statusRpc} data-state={slot.ok ? 'ok' : 'bad'}>
                     <span className="dot" data-state={slot.ok ? 'ok' : 'bad'} aria-hidden="true" />
                     RPC{' '}

@@ -22,6 +22,7 @@ import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { E2E_DIR, WEB_DIR } from '../env.ts';
 import { type App, E2E_WALLET_NAME, expect, requireTrading, T, test } from '../fixtures.ts';
+import { freshOpenPrice } from '../validator/actions.ts';
 
 const DIR = join(
     process.env.SHORTWIN_E2E_SCREENSHOTS === 'update'
@@ -93,6 +94,7 @@ test.describe('phone: short', { tag: '@short' }, () => {
         // Connect on the positions page; the market page then reconnects the approved wallet.
         await app.goto('/positions', 'positions');
         await tapConnect(app);
+        await freshOpenPrice(m);
         await app.goto(`/m/${m.mint}?panel=short`, 'market');
         await tapConnect(app);
         const panel = await openShortPanel(app);

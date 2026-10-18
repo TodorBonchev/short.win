@@ -1,0 +1,711 @@
+Pass 1 — specialist 9: account validation
+Frozen commit: b815269224ba0f5d946f49de7e113220c4067041
+Auditor commit: 6c41e1d46386de7fd9b1fa48c847e876ac8b2676
+Method: plain static audit; no build, test, runtime reproduction, source edit, or subagent.
+Source: frozen agent-9-bundle.md, then bounded extracts of that bundle in /tmp/account-source.
+The actual extraction path is /tmp/shortwin-audit-results-20261018/account-source.
+The repository remained read-only. Local Anchor dependency source provided framework context.
+No other agent's findings were supplied to this reviewer.
+
+Scope and limits
+I reviewed all 30 Anchor account sets and all 30 instruction implementation files through their production code.
+I reviewed the shared account/CPI machinery at the exact ranges below.
+I did not review all 58,914 source lines. Math and service logic remain outside this lens except named call sites.
+FULL PRODUCTION means all production lines in that file were read, not a proof of every economic invariant.
+FULL FILE means the complete source file was read, including any tests that happened to occur there.
+BOUNDED means only the listed ranges were read. SEARCH-ONLY means pattern scans, not full-source review.
+UNREAD means no source reading claimed. Nonblank source lines were displayed with original line numbers.
+A production state-file output truncated once; the missing venue_guard/oracle material was reread in bounded output.
+Some metadata and broad search outputs truncated; they never count as full production coverage.
+The range union is deduplicated. Counts include comments, blank lines, and any tests inside read ranges.
+The build context identifies Anchor 1.2.0 and overflow checks enabled in the on-chain workspace.
+The services workspace disables release overflow checks; its implementation was not audited here.
+
+Account-review method
+For every explicit field below I checked signer, owner, type, identity, PDA seeds/bump, mutability,
+initialization, duplicate aliases, sysvar source, CPI program, and lamport/rent behavior.
+The literal context constraints are retained below in field order, with handler dispositions following.
+AccountLoader supplies owner/discriminator checks; Account supplies owner/discriminator/Borsh decoding.
+InterfaceAccount checks the accepted owner set and decodes the token base state; a token_program relationship
+needs a written constraint or the verified creation/transfer path. The pool-vault gap is a hardening LEAD.
+Signer checks is_signer. Program<System> and Interface<TokenInterface> check program identity and executable status.
+Canonical PDA bumps originate in init constraints, find_program_address, or fixed cache derivation.
+Stored bumps cannot be chosen through an external instruction after initialization.
+Distinct prefixes plus market/user/nonce/epoch fixed-width seeds separate accounts and prevent seed concatenation ambiguity.
+Anchor 1.2.0 duplicate-mutable validation covers writable Account and InterfaceAccount fields, not all raw accounts.
+Raw duplicates were checked against keys, discriminators, seed namespaces, and direct move from!=to checks.
+
+No-signer account-map rows — all twelve resolved
+1. apply_config — intentional permissionless execution, not an authority mutation chosen by the caller.
+   instructions/apply_config.rs:1,58-104 applies the stored pending change after the timelock.
+   instructions/propose_config.rs:19-39 requires the governance Signer and stores that proposal.
+   lib.rs:91-94 explicitly permits anyone to apply it. No missing-signer finding.
+2. crank_price — intentional permissionless observation. lib.rs:271-273 states the role.
+   instructions/crank_price.rs:62-95 binds config, market, mint owner, and the venue ReadSet.
+   venues::parse/check_read and owner-aware readers validate evidence; callers do not submit the price as authority.
+3. crank_sol_usd — intentional permissionless refresh. lib.rs:205-207 states the role.
+   instructions/crank_sol_usd.rs:36-53 binds the cache PDA, configured feed key, and Pyth receiver owner.
+   :92-106 parses and validates the Pyth update. The raw reader checks owner/discriminator/length.
+4. execute_pool_switch — intentional permissionless resolution. lib.rs:295-300 states the role.
+   instructions/execute_pool_switch.rs:84-114 binds the account set; :164-186 requires the existing window and verifies its candidate.
+   Fresh eligibility and configured candidate keys constrain the resulting switch.
+5. flag_unsafe_mint — intentional permissionless safety flag. lib.rs:154-156 states the role.
+   instructions/flag_unsafe_mint.rs:30-40 binds the market and mint; :55-57 requires an actual owner/filter failure.
+   The unchecked mint intentionally permits observation of a closed or broken mint; it cannot choose another market's mint.
+6. flag_venue_upgraded — intentional permissionless evidence. lib.rs:122-124 states the role.
+   instructions/flag_venue_upgraded.rs:63-75 binds ProgramData address, loader owner, and decoded state.
+   :128-138 compares the deployment evidence. :81-109 handles the ELF fingerprint path.
+7. pump_amm::init_uva — helper, not an Anchor instruction. venues/pump_amm.rs:1139-1189.
+   create_market::pump_listing passes creator as payer at instructions/create_market.rs:456-464.
+   Creator is Signer at :192. CPI meta marks payer signer at pump_amm.rs:1167; program is pinned at :1149-1154.
+   invoke_signed receives &[] at :1186, so this helper invents no PDA signer privilege.
+   The distinct existing-UVA hardening LEAD is not a no-signer issue.
+8. pump_curve::init_uva — helper, not an Anchor instruction. venues/pump_curve.rs:1025-1075.
+   It inherits the same create_market creator Signer. :1035-1040 pins the program, :1053 forwards payer signer,
+   and :1072 supplies no PDA signer groups. No externally reachable unsigned payer path was found.
+9. propose_pool — intentional permissionless candidate submission. lib.rs:284-292 states the role.
+   instructions/propose_pool.rs:106-136 binds market/config; :231-235 validates mint owner;
+   :258-273 verifies candidate accounts, rejects the incumbent where required, and applies guarded selection.
+   engine/pool_select.rs:341-356 dispatches only to the two Raydium verification paths.
+10. pump_listing — helper, not an instruction. instructions/create_market.rs:430-465; caller at :611.
+    Creator Signer at :192 supplies the payer. :435 uses CreateIdempotent for the canonical ATA;
+    :446 validates the resulting base account. Nested init_uva calls inherit those constraints.
+11. sweep_protocol_fees — intentional permissionless sweep to a fixed recipient. lib.rs:138-140 states the role.
+    instructions/sweep_protocol_fees.rs:39-54 binds the market/vault PDAs and configured fee recipient;
+    :67-83 debits tracked protocol fees and enforces the vault floor. The caller cannot choose the recipient.
+12. sweep_trader — intentional permissionless donation/reward recovery. lib.rs:276-279 states the role.
+    instructions/sweep_trader.rs:149-180 validates the trader cache and keys; :232-243 binds token-side addresses.
+    Only fixed market/epoch recipients receive recovered assets. Trader/WSOL/base normalization and floor checks constrain writes.
+
+Related signer boundary
+sync_lender.rs:118 selects signed-owner conversion; :120 calls that path and :126 uses pot-only touch otherwise.
+Its stored lender owner and market are constrained. :130-133 prevents unsigned rebase-record writes.
+This instruction's permissionless branch does not authorize the signed-owner branch.
+
+Raw account, close, and remaining-account results
+- engine/lender.rs:48-79 checks ShareEpoch owner, discriminator, market, PDA, and consecutive epoch ordering.
+  Consecutive ordering rejects duplicate records. The accepted prefix is capped by the caller's max_epochs/account count.
+  :88-113 writes only validated records, checks writable status, and writes the changed conv_rem at the correct 16-byte offset.
+  state/epoch.rs:1-97 confirms discriminator8 + market32 + epoch4 + five u128 fields80 + three bytes = conv_rem offset127.
+  Lender paths retain this checked record list through store_records; no intervening venue CPI replaces record bytes.
+- init_if_needed lender/exposure accounts use user+market PDAs; existing initialization cannot reset ownership or balances.
+  deposit.rs:128+ initializes only the fresh default owner; open_short.rs:635-640 initializes only the fresh default wallet.
+- Close recipients are the stored lender owner or position borrower; keeper closings constrain borrower even without its signature.
+  A keeper may be the borrower. That alias does not redirect another borrower's rent or proceeds.
+  Anchor close zeroes lamports, assigns System, and resizes data to zero. The account exit path skips closed accounts.
+  A later valid initialization at the same PDA is fresh state; stale data cannot be revived by a lamport donation.
+- create_market.rs:281-349 handles prefunded pool-vault PDAs with fund/allocate/assign and initializes the fixed token mint/authority.
+  arming.rs:285-344 validates System+empty, sweeps donations, funds exact rent, allocates, and assigns the ShareEpoch PDA.
+  sol_settle.rs binds that record's key to the actual rolled epoch before creation and serialization.
+  An unused share_epoch_rec on a no-op path supplies no trusted evidence and receives no writes.
+- engine/trader.rs normalizes fixed market trader and WSOL addresses; System and empty-data checks precede System transfers.
+  Base ATAs validate the token program, mint, trader authority, delegate, close authority, and frozen state.
+  Both Pump and Raydium trade paths perform required post-CPI token/lamport reads and postconditions.
+- lamports.rs:26-83 rejects source==destination and non-program-owned debits, checks writable flags and arithmetic,
+  and preserves rent for ordinary transfers. The in-leg helper is limited to paths restored or closed before return.
+- venues/mod.rs:1233-1276 splits exact ReadSet, TradeSet, and selected extras; read-only paths reject surplus accounts.
+  :156-286 validates extras owner/discriminator/PDA/version, bounded count, derived/fixed keys, writable flags,
+  no signer, no shortwin-owned accounts, and named-account deny lists. Extra metas always clear signer status.
+  Templates enforce canonical PDA derivation. Fixed byte seed slots avoid unbounded instruction-controlled concatenation.
+- All supported mints pass current owner checks. mint_filter.rs:65-101 permits only approved metadata/group extensions,
+  rejects freeze authority/native mints, and rechecks entry paths. Exit paths retain identity checks when safety has changed.
+  Token transfer hooks, fees, permanent delegates, and mint-close authority do not enter the supported mint set.
+- Raw venue readers check target owner and discriminator/layout before trusting fields. Pump's zero-padding readers explicitly
+  support older appended layouts; current pool/curve identity, mint, authority, and executability checks constrain use.
+  No raw Instructions sysvar input was found. Production Clock and Rent reads use get().
+
+CPI privilege results
+- Native System, token, token-interface, ATA, and optional Memo program targets are typed or key-pinned.
+  The optional Memo CPI uses the fixed memo ID and no account privileges.
+- Venue programs are compile-time Pump, PumpSwap, Raydium v4, or CPMM IDs, with executable/key checks.
+  Each trade CPI signs only the per-market trader PDA; user, keeper, position, and market-wide signing power is not forwarded.
+  The pool-vault delegate is approved for the exact leg amount and checked after use; destinations and balance deltas are bound.
+- init_uva forwards the outer creator signature to the fixed venue program solely as payer. It does not sign for trader.
+- Anchor event CPI uses crate::ID, the fixed event-authority PDA and no financial accounts.
+  Its generated receiver checks the event authority signature and key. The generated program field is not a caller-chosen CPI target.
+- CPI-bearing helper structs (ExitAccounts, trader sides, Leg, ExtraContext) inherit caller constraints.
+  The account map's native/Pinocchio label does not turn these Rust helpers into separately dispatched instructions.
+
+Instruction-data results
+lib.rs:74-324 defines the 30 exported Anchor handlers; it defines no custom fallback or native byte-dispatch handler.
+Anchor checks discriminator prefixes, rejects unknown dispatch tags, and reports argument decode failures.
+Borsh argument decoding may leave trailing bytes; reviewed handlers do not use those bytes as a second authority or account selection.
+set_venue_extras bounds the decoded vector to four entries and each template's seed count/length.
+An overlarge serialized vector can fail the caller's own decode, not bypass the signer/venue constraints.
+The account lens traced numeric arguments to guards and typed math calls; it did not independently prove all math formulas.
+
+Hardening checklist dispositions
+GlobalConfig, Market, VenueGuard, and VenueExtras layout versions are checked before operational use.
+OracleCache, LenderPosition, MarketVault, ShortPosition, ShareEpoch, and TraderExposure use Anchor discriminators; they lack an unchecked layout-version field.
+POSITION_OPEN=0 is a business status inside an already discriminated account, not an account type accepted from zeroed memory.
+ENTRY_NONE/SEED_NONE identify unused slots; selected extras reject them as active entries.
+Three missing defensive checks are recorded as hardening LEADs, with the present exploit blockers stated.
+
+Dependency-source context (not part of in-scope coverage counts)
+anchor-lang 1.2.0 common.rs: complete close/is_closed implementation.
+anchor-lang accounts/account.rs:250-340: exit, reload, typed initialization.
+anchor-lang accounts/account_loader.rs:126-196: owner/discriminator/size and mutable access.
+anchor-lang accounts/interface_account.rs:210-250: accepted-owner and reload checks.
+anchor-spl token_interface.rs:1-85: two supported owner/program IDs and state decoding.
+anchor-syn codegen/accounts/constraints.rs:1140-1210,1769-1855: init_if_needed validation and prefunded PDA initialization.
+anchor-syn codegen/accounts/try_accounts.rs:338-440: duplicate mutable typed-account validation.
+anchor-syn parser/accounts/event_cpi.rs:1-75; anchor-attribute-event lib.rs:150-200: fixed event authority and CPI target.
+anchor-syn codegen/program/dispatch.rs:15-95; handlers.rs:109-129 and search context303-325: decode, dispatch, event signer.
+
+Per-file source coverage
+SEARCH-ONLY	crates/shortwin-math/Cargo.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+SEARCH-ONLY	crates/shortwin-venue-state/Cargo.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+SEARCH-ONLY	programs/shortwin/Cargo.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+SEARCH-ONLY	services/common/Cargo.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+SEARCH-ONLY	services/keeper/Cargo.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+SEARCH-ONLY	Cargo.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+SEARCH-ONLY	Anchor.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+SEARCH-ONLY	services/Cargo.toml	read lines: build metadata only; initial bundle1-340, no source implementation
+UNREAD	crates/shortwin-math/src/bounds.rs	read lines: -
+UNREAD	crates/shortwin-math/src/caps.rs	read lines: -
+UNREAD	crates/shortwin-math/src/consts.rs	read lines: -
+UNREAD	crates/shortwin-math/src/error.rs	read lines: -
+UNREAD	crates/shortwin-math/src/fees.rs	read lines: -
+UNREAD	crates/shortwin-math/src/lib.rs	read lines: -
+UNREAD	crates/shortwin-math/src/num/mod.rs	read lines: -
+UNREAD	crates/shortwin-math/src/num/u256.rs	read lines: -
+UNREAD	crates/shortwin-math/src/observe.rs	read lines: -
+UNREAD	crates/shortwin-math/src/params.rs	read lines: -
+UNREAD	crates/shortwin-math/src/persist.rs	read lines: -
+UNREAD	crates/shortwin-math/src/pool.rs	read lines: -
+UNREAD	crates/shortwin-math/src/pool_select.rs	read lines: -
+UNREAD	crates/shortwin-math/src/quote/cpmm.rs	read lines: -
+UNREAD	crates/shortwin-math/src/quote/mod.rs	read lines: -
+UNREAD	crates/shortwin-math/src/quote/pricing.rs	read lines: -
+UNREAD	crates/shortwin-math/src/quote/ray_v4.rs	read lines: -
+UNREAD	crates/shortwin-math/src/quote/reprice.rs	read lines: -
+UNREAD	crates/shortwin-math/src/quote/sol_leg.rs	read lines: -
+UNREAD	crates/shortwin-math/src/quote/straddle.rs	read lines: -
+UNREAD	crates/shortwin-math/src/rent.rs	read lines: -
+UNREAD	crates/shortwin-math/src/risk.rs	read lines: -
+UNREAD	crates/shortwin-math/src/settle.rs	read lines: -
+UNREAD	crates/shortwin-math/src/tier.rs	read lines: -
+UNREAD	crates/shortwin-math/src/waterfall.rs	read lines: -
+FULL FILE	crates/shortwin-venue-state/src/bytes.rs	read lines: 1-108
+SEARCH-ONLY	crates/shortwin-venue-state/src/lib.rs	read lines: -
+BOUNDED	crates/shortwin-venue-state/src/mint.rs	read lines: 155-200
+BOUNDED	crates/shortwin-venue-state/src/program_data.rs	read lines: 1-95
+BOUNDED	crates/shortwin-venue-state/src/pump.rs	read lines: 283-345,408-481,709-799
+BOUNDED	crates/shortwin-venue-state/src/pump_amm.rs	read lines: 264-309,357-414,493-525
+BOUNDED	crates/shortwin-venue-state/src/pyth.rs	read lines: 150-226
+BOUNDED	crates/shortwin-venue-state/src/raydium_cpmm.rs	read lines: 235-304
+BOUNDED	crates/shortwin-venue-state/src/raydium_v4.rs	read lines: 146-200
+BOUNDED	crates/shortwin-venue-state/src/token_account.rs	read lines: 1-124
+SEARCH-ONLY	programs/shortwin/src/constants.rs	read lines: -
+BOUNDED	programs/shortwin/src/engine/arming.rs	read lines: 270-393
+SEARCH-ONLY	programs/shortwin/src/engine/bounds.rs	read lines: -
+SEARCH-ONLY	programs/shortwin/src/engine/caps.rs	read lines: -
+FULL PRODUCTION	programs/shortwin/src/engine/guard.rs	read lines: 1-190
+FULL PRODUCTION	programs/shortwin/src/engine/lender.rs	read lines: 1-245
+SEARCH-ONLY	programs/shortwin/src/engine/mod.rs	read lines: -
+SEARCH-ONLY	programs/shortwin/src/engine/observe.rs	read lines: -
+BOUNDED	programs/shortwin/src/engine/pool_select.rs	read lines: 330-393
+SEARCH-ONLY	programs/shortwin/src/engine/prologue.rs	read lines: -
+SEARCH-ONLY	programs/shortwin/src/engine/route.rs	read lines: -
+SEARCH-ONLY	programs/shortwin/src/engine/tier.rs	read lines: -
+FULL FILE	programs/shortwin/src/engine/trader.rs	read lines: 1-506
+BOUNDED	programs/shortwin/src/engine/waterfall.rs	read lines: 108-140
+SEARCH-ONLY	programs/shortwin/src/errors.rs	read lines: -
+SEARCH-ONLY	programs/shortwin/src/events.rs	read lines: -
+FULL FILE	programs/shortwin/src/instructions/add_margin.rs	read lines: 1-105
+FULL FILE	programs/shortwin/src/instructions/apply_config.rs	read lines: 1-125
+FULL FILE	programs/shortwin/src/instructions/cancel_config.rs	read lines: 1-59
+FULL FILE	programs/shortwin/src/instructions/claim_sol.rs	read lines: 1-137
+FULL FILE	programs/shortwin/src/instructions/close_short.rs	read lines: 1-356
+FULL FILE	programs/shortwin/src/instructions/cover_deficit.rs	read lines: 1-115
+FULL FILE	programs/shortwin/src/instructions/crank_price.rs	read lines: 1-267
+FULL FILE	programs/shortwin/src/instructions/crank_sol_usd.rs	read lines: 1-139
+FULL PRODUCTION	programs/shortwin/src/instructions/create_market.rs	read lines: 1-720
+FULL FILE	programs/shortwin/src/instructions/deposit.rs	read lines: 1-210
+FULL FILE	programs/shortwin/src/instructions/disable_venue.rs	read lines: 1-79
+FULL FILE	programs/shortwin/src/instructions/execute_pool_switch.rs	read lines: 1-276
+FULL FILE	programs/shortwin/src/instructions/expire.rs	read lines: 1-195
+FULL FILE	programs/shortwin/src/instructions/flag_unsafe_mint.rs	read lines: 1-68
+FULL FILE	programs/shortwin/src/instructions/flag_venue_upgraded.rs	read lines: 1-159
+FULL FILE	programs/shortwin/src/instructions/initialize_config.rs	read lines: 1-197
+FULL FILE	programs/shortwin/src/instructions/liquidate.rs	read lines: 1-740
+SEARCH-ONLY	programs/shortwin/src/instructions/mod.rs	read lines: -
+FULL FILE	programs/shortwin/src/instructions/open_short.rs	read lines: 1-721
+FULL FILE	programs/shortwin/src/instructions/propose_config.rs	read lines: 1-52
+FULL FILE	programs/shortwin/src/instructions/propose_pool.rs	read lines: 1-348
+FULL FILE	programs/shortwin/src/instructions/revalidate_venue.rs	read lines: 1-123
+FULL FILE	programs/shortwin/src/instructions/set_coverage_pause.rs	read lines: 1-114
+FULL FILE	programs/shortwin/src/instructions/set_pause.rs	read lines: 1-77
+FULL FILE	programs/shortwin/src/instructions/set_route_broken.rs	read lines: 1-85
+FULL FILE	programs/shortwin/src/instructions/set_venue_extras.rs	read lines: 1-203
+FULL FILE	programs/shortwin/src/instructions/sol_settle.rs	read lines: 1-551
+FULL FILE	programs/shortwin/src/instructions/sweep_protocol_fees.rs	read lines: 1-94
+FULL FILE	programs/shortwin/src/instructions/sweep_trader.rs	read lines: 1-415
+FULL FILE	programs/shortwin/src/instructions/sync_lender.rs	read lines: 1-163
+FULL FILE	programs/shortwin/src/instructions/withdraw.rs	read lines: 1-316
+FULL FILE	programs/shortwin/src/lamports.rs	read lines: 1-93
+FULL FILE	programs/shortwin/src/lib.rs	read lines: 1-325
+FULL PRODUCTION	programs/shortwin/src/mint_filter.rs	read lines: 1-255
+BOUNDED	programs/shortwin/src/state/config.rs	read lines: 1-106
+FULL FILE	programs/shortwin/src/state/epoch.rs	read lines: 1-136
+FULL FILE	programs/shortwin/src/state/exposure.rs	read lines: 1-22
+SEARCH-ONLY	programs/shortwin/src/state/layout_asserts.rs	read lines: -
+BOUNDED	programs/shortwin/src/state/lender.rs	read lines: 1-90
+BOUNDED	programs/shortwin/src/state/market.rs	read lines: 125-210,273-332,474-496
+SEARCH-ONLY	programs/shortwin/src/state/mod.rs	read lines: -
+FULL FILE	programs/shortwin/src/state/oracle.rs	read lines: 1-29
+SEARCH-ONLY	programs/shortwin/src/state/pod.rs	read lines: -
+BOUNDED	programs/shortwin/src/state/position.rs	read lines: 1-190
+FULL FILE	programs/shortwin/src/state/vault.rs	read lines: 1-98
+FULL FILE	programs/shortwin/src/state/venue_extras.rs	read lines: 1-143
+BOUNDED	programs/shortwin/src/state/venue_guard.rs	read lines: 1-106
+BOUNDED	programs/shortwin/src/venues/detect.rs	read lines: 1-221
+BOUNDED	programs/shortwin/src/venues/mod.rs	read lines: 1-365,915-1115,1180-1507
+BOUNDED	programs/shortwin/src/venues/pump_amm.rs	read lines: 360-1190
+BOUNDED	programs/shortwin/src/venues/pump_curve.rs	read lines: 302-570,713-1075
+FULL FILE	programs/shortwin/src/venues/raydium.rs	read lines: 1-394
+BOUNDED	programs/shortwin/src/venues/raydium_cpmm.rs	read lines: 100-240,258-575
+BOUNDED	programs/shortwin/src/venues/raydium_v4.rs	read lines: 80-520
+UNREAD	services/common/src/chain.rs	read lines: -
+UNREAD	services/common/src/tx.rs	read lines: -
+UNREAD	services/keeper/src/budget.rs	read lines: -
+UNREAD	services/keeper/src/coverage.rs	read lines: -
+UNREAD	services/keeper/src/decide.rs	read lines: -
+UNREAD	services/keeper/src/fees.rs	read lines: -
+UNREAD	services/keeper/src/graduation.rs	read lines: -
+UNREAD	services/keeper/src/ixs.rs	read lines: -
+UNREAD	services/keeper/src/monitor.rs	read lines: -
+UNREAD	services/keeper/src/pda.rs	read lines: -
+UNREAD	services/keeper/src/pool_monitor.rs	read lines: -
+UNREAD	services/keeper/src/sweep.rs	read lines: -
+UNREAD	services/keeper/src/venue.rs	read lines: -
+UNREAD	services/keeper/src/view.rs	read lines: -
+
+File classification counts: SEARCH-ONLY=23, UNREAD=39, FULL FILE=39, BOUNDED=22, FULL PRODUCTION=4
+Unique explicitly read source lines (comments/blanks/tests included): 14945
+
+Ordered per-account review checklist
+
+1. add_margin — programs/shortwin/src/instructions/add_margin.rs:50
+Disposition: Borrower signer owns the bound position; amount transfers from that signer into the position. No arbitrary debit or close destination.
+  [reviewed 1] line 52: #[account(mut)] pub borrower: Signer<'info>,
+  [reviewed 2] line 59: #[account( constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion )] pub market: AccountLoader<'info, Market>,
+  [reviewed 3] line 67: #[account( mut, has_one = borrower @ ShortwinError::AccountMismatch, has_one = market @ ShortwinError::AccountMismatch, constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = position.status == POSITION_OPEN @ ShortwinError::AccountMismatch )] pub position: Box<Account<'info, ShortPosition>>,
+  [reviewed 4] line 68: pub system_program: Program<'info, System>,
+  [reviewed 5] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 6] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+2. apply_config — programs/shortwin/src/instructions/apply_config.rs:35
+Disposition: Stored governance proposal and deadline authorize permissionless execution; no caller authority key is trusted.
+  [reviewed 1] line 42: #[account( mut, seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 2] line 47: #[account(mut)] pub fee_recipient: Option<UncheckedAccount<'info>>,
+  [reviewed 3] line 54: #[account( mut, seeds = [OracleCache::SEED], bump = oracle_cache.bump )] pub oracle_cache: Option<Box<Account<'info, OracleCache>>>,
+  [reviewed 4] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 5] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+3. cancel_config — programs/shortwin/src/instructions/cancel_config.rs:21
+Disposition: Signer must match governance or pause authority; the fixed config PDA supplies both roles.
+  [reviewed 1] line 23: pub authority: Signer<'info>,
+  [reviewed 2] line 32: #[account( mut, seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.is_pause_or_governance(authority.key) @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 4] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+4. claim_sol — programs/shortwin/src/instructions/claim_sol.rs:44
+Disposition: Owner signer binds lender and fixed market vault; validated epoch records supply conversion history; closable rent goes to owner.
+  [reviewed 1] line 48: #[account(mut)] pub owner: Signer<'info>,
+  [reviewed 2] line 57: #[account( constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = market_vault @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 3] line 65: #[account( mut, seeds = [LenderPosition::SEED, market.key().as_ref(), owner.key().as_ref()], bump = lender.bump, has_one = owner @ ShortwinError::Unauthorized, has_one = market @ ShortwinError::AccountMismatch )] pub lender: Box<Account<'info, LenderPosition>>,
+  [reviewed 4] line 71: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 5] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 6] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+5. close_short — programs/shortwin/src/instructions/close_short.rs:61
+Disposition: Borrower signer binds position and exposure; market binds mint/vault/program/trader; parsed trade context normalizes raw trader and checks output.
+  [reviewed 1] line 64: #[account(mut)] pub borrower: Signer<'info>,
+  [reviewed 2] line 70: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 82: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch, has_one = market_vault @ ShortwinError::AccountMismatch, has_one = pool_vault @ ShortwinError::AccountMismatch, has_one = token_program @ ShortwinError::AccountMismatch, has_one = trader @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 4] line 91: #[account( mut, close = borrower, has_one = borrower @ ShortwinError::AccountMismatch, has_one = market @ ShortwinError::AccountMismatch, constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds )] pub position: Box<Account<'info, ShortPosition>>,
+  [reviewed 5] line 99: #[account( mut, seeds = [WalletExposure::SEED, market.key().as_ref(), borrower.key().as_ref()], bump = exposure.bump, has_one = market @ ShortwinError::AccountMismatch, constraint = exposure.wallet == borrower.key() @ ShortwinError::AccountMismatch )] pub exposure: Box<Account<'info, WalletExposure>>,
+  [reviewed 6] line 101: #[account(mint::token_program = token_program)] pub mint: Box<InterfaceAccount<'info, Mint>>,
+  [reviewed 7] line 107: #[account( mut, seeds = [POOL_VAULT_SEED, market.key().as_ref()], bump = market.load()?.pool_vault_bump )] pub pool_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 8] line 113: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 9] line 116: #[account(mut)] pub trader: UncheckedAccount<'info>,
+  [reviewed 10] line 117: pub token_program: Interface<'info, TokenInterface>,
+  [reviewed 11] line 118: pub system_program: Program<'info, System>,
+  [reviewed 12] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 13] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+6. cover_deficit — programs/shortwin/src/instructions/cover_deficit.rs:28
+Disposition: Owner signer binds lender; validated epoch records determine debt; signed System transfer funds only the fixed market vault.
+  [reviewed 1] line 31: #[account(mut)] pub owner: Signer<'info>,
+  [reviewed 2] line 40: #[account( constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = market_vault @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 3] line 48: #[account( mut, seeds = [LenderPosition::SEED, market.key().as_ref(), owner.key().as_ref()], bump = lender.bump, has_one = owner @ ShortwinError::Unauthorized, has_one = market @ ShortwinError::AccountMismatch )] pub lender: Box<Account<'info, LenderPosition>>,
+  [reviewed 4] line 54: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 5] line 55: pub system_program: Program<'info, System>,
+  [reviewed 6] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 7] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+7. crank_price — programs/shortwin/src/instructions/crank_price.rs:61
+Disposition: Bound config/market/mint/oracle and verified ReadSet provide permissionless evidence, with no arbitrary writable recipient.
+  [reviewed 1] line 67: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 2] line 75: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 3] line 78: pub mint: UncheckedAccount<'info>,
+  [reviewed 4] line 80: #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)] pub oracle_cache: Box<Account<'info, OracleCache>>,
+  [reviewed 5] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 6] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+8. crank_sol_usd — programs/shortwin/src/instructions/crank_sol_usd.rs:35
+Disposition: Configured Pyth key and receiver owner, decoded feed identity and update checks constrain the permissionless cache write.
+  [reviewed 1] line 41: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 2] line 47: #[account( mut, seeds = [OracleCache::SEED], bump = oracle_cache.bump )] pub oracle_cache: Account<'info, OracleCache>,
+  [reviewed 3] line 54: #[account( address = config.load()?.pyth_sol_usd @ ShortwinError::OracleFeed, owner = PYTH_RECEIVER_ID @ ShortwinError::OracleOwner )] pub price_update: UncheckedAccount<'info>,
+
+9. create_market — programs/shortwin/src/instructions/create_market.rs:188
+Disposition: Creator signer pays; mint owner matches token program; init seeds create unique market/vault/trader addresses; fixed recipient receives capped fee.
+  [reviewed 1] line 192: #[account(mut)] pub creator: Signer<'info>,
+  [reviewed 2] line 198: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 207: #[account( seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump, constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION @ ShortwinError::ConfigVersion )] pub venue_guard: AccountLoader<'info, VenueGuard>,
+  [reviewed 4] line 216: #[account( init, payer = creator, space = Market::SPACE, seeds = [Market::SEED, mint.key().as_ref()], bump )] pub market: AccountLoader<'info, Market>,
+  [reviewed 5] line 224: #[account( init, payer = creator, space = MarketVault::SPACE, seeds = [MarketVault::SEED, market.key().as_ref()], bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 6] line 230: #[account(mut, seeds = [POOL_VAULT_SEED, market.key().as_ref()], bump)] pub pool_vault: UncheckedAccount<'info>,
+  [reviewed 7] line 234: pub mint: UncheckedAccount<'info>,
+  [reviewed 8] line 239: #[account(seeds = [TRADER_SEED, market.key().as_ref()], bump)] pub trader: UncheckedAccount<'info>,
+  [reviewed 9] line 251: #[account( mut, address = get_associated_token_address_with_program_id( &trader.key(), &mint.key(), &token_program.key() ) @ ShortwinError::AccountMismatch )] pub trader_base_ata: UncheckedAccount<'info>,
+  [reviewed 10] line 252: pub token_program: Interface<'info, TokenInterface>,
+  [reviewed 11] line 253: pub associated_token_program: Program<'info, AssociatedToken>,
+  [reviewed 12] line 254: pub system_program: Program<'info, System>,
+  [reviewed 13] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 14] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+10. deposit — programs/shortwin/src/instructions/deposit.rs:50
+Disposition: Owner signer binds lender; source mint/program constrained and token CPI checks source authority; fixed pool vault relies on creation-time fields (LEAD).
+  [reviewed 1] line 53: #[account(mut)] pub owner: Signer<'info>,
+  [reviewed 2] line 59: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 70: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch, has_one = market_vault @ ShortwinError::AccountMismatch, has_one = pool_vault @ ShortwinError::AccountMismatch, has_one = token_program @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 4] line 76: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 5] line 84: #[account( init_if_needed, payer = owner, space = LenderPosition::SPACE, seeds = [LenderPosition::SEED, market.key().as_ref(), owner.key().as_ref()], bump )] pub lender: Box<Account<'info, LenderPosition>>,
+  [reviewed 6] line 86: #[account(mint::token_program = token_program)] pub mint: Box<InterfaceAccount<'info, Mint>>,
+  [reviewed 7] line 93: #[account( mut, token::mint = mint, token::token_program = token_program )] pub owner_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 8] line 99: #[account( mut, seeds = [POOL_VAULT_SEED, market.key().as_ref()], bump = market.load()?.pool_vault_bump )] pub pool_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 9] line 100: pub token_program: Interface<'info, TokenInterface>,
+  [reviewed 10] line 101: pub system_program: Program<'info, System>,
+  [reviewed 11] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 12] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+11. disable_venue — programs/shortwin/src/instructions/disable_venue.rs:23
+Disposition: Emergency signer matches config pause authority; bounded supported venue bit changes only the fixed config.
+  [reviewed 1] line 24: pub pause_authority: Signer<'info>,
+  [reviewed 2] line 33: #[account( mut, seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.pause_authority == pause_authority.key() @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 4] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+12. execute_pool_switch — programs/shortwin/src/instructions/execute_pool_switch.rs:83
+Disposition: Fixed market/config and existing mature candidate window constrain permissionless re-verification and adoption.
+  [reviewed 1] line 89: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 2] line 98: #[account( seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump, constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION @ ShortwinError::ConfigVersion )] pub venue_guard: AccountLoader<'info, VenueGuard>,
+  [reviewed 3] line 106: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 4] line 109: pub mint: UncheckedAccount<'info>,
+  [reviewed 5] line 114: #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)] pub oracle_cache: Box<Account<'info, OracleCache>>,
+  [reviewed 6] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 7] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+13. expire — programs/shortwin/src/instructions/expire.rs:58
+Disposition: Keeper signer receives bounded keeper compensation; stored borrower receives position/exposure rent and proceeds; trader and venue paths are validated.
+  [reviewed 1] line 61: #[account(mut)] pub keeper: Signer<'info>,
+  [reviewed 2] line 64: #[account(mut)] pub borrower: UncheckedAccount<'info>,
+  [reviewed 3] line 70: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 4] line 82: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch, has_one = market_vault @ ShortwinError::AccountMismatch, has_one = pool_vault @ ShortwinError::AccountMismatch, has_one = token_program @ ShortwinError::AccountMismatch, has_one = trader @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 5] line 90: #[account( mut, close = borrower, has_one = borrower @ ShortwinError::AccountMismatch, has_one = market @ ShortwinError::AccountMismatch, constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds )] pub position: Box<Account<'info, ShortPosition>>,
+  [reviewed 6] line 98: #[account( mut, seeds = [WalletExposure::SEED, market.key().as_ref(), borrower.key().as_ref()], bump = exposure.bump, has_one = market @ ShortwinError::AccountMismatch, constraint = exposure.wallet == borrower.key() @ ShortwinError::AccountMismatch )] pub exposure: Box<Account<'info, WalletExposure>>,
+  [reviewed 7] line 100: #[account(mint::token_program = token_program)] pub mint: Box<InterfaceAccount<'info, Mint>>,
+  [reviewed 8] line 106: #[account( mut, seeds = [POOL_VAULT_SEED, market.key().as_ref()], bump = market.load()?.pool_vault_bump )] pub pool_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 9] line 112: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 10] line 115: #[account(mut)] pub trader: UncheckedAccount<'info>,
+  [reviewed 11] line 116: pub token_program: Interface<'info, TokenInterface>,
+  [reviewed 12] line 117: pub system_program: Program<'info, System>,
+  [reviewed 13] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 14] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+14. flag_unsafe_mint — programs/shortwin/src/instructions/flag_unsafe_mint.rs:29
+Disposition: Unchecked mint is the market mint; broken owner/filter evidence is deliberate; no signature is required for the safety flag.
+  [reviewed 1] line 37: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 2] line 40: pub mint: UncheckedAccount<'info>,
+  [reviewed 3] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 4] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+15. flag_venue_upgraded — programs/shortwin/src/instructions/flag_venue_upgraded.rs:49
+Disposition: Fixed ProgramData key and loader owner feed decoded deploy evidence; permissionless flag cannot target arbitrary account data.
+  [reviewed 1] line 58: #[account( mut, seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump, constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION @ ShortwinError::ConfigVersion, constraint = usize::from(venue) < VENUE_PROGRAMS @ ShortwinError::InvalidParams )] pub venue_guard: AccountLoader<'info, VenueGuard>,
+  [reviewed 2] line 67: #[account( address = venue_program_data(venue).unwrap_or_default() @ ShortwinError::VenueAccountMismatch, owner = bpf_loader_upgradeable::ID @ ShortwinError::VenueAccountMismatch )] pub program_data: UncheckedAccount<'info>,
+  [reviewed 3] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 4] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+16. initialize_config — programs/shortwin/src/instructions/initialize_config.rs:32
+Disposition: Upgrade-authority signer matches canonical own ProgramData; init creates fixed config, guard, oracle, and four extras PDAs once.
+  [reviewed 1] line 35: #[account(mut)] pub authority: Signer<'info>,
+  [reviewed 2] line 43: #[account( init, payer = authority, space = GlobalConfig::SPACE, seeds = [GlobalConfig::SEED], bump )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 51: #[account( init, payer = authority, space = VenueGuard::SPACE, seeds = [VenueGuard::SEED], bump )] pub venue_guard: AccountLoader<'info, VenueGuard>,
+  [reviewed 4] line 59: #[account( init, payer = authority, space = VenueExtras::SPACE, seeds = [VenueExtras::SEED, EXTRAS_PUMP_CURVE], bump )] pub venue_extras_pump_curve: AccountLoader<'info, VenueExtras>,
+  [reviewed 5] line 67: #[account( init, payer = authority, space = VenueExtras::SPACE, seeds = [VenueExtras::SEED, EXTRAS_PUMP_SWAP], bump )] pub venue_extras_pump_swap: AccountLoader<'info, VenueExtras>,
+  [reviewed 6] line 75: #[account( init, payer = authority, space = VenueExtras::SPACE, seeds = [VenueExtras::SEED, EXTRAS_RAYDIUM_V4], bump )] pub venue_extras_raydium_v4: AccountLoader<'info, VenueExtras>,
+  [reviewed 7] line 83: #[account( init, payer = authority, space = VenueExtras::SPACE, seeds = [VenueExtras::SEED, EXTRAS_RAYDIUM_CPMM], bump )] pub venue_extras_raydium_cpmm: AccountLoader<'info, VenueExtras>,
+  [reviewed 8] line 91: #[account( init, payer = authority, space = OracleCache::SPACE, seeds = [OracleCache::SEED], bump )] pub oracle_cache: Box<Account<'info, OracleCache>>,
+  [reviewed 9] line 101: #[account( seeds = [crate::ID.as_ref()], bump, seeds::program = bpf_loader_upgradeable::ID, constraint = program_data.upgrade_authority_address == Some(authority.key()) @ ShortwinError::Unauthorized )] pub program_data: Box<Account<'info, ProgramData>>,
+  [reviewed 10] line 102: pub system_program: Program<'info, System>,
+
+17. liquidate — programs/shortwin/src/instructions/liquidate.rs:97
+Disposition: Keeper signer uses stored borrower/position/exposure bindings; shared keeper_exit receives only those checked accounts and bounded venue context.
+  [reviewed 1] line 100: #[account(mut)] pub keeper: Signer<'info>,
+  [reviewed 2] line 103: #[account(mut)] pub borrower: UncheckedAccount<'info>,
+  [reviewed 3] line 109: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 4] line 121: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch, has_one = market_vault @ ShortwinError::AccountMismatch, has_one = pool_vault @ ShortwinError::AccountMismatch, has_one = token_program @ ShortwinError::AccountMismatch, has_one = trader @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 5] line 129: #[account( mut, close = borrower, has_one = borrower @ ShortwinError::AccountMismatch, has_one = market @ ShortwinError::AccountMismatch, constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds )] pub position: Box<Account<'info, ShortPosition>>,
+  [reviewed 6] line 137: #[account( mut, seeds = [WalletExposure::SEED, market.key().as_ref(), borrower.key().as_ref()], bump = exposure.bump, has_one = market @ ShortwinError::AccountMismatch, constraint = exposure.wallet == borrower.key() @ ShortwinError::AccountMismatch )] pub exposure: Box<Account<'info, WalletExposure>>,
+  [reviewed 7] line 139: #[account(mint::token_program = token_program)] pub mint: Box<InterfaceAccount<'info, Mint>>,
+  [reviewed 8] line 145: #[account( mut, seeds = [POOL_VAULT_SEED, market.key().as_ref()], bump = market.load()?.pool_vault_bump )] pub pool_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 9] line 151: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 10] line 154: #[account(mut)] pub trader: UncheckedAccount<'info>,
+  [reviewed 11] line 155: pub token_program: Interface<'info, TokenInterface>,
+  [reviewed 12] line 156: pub system_program: Program<'info, System>,
+  [reviewed 13] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 14] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+18. open_short — programs/shortwin/src/instructions/open_short.rs:110
+Disposition: Borrower signer funds new nonce-bound position; exposure binds market and wallet; mint/program/vault/trader identities and venue extras constrain leg.
+  [reviewed 1] line 113: #[account(mut)] pub borrower: Signer<'info>,
+  [reviewed 2] line 119: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 127: #[account( seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump, constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION @ ShortwinError::ConfigVersion )] pub venue_guard: AccountLoader<'info, VenueGuard>,
+  [reviewed 4] line 130: #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)] pub oracle_cache: Box<Account<'info, OracleCache>>,
+  [reviewed 5] line 142: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch, has_one = market_vault @ ShortwinError::AccountMismatch, has_one = pool_vault @ ShortwinError::AccountMismatch, has_one = token_program @ ShortwinError::AccountMismatch, has_one = trader @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 6] line 155: #[account( init, payer = borrower, space = ShortPosition::SPACE, seeds = [ ShortPosition::SEED, market.key().as_ref(), borrower.key().as_ref(), &nonce.to_le_bytes() ], bump )] pub position: Box<Account<'info, ShortPosition>>,
+  [reviewed 7] line 163: #[account( init_if_needed, payer = borrower, space = WalletExposure::SPACE, seeds = [WalletExposure::SEED, market.key().as_ref(), borrower.key().as_ref()], bump )] pub exposure: Box<Account<'info, WalletExposure>>,
+  [reviewed 8] line 165: #[account(mint::token_program = token_program)] pub mint: Box<InterfaceAccount<'info, Mint>>,
+  [reviewed 9] line 171: #[account( mut, seeds = [POOL_VAULT_SEED, market.key().as_ref()], bump = market.load()?.pool_vault_bump )] pub pool_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 10] line 177: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 11] line 181: #[account(mut)] pub trader: UncheckedAccount<'info>,
+  [reviewed 12] line 182: pub token_program: Interface<'info, TokenInterface>,
+  [reviewed 13] line 183: pub system_program: Program<'info, System>,
+  [reviewed 14] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 15] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+19. propose_config — programs/shortwin/src/instructions/propose_config.rs:18
+Disposition: Governance signer alone writes the fixed config pending payload after change validation.
+  [reviewed 1] line 19: pub governance: Signer<'info>,
+  [reviewed 2] line 27: #[account( mut, seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.governance == governance.key() @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 4] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+20. propose_pool — programs/shortwin/src/instructions/propose_pool.rs:105
+Disposition: Market/config/guard/oracle bind the proposal; fixed current ReadSet and independently verified candidate ReadSet constrain permissionless selection.
+  [reviewed 1] line 111: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 2] line 120: #[account( seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump, constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION @ ShortwinError::ConfigVersion )] pub venue_guard: AccountLoader<'info, VenueGuard>,
+  [reviewed 3] line 128: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 4] line 131: pub mint: UncheckedAccount<'info>,
+  [reviewed 5] line 136: #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)] pub oracle_cache: Box<Account<'info, OracleCache>>,
+  [reviewed 6] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 7] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+21. revalidate_venue — programs/shortwin/src/instructions/revalidate_venue.rs:37
+Disposition: Emergency signer and exact ProgramData identity bind the reviewed deployment evidence and expected slot/hash.
+  [reviewed 1] line 38: pub pause_authority: Signer<'info>,
+  [reviewed 2] line 46: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.pause_authority == pause_authority.key() @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 55: #[account( mut, seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump, constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION @ ShortwinError::ConfigVersion, constraint = usize::from(venue) < VENUE_PROGRAMS @ ShortwinError::InvalidParams )] pub venue_guard: AccountLoader<'info, VenueGuard>,
+  [reviewed 4] line 63: #[account( address = venue_program_data(venue).unwrap_or_default() @ ShortwinError::VenueAccountMismatch, owner = bpf_loader_upgradeable::ID @ ShortwinError::VenueAccountMismatch )] pub program_data: UncheckedAccount<'info>,
+  [reviewed 5] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 6] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+22. set_coverage_pause — programs/shortwin/src/instructions/set_coverage_pause.rs:62
+Disposition: Signer matches coverage authority, or emergency for clear-only; market PDA and version prevent arbitrary account mutation.
+  [reviewed 1] line 65: pub coverage_authority: Signer<'info>,
+  [reviewed 2] line 77: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.is_emergency_coverage_clear(coverage_authority.key, paused) || config.load()?.coverage_enabled() @ ShortwinError::CoverageAuthorityDisabled, constraint = config.load()?.is_emergency_coverage_clear(coverage_authority.key, paused) || config.load()?.is_coverage_authority(coverage_authority.key) @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 86: #[account( mut, constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion )] pub market: AccountLoader<'info, Market>,
+  [reviewed 4] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 5] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+23. set_pause — programs/shortwin/src/instructions/set_pause.rs:24
+Disposition: Signer matches stored governance or emergency; optional market validates its own PDA/version before market-scoped writes.
+  [reviewed 1] line 26: pub authority: Signer<'info>,
+  [reviewed 2] line 35: #[account( mut, seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.is_pause_or_governance(authority.key) @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 44: #[account( mut, constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion )] pub market: Option<AccountLoader<'info, Market>>,
+  [reviewed 4] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 5] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+24. set_route_broken — programs/shortwin/src/instructions/set_route_broken.rs:23
+Disposition: Emergency signer matches stored pause authority; optional market self-PDA/version and venue/scope checks constrain writes.
+  [reviewed 1] line 25: pub authority: Signer<'info>,
+  [reviewed 2] line 34: #[account( mut, seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.is_pause_or_governance(authority.key) @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 43: #[account( mut, constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion )] pub market: Option<AccountLoader<'info, Market>>,
+  [reviewed 4] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 5] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+25. set_venue_extras — programs/shortwin/src/instructions/set_venue_extras.rs:105
+Disposition: Emergency signer matches stored pause authority; selected extras PDA/venue/version and bounded entries constrain saved CPI account templates.
+  [reviewed 1] line 107: pub authority: Signer<'info>,
+  [reviewed 2] line 115: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion, constraint = config.load()?.is_pause_or_governance(authority.key) @ ShortwinError::Unauthorized )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 121: #[account( mut, seeds = [VenueExtras::SEED, &[venue]], bump = venue_extras.load()?.bump )] pub venue_extras: AccountLoader<'info, VenueExtras>,
+  [reviewed 4] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 5] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+26. sol_settle — programs/shortwin/src/instructions/sol_settle.rs:103
+Disposition: Keeper signer pays actual epoch initialization; stored borrower and exposure bind payouts; mint/ReadSet evidence and epoch key are checked before effects.
+  [reviewed 1] line 106: #[account(mut)] pub keeper: Signer<'info>,
+  [reviewed 2] line 112: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 121: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch, has_one = market_vault @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 4] line 128: #[account( mut, has_one = borrower @ ShortwinError::AccountMismatch, has_one = market @ ShortwinError::AccountMismatch, constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds )] pub position: Box<Account<'info, ShortPosition>>,
+  [reviewed 5] line 131: #[account(mut)] pub borrower: UncheckedAccount<'info>,
+  [reviewed 6] line 139: #[account( mut, seeds = [WalletExposure::SEED, market.key().as_ref(), borrower.key().as_ref()], bump = exposure.bump, has_one = market @ ShortwinError::AccountMismatch, constraint = exposure.wallet == borrower.key() @ ShortwinError::AccountMismatch )] pub exposure: Box<Account<'info, WalletExposure>>,
+  [reviewed 7] line 145: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 8] line 147: pub mint: UncheckedAccount<'info>,
+  [reviewed 9] line 151: #[account(mut)] pub share_epoch_rec: UncheckedAccount<'info>,
+  [reviewed 10] line 152: pub system_program: Program<'info, System>,
+  [reviewed 11] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 12] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+27. sweep_protocol_fees — programs/shortwin/src/instructions/sweep_protocol_fees.rs:29
+Disposition: Fixed configured recipient receives only tracked protocol fees; market-vault PDA and rent/tracked floors protect other balances.
+  [reviewed 1] line 35: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 2] line 44: #[account( constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = market_vault @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 3] line 50: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 4] line 56: #[account( mut, address = config.load()?.fee_recipient @ ShortwinError::AccountMismatch )] pub fee_recipient: UncheckedAccount<'info>,
+  [reviewed 5] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 6] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+28. sweep_trader — programs/shortwin/src/instructions/sweep_trader.rs:142
+Disposition: Fixed trader/WSOL/ATAs and market/wipe record destinations constrain permissionless surplus recovery; no authority role needs a caller signature.
+  [reviewed 1] line 148: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 2] line 160: #[account( mut, constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = market_vault @ ShortwinError::AccountMismatch, has_one = trader @ ShortwinError::AccountMismatch, has_one = trader_wsol @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 3] line 166: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 4] line 170: #[account(mut)] pub trader: UncheckedAccount<'info>,
+  [reviewed 5] line 174: #[account(mut)] pub trader_wsol: UncheckedAccount<'info>,
+  [reviewed 6] line 177: #[account(mut)] pub trader_wsol_ata: UncheckedAccount<'info>,
+  [reviewed 7] line 180: #[account(address = TOKEN_PROGRAM_ID @ ShortwinError::AccountMismatch)] pub token_program: UncheckedAccount<'info>,
+  [reviewed 8] line 181: pub system_program: Program<'info, System>,
+  [reviewed 9] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 10] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+29. sync_lender — programs/shortwin/src/instructions/sync_lender.rs:71
+Disposition: Stored owner identity binds lender; unsigned path performs pot-only synchronization and cannot write signed-owner rebase conversion.
+  [reviewed 1] line 80: #[account( constraint = market.load()?.is_pda(&market.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = market_vault @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 2] line 86: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 3] line 94: #[account( mut, seeds = [LenderPosition::SEED, market.key().as_ref(), owner.key().as_ref()], bump = lender.bump, has_one = owner @ ShortwinError::Unauthorized, has_one = market @ ShortwinError::AccountMismatch )] pub lender: Box<Account<'info, LenderPosition>>,
+  [reviewed 4] line 99: pub owner: UncheckedAccount<'info>,
+  [reviewed 5] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 6] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+30. withdraw — programs/shortwin/src/instructions/withdraw.rs:83
+Disposition: Owner signer binds lender; chosen destination mint/program constrained; fixed market-signed pool transfer and memo path constrain payout; closure returns rent to owner.
+  [reviewed 1] line 86: #[account(mut)] pub owner: Signer<'info>,
+  [reviewed 2] line 92: #[account( seeds = [GlobalConfig::SEED], bump = config.load()?.bump, constraint = config.load()?.version == CONFIG_VERSION @ ShortwinError::ConfigVersion )] pub config: AccountLoader<'info, GlobalConfig>,
+  [reviewed 3] line 103: #[account( mut, seeds = [Market::SEED, mint.key().as_ref()], bump = market.load()?.bump, constraint = market.load()?.version == MARKET_VERSION @ ShortwinError::ConfigVersion, has_one = mint @ ShortwinError::AccountMismatch, has_one = market_vault @ ShortwinError::AccountMismatch, has_one = pool_vault @ ShortwinError::AccountMismatch, has_one = token_program @ ShortwinError::AccountMismatch )] pub market: AccountLoader<'info, Market>,
+  [reviewed 4] line 109: #[account( mut, seeds = [MarketVault::SEED, market.key().as_ref()], bump = market_vault.load()?.bump )] pub market_vault: AccountLoader<'info, MarketVault>,
+  [reviewed 5] line 117: #[account( mut, seeds = [LenderPosition::SEED, market.key().as_ref(), owner.key().as_ref()], bump = lender.bump, has_one = owner @ ShortwinError::Unauthorized, has_one = market @ ShortwinError::AccountMismatch )] pub lender: Box<Account<'info, LenderPosition>>,
+  [reviewed 6] line 119: #[account(mint::token_program = token_program)] pub mint: Box<InterfaceAccount<'info, Mint>>,
+  [reviewed 7] line 126: #[account( mut, token::mint = mint, token::token_program = token_program )] pub owner_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 8] line 132: #[account( mut, seeds = [POOL_VAULT_SEED, market.key().as_ref()], bump = market.load()?.pool_vault_bump )] pub pool_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+  [reviewed 9] line 133: pub token_program: Interface<'info, TokenInterface>,
+  [reviewed 10] line 134: pub system_program: Program<'info, System>,
+  [reviewed 11] line 140: #[account(address = MEMO_PROGRAM_ID @ ShortwinError::AccountMismatch)] pub memo_program: Option<UncheckedAccount<'info>>,
+  [reviewed 12] generated event_authority: UncheckedAccount; address=crate::EVENT_AUTHORITY_AND_BUMP.0.
+  [reviewed 13] generated program: UncheckedAccount; event CPI hardcodes crate::ID and does not use this key as target.
+
+Explicit account sets: 30; explicit named fields: 176. Generated event accounts appear after explicit fields.
+
+CPI/sysvar/remaining-account index (search inventory; reviewed code ranges are listed above)
+programs/shortwin/src/engine/arming.rs:301:            CpiContext::new_with_signer(
+programs/shortwin/src/engine/arming.rs:313:        CpiContext::new(
+programs/shortwin/src/engine/arming.rs:324:        CpiContext::new_with_signer(
+programs/shortwin/src/engine/arming.rs:334:        CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:37:use anchor_lang::solana_program::program::invoke_signed;
+programs/shortwin/src/engine/trader.rs:156:            CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:172:            CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:211:    token_interface::close_account(CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:243:        CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:294:            CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:376:                    CpiContext::new(
+programs/shortwin/src/engine/trader.rs:386:                    CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:409:                invoke_signed(&ix, &[w.trader_wsol.clone(), position.clone()], &[seeds])?;
+programs/shortwin/src/engine/trader.rs:413:            CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:422:        token_interface::initialize_account3(CpiContext::new(
+programs/shortwin/src/engine/trader.rs:451:        token_interface::close_account(CpiContext::new_with_signer(
+programs/shortwin/src/engine/trader.rs:469:            CpiContext::new_with_signer(
+programs/shortwin/src/instructions/add_margin.rs:73:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/add_margin.rs:82:        CpiContext::new(
+programs/shortwin/src/lamports.rs:21:    Ok(Rent::get()?.minimum_balance(data_len))
+programs/shortwin/src/instructions/apply_config.rs:58:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/cancel_config.rs:36:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/claim_sol.rs:75:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/claim_sol.rs:84:        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+programs/shortwin/src/instructions/claim_sol.rs:91:        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
+programs/shortwin/src/instructions/close_short.rs:126:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/close_short.rs:162:            ctx.remaining_accounts,
+programs/shortwin/src/instructions/cover_deficit.rs:60:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/cover_deficit.rs:69:        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+programs/shortwin/src/instructions/cover_deficit.rs:74:        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
+programs/shortwin/src/instructions/cover_deficit.rs:87:        CpiContext::new(
+programs/shortwin/src/instructions/crank_price.rs:84:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/crank_price.rs:94:    let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
+programs/shortwin/src/instructions/crank_sol_usd.rs:92:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/create_market.rs:287:    let rent_min = Rent::get()?.minimum_balance(POOL_VAULT_LEN);
+programs/shortwin/src/instructions/create_market.rs:295:            CpiContext::new_with_signer(
+programs/shortwin/src/instructions/create_market.rs:311:                CpiContext::new(
+programs/shortwin/src/instructions/create_market.rs:322:            CpiContext::new_with_signer(
+programs/shortwin/src/instructions/create_market.rs:332:            CpiContext::new_with_signer(
+programs/shortwin/src/instructions/create_market.rs:342:    token_interface::initialize_account3(CpiContext::new(
+programs/shortwin/src/instructions/create_market.rs:435:    ata::create_idempotent(CpiContext::new(
+programs/shortwin/src/instructions/create_market.rs:506:    let detection_len = DETECTION_SET_LEN.min(ctx.remaining_accounts.len());
+programs/shortwin/src/instructions/create_market.rs:507:    let (detection, hint_accounts) = ctx.remaining_accounts.split_at(detection_len);
+programs/shortwin/src/instructions/create_market.rs:509:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/create_market.rs:595:            CpiContext::new(
+programs/shortwin/src/instructions/deposit.rs:110:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/deposit.rs:140:        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+programs/shortwin/src/instructions/deposit.rs:157:        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
+programs/shortwin/src/instructions/deposit.rs:171:        CpiContext::new(
+programs/shortwin/src/instructions/disable_venue.rs:41:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/execute_pool_switch.rs:153:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/execute_pool_switch.rs:181:    let inc = incumbent(&market, kind, ctx.remaining_accounts, clock.unix_timestamp)?;
+programs/shortwin/src/instructions/expire.rs:121:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/expire.rs:142:            ctx.remaining_accounts,
+programs/shortwin/src/instructions/flag_unsafe_mint.rs:59:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/flag_venue_upgraded.rs:112:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/liquidate.rs:160:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/liquidate.rs:181:            ctx.remaining_accounts,
+programs/shortwin/src/instructions/open_short.rs:217:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/open_short.rs:254:            ctx.remaining_accounts,
+programs/shortwin/src/instructions/open_short.rs:571:            CpiContext::new(
+programs/shortwin/src/instructions/open_short.rs:587:            CpiContext::new(
+programs/shortwin/src/instructions/propose_config.rs:31:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/propose_pool.rs:227:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/propose_pool.rs:238:    let inc = incumbent(&market, kind, ctx.remaining_accounts, clock.unix_timestamp)?;
+programs/shortwin/src/instructions/revalidate_venue.rs:85:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/set_coverage_pause.rs:94:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/set_pause.rs:48:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/set_route_broken.rs:52:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/set_venue_extras.rs:167:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/sol_settle.rs:203:    let rem = venues::parse(&market, kind, ctx.remaining_accounts, Carry::ReadSet, &[])?;
+programs/shortwin/src/instructions/sol_settle.rs:362:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/sweep_protocol_fees.rs:60:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/sweep_trader.rs:133:    let floor = Rent::get()?.minimum_balance(uva.data_len());
+programs/shortwin/src/instructions/sweep_trader.rs:185:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/sweep_trader.rs:228:            ctx.remaining_accounts.len() >= leg_len,
+programs/shortwin/src/instructions/sweep_trader.rs:231:        let (leg, rest) = ctx.remaining_accounts.split_at(leg_len);
+programs/shortwin/src/instructions/sweep_trader.rs:237:        (None, ctx.remaining_accounts)
+programs/shortwin/src/instructions/sync_lender.rs:103:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/sync_lender.rs:113:            lender::load_records(&market_key, ctx.remaining_accounts, usize::from(max_epochs))?;
+programs/shortwin/src/instructions/sync_lender.rs:134:        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
+programs/shortwin/src/instructions/withdraw.rs:165:    let clock = Clock::get()?;
+programs/shortwin/src/instructions/withdraw.rs:190:        let mut records = lender::load_records(&market_key, ctx.remaining_accounts, usize::MAX)?;
+programs/shortwin/src/instructions/withdraw.rs:215:        lender::store_records(ctx.remaining_accounts, &loaded, &records)?;
+programs/shortwin/src/instructions/withdraw.rs:252:            CpiContext::new_with_signer(
+programs/shortwin/src/venues/raydium.rs:38:use anchor_lang::solana_program::program::invoke_signed;
+programs/shortwin/src/venues/raydium.rs:327:    invoke_signed(&ix, &infos, &[seeds])?;
+programs/shortwin/src/venues/raydium.rs:344:        CpiContext::new_with_signer(
+programs/shortwin/src/venues/pump_amm.rs:107:use anchor_lang::solana_program::program::invoke_signed;
+programs/shortwin/src/venues/pump_amm.rs:1011:        CpiContext::new_with_signer(
+programs/shortwin/src/venues/pump_amm.rs:1028:            CpiContext::new(
+programs/shortwin/src/venues/pump_amm.rs:1107:        CpiContext::new_with_signer(
+programs/shortwin/src/venues/pump_amm.rs:1176:    invoke_signed(
+programs/shortwin/src/venues/pump_curve.rs:79:use anchor_lang::solana_program::program::invoke_signed;
+programs/shortwin/src/venues/pump_curve.rs:912:        CpiContext::new_with_signer(
+programs/shortwin/src/venues/pump_curve.rs:929:            CpiContext::new(
+programs/shortwin/src/venues/pump_curve.rs:995:        CpiContext::new_with_signer(
+programs/shortwin/src/venues/pump_curve.rs:1062:    invoke_signed(

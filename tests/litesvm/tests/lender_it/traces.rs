@@ -893,8 +893,9 @@ fn lock_heavy_mix_keeps_i_p4_on_the_untouched_state() {
 }
 
 /// T-POT / R3A-2: the reviewer's 40-seed stranding table (`pool_model.stranded_table()`,
-/// v0.4 rows: 15,044 lamports stranded over 50,850 SOL of inflow, worst seed 435 — 15,058 over
-/// 51,186 SOL and 440 before AIR-07's drained-pool gate refused some of the table's deposits,
+/// current v0.4 rows: 15,273 lamports stranded over 50,850 SOL of inflow, worst seed 444.
+/// The pre-AIR2 dust-sweep row was 15,044 / 435; it was 15,058 over 51,186 SOL and 440
+/// before AIR-07's drained-pool gate refused some of the table's deposits,
 /// 19,887 and 582 before AIR-03 carried the rent credit's remainder, 20,399 and 596 before
 /// M10-8C-1's vested rent top-up). Through the program (which pays the SOL part of withdrawals
 /// at once) nothing is stranded beyond rounding either.
@@ -926,7 +927,7 @@ fn stranding_table_wind_down_strands_only_dust() {
     println!("stranding: {seeds} seeds, total {total} lamports, worst {worst}");
     if full() {
         // Exactly the model's R3A-2 row (the generator's `source` line of these files).
-        assert_eq!((seeds, total, worst), (40, 15_044, 435));
+        assert_eq!((seeds, total, worst), (40, 15_273, 444));
     }
 }
 

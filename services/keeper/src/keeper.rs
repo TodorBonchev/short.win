@@ -3123,7 +3123,8 @@ impl<C: Chain> Keeper<C> {
                 .await
                 .ok()
                 .and_then(|v| v.into_iter().next().flatten())
-                .and_then(|a| view::decode_zc::<VenueGuard>(&a));
+                .and_then(|a| view::decode_zc::<VenueGuard>(&a))
+                .filter(|g| g.version == shortwin::constants::VENUE_GUARD_VERSION);
             *cache = Some(g);
         }
         cache
@@ -3239,13 +3240,21 @@ impl<C: Chain> Keeper<C> {
             let t = self.pool_tracks.entry(key).or_default();
             if round == 0 && !t.rank_queue.is_empty() {
                 let batch = t.next_rank_batch(pcfg.rank_keys_per_tick);
-                let keys: Vec<Pubkey> = batch.iter().flat_map(|c| c.rank_keys()).collect();
-                let accs = self.chain.accounts(&keys).await?;
-                let scored: Vec<(u128, pool_monitor::CandidatePool)> = batch
-                    .into_iter()
-                    .zip(accs.chunks(2))
-                    .map(|(c, a)| (pool_monitor::score(&c, a), c))
-                    .collect();
+                let mut scored = Vec::with_capacity(batch.len());
+                // RpcChain chunks at 100 keys. Keep each pool/vault/mint snapshot inside one
+                // request, and commit the queue only after all groups succeed.
+                for group in batch.chunks(33) {
+                    let keys: Vec<Pubkey> = group.iter().flat_map(|c| c.rank_keys()).collect();
+                    let accs = self.chain.accounts(&keys).await?;
+                    anyhow::ensure!(accs.len() == keys.len(), "incomplete pool ranking read");
+                    scored.extend(
+                        group
+                            .iter()
+                            .cloned()
+                            .zip(accs.as_chunks::<3>().0)
+                            .map(|(c, a)| (pool_monitor::score(&c, a), c)),
+                    );
+                }
                 let t = self.pool_tracks.entry(key).or_default();
                 if t.finish_rank_batch(scored, pcfg.max_candidates) {
                     t.last_eval = None;
@@ -3685,6 +3694,7 @@ impl<C: Chain> Keeper<C> {
             .first()
             .and_then(Option::as_ref)
             .and_then(view::decode_zc::<VenueGuard>)
+            .filter(|g| g.version == shortwin::constants::VENUE_GUARD_VERSION)
         else {
             report.errors.push("VenueGuard not found".into());
             return None;

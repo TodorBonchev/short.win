@@ -1,0 +1,603 @@
+{
+  "items": [
+    {
+      "program": "shortwin-math",
+      "function": "withdraw_in",
+      "bug_class": "carry-crosses-empty-pool",
+      "kind": "FINDING",
+      "title": "The last withdrawal leaves carry for the next lender",
+      "description": "A new lender collects old SOL after the last withdrawal preserves both carries; the largest complete second-pass trace transfers 1,000 lamports.",
+      "source_ids": [
+        "p2-a01-b01",
+        "p2-a05-b01",
+        "p2-a12-b01"
+      ],
+      "gate_evidence": {
+        "1": "ALLOWS: real owner signatures, market/vault/lender PDA bindings and token CPIs apply. withdraw_in(pool.rs1823-1917) touches, flushes any vest, burns shares and clears only wipe_swept; both carries survive. claim2119-2134 requires positive backed pending/real and caps by lender_sol, all satisfied by the actual swept lamports.",
+        "2": "ALLOWS: a safe SPL mint admits T=2*10^18 raw units (<u64MAX), S=1000T=2*10^21 (<u128MAX); B=0 and no lock/epoch record. A1000-lamport realised sweep gives d=0 and each carry=1000WAD. Last withdrawal returns allT and zeroSOL. LastSharesBorrowed at withdraw.rs205-209 passes because B=0. A zero sweep sets the needed trader bit. A1-raw-token deposit mints1000shares; a subsequent1-lamport vested release allocates1001 backed lamports to the new lender. Independent500-lamport and2-lamport traces agree; no imaginary zero-share borrowed state is used.",
+        "3": "ALLOWS: departing lender authorizes its own full withdrawal; the later lender signs only its own deposit/claim and supplies one new lamport. sweep_trader is public. No trusted admin, victim signature forgery, venue trade, minimum-notional override, or unverified account bytes are required.",
+        "4": "ALLOWS bounded misallocation: the new cohort receives1000lamports earned/donated before entry in the largest complete pass2 trace. Existing prior raw report already identified this carry inheritance. Magnitude depends on the admitted old share supply; neither profitable repetition nor arbitrary vault drain is established. Score100-15 bounded loss-10 specific high-share empty transition=75."
+      },
+      "known_issue_comparison": "Prior report-5-math-core.md:320 already raised the same carry-to-next-depositor mechanism as a lead. Current scan adds production/numeric trace; source ECON carry dust bounds are related, not an explicit assignment to the next cohort.",
+      "confidence": 75,
+      "pass_2_proof_sources": [
+        {
+          "raw_id": "p2-a01-b01",
+          "artifact": "p2-01-math.md"
+        },
+        {
+          "raw_id": "p2-a05-b01",
+          "artifact": "p2-05-invariant.md"
+        },
+        {
+          "raw_id": "p2-a12-b01",
+          "artifact": "p2-12-flow.md"
+        }
+      ],
+      "raw_fix_proposals": [
+        {
+          "raw_id": "p2-a01-b01",
+          "diff": "--- a/crates/shortwin-math/src/pool.rs\n+++ b/crates/shortwin-math/src/pool.rs\n@@ -1906,6 +1906,9 @@ fn withdraw_in(\n     l.shares = sub_u128(l.shares, shares)?;\n     p.total_shares = sub_u128(p.total_shares, shares)?;\n     if p.total_shares == 0 {\n+        p.dust = add_i128(add_i128(p.dust, p.carry)?, to_i128(p.carry_r)?)?;\n+        p.carry = 0;\n+        p.carry_r = 0;\n         // AIR-08: the market has no lender again; SOL that reaches the trader from now on is\n         // the protocol's (KI-10), so the next deposit waits for the sweeps, as after a wipe.\n         p.wipe_swept = 0;"
+        },
+        {
+          "raw_id": "p2-a05-b01",
+          "diff": "--- a/crates/shortwin-math/src/pool.rs\n+++ b/crates/shortwin-math/src/pool.rs\n@@ -1906,6 +1906,9 @@\n     l.shares = sub_u128(l.shares, shares)?;\n     p.total_shares = sub_u128(p.total_shares, shares)?;\n     if p.total_shares == 0 {\n+        p.dust = add_i128(add_i128(p.dust, p.carry)?, to_i128(p.carry_r)?)?;\n+        p.carry = 0;\n+        p.carry_r = 0;\n         // AIR-08: the market has no lender again; SOL that reaches the trader from now on is\n         // the protocol's (KI-10), so the next deposit waits for the sweeps, as after a wipe.\n         p.wipe_swept = 0;"
+        },
+        {
+          "raw_id": "p2-a12-b01",
+          "diff": "--- a/crates/shortwin-math/src/pool.rs\n+++ b/crates/shortwin-math/src/pool.rs\n@@ -1908,6 +1908,9 @@\n     if p.total_shares == 0 {\n         // AIR-08: the market has no lender again; SOL that reaches the trader from now on is\n         // the protocol's (KI-10), so the next deposit waits for the sweeps, as after a wipe.\n+        p.dust = add_i128(add_i128(p.dust, p.carry)?, to_i128(p.carry_r)?)?;\n+        p.carry = 0;\n+        p.carry_r = 0;\n         p.wipe_swept = 0;\n     }\n     let amount = to_u64(amount)?;"
+        }
+      ],
+      "fixes": [
+        {
+          "label": "move carry to dust at the empty transition",
+          "diff": "--- a/crates/shortwin-math/src/pool.rs\n+++ b/crates/shortwin-math/src/pool.rs\n@@ -1906,6 +1906,9 @@ fn withdraw_in(\n     l.shares = sub_u128(l.shares, shares)?;\n     p.total_shares = sub_u128(p.total_shares, shares)?;\n     if p.total_shares == 0 {\n+        p.dust = add_i128(add_i128(p.dust, p.carry)?, to_i128(p.carry_r)?)?;\n+        p.carry = 0;\n+        p.carry_r = 0;\n         // AIR-08: the market has no lender again; SOL that reaches the trader from now on is\n         // the protocol's (KI-10), so the next deposit waits for the sweeps, as after a wipe.\n         p.wipe_swept = 0;"
+        }
+      ],
+      "fix_dedup_evidence": "All three raw proposals add exactly the same dust accumulation and carry/carry_r resets in the same last-share branch. The a12 insertion follows its comment instead of preceding it; no functional difference. One verbatim option retained; all raw variants preserved separately.",
+      "patch_limits": "This resets both distribution carries by the existing epoch-roll dust policy. It prevents future-cohort allocation but does not pay former holders or reclassify the corresponding vault SOL; choose that accounting policy before implementing. The different payout-based pass1 proposal remains preserved in run1 and its raw report. No patch applied or compiled."
+    },
+    {
+      "program": "shortwin",
+      "function": "sync_lender",
+      "bug_class": "repeated-accrual-truncation",
+      "kind": "LEAD",
+      "title": "Repeated sync calls discard fractional lender credits",
+      "description": "Unsigned syncs discard fractional lender credits; a complete two-release trace loses one lamport, while material aggregate harm remains unproved.",
+      "source_ids": [
+        "p2-a01-b02",
+        "p2-a05-b02",
+        "p2-a12-b03"
+      ],
+      "gate_evidence": {
+        "1": "ALLOWS: SyncLender74-94 binds real lender/owner/market; owner is UncheckedAccount. Unsigned118-132 selects touch_pot and bars rebase writes, which the current-epoch no-forward-chain trace does not need. touch_tail1474-1488 floors interval credits then advances both snapshots.",
+        "2": "ALLOWS: two genuine1-raw-token deposits yield1000shares each,S2000. A realised2-lamport sweep over default21600seconds releases1 at midpoint and1 at end via zero sweeps. Each index delta is500000000000000; a victim touch after each credits0, versus1lamport after one final touch. The other lender can receive its own1lamport and the lost value remains tracked.",
+        "3": "ALLOWS: any caller can sync the current-epoch victim without its signature; no rebase or record mutation is required. Unchanged-index syncs are idempotent.",
+        "4": "DEMOTE: each touch discards less than1lamport per accumulator. The complete source trace proves1lamport; the300-release/100lamport arithmetic lacks a complete live schedule or material economic harm. KI68 discloses current/parked per-touch flooring. No extraction or scalable lockout was established."
+      },
+      "known_issue_comparison": "KI-68; docs/design/ECONOMICS.md:1422 explicitly describes current/parked per-touch rounding.",
+      "code_smells": "per-touch floor; snapshots advance without a lender remainder",
+      "pass_2_proof_sources": [
+        {
+          "raw_id": "p2-a01-b02",
+          "artifact": "p2-01-math.md"
+        },
+        {
+          "raw_id": "p2-a05-b02",
+          "artifact": "p2-05-invariant.md"
+        },
+        {
+          "raw_id": "p2-a12-b03",
+          "artifact": "p2-12-flow.md"
+        }
+      ],
+      "remediation_limits": "Per-lender fractional remainders need share-change/epoch semantics. Copying cumulative-floor differences from the forward-chain path into current touch can select another rounding phase after a share change; no such patch is endorsed."
+    },
+    {
+      "program": "shortwin",
+      "function": "apply_config",
+      "bug_class": "unsafe-authority-transfer",
+      "kind": "FINDING",
+      "title": "Authority changes accept a successor without its signature",
+      "description": "An honest authority change can install unusable governance, pause, or coverage keys; lost governance requires a program upgrade to recover.",
+      "source_ids": [
+        "p2-a02-b01",
+        "p2-a06-b01",
+        "p2-a08-b01",
+        "p2-a09-b01"
+      ],
+      "gate_evidence": {
+        "1": "ALLOWS: ApplyConfig canonical loader/version and pending/timelock/expiry checks (apply_config.rs35-81) authenticate the old proposal. ProposeConfig19-25 requires old governance. check_authorities(config.rs769-799) enforces nonzero/distinct roles, not successor control. These are actual constraints, not an outsider authorization bypass.",
+        "2": "ALLOWS: a valid Authorities proposal can use the real config PDA as governance, retain a valid writable System-owned fee recipient, and apply within its normal window. The PDA cannot produce the future governance signature through any current signing path. No malformed account or new instruction is assumed.",
+        "3": "ALLOWS honest-admin hazard: the old governance signer makes the address error and fails to cancel before public execution. This is not malicious-admin theft. Pause/coverage successors can similarly become unusable; governance can replace those roles if it remains controlled.",
+        "4": "ALLOWS: lost governance prevents later proposals through the current program; retained upgrade authority can repair by program upgrade. User exits remain available. Score100-10 honest-admin precondition-15 upgrade-recoverable impact=75."
+      },
+      "known_issue_comparison": "KI-70 and AIR2-06 explicitly disclosed/accepted; optional successor Signer diff is an uncompiled proposal and requires IDL/client updates.",
+      "confidence": 75,
+      "pass_2_proof_sources": [
+        {
+          "raw_id": "p2-a02-b01",
+          "artifact": "p2-02-access.md"
+        },
+        {
+          "raw_id": "p2-a06-b01",
+          "artifact": "p2-06-periphery.md"
+        },
+        {
+          "raw_id": "p2-a08-b01",
+          "artifact": "p2-08-asymmetry.md"
+        },
+        {
+          "raw_id": "p2-a09-b01",
+          "artifact": "p2-09-accounts.md"
+        }
+      ],
+      "raw_fix_proposals": [
+        {
+          "raw_id": "p2-a02-b01",
+          "diff": "--- a/programs/shortwin/src/instructions/apply_config.rs\n+++ b/programs/shortwin/src/instructions/apply_config.rs\n@@ -52,6 +52,8 @@\n         bump = oracle_cache.bump\n     )]\n     pub oracle_cache: Option<Box<Account<'info, OracleCache>>>,\n+    /// The successor must accept a change of governance.\n+    pub new_governance: Option<Signer<'info>>,\n }\n \n pub fn handler(ctx: Context<ApplyConfig>) -> Result<()> {\n@@ -76,6 +78,16 @@\n         );\n         let change = c.pending.change()?;\n         c.check_change(&change)?;\n+        if let ConfigChange::Authorities { governance, .. } = &change {\n+            if *governance != c.governance {\n+                let successor = ctx\n+                    .accounts\n+                    .new_governance\n+                    .as_ref()\n+                    .ok_or_else(|| error!(ShortwinError::Unauthorized))?;\n+                require_keys_eq!(successor.key(), *governance, ShortwinError::Unauthorized);\n+            }\n+        }\n         let applied = (c.pending.kind, c.pending.hash());\n         c.apply(&change, clock.unix_timestamp)?;\n         c.pending.clear();"
+        },
+        {
+          "raw_id": "p2-a06-b01",
+          "diff": "--- a/programs/shortwin/src/instructions/apply_config.rs\n+++ b/programs/shortwin/src/instructions/apply_config.rs\n@@ -76,6 +76,22 @@\n         );\n         let change = c.pending.change()?;\n         c.check_change(&change)?;\n+        if let ConfigChange::Authorities {\n+            governance, pause_authority, coverage_authority, ..\n+        } = &change {\n+            for (old, new) in [\n+                (c.governance, *governance),\n+                (c.pause_authority, *pause_authority),\n+                (c.coverage_authority, *coverage_authority),\n+            ] {\n+                if new != old && new != Pubkey::default() {\n+                    require!(\n+                        ctx.remaining_accounts.iter().any(|a| a.key() == new && a.is_signer),\n+                        ShortwinError::Unauthorized\n+                    );\n+                }\n+            }\n+        }\n         let applied = (c.pending.kind, c.pending.hash());\n         c.apply(&change, clock.unix_timestamp)?;\n         c.pending.clear();"
+        },
+        {
+          "raw_id": "p2-a08-b01",
+          "diff": "--- a/programs/shortwin/src/instructions/apply_config.rs\n+++ b/programs/shortwin/src/instructions/apply_config.rs\n@@ -52,6 +52,8 @@\n         bump = oracle_cache.bump\n     )]\n     pub oracle_cache: Option<Box<Account<'info, OracleCache>>>,\n+    /// Required when an Authorities change replaces governance.\n+    pub new_governance: Option<Signer<'info>>,\n }\n \n pub fn handler(ctx: Context<ApplyConfig>) -> Result<()> {\n@@ -76,6 +78,13 @@\n         );\n         let change = c.pending.change()?;\n         c.check_change(&change)?;\n+        if let ConfigChange::Authorities { governance, .. } = &change {\n+            if *governance != c.governance {\n+                let successor = ctx.accounts.new_governance.as_ref()\n+                    .ok_or_else(|| error!(ShortwinError::Unauthorized))?;\n+                require_keys_eq!(successor.key(), *governance, ShortwinError::Unauthorized);\n+            }\n+        }\n         let applied = (c.pending.kind, c.pending.hash());\n         c.apply(&change, clock.unix_timestamp)?;\n         c.pending.clear();"
+        },
+        {
+          "raw_id": "p2-a09-b01",
+          "diff": "--- a/programs/shortwin/src/instructions/apply_config.rs\n+++ b/programs/shortwin/src/instructions/apply_config.rs\n@@ -77,6 +77,28 @@\n         let change = c.pending.change()?;\n         c.check_change(&change)?;\n         let applied = (c.pending.kind, c.pending.hash());\n+        if let ConfigChange::Authorities {\n+            governance,\n+            pause_authority,\n+            coverage_authority,\n+            ..\n+        } = &change\n+        {\n+            for (current, next) in [\n+                (c.governance, *governance),\n+                (c.pause_authority, *pause_authority),\n+                (c.coverage_authority, *coverage_authority),\n+            ] {\n+                if next != Pubkey::default() && next != current {\n+                    require!(\n+                        ctx.remaining_accounts\n+                            .iter()\n+                            .any(|account| account.key() == next && account.is_signer),\n+                        ShortwinError::Unauthorized\n+                    );\n+                }\n+            }\n+        }\n         c.apply(&change, clock.unix_timestamp)?;\n         c.pending.clear();\n         (applied.0, applied.1, change)"
+        }
+      ],
+      "fixes": [
+        {
+          "label": "require governance acceptance; pause and coverage remain unchecked",
+          "diff": "--- a/programs/shortwin/src/instructions/apply_config.rs\n+++ b/programs/shortwin/src/instructions/apply_config.rs\n@@ -52,6 +52,8 @@\n         bump = oracle_cache.bump\n     )]\n     pub oracle_cache: Option<Box<Account<'info, OracleCache>>>,\n+    /// The successor must accept a change of governance.\n+    pub new_governance: Option<Signer<'info>>,\n }\n \n pub fn handler(ctx: Context<ApplyConfig>) -> Result<()> {\n@@ -76,6 +78,16 @@\n         );\n         let change = c.pending.change()?;\n         c.check_change(&change)?;\n+        if let ConfigChange::Authorities { governance, .. } = &change {\n+            if *governance != c.governance {\n+                let successor = ctx\n+                    .accounts\n+                    .new_governance\n+                    .as_ref()\n+                    .ok_or_else(|| error!(ShortwinError::Unauthorized))?;\n+                require_keys_eq!(successor.key(), *governance, ShortwinError::Unauthorized);\n+            }\n+        }\n         let applied = (c.pending.kind, c.pending.hash());\n         c.apply(&change, clock.unix_timestamp)?;\n         c.pending.clear();"
+        },
+        {
+          "label": "require every changed enabled authority to sign",
+          "diff": "--- a/programs/shortwin/src/instructions/apply_config.rs\n+++ b/programs/shortwin/src/instructions/apply_config.rs\n@@ -76,6 +76,22 @@\n         );\n         let change = c.pending.change()?;\n         c.check_change(&change)?;\n+        if let ConfigChange::Authorities {\n+            governance, pause_authority, coverage_authority, ..\n+        } = &change {\n+            for (old, new) in [\n+                (c.governance, *governance),\n+                (c.pause_authority, *pause_authority),\n+                (c.coverage_authority, *coverage_authority),\n+            ] {\n+                if new != old && new != Pubkey::default() {\n+                    require!(\n+                        ctx.remaining_accounts.iter().any(|a| a.key() == new && a.is_signer),\n+                        ShortwinError::Unauthorized\n+                    );\n+                }\n+            }\n+        }\n         let applied = (c.pending.kind, c.pending.hash());\n         c.apply(&change, clock.unix_timestamp)?;\n         c.pending.clear();"
+        }
+      ],
+      "fix_dedup_evidence": "a02 and a08 implement the same optional-governance signer expression; differences are formatting/comment only. a06 and a09 implement the same changed/nondefault authority loop and remaining-account signature predicate, differing only in bound variable names, layout, and placement relative to the side-effect-free applied tuple. Both semantic ADD-line alternatives are preserved verbatim. All four raw diffs remain in raw_fix_proposals.",
+      "patch_limits": "Option A covers governance only. Option B also covers enabled pause/coverage successors. Both require matching client account metadata; Option A also changes the Anchor account schema/IDL. No compile or integration check."
+    },
+    {
+      "program": "shortwin",
+      "function": "close_short",
+      "bug_class": "hardening-position-status-unchecked",
+      "kind": "LEAD",
+      "title": "Exit instructions omit the position status check",
+      "description": "A future instruction that persists a non-open status needs matching exit checks; current writers only create open positions.",
+      "source_ids": [
+        "p2-a02-b03",
+        "p2-a04-b01",
+        "p2-a08-b02",
+        "p2-a09-b05"
+      ],
+      "gate_evidence": {
+        "1": "UNCERTAIN hypothetical non-open state: close_short/liquidate/expire/sol_settle check actual owner/discriminator/PDA/market/borrower bindings but omit status, while add_margin65 requires POSITION_OPEN.",
+        "2": "BLOCKS current exploit: position.rs19-21 reserves status1 forv1.1; the only production assignment at open_short616 writes POSITION_OPEN. Anchor1.2.0 close removes lamports, assigns System ownership and resizes data tozero; no closed-account revival path is supplied. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker.",
+        "4": "NOT EVALUATED after gate2 blocker."
+      },
+      "known_issue_comparison": "Existing hardening lead comparison recorded separately.",
+      "code_smells": "close_short, liquidate, expire, sol_settle omit status guards",
+      "pass_2_proof_sources": [
+        {
+          "raw_id": "p2-a02-b03",
+          "artifact": "p2-02-access.md"
+        },
+        {
+          "raw_id": "p2-a04-b01",
+          "artifact": "p2-04-execution.md"
+        },
+        {
+          "raw_id": "p2-a08-b02",
+          "artifact": "p2-08-asymmetry.md"
+        },
+        {
+          "raw_id": "p2-a09-b05",
+          "artifact": "p2-09-accounts.md"
+        }
+      ],
+      "raw_fix_proposals": [
+        {
+          "raw_id": "p2-a04-b01",
+          "diff": "--- a/programs/shortwin/src/instructions/close_short.rs\n+++ b/programs/shortwin/src/instructions/close_short.rs\n@@ -89,1 +89,2 @@\n-        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds\n+        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds,\n+        constraint = position.status == crate::state::POSITION_OPEN @ ShortwinError::AccountMismatch\n--- a/programs/shortwin/src/instructions/liquidate.rs\n+++ b/programs/shortwin/src/instructions/liquidate.rs\n@@ -127,1 +127,2 @@\n-        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds\n+        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds,\n+        constraint = position.status == crate::state::POSITION_OPEN @ ShortwinError::AccountMismatch\n--- a/programs/shortwin/src/instructions/expire.rs\n+++ b/programs/shortwin/src/instructions/expire.rs\n@@ -88,1 +88,2 @@\n-        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds\n+        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds,\n+        constraint = position.status == crate::state::POSITION_OPEN @ ShortwinError::AccountMismatch\n--- a/programs/shortwin/src/instructions/sol_settle.rs\n+++ b/programs/shortwin/src/instructions/sol_settle.rs\n@@ -126,1 +126,2 @@\n-        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds\n+        constraint = position.is_pda(&position.key()) @ anchor_lang::error::ErrorCode::ConstraintSeeds,\n+        constraint = position.status == crate::state::POSITION_OPEN @ ShortwinError::AccountMismatch"
+        }
+      ],
+      "mechanism_coverage": "All four exits preserved in description/code_smells and raw evidence. Proposed four-site defensive diff from a04 is retained in raw_fix_proposals, not promoted to a current finding."
+    },
+    {
+      "program": "shortwin",
+      "function": "deposit",
+      "bug_class": "hardening-pool-vault-fields-unchecked",
+      "kind": "LEAD",
+      "title": "Pool vault loads omit token field constraints.",
+      "description": "A future vault importer can admit the wrong asset because the loaders omit checks of the vault mint, authority, and token program.",
+      "source_ids": [
+        "p2-a02-b04",
+        "p2-a05-b04",
+        "p2-a08-b03",
+        "p2-a09-b06"
+      ],
+      "gate_evidence": {
+        "1": "BLOCKS current substitution: deposit94-99 and sibling vault loads bind InterfaceAccount<TokenAccount> to the stored market vault PDA; create_market281-350 creates that PDA under the intended token program and initializes its mint/market authority. Runtime PDA ownership and current lack of any vault-authority writer prevent attacker replacement. TransferChecked enforces transfer-specific mint/program rules. Missing explicit mint/authority/program constraints remain a hardening LEAD.",
+        "2": "NOT EVALUATED after gate1 blocker.",
+        "3": "NOT EVALUATED after gate1 blocker.",
+        "4": "NOT EVALUATED after gate1 blocker."
+      },
+      "known_issue_comparison": "No matching known issue identified; the creation invariant is a real current guard, not assumed operator behavior.",
+      "code_smells": "The canonical vault PDA and stored key are checked, but deposit, withdraw, open_short, close_short, liquidate, and expire omit explicit token field constraints.",
+      "pass_2_proof_sources": [
+        {
+          "raw_id": "p2-a02-b04",
+          "artifact": "p2-02-access.md"
+        },
+        {
+          "raw_id": "p2-a05-b04",
+          "artifact": "p2-05-invariant.md"
+        },
+        {
+          "raw_id": "p2-a08-b03",
+          "artifact": "p2-08-asymmetry.md"
+        },
+        {
+          "raw_id": "p2-a09-b06",
+          "artifact": "p2-09-accounts.md"
+        }
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "inputs",
+      "bug_class": "transaction-controlled-settlement-legs",
+      "kind": "LEAD",
+      "title": "Temporary withdrawals change live settlement inputs",
+      "description": "Temporary LP withdrawals alter live settlement legs, but a complete production sequence and loss beyond the documented AIR-20 residual remain unproved.",
+      "source_ids": [
+        "p2-a03-b01",
+        "p2-a04-b02"
+      ],
+      "gate_evidence": {
+        "1": "UNCERTAIN complete execution: arming::inputs208-220 reads real live reserves and259 passes raw l_live to S1/S2; l_spot at223 protects only CR. Accounts and venue identity guards prevent fabricated state. Independent box legs, eligibility, warm-up/freshness, arming gaps, restart markers and persisted EMA updates constrain actual execution.",
+        "2": "UNCERTAIN: fee-free quote arithmetic q100,X=Y1000->112 versus proportional200reserves->200 and budget150 changes the live predicate, but the raws do not construct a production-admitted open state satisfying all caps, box and persistence conditions. Same-second calls cannot invent EMA updates; later failure rolls the transaction back.",
+        "3": "ALLOWS conditional actor: an unlocked LP can move its own adopted-venue liquidity and call public settlement; no admin authority is assumed.",
+        "4": "DEMOTE: both reviewers explicitly identify the accepted AIR20/KI75 residual and no independent borrower loss or net payoff. Source-stated default/alternative-parameter model results are not reproduced measurements from this scan. Altering live legs would change the documented design."
+      },
+      "known_issue_comparison": "AIR-20 / KI-75, source explicitly keeps raw L_live for these legs.",
+      "code_smells": "live reserves feed S1/S2; only the CR leg uses the EMA floor",
+      "pass_2_proof_sources": [
+        {
+          "raw_id": "p2-a03-b01",
+          "artifact": "p2-03-economic.md"
+        },
+        {
+          "raw_id": "p2-a04-b02",
+          "artifact": "p2-04-execution.md"
+        }
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "deposit",
+      "bug_class": "donation-extends-deposit-hold",
+      "kind": "LEAD",
+      "title": "Small donations can extend a settlement hold",
+      "description": "Small donations can renew an active settlement hold; sustained blockage and a fix that preserves historical rewards remain unverified.",
+      "source_ids": [
+        "p2-a05-b03",
+        "p2-a08-b04",
+        "p2-a12-b02"
+      ],
+      "gate_evidence": {
+        "1": "ALLOWS conditional mechanism: Deposit130-135 treats nonnegative deposit_hold_until as a marker and requires shared vest_bal==0. SweepTrader uses genuine canonical trader/market accounts and is public; its prologue releases old vest before sweep adds another. pool::vest_in948-999 applies value-weighted floor rounding.",
+        "2": "UNCERTAIN complete production setup: all three raws start from S>0 and an active settlement hold; none independently constructs that exact low-value state from open_short through settlement. Conditional arithmetic is valid: with1lamport left and1second remaining, another1lamport sets span10800 at default21600. At the old end, a sweep can release old vest then start a fresh1lamport vest before any successful deposit clears the marker.",
+        "3": "ALLOWS conditional trigger: ordinary donations need no owner/borrower signature. The required normal sweep branch must apply, rather than an after-flush immediate-credit entitlement. Last-share withdrawal flushes vest and successful deposit at zero can clear the marker.",
+        "4": "DEMOTE: later legitimate income is explicitly protected by the current source and AIR2-04/05 policy. Withdrawals/claims remain available. No guaranteed lasting denial, current profit or safe separate-donation accounting change is proved. The pre-expiry arithmetic does not require winning the exact-expiry race but still requires the initial held state."
+      },
+      "known_issue_comparison": "AIR2-04/05 documentation already states extensions prolong deposits; this low-cost repeated schedule is additional detail. AIR-02 weighted-end rounding is related but a different old defect.",
+      "code_smells": "the shared vest gates deposits; public sweeps renew the vest",
+      "pass_2_proof_sources": [
+        {
+          "raw_id": "p2-a05-b03",
+          "artifact": "p2-05-invariant.md"
+        },
+        {
+          "raw_id": "p2-a08-b04",
+          "artifact": "p2-08-asymmetry.md"
+        },
+        {
+          "raw_id": "p2-a12-b02",
+          "artifact": "p2-12-flow.md"
+        }
+      ],
+      "mechanism_coverage": "Preserves both pre-expiry extension and post-expiry renewal before a successful deposit. Simple timestamp-only clearing would reopen historical-income capture, so it is not endorsed."
+    }
+  ],
+  "dispositions": [
+    {
+      "raw_id": "p2-a01-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-math|withdraw-in|carry-crosses-empty-pool",
+      "reason": "A new lender collects old SOL after the last withdrawal preserves both carries; the largest complete second-pass trace transfers 1,000 lamports.",
+      "gates": {
+        "1": "ALLOWS: real owner signatures, market/vault/lender PDA bindings and token CPIs apply. withdraw_in(pool.rs1823-1917) touches, flushes any vest, burns shares and clears only wipe_swept; both carries survive. claim2119-2134 requires positive backed pending/real and caps by lender_sol, all satisfied by the actual swept lamports.",
+        "2": "ALLOWS: a safe SPL mint admits T=2*10^18 raw units (<u64MAX), S=1000T=2*10^21 (<u128MAX); B=0 and no lock/epoch record. A1000-lamport realised sweep gives d=0 and each carry=1000WAD. Last withdrawal returns allT and zeroSOL. LastSharesBorrowed at withdraw.rs205-209 passes because B=0. A zero sweep sets the needed trader bit. A1-raw-token deposit mints1000shares; a subsequent1-lamport vested release allocates1001 backed lamports to the new lender. Independent500-lamport and2-lamport traces agree; no imaginary zero-share borrowed state is used.",
+        "3": "ALLOWS: departing lender authorizes its own full withdrawal; the later lender signs only its own deposit/claim and supplies one new lamport. sweep_trader is public. No trusted admin, victim signature forgery, venue trade, minimum-notional override, or unverified account bytes are required.",
+        "4": "ALLOWS bounded misallocation: the new cohort receives1000lamports earned/donated before entry in the largest complete pass2 trace. Existing prior raw report already identified this carry inheritance. Magnitude depends on the admitted old share supply; neither profitable repetition nor arbitrary vault drain is established. Score100-15 bounded loss-10 specific high-share empty transition=75."
+      }
+    },
+    {
+      "raw_id": "p2-a05-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-math|withdraw-in|carry-crosses-empty-pool",
+      "reason": "A new lender collects old SOL after the last withdrawal preserves both carries; the largest complete second-pass trace transfers 1,000 lamports.",
+      "gates": {
+        "1": "ALLOWS: real owner signatures, market/vault/lender PDA bindings and token CPIs apply. withdraw_in(pool.rs1823-1917) touches, flushes any vest, burns shares and clears only wipe_swept; both carries survive. claim2119-2134 requires positive backed pending/real and caps by lender_sol, all satisfied by the actual swept lamports.",
+        "2": "ALLOWS: a safe SPL mint admits T=2*10^18 raw units (<u64MAX), S=1000T=2*10^21 (<u128MAX); B=0 and no lock/epoch record. A1000-lamport realised sweep gives d=0 and each carry=1000WAD. Last withdrawal returns allT and zeroSOL. LastSharesBorrowed at withdraw.rs205-209 passes because B=0. A zero sweep sets the needed trader bit. A1-raw-token deposit mints1000shares; a subsequent1-lamport vested release allocates1001 backed lamports to the new lender. Independent500-lamport and2-lamport traces agree; no imaginary zero-share borrowed state is used.",
+        "3": "ALLOWS: departing lender authorizes its own full withdrawal; the later lender signs only its own deposit/claim and supplies one new lamport. sweep_trader is public. No trusted admin, victim signature forgery, venue trade, minimum-notional override, or unverified account bytes are required.",
+        "4": "ALLOWS bounded misallocation: the new cohort receives1000lamports earned/donated before entry in the largest complete pass2 trace. Existing prior raw report already identified this carry inheritance. Magnitude depends on the admitted old share supply; neither profitable repetition nor arbitrary vault drain is established. Score100-15 bounded loss-10 specific high-share empty transition=75."
+      }
+    },
+    {
+      "raw_id": "p2-a12-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-math|withdraw-in|carry-crosses-empty-pool",
+      "reason": "A new lender collects old SOL after the last withdrawal preserves both carries; the largest complete second-pass trace transfers 1,000 lamports.",
+      "gates": {
+        "1": "ALLOWS: real owner signatures, market/vault/lender PDA bindings and token CPIs apply. withdraw_in(pool.rs1823-1917) touches, flushes any vest, burns shares and clears only wipe_swept; both carries survive. claim2119-2134 requires positive backed pending/real and caps by lender_sol, all satisfied by the actual swept lamports.",
+        "2": "ALLOWS: a safe SPL mint admits T=2*10^18 raw units (<u64MAX), S=1000T=2*10^21 (<u128MAX); B=0 and no lock/epoch record. A1000-lamport realised sweep gives d=0 and each carry=1000WAD. Last withdrawal returns allT and zeroSOL. LastSharesBorrowed at withdraw.rs205-209 passes because B=0. A zero sweep sets the needed trader bit. A1-raw-token deposit mints1000shares; a subsequent1-lamport vested release allocates1001 backed lamports to the new lender. Independent500-lamport and2-lamport traces agree; no imaginary zero-share borrowed state is used.",
+        "3": "ALLOWS: departing lender authorizes its own full withdrawal; the later lender signs only its own deposit/claim and supplies one new lamport. sweep_trader is public. No trusted admin, victim signature forgery, venue trade, minimum-notional override, or unverified account bytes are required.",
+        "4": "ALLOWS bounded misallocation: the new cohort receives1000lamports earned/donated before entry in the largest complete pass2 trace. Existing prior raw report already identified this carry inheritance. Magnitude depends on the admitted old share supply; neither profitable repetition nor arbitrary vault drain is established. Score100-15 bounded loss-10 specific high-share empty transition=75."
+      }
+    },
+    {
+      "raw_id": "p2-a01-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|sync-lender|repeated-accrual-truncation",
+      "reason": "Unsigned syncs discard fractional lender credits; a complete two-release trace loses one lamport, while material aggregate harm remains unproved.",
+      "gates": {
+        "1": "ALLOWS: SyncLender74-94 binds real lender/owner/market; owner is UncheckedAccount. Unsigned118-132 selects touch_pot and bars rebase writes, which the current-epoch no-forward-chain trace does not need. touch_tail1474-1488 floors interval credits then advances both snapshots.",
+        "2": "ALLOWS: two genuine1-raw-token deposits yield1000shares each,S2000. A realised2-lamport sweep over default21600seconds releases1 at midpoint and1 at end via zero sweeps. Each index delta is500000000000000; a victim touch after each credits0, versus1lamport after one final touch. The other lender can receive its own1lamport and the lost value remains tracked.",
+        "3": "ALLOWS: any caller can sync the current-epoch victim without its signature; no rebase or record mutation is required. Unchanged-index syncs are idempotent.",
+        "4": "DEMOTE: each touch discards less than1lamport per accumulator. The complete source trace proves1lamport; the300-release/100lamport arithmetic lacks a complete live schedule or material economic harm. KI68 discloses current/parked per-touch flooring. No extraction or scalable lockout was established."
+      }
+    },
+    {
+      "raw_id": "p2-a05-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|sync-lender|repeated-accrual-truncation",
+      "reason": "Unsigned syncs discard fractional lender credits; a complete two-release trace loses one lamport, while material aggregate harm remains unproved.",
+      "gates": {
+        "1": "ALLOWS: SyncLender74-94 binds real lender/owner/market; owner is UncheckedAccount. Unsigned118-132 selects touch_pot and bars rebase writes, which the current-epoch no-forward-chain trace does not need. touch_tail1474-1488 floors interval credits then advances both snapshots.",
+        "2": "ALLOWS: two genuine1-raw-token deposits yield1000shares each,S2000. A realised2-lamport sweep over default21600seconds releases1 at midpoint and1 at end via zero sweeps. Each index delta is500000000000000; a victim touch after each credits0, versus1lamport after one final touch. The other lender can receive its own1lamport and the lost value remains tracked.",
+        "3": "ALLOWS: any caller can sync the current-epoch victim without its signature; no rebase or record mutation is required. Unchanged-index syncs are idempotent.",
+        "4": "DEMOTE: each touch discards less than1lamport per accumulator. The complete source trace proves1lamport; the300-release/100lamport arithmetic lacks a complete live schedule or material economic harm. KI68 discloses current/parked per-touch flooring. No extraction or scalable lockout was established."
+      }
+    },
+    {
+      "raw_id": "p2-a12-b03",
+      "verdict": "LEAD",
+      "key": "shortwin|sync-lender|repeated-accrual-truncation",
+      "reason": "Unsigned syncs discard fractional lender credits; a complete two-release trace loses one lamport, while material aggregate harm remains unproved.",
+      "gates": {
+        "1": "ALLOWS: SyncLender74-94 binds real lender/owner/market; owner is UncheckedAccount. Unsigned118-132 selects touch_pot and bars rebase writes, which the current-epoch no-forward-chain trace does not need. touch_tail1474-1488 floors interval credits then advances both snapshots.",
+        "2": "ALLOWS: two genuine1-raw-token deposits yield1000shares each,S2000. A realised2-lamport sweep over default21600seconds releases1 at midpoint and1 at end via zero sweeps. Each index delta is500000000000000; a victim touch after each credits0, versus1lamport after one final touch. The other lender can receive its own1lamport and the lost value remains tracked.",
+        "3": "ALLOWS: any caller can sync the current-epoch victim without its signature; no rebase or record mutation is required. Unchanged-index syncs are idempotent.",
+        "4": "DEMOTE: each touch discards less than1lamport per accumulator. The complete source trace proves1lamport; the300-release/100lamport arithmetic lacks a complete live schedule or material economic harm. KI68 discloses current/parked per-touch flooring. No extraction or scalable lockout was established."
+      }
+    },
+    {
+      "raw_id": "p2-a02-b01",
+      "verdict": "FINDING",
+      "key": "shortwin|apply-config|unsafe-authority-transfer",
+      "reason": "An honest authority change can install unusable governance, pause, or coverage keys; lost governance requires a program upgrade to recover.",
+      "gates": {
+        "1": "ALLOWS: ApplyConfig canonical loader/version and pending/timelock/expiry checks (apply_config.rs35-81) authenticate the old proposal. ProposeConfig19-25 requires old governance. check_authorities(config.rs769-799) enforces nonzero/distinct roles, not successor control. These are actual constraints, not an outsider authorization bypass.",
+        "2": "ALLOWS: a valid Authorities proposal can use the real config PDA as governance, retain a valid writable System-owned fee recipient, and apply within its normal window. The PDA cannot produce the future governance signature through any current signing path. No malformed account or new instruction is assumed.",
+        "3": "ALLOWS honest-admin hazard: the old governance signer makes the address error and fails to cancel before public execution. This is not malicious-admin theft. Pause/coverage successors can similarly become unusable; governance can replace those roles if it remains controlled.",
+        "4": "ALLOWS: lost governance prevents later proposals through the current program; retained upgrade authority can repair by program upgrade. User exits remain available. Score100-10 honest-admin precondition-15 upgrade-recoverable impact=75."
+      }
+    },
+    {
+      "raw_id": "p2-a06-b01",
+      "verdict": "FINDING",
+      "key": "shortwin|apply-config|unsafe-authority-transfer",
+      "reason": "An honest authority change can install unusable governance, pause, or coverage keys; lost governance requires a program upgrade to recover.",
+      "gates": {
+        "1": "ALLOWS: ApplyConfig canonical loader/version and pending/timelock/expiry checks (apply_config.rs35-81) authenticate the old proposal. ProposeConfig19-25 requires old governance. check_authorities(config.rs769-799) enforces nonzero/distinct roles, not successor control. These are actual constraints, not an outsider authorization bypass.",
+        "2": "ALLOWS: a valid Authorities proposal can use the real config PDA as governance, retain a valid writable System-owned fee recipient, and apply within its normal window. The PDA cannot produce the future governance signature through any current signing path. No malformed account or new instruction is assumed.",
+        "3": "ALLOWS honest-admin hazard: the old governance signer makes the address error and fails to cancel before public execution. This is not malicious-admin theft. Pause/coverage successors can similarly become unusable; governance can replace those roles if it remains controlled.",
+        "4": "ALLOWS: lost governance prevents later proposals through the current program; retained upgrade authority can repair by program upgrade. User exits remain available. Score100-10 honest-admin precondition-15 upgrade-recoverable impact=75."
+      }
+    },
+    {
+      "raw_id": "p2-a08-b01",
+      "verdict": "FINDING",
+      "key": "shortwin|apply-config|unsafe-authority-transfer",
+      "reason": "An honest authority change can install unusable governance, pause, or coverage keys; lost governance requires a program upgrade to recover.",
+      "gates": {
+        "1": "ALLOWS: ApplyConfig canonical loader/version and pending/timelock/expiry checks (apply_config.rs35-81) authenticate the old proposal. ProposeConfig19-25 requires old governance. check_authorities(config.rs769-799) enforces nonzero/distinct roles, not successor control. These are actual constraints, not an outsider authorization bypass.",
+        "2": "ALLOWS: a valid Authorities proposal can use the real config PDA as governance, retain a valid writable System-owned fee recipient, and apply within its normal window. The PDA cannot produce the future governance signature through any current signing path. No malformed account or new instruction is assumed.",
+        "3": "ALLOWS honest-admin hazard: the old governance signer makes the address error and fails to cancel before public execution. This is not malicious-admin theft. Pause/coverage successors can similarly become unusable; governance can replace those roles if it remains controlled.",
+        "4": "ALLOWS: lost governance prevents later proposals through the current program; retained upgrade authority can repair by program upgrade. User exits remain available. Score100-10 honest-admin precondition-15 upgrade-recoverable impact=75."
+      }
+    },
+    {
+      "raw_id": "p2-a09-b01",
+      "verdict": "FINDING",
+      "key": "shortwin|apply-config|unsafe-authority-transfer",
+      "reason": "An honest authority change can install unusable governance, pause, or coverage keys; lost governance requires a program upgrade to recover.",
+      "gates": {
+        "1": "ALLOWS: ApplyConfig canonical loader/version and pending/timelock/expiry checks (apply_config.rs35-81) authenticate the old proposal. ProposeConfig19-25 requires old governance. check_authorities(config.rs769-799) enforces nonzero/distinct roles, not successor control. These are actual constraints, not an outsider authorization bypass.",
+        "2": "ALLOWS: a valid Authorities proposal can use the real config PDA as governance, retain a valid writable System-owned fee recipient, and apply within its normal window. The PDA cannot produce the future governance signature through any current signing path. No malformed account or new instruction is assumed.",
+        "3": "ALLOWS honest-admin hazard: the old governance signer makes the address error and fails to cancel before public execution. This is not malicious-admin theft. Pause/coverage successors can similarly become unusable; governance can replace those roles if it remains controlled.",
+        "4": "ALLOWS: lost governance prevents later proposals through the current program; retained upgrade authority can repair by program upgrade. User exits remain available. Score100-10 honest-admin precondition-15 upgrade-recoverable impact=75."
+      }
+    },
+    {
+      "raw_id": "p2-a02-b03",
+      "verdict": "LEAD",
+      "key": "shortwin|close-short|hardening-position-status-unchecked",
+      "reason": "A future instruction that persists a non-open status needs matching exit checks; current writers only create open positions.",
+      "gates": {
+        "1": "UNCERTAIN hypothetical non-open state: close_short/liquidate/expire/sol_settle check actual owner/discriminator/PDA/market/borrower bindings but omit status, while add_margin65 requires POSITION_OPEN.",
+        "2": "BLOCKS current exploit: position.rs19-21 reserves status1 forv1.1; the only production assignment at open_short616 writes POSITION_OPEN. Anchor1.2.0 close removes lamports, assigns System ownership and resizes data tozero; no closed-account revival path is supplied. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker.",
+        "4": "NOT EVALUATED after gate2 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a04-b01",
+      "verdict": "LEAD",
+      "key": "shortwin|close-short|hardening-position-status-unchecked",
+      "reason": "A future instruction that persists a non-open status needs matching exit checks; current writers only create open positions.",
+      "gates": {
+        "1": "UNCERTAIN hypothetical non-open state: close_short/liquidate/expire/sol_settle check actual owner/discriminator/PDA/market/borrower bindings but omit status, while add_margin65 requires POSITION_OPEN.",
+        "2": "BLOCKS current exploit: position.rs19-21 reserves status1 forv1.1; the only production assignment at open_short616 writes POSITION_OPEN. Anchor1.2.0 close removes lamports, assigns System ownership and resizes data tozero; no closed-account revival path is supplied. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker.",
+        "4": "NOT EVALUATED after gate2 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a08-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|close-short|hardening-position-status-unchecked",
+      "reason": "A future instruction that persists a non-open status needs matching exit checks; current writers only create open positions.",
+      "gates": {
+        "1": "UNCERTAIN hypothetical non-open state: close_short/liquidate/expire/sol_settle check actual owner/discriminator/PDA/market/borrower bindings but omit status, while add_margin65 requires POSITION_OPEN.",
+        "2": "BLOCKS current exploit: position.rs19-21 reserves status1 forv1.1; the only production assignment at open_short616 writes POSITION_OPEN. Anchor1.2.0 close removes lamports, assigns System ownership and resizes data tozero; no closed-account revival path is supplied. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker.",
+        "4": "NOT EVALUATED after gate2 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a09-b05",
+      "verdict": "LEAD",
+      "key": "shortwin|close-short|hardening-position-status-unchecked",
+      "reason": "A future instruction that persists a non-open status needs matching exit checks; current writers only create open positions.",
+      "gates": {
+        "1": "UNCERTAIN hypothetical non-open state: close_short/liquidate/expire/sol_settle check actual owner/discriminator/PDA/market/borrower bindings but omit status, while add_margin65 requires POSITION_OPEN.",
+        "2": "BLOCKS current exploit: position.rs19-21 reserves status1 forv1.1; the only production assignment at open_short616 writes POSITION_OPEN. Anchor1.2.0 close removes lamports, assigns System ownership and resizes data tozero; no closed-account revival path is supplied. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker.",
+        "4": "NOT EVALUATED after gate2 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a02-b04",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "reason": "A future vault importer can admit the wrong asset because the loaders omit checks of the vault mint, authority, and token program.",
+      "gates": {
+        "1": "BLOCKS current substitution: deposit94-99 and sibling vault loads bind InterfaceAccount<TokenAccount> to the stored market vault PDA; create_market281-350 creates that PDA under the intended token program and initializes its mint/market authority. Runtime PDA ownership and current lack of any vault-authority writer prevent attacker replacement. TransferChecked enforces transfer-specific mint/program rules. Missing explicit mint/authority/program constraints remain a hardening LEAD.",
+        "2": "NOT EVALUATED after gate1 blocker.",
+        "3": "NOT EVALUATED after gate1 blocker.",
+        "4": "NOT EVALUATED after gate1 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a05-b04",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "reason": "A future vault importer can admit the wrong asset because the loaders omit checks of the vault mint, authority, and token program.",
+      "gates": {
+        "1": "BLOCKS current substitution: deposit94-99 and sibling vault loads bind InterfaceAccount<TokenAccount> to the stored market vault PDA; create_market281-350 creates that PDA under the intended token program and initializes its mint/market authority. Runtime PDA ownership and current lack of any vault-authority writer prevent attacker replacement. TransferChecked enforces transfer-specific mint/program rules. Missing explicit mint/authority/program constraints remain a hardening LEAD.",
+        "2": "NOT EVALUATED after gate1 blocker.",
+        "3": "NOT EVALUATED after gate1 blocker.",
+        "4": "NOT EVALUATED after gate1 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a08-b03",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "reason": "A future vault importer can admit the wrong asset because the loaders omit checks of the vault mint, authority, and token program.",
+      "gates": {
+        "1": "BLOCKS current substitution: deposit94-99 and sibling vault loads bind InterfaceAccount<TokenAccount> to the stored market vault PDA; create_market281-350 creates that PDA under the intended token program and initializes its mint/market authority. Runtime PDA ownership and current lack of any vault-authority writer prevent attacker replacement. TransferChecked enforces transfer-specific mint/program rules. Missing explicit mint/authority/program constraints remain a hardening LEAD.",
+        "2": "NOT EVALUATED after gate1 blocker.",
+        "3": "NOT EVALUATED after gate1 blocker.",
+        "4": "NOT EVALUATED after gate1 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a09-b06",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "reason": "A future vault importer can admit the wrong asset because the loaders omit checks of the vault mint, authority, and token program.",
+      "gates": {
+        "1": "BLOCKS current substitution: deposit94-99 and sibling vault loads bind InterfaceAccount<TokenAccount> to the stored market vault PDA; create_market281-350 creates that PDA under the intended token program and initializes its mint/market authority. Runtime PDA ownership and current lack of any vault-authority writer prevent attacker replacement. TransferChecked enforces transfer-specific mint/program rules. Missing explicit mint/authority/program constraints remain a hardening LEAD.",
+        "2": "NOT EVALUATED after gate1 blocker.",
+        "3": "NOT EVALUATED after gate1 blocker.",
+        "4": "NOT EVALUATED after gate1 blocker."
+      }
+    },
+    {
+      "raw_id": "p2-a03-b01",
+      "verdict": "LEAD",
+      "key": "shortwin|inputs|transaction-controlled-settlement-legs",
+      "reason": "Temporary LP withdrawals alter live settlement legs, but a complete production sequence and loss beyond the documented AIR-20 residual remain unproved.",
+      "gates": {
+        "1": "UNCERTAIN complete execution: arming::inputs208-220 reads real live reserves and259 passes raw l_live to S1/S2; l_spot at223 protects only CR. Accounts and venue identity guards prevent fabricated state. Independent box legs, eligibility, warm-up/freshness, arming gaps, restart markers and persisted EMA updates constrain actual execution.",
+        "2": "UNCERTAIN: fee-free quote arithmetic q100,X=Y1000->112 versus proportional200reserves->200 and budget150 changes the live predicate, but the raws do not construct a production-admitted open state satisfying all caps, box and persistence conditions. Same-second calls cannot invent EMA updates; later failure rolls the transaction back.",
+        "3": "ALLOWS conditional actor: an unlocked LP can move its own adopted-venue liquidity and call public settlement; no admin authority is assumed.",
+        "4": "DEMOTE: both reviewers explicitly identify the accepted AIR20/KI75 residual and no independent borrower loss or net payoff. Source-stated default/alternative-parameter model results are not reproduced measurements from this scan. Altering live legs would change the documented design."
+      }
+    },
+    {
+      "raw_id": "p2-a04-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|inputs|transaction-controlled-settlement-legs",
+      "reason": "Temporary LP withdrawals alter live settlement legs, but a complete production sequence and loss beyond the documented AIR-20 residual remain unproved.",
+      "gates": {
+        "1": "UNCERTAIN complete execution: arming::inputs208-220 reads real live reserves and259 passes raw l_live to S1/S2; l_spot at223 protects only CR. Accounts and venue identity guards prevent fabricated state. Independent box legs, eligibility, warm-up/freshness, arming gaps, restart markers and persisted EMA updates constrain actual execution.",
+        "2": "UNCERTAIN: fee-free quote arithmetic q100,X=Y1000->112 versus proportional200reserves->200 and budget150 changes the live predicate, but the raws do not construct a production-admitted open state satisfying all caps, box and persistence conditions. Same-second calls cannot invent EMA updates; later failure rolls the transaction back.",
+        "3": "ALLOWS conditional actor: an unlocked LP can move its own adopted-venue liquidity and call public settlement; no admin authority is assumed.",
+        "4": "DEMOTE: both reviewers explicitly identify the accepted AIR20/KI75 residual and no independent borrower loss or net payoff. Source-stated default/alternative-parameter model results are not reproduced measurements from this scan. Altering live legs would change the documented design."
+      }
+    },
+    {
+      "raw_id": "p2-a05-b03",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|donation-extends-deposit-hold",
+      "reason": "Small donations can renew an active settlement hold; sustained blockage and a fix that preserves historical rewards remain unverified.",
+      "gates": {
+        "1": "ALLOWS conditional mechanism: Deposit130-135 treats nonnegative deposit_hold_until as a marker and requires shared vest_bal==0. SweepTrader uses genuine canonical trader/market accounts and is public; its prologue releases old vest before sweep adds another. pool::vest_in948-999 applies value-weighted floor rounding.",
+        "2": "UNCERTAIN complete production setup: all three raws start from S>0 and an active settlement hold; none independently constructs that exact low-value state from open_short through settlement. Conditional arithmetic is valid: with1lamport left and1second remaining, another1lamport sets span10800 at default21600. At the old end, a sweep can release old vest then start a fresh1lamport vest before any successful deposit clears the marker.",
+        "3": "ALLOWS conditional trigger: ordinary donations need no owner/borrower signature. The required normal sweep branch must apply, rather than an after-flush immediate-credit entitlement. Last-share withdrawal flushes vest and successful deposit at zero can clear the marker.",
+        "4": "DEMOTE: later legitimate income is explicitly protected by the current source and AIR2-04/05 policy. Withdrawals/claims remain available. No guaranteed lasting denial, current profit or safe separate-donation accounting change is proved. The pre-expiry arithmetic does not require winning the exact-expiry race but still requires the initial held state."
+      }
+    },
+    {
+      "raw_id": "p2-a08-b04",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|donation-extends-deposit-hold",
+      "reason": "Small donations can renew an active settlement hold; sustained blockage and a fix that preserves historical rewards remain unverified.",
+      "gates": {
+        "1": "ALLOWS conditional mechanism: Deposit130-135 treats nonnegative deposit_hold_until as a marker and requires shared vest_bal==0. SweepTrader uses genuine canonical trader/market accounts and is public; its prologue releases old vest before sweep adds another. pool::vest_in948-999 applies value-weighted floor rounding.",
+        "2": "UNCERTAIN complete production setup: all three raws start from S>0 and an active settlement hold; none independently constructs that exact low-value state from open_short through settlement. Conditional arithmetic is valid: with1lamport left and1second remaining, another1lamport sets span10800 at default21600. At the old end, a sweep can release old vest then start a fresh1lamport vest before any successful deposit clears the marker.",
+        "3": "ALLOWS conditional trigger: ordinary donations need no owner/borrower signature. The required normal sweep branch must apply, rather than an after-flush immediate-credit entitlement. Last-share withdrawal flushes vest and successful deposit at zero can clear the marker.",
+        "4": "DEMOTE: later legitimate income is explicitly protected by the current source and AIR2-04/05 policy. Withdrawals/claims remain available. No guaranteed lasting denial, current profit or safe separate-donation accounting change is proved. The pre-expiry arithmetic does not require winning the exact-expiry race but still requires the initial held state."
+      }
+    },
+    {
+      "raw_id": "p2-a12-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|donation-extends-deposit-hold",
+      "reason": "Small donations can renew an active settlement hold; sustained blockage and a fix that preserves historical rewards remain unverified.",
+      "gates": {
+        "1": "ALLOWS conditional mechanism: Deposit130-135 treats nonnegative deposit_hold_until as a marker and requires shared vest_bal==0. SweepTrader uses genuine canonical trader/market accounts and is public; its prologue releases old vest before sweep adds another. pool::vest_in948-999 applies value-weighted floor rounding.",
+        "2": "UNCERTAIN complete production setup: all three raws start from S>0 and an active settlement hold; none independently constructs that exact low-value state from open_short through settlement. Conditional arithmetic is valid: with1lamport left and1second remaining, another1lamport sets span10800 at default21600. At the old end, a sweep can release old vest then start a fresh1lamport vest before any successful deposit clears the marker.",
+        "3": "ALLOWS conditional trigger: ordinary donations need no owner/borrower signature. The required normal sweep branch must apply, rather than an after-flush immediate-credit entitlement. Last-share withdrawal flushes vest and successful deposit at zero can clear the marker.",
+        "4": "DEMOTE: later legitimate income is explicitly protected by the current source and AIR2-04/05 policy. Withdrawals/claims remain available. No guaranteed lasting denial, current profit or safe separate-donation accounting change is proved. The pre-expiry arithmetic does not require winning the exact-expiry race but still requires the initial held state."
+      }
+    }
+  ],
+  "dedup_notes": [
+    "23raw candidates map to7canonical exact known keys:2findings and5leads. Same-function deposit has separate hold and vault-hardening causes; neither is folded into the other.",
+    "Known keys remain function-isolated. No candidate is dropped; no cross-program echo fold or composite chain adds a new item.",
+    "Authority fixes retain two semantic alternatives; four original text variants remain in raw_fix_proposals. All carry fixes have identical ADD statements. Hardening diffs are retained as evidence without promotion."
+  ]
+}

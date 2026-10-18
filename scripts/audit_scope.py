@@ -85,6 +85,10 @@ UNITS = [
 # names makes `write` and `check` fail.
 EXCLUDED = [
     ("crates/shortwin-math/README.md", "documentation (the math derivations; read for context)"),
+    ("crates/shortwin-math/LICENSE-APACHE", "published crate license text; not built"),
+    ("crates/shortwin-math/NOTICE", "published crate attribution; not built"),
+    ("crates/shortwin-venue-state/README.md", "published crate documentation; read for context"),
+    ("programs/shortwin/README.md", "published program crate documentation; read for context"),
     ("crates/shortwin-math/tests", "tests"),
     ("crates/shortwin-math-wasm", "the WASM facade for the frontend; never linked on-chain"),
     ("services/README.md", "documentation"),
@@ -96,6 +100,7 @@ EXCLUDED = [
     ("services/keeper-litesvm", "keeper test harness"),
     ("services/indexer", "the indexer and API: off-chain, read-only (AUDIT.md §2 out of scope)"),
     ("services/indexer-litesvm", "indexer test harness"),
+    ("services/vendor/postgresql_archive", "vendored ZIP compatibility patch used only by the indexer's optional embedded PostgreSQL test fixture; see PATCH.md"),
     ("tests/litesvm", "the LiteSVM test suites (root workspace member)"),
     ("tests/fuzz", "the invariant fuzz harness (root workspace member)"),
 ]

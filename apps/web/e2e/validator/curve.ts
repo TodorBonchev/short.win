@@ -7,6 +7,7 @@
  * TEST-ONLY.
  */
 import {
+    getCrankPriceInstructionAsync,
     getCreateMarketInstructionAsync,
     getDepositInstructionAsync,
     getMarketDecoder,
@@ -21,6 +22,7 @@ import {
     type Signature,
 } from '@solana/kit';
 import { getCreateAssociatedTokenIdempotentInstructionAsync } from '@solana-program/token';
+import { readMetas, readSet } from '../../src/venues/lists.ts';
 import {
     ata,
     clock,
@@ -32,6 +34,7 @@ import {
     pda,
     send,
     WSOL_MINT,
+    waitForClock,
 } from './chain.ts';
 import { CURVE_LEND_RAW, fixtureAddress } from './genesis.ts';
 import { signerFor } from './keys.ts';
@@ -110,6 +113,25 @@ export async function listCurveMarket(): Promise<CurveMarket> {
     });
     await send(lender, [deposit], { computeUnits: 400_000 });
     return { mint, market: k.market, createdAt: (await clock()).unixTimestamp };
+}
+
+/** Complete a current Pump curve price bucket after the listing's 50-second warm-up. */
+export async function freshCurveOpenPrice(m: CurveMarket): Promise<void> {
+    const account = await getAccount(m.market);
+    if (!account) throw new Error('the listed curve market is missing');
+    const read = readMetas('pump_curve', await readSet('pump_curve', getMarketDecoder().decode(account.data)), false);
+    const crank = await getCrankPriceInstructionAsync({
+        mint: m.mint,
+        eventAuthority: await eventAuthority(),
+        program: SHORTWIN_PROGRAM_ADDRESS,
+    });
+    const ix = { ...crank, accounts: [...crank.accounts, ...read] };
+    const payer = await signerFor('payer');
+    await send(payer, [ix]);
+    const recorded = await getAccount(m.market);
+    if (!recorded) throw new Error('the listed curve market disappeared after its price crank');
+    await waitForClock(getMarketDecoder().decode(recorded.data).bSec + 1n);
+    await send(payer, [ix]);
 }
 
 /** The live curve's `(vT, vQ, rT, rQ, complete)` and its post-complete fields (@150, @158). */

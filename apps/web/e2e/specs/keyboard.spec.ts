@@ -7,6 +7,7 @@
  */
 
 import { type App, E2E_WALLET_NAME, expect, need, requireTrading, T, test } from '../fixtures.ts';
+import { freshOpenPrice } from '../validator/actions.ts';
 import { getTokenAmount } from '../validator/chain.ts';
 
 test.use({ wallet: 'keyboard' });
@@ -60,6 +61,9 @@ test.describe('keyboard only', () => {
     test('an open', { tag: '@short' }, async ({ app, state }) => {
         requireTrading(state);
         const m = state.markets.main;
+        // Earlier browser specs can outlast the open freshness window. Complete a current
+        // observation bucket, as the keeper would, before exercising the keyboard flow.
+        await freshOpenPrice(m);
         await app.goto(`/m/${m.mint}?panel=short`, 'market');
         await connectWithKeyboard(app);
         await app.tabTo(T.shortQInput);

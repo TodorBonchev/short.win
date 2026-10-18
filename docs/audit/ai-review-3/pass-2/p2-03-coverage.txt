@@ -1,0 +1,152 @@
+PASS2 specialist 3: economic security
+Frozen source commit: b815269224ba0f5d946f49de7e113220c4067041
+Tool revision: 6c41e1d46386de7fd9b1fa48c847e876ac8b2676
+
+Review outcome: 0 new blocks; 0 findings; 1 independently reached known lead.
+Static review only. No test, build, runtime reproduction, live protocol interaction, or repository write.
+All production reads used the frozen bundle. Source line ranges below exclude the markdown heading and fence.
+Full-production means all code before the final cfg(test) test module, or the entire file when no test module occurs. It does not mean all test code was reviewed.
+Bounded means only the stated range was read. Unread means no substantive production read.
+Source-wide header searches served navigation only. A targeted venues/mod.rs function search preceded its bounded read.
+The 58,914-line source portion was NOT fully read. No full-repository assurance is claimed.
+
+SOP/specialty/shared rules/report language and known appendix were read; exploit catalogue and account map received partial bounded reads. One large initial metadata read truncated; no production coverage relies on that truncation.
+
+Classifications:
+bounded	./crates/shortwin-math/Cargo.toml	source lines 1-18
+bounded	./crates/shortwin-venue-state/Cargo.toml	source lines 1-18
+bounded	./programs/shortwin/Cargo.toml	source lines 1-48
+bounded	./services/common/Cargo.toml	source lines 1-36
+bounded	./services/keeper/Cargo.toml	source lines 1-58
+bounded	./Cargo.toml	source lines 1-37
+bounded	./Anchor.toml	source lines 1-6
+unread	./services/Cargo.toml	source lines -
+unread	./crates/shortwin-math/src/bounds.rs	source lines -
+unread	./crates/shortwin-math/src/caps.rs	source lines -
+unread	./crates/shortwin-math/src/consts.rs	source lines -
+unread	./crates/shortwin-math/src/error.rs	source lines -
+unread	./crates/shortwin-math/src/fees.rs	source lines -
+unread	./crates/shortwin-math/src/lib.rs	source lines -
+unread	./crates/shortwin-math/src/num/mod.rs	source lines -
+unread	./crates/shortwin-math/src/num/u256.rs	source lines -
+unread	./crates/shortwin-math/src/observe.rs	source lines -
+unread	./crates/shortwin-math/src/params.rs	source lines -
+unread	./crates/shortwin-math/src/persist.rs	source lines -
+unread	./crates/shortwin-math/src/pool.rs	source lines -
+unread	./crates/shortwin-math/src/pool_select.rs	source lines -
+unread	./crates/shortwin-math/src/quote/cpmm.rs	source lines -
+unread	./crates/shortwin-math/src/quote/mod.rs	source lines -
+unread	./crates/shortwin-math/src/quote/pricing.rs	source lines -
+unread	./crates/shortwin-math/src/quote/ray_v4.rs	source lines -
+unread	./crates/shortwin-math/src/quote/reprice.rs	source lines -
+unread	./crates/shortwin-math/src/quote/sol_leg.rs	source lines -
+unread	./crates/shortwin-math/src/quote/straddle.rs	source lines -
+unread	./crates/shortwin-math/src/rent.rs	source lines -
+unread	./crates/shortwin-math/src/risk.rs	source lines -
+full-production	./crates/shortwin-math/src/settle.rs	source lines 1-754
+unread	./crates/shortwin-math/src/tier.rs	source lines -
+unread	./crates/shortwin-math/src/waterfall.rs	source lines -
+unread	./crates/shortwin-venue-state/src/bytes.rs	source lines -
+unread	./crates/shortwin-venue-state/src/lib.rs	source lines -
+unread	./crates/shortwin-venue-state/src/mint.rs	source lines -
+unread	./crates/shortwin-venue-state/src/program_data.rs	source lines -
+unread	./crates/shortwin-venue-state/src/pump.rs	source lines -
+unread	./crates/shortwin-venue-state/src/pump_amm.rs	source lines -
+full-production	./crates/shortwin-venue-state/src/pyth.rs	source lines 1-406
+unread	./crates/shortwin-venue-state/src/raydium_cpmm.rs	source lines -
+unread	./crates/shortwin-venue-state/src/raydium_v4.rs	source lines -
+unread	./crates/shortwin-venue-state/src/token_account.rs	source lines -
+unread	./programs/shortwin/src/constants.rs	source lines -
+full-production	./programs/shortwin/src/engine/arming.rs	source lines 1-345
+unread	./programs/shortwin/src/engine/bounds.rs	source lines -
+unread	./programs/shortwin/src/engine/caps.rs	source lines -
+full-production	./programs/shortwin/src/engine/guard.rs	source lines 1-243
+unread	./programs/shortwin/src/engine/lender.rs	source lines -
+unread	./programs/shortwin/src/engine/mod.rs	source lines -
+unread	./programs/shortwin/src/engine/observe.rs	source lines -
+unread	./programs/shortwin/src/engine/pool_select.rs	source lines -
+full-production	./programs/shortwin/src/engine/prologue.rs	source lines 1-414
+full-production	./programs/shortwin/src/engine/route.rs	source lines 1-186
+full-production	./programs/shortwin/src/engine/tier.rs	source lines 1-109
+unread	./programs/shortwin/src/engine/trader.rs	source lines -
+unread	./programs/shortwin/src/engine/waterfall.rs	source lines -
+unread	./programs/shortwin/src/errors.rs	source lines -
+unread	./programs/shortwin/src/events.rs	source lines -
+unread	./programs/shortwin/src/instructions/add_margin.rs	source lines -
+unread	./programs/shortwin/src/instructions/apply_config.rs	source lines -
+unread	./programs/shortwin/src/instructions/cancel_config.rs	source lines -
+unread	./programs/shortwin/src/instructions/claim_sol.rs	source lines -
+unread	./programs/shortwin/src/instructions/close_short.rs	source lines -
+unread	./programs/shortwin/src/instructions/cover_deficit.rs	source lines -
+unread	./programs/shortwin/src/instructions/crank_price.rs	source lines -
+full-production	./programs/shortwin/src/instructions/crank_sol_usd.rs	source lines 1-139
+unread	./programs/shortwin/src/instructions/create_market.rs	source lines -
+unread	./programs/shortwin/src/instructions/deposit.rs	source lines -
+unread	./programs/shortwin/src/instructions/disable_venue.rs	source lines -
+unread	./programs/shortwin/src/instructions/execute_pool_switch.rs	source lines -
+unread	./programs/shortwin/src/instructions/expire.rs	source lines -
+unread	./programs/shortwin/src/instructions/flag_unsafe_mint.rs	source lines -
+unread	./programs/shortwin/src/instructions/flag_venue_upgraded.rs	source lines -
+unread	./programs/shortwin/src/instructions/initialize_config.rs	source lines -
+full-production	./programs/shortwin/src/instructions/liquidate.rs	source lines 1-740
+unread	./programs/shortwin/src/instructions/mod.rs	source lines -
+full-production	./programs/shortwin/src/instructions/open_short.rs	source lines 1-721
+unread	./programs/shortwin/src/instructions/propose_config.rs	source lines -
+unread	./programs/shortwin/src/instructions/propose_pool.rs	source lines -
+unread	./programs/shortwin/src/instructions/revalidate_venue.rs	source lines -
+unread	./programs/shortwin/src/instructions/set_coverage_pause.rs	source lines -
+unread	./programs/shortwin/src/instructions/set_pause.rs	source lines -
+unread	./programs/shortwin/src/instructions/set_route_broken.rs	source lines -
+unread	./programs/shortwin/src/instructions/set_venue_extras.rs	source lines -
+full-production	./programs/shortwin/src/instructions/sol_settle.rs	source lines 1-551
+unread	./programs/shortwin/src/instructions/sweep_protocol_fees.rs	source lines -
+unread	./programs/shortwin/src/instructions/sweep_trader.rs	source lines -
+unread	./programs/shortwin/src/instructions/sync_lender.rs	source lines -
+unread	./programs/shortwin/src/instructions/withdraw.rs	source lines -
+unread	./programs/shortwin/src/lamports.rs	source lines -
+unread	./programs/shortwin/src/lib.rs	source lines -
+full-production	./programs/shortwin/src/mint_filter.rs	source lines 1-272
+unread	./programs/shortwin/src/state/config.rs	source lines -
+unread	./programs/shortwin/src/state/epoch.rs	source lines -
+unread	./programs/shortwin/src/state/exposure.rs	source lines -
+unread	./programs/shortwin/src/state/layout_asserts.rs	source lines -
+unread	./programs/shortwin/src/state/lender.rs	source lines -
+unread	./programs/shortwin/src/state/market.rs	source lines -
+unread	./programs/shortwin/src/state/mod.rs	source lines -
+unread	./programs/shortwin/src/state/oracle.rs	source lines -
+unread	./programs/shortwin/src/state/pod.rs	source lines -
+unread	./programs/shortwin/src/state/position.rs	source lines -
+unread	./programs/shortwin/src/state/vault.rs	source lines -
+unread	./programs/shortwin/src/state/venue_extras.rs	source lines -
+unread	./programs/shortwin/src/state/venue_guard.rs	source lines -
+unread	./programs/shortwin/src/venues/detect.rs	source lines -
+bounded	./programs/shortwin/src/venues/mod.rs	source lines 1009-1259
+unread	./programs/shortwin/src/venues/pump_amm.rs	source lines -
+unread	./programs/shortwin/src/venues/pump_curve.rs	source lines -
+unread	./programs/shortwin/src/venues/raydium.rs	source lines -
+unread	./programs/shortwin/src/venues/raydium_cpmm.rs	source lines -
+unread	./programs/shortwin/src/venues/raydium_v4.rs	source lines -
+unread	./services/common/src/chain.rs	source lines -
+unread	./services/common/src/tx.rs	source lines -
+unread	./services/keeper/src/budget.rs	source lines -
+unread	./services/keeper/src/coverage.rs	source lines -
+unread	./services/keeper/src/decide.rs	source lines -
+unread	./services/keeper/src/fees.rs	source lines -
+unread	./services/keeper/src/graduation.rs	source lines -
+unread	./services/keeper/src/ixs.rs	source lines -
+unread	./services/keeper/src/monitor.rs	source lines -
+unread	./services/keeper/src/pda.rs	source lines -
+unread	./services/keeper/src/pool_monitor.rs	source lines -
+unread	./services/keeper/src/sweep.rs	source lines -
+unread	./services/keeper/src/venue.rs	source lines -
+unread	./services/keeper/src/view.rs	source lines -
+
+Checks completed:
+- Borrower entry: freshness, warm-up, venue caps, measured proceeds, post-trade margin, locked terms.
+- Liquidation: guarded CR legs, fresh reference, buyback affordability, fixed bounds, measured spending and payouts.
+- Settlement: S1/S2 persistence, box predicates, no-route timing, capped fallback quotes, epoch-account prefunding.
+- SOL/USD cache: pinned owner/address/feed, Full verification, exponent, age, confidence, step, and ordering checks.
+- Mint entry: extension allowlist, freeze authority rejection, repeated safety validation.
+- Known AIR-20 residual: traced from live inputs through the decision predicates; no new reachability or profit proof.
+
+Not completed in this pass: complete venue adapters, lender share math, all keeper/common paths, full caps/risk/waterfall math, cross-program production reproduction.

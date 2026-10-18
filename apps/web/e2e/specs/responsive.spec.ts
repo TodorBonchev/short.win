@@ -36,6 +36,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { type CDPSession, devices, type Locator, type Page, type Route } from '@playwright/test';
 import { SHORT_PHONE } from '../../src/styles/breakpoints.ts';
+import { COVERAGE_GAP_S } from '../../src/venues/constants.ts';
 import { E2E_DIR, URLS } from '../env.ts';
 import { type App, E2E_WALLET_NAME, expect, need, T, test } from '../fixtures.ts';
 import {
@@ -51,11 +52,14 @@ import {
 import {
     accrue,
     closeShortFromNode,
+    freshOpenPrice,
     lenderPosition,
     lendFromNode,
+    marketAccount,
     shortPosition,
     simulatePotSync,
 } from '../validator/actions.ts';
+import { waitForClock } from '../validator/chain.ts';
 import { signerFor } from '../validator/keys.ts';
 import type { E2EState } from '../validator/state.ts';
 
@@ -897,6 +901,8 @@ for (const vp of VIEWPORTS) {
                 test.skip(!tradingSeeded(state), 'needs the test-venue build (mock venue)');
                 const cap = new Capture(page, vp);
                 const main = state.markets.main;
+                // The phone's scrolled trade sheet must stay tappable when price refresh appears.
+                if (vp.name === 'phone') await waitForClock((await marketAccount(main)).emaTs + COVERAGE_GAP_S + 1n);
                 await cap.step('market-overview', async () => {
                     await app.goto(`/m/${main.mint}`, 'market');
                     await expect(app.id(T.marketSource)).toHaveAttribute('data-value', 'indexer');
@@ -923,6 +929,7 @@ for (const vp of VIEWPORTS) {
                     await cap.step('market-trade-sheet', async () => {
                         await cap.tap(app.id(T.marketActionShort));
                         await expect(app.id(T.shortPanel)).toBeVisible();
+                        await expect(app.id(T.connectCta('short'))).toHaveCount(1);
                         await cap.shot('market-trade-sheet', { viewportOnly: true });
                         await cap.tap(app.id(T.tradeSheetClose));
                         await expect(app.id(T.tradeSheetClose)).toBeHidden();
@@ -964,6 +971,7 @@ for (const vp of VIEWPORTS) {
                 test.skip(!tradingSeeded(state), 'needs the test-venue build (mock venue)');
                 const cap = new Capture(page, vp);
                 const main = state.markets.main;
+                await freshOpenPrice(main);
                 await cap.step('short-preview', async () => {
                     await tradePanel(cap, app, main.mint, 'panel=short', 'short');
                     const panel = app.id(T.shortPanel);
@@ -1242,6 +1250,50 @@ for (const vp of VIEWPORTS) {
                     await expect(app.id(T.fallbackBanner)).toBeVisible();
                     await expect(app.id(T.marketSource)).toHaveAttribute('data-value', 'chain');
                     await cap.shot('fallback-market');
+                    if (vp.name === 'tablet') {
+                        // A four-digit test-validator slot once widened the whole shell by 12 px.
+                        // Stress the same status strip with that slot and a mainnet-sized one.
+                        const widths = await page.evaluate((statusRpc) => {
+                            const slot = document.querySelector<HTMLElement>(`[data-testid="${statusRpc}"] .num`);
+                            if (!slot) throw new Error('missing RPC slot');
+                            const original = slot.textContent;
+                            const measures = ['1,206', '458,456,265'].map((text) => {
+                                slot.textContent = text;
+                                return { slot: text, document: document.documentElement.scrollWidth };
+                            });
+                            slot.textContent = '458,456,265';
+                            return { original, measures };
+                        }, T.statusRpc);
+                        for (const measure of widths.measures)
+                            expect(measure.document, `document width at RPC ${measure.slot}`).toBe(vp.width);
+                        const statusItems = page.locator('#statusbar-items');
+                        await expect(statusItems).toHaveAttribute('role', 'group');
+                        await expect(statusItems).toHaveAttribute('aria-label', 'Network status details');
+                        await expect(statusItems).toHaveAttribute('tabindex', '0');
+                        await statusItems.focus();
+                        await expect(statusItems).toBeFocused();
+                        await app.id(T.nav('security')).focus();
+                        const reached = await page.evaluate((securityId) => {
+                            const items = document.querySelector('#statusbar-items')?.getBoundingClientRect();
+                            const security = document
+                                .querySelector(`[data-testid="${securityId}"]`)
+                                ?.getBoundingClientRect();
+                            return (
+                                !!items &&
+                                !!security &&
+                                security.right <= items.right + 1 &&
+                                security.left >= items.left - 1
+                            );
+                        }, T.nav('security'));
+                        expect(reached, 'the last status link is reachable by keyboard focus').toBe(true);
+                        await page.evaluate(
+                            ({ statusRpc, original }) => {
+                                const slot = document.querySelector<HTMLElement>(`[data-testid="${statusRpc}"] .num`);
+                                if (slot) slot.textContent = original;
+                            },
+                            { statusRpc: T.statusRpc, original: widths.original },
+                        );
+                    }
                 });
                 await cap.step('fallback-markets', async () => {
                     await app.goto('/markets', 'markets');

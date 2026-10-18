@@ -9,7 +9,51 @@ They were initially pushed with `[skip ci]`; current CI and local verification a
 below. Historical ticked items name their commits; the 2026-10-18 follow-up is committed as
 the draft 1.0.2 audit-fix batch.
 
-## Working-tree follow-up (2026-10-18)
+## AI review 3 and draft 1.0.3 (2026-10-18)
+
+This is the current unreleased gate candidate; the 1.0.2 sections below are historical.
+The two-pass rust-auditor scan reviewed `b815269`, before these changes. Its
+[archive](docs/audit/ai-review-3/README.md) preserves all reports, source hashes,
+coverage and dispositions; the [31-item register](docs/audit/ai-review-3/triage.md)
+separates prior issues from new observations and records implementation decisions.
+
+- [x] Archive eight findings and 23 leads, including the failed first-pass economic lens
+      and narrower second-pass coverage. Confidence scores are not severity ratings.
+- [x] Prepare the program package and lockfiles for **1.0.3**, an unreleased draft.
+- [x] Complete and validate the keeper floor, candidate ordering, fresh LP-counter,
+      creator-placeholder and RPC retry fixes; reject unsupported account versions.
+- [x] Close the last-withdrawal carry leak, with conservation and new-cohort regressions,
+      and synchronize the normative model, replay vectors and WASM/client artifacts.
+- [x] Reject truncated address lookup table metadata; the regression fails before the
+      parser change and all ten common-library tests pass afterward.
+- [x] Record combined validation and local artifact hashes in the
+      [findings tracker](docs/audit/findings.md#ai-review-3-draft-103-2026-10-18).
+- [x] Complete the opt-in responsive browser gate on the final web source: 96/96 cases
+      passed across eight viewports, with no captured overflow, offscreen controls,
+      tap covers or axe violations. The mobile sheet and long RPC-slot regressions pass.
+- [x] Complete the required browser E2E gate on `9b91060`: CI passed 125 cases
+      with two expected skips; the MWA-disabled follow-up passed nine with 19 expected skips.
+- [x] Complete the exact-ref full CI gate on `9b91060`:
+      [run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
+      passed 25 jobs, with only the scheduled fuzz shard skipped. The Anchor and
+      verifiable release ELFs are byte-identical; 1,385 program tests passed with five
+      ignored, and all 19 mutants were killed.
+- [ ] Complete the ≥24 h fuzz run on the 1.0.3 program and fuzzer bytes. It started
+      2026-10-18 13:44 UTC with four jobs and all venue profiles; the earlier fuzz
+      waiver covers AIR-01 … AIR-24 only.
+- [x] Record [independent AI fix review](docs/audit/ai-review-3/independent-fix-review-1.0.3.md)
+      and [written treatment](docs/audit/ai-review-3/unresolved-1.0.3.md) of every
+      unresolved packet finding and lead. Q2/Q3/Q4 accepted; Q1 conditional.
+- [ ] Resolve AI3-FR01's pre-fix empty-pool carry migration condition; resolve or
+      obtain explicit owner sign-off on the remaining exact residuals, complete
+      the ≥24 h zero-failure fuzz run and required review/gates before marking
+      findings fixed or tagging 1.0.3. Documentation is not owner acceptance.
+
+KI-69's hashed-bootstrap procedure and KI-70's authority-transfer behavior retain their
+existing owner decisions. No new acceptance of open fee, cashback, pot-entitlement or
+economic-liveness issues is implied. No tag, deployment or publication is part of this draft.
+
+## Working-tree follow-up (2026-10-18; historical 1.0.2)
 
 This section supersedes the older “CI has not run” notes below. The changes are committed;
 program changes remain a draft fix batch, not a released or externally reviewed patch.
@@ -285,9 +329,10 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
   - [ ] Green full CI on GitHub: run 39073841046 covers the integrated committed code;
         services dependency audit failed. The current working-tree changes need a new run.
 
-## What remains
+## What remained in the earlier AI-review follow-up (historical)
 
 Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-13.
+These unchecked entries record that earlier state; the current 1.0.3 gates are at the top.
 
 **Release evidence (needs CI or tools not on the local machine)**
 - [ ] Green full CI on GitHub: run 39073841046 now supplies committed-tree evidence,

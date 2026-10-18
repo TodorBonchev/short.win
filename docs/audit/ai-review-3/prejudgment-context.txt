@@ -1,0 +1,5 @@
+Prior issue comparison context, not verdicts.
+docs/audit/findings.md:72-89 explicitly documents deposit holds waiting for the actual shared vest, later credits prolonging the hold, and successful deposit clearing the marker. Investigate the cheap repeatable extension independently; disclosure alone is not a guard.
+docs/design/ECONOMICS.md:82 describes accumulator rounding carries up to S/WAD lamports per epoch. Section 9.4 (1392 onward) describes floor dust and entitlement/allocation conservation. This is relevant context for carry-crosses-empty-pool; it does not itself prove intentional transfer to a new cohort.
+Known issue matches to consider: KI-68 current/parked per-touch rounding; KI-70/AIR2-06 unsigned authority successor with upgrade recovery; KI-72 PumpSwap live-supply burn risk fee; KI-77 curve synthetic fee live supply versus 10^15 standard quote basis; KI-75 live liquidity in S1/S2; KI-69/AIR2-07 truncated ELF digest; AIR2-09 raw LP depth fix on chain; AIR2-12 noncanonical WSOL cashback.
+All source proofs, dedup, gates and labels wait until all 12 pass-one specialties complete or fail naturally.

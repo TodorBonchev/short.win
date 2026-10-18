@@ -1,0 +1,3092 @@
+{
+  "basis": "Mechanical conservative union of explicit completed-specialist full-production/full-file records. Search hits, bounded ranges, and test-only read counts do not establish whole-file production coverage. This records reading scope, not security assurance.",
+  "audited_commit": "b815269224ba0f5d946f49de7e113220c4067041",
+  "pass": 1,
+  "completed_specialists_included": [
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "failed_specialists": [
+    3
+  ],
+  "specialists_pending_at_snapshot": [],
+  "snapshot_policy": "Final pass1 conservative union from all11 returned specialist coverage records; economic-security failed. Every in-scope production file has at least one full production read, not every specialty read every file.",
+  "scoped_file_count": 119,
+  "full_production_file_count": 119,
+  "pending_file_count": 0,
+  "full_file_to_specialist": {
+    "crates/shortwin-math/src/bounds.rs": [
+      1,
+      10,
+      12
+    ],
+    "crates/shortwin-math/src/caps.rs": [
+      1,
+      10,
+      11
+    ],
+    "crates/shortwin-math/src/consts.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/error.rs": [
+      8
+    ],
+    "crates/shortwin-math/src/fees.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-math/src/lib.rs": [
+      8
+    ],
+    "crates/shortwin-math/src/num/mod.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/num/u256.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/observe.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-math/src/params.rs": [
+      8
+    ],
+    "crates/shortwin-math/src/persist.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/pool.rs": [
+      1,
+      5,
+      10
+    ],
+    "crates/shortwin-math/src/pool_select.rs": [
+      1,
+      7,
+      11
+    ],
+    "crates/shortwin-math/src/quote/cpmm.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/mod.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/pricing.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-math/src/quote/ray_v4.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/reprice.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-math/src/quote/sol_leg.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-math/src/quote/straddle.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/rent.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-math/src/risk.rs": [
+      1,
+      4,
+      10
+    ],
+    "crates/shortwin-math/src/settle.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-math/src/tier.rs": [
+      1,
+      10,
+      11
+    ],
+    "crates/shortwin-math/src/waterfall.rs": [
+      1,
+      10
+    ],
+    "crates/shortwin-venue-state/src/bytes.rs": [
+      6,
+      9
+    ],
+    "crates/shortwin-venue-state/src/lib.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/mint.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/program_data.rs": [
+      6,
+      11
+    ],
+    "crates/shortwin-venue-state/src/pump.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/pump_amm.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/pyth.rs": [
+      6,
+      11
+    ],
+    "crates/shortwin-venue-state/src/raydium_cpmm.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/raydium_v4.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/token_account.rs": [
+      6
+    ],
+    "programs/shortwin/src/constants.rs": [
+      6
+    ],
+    "programs/shortwin/src/engine/arming.rs": [
+      1,
+      4,
+      8
+    ],
+    "programs/shortwin/src/engine/bounds.rs": [
+      10
+    ],
+    "programs/shortwin/src/engine/caps.rs": [
+      10
+    ],
+    "programs/shortwin/src/engine/guard.rs": [
+      2,
+      9,
+      11
+    ],
+    "programs/shortwin/src/engine/lender.rs": [
+      2,
+      4,
+      5,
+      8,
+      9,
+      12
+    ],
+    "programs/shortwin/src/engine/mod.rs": [
+      11,
+      12
+    ],
+    "programs/shortwin/src/engine/observe.rs": [
+      10,
+      11
+    ],
+    "programs/shortwin/src/engine/pool_select.rs": [
+      11
+    ],
+    "programs/shortwin/src/engine/prologue.rs": [
+      4,
+      5,
+      8,
+      12
+    ],
+    "programs/shortwin/src/engine/route.rs": [
+      11,
+      12
+    ],
+    "programs/shortwin/src/engine/tier.rs": [
+      10
+    ],
+    "programs/shortwin/src/engine/trader.rs": [
+      2,
+      4,
+      5,
+      6,
+      9,
+      12
+    ],
+    "programs/shortwin/src/engine/waterfall.rs": [
+      5,
+      8,
+      10,
+      12
+    ],
+    "programs/shortwin/src/errors.rs": [
+      12
+    ],
+    "programs/shortwin/src/events.rs": [
+      12
+    ],
+    "programs/shortwin/src/instructions/add_margin.rs": [
+      2,
+      5,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/apply_config.rs": [
+      2,
+      8,
+      9,
+      11
+    ],
+    "programs/shortwin/src/instructions/cancel_config.rs": [
+      2,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/claim_sol.rs": [
+      2,
+      4,
+      5,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/close_short.rs": [
+      2,
+      4,
+      5,
+      8,
+      9,
+      12
+    ],
+    "programs/shortwin/src/instructions/cover_deficit.rs": [
+      2,
+      5,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/crank_price.rs": [
+      2,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/crank_sol_usd.rs": [
+      2,
+      6,
+      9,
+      11
+    ],
+    "programs/shortwin/src/instructions/create_market.rs": [
+      2,
+      9
+    ],
+    "programs/shortwin/src/instructions/deposit.rs": [
+      2,
+      4,
+      5,
+      7,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/disable_venue.rs": [
+      2,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/execute_pool_switch.rs": [
+      2,
+      9,
+      11,
+      12
+    ],
+    "programs/shortwin/src/instructions/expire.rs": [
+      2,
+      4,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/flag_unsafe_mint.rs": [
+      2,
+      9
+    ],
+    "programs/shortwin/src/instructions/flag_venue_upgraded.rs": [
+      2,
+      6,
+      8,
+      9,
+      11
+    ],
+    "programs/shortwin/src/instructions/initialize_config.rs": [
+      2,
+      8,
+      9,
+      11
+    ],
+    "programs/shortwin/src/instructions/liquidate.rs": [
+      2,
+      4,
+      9
+    ],
+    "programs/shortwin/src/instructions/mod.rs": [
+      12
+    ],
+    "programs/shortwin/src/instructions/open_short.rs": [
+      2,
+      4,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/propose_config.rs": [
+      2,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/propose_pool.rs": [
+      2,
+      9,
+      11
+    ],
+    "programs/shortwin/src/instructions/revalidate_venue.rs": [
+      2,
+      6,
+      8,
+      9,
+      11
+    ],
+    "programs/shortwin/src/instructions/set_coverage_pause.rs": [
+      2,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/set_pause.rs": [
+      2,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/set_route_broken.rs": [
+      2,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/set_venue_extras.rs": [
+      2,
+      6,
+      7,
+      8,
+      9,
+      11
+    ],
+    "programs/shortwin/src/instructions/sol_settle.rs": [
+      2,
+      4,
+      5,
+      8,
+      9,
+      12
+    ],
+    "programs/shortwin/src/instructions/sweep_protocol_fees.rs": [
+      2,
+      5,
+      9
+    ],
+    "programs/shortwin/src/instructions/sweep_trader.rs": [
+      2,
+      4,
+      5,
+      7,
+      9,
+      12
+    ],
+    "programs/shortwin/src/instructions/sync_lender.rs": [
+      1,
+      2,
+      5,
+      8,
+      9
+    ],
+    "programs/shortwin/src/instructions/withdraw.rs": [
+      1,
+      2,
+      4,
+      5,
+      8,
+      9,
+      10
+    ],
+    "programs/shortwin/src/lamports.rs": [
+      4,
+      5,
+      6,
+      9
+    ],
+    "programs/shortwin/src/lib.rs": [
+      4,
+      9,
+      12
+    ],
+    "programs/shortwin/src/mint_filter.rs": [
+      2,
+      5,
+      6,
+      9
+    ],
+    "programs/shortwin/src/state/config.rs": [
+      8
+    ],
+    "programs/shortwin/src/state/epoch.rs": [
+      5,
+      8,
+      9
+    ],
+    "programs/shortwin/src/state/exposure.rs": [
+      5,
+      8,
+      9
+    ],
+    "programs/shortwin/src/state/layout_asserts.rs": [
+      8
+    ],
+    "programs/shortwin/src/state/lender.rs": [
+      5,
+      8
+    ],
+    "programs/shortwin/src/state/market.rs": [
+      8
+    ],
+    "programs/shortwin/src/state/mod.rs": [
+      8,
+      11
+    ],
+    "programs/shortwin/src/state/oracle.rs": [
+      6,
+      8,
+      9,
+      11
+    ],
+    "programs/shortwin/src/state/pod.rs": [
+      6,
+      8
+    ],
+    "programs/shortwin/src/state/position.rs": [
+      2,
+      8
+    ],
+    "programs/shortwin/src/state/vault.rs": [
+      5,
+      8,
+      9
+    ],
+    "programs/shortwin/src/state/venue_extras.rs": [
+      6,
+      8,
+      9
+    ],
+    "programs/shortwin/src/state/venue_guard.rs": [
+      6,
+      8,
+      11
+    ],
+    "programs/shortwin/src/venues/detect.rs": [
+      6,
+      11
+    ],
+    "programs/shortwin/src/venues/mod.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/pump_amm.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/pump_curve.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/raydium.rs": [
+      2,
+      4,
+      6,
+      9,
+      11
+    ],
+    "programs/shortwin/src/venues/raydium_cpmm.rs": [
+      6,
+      11
+    ],
+    "programs/shortwin/src/venues/raydium_v4.rs": [
+      6,
+      11
+    ],
+    "services/common/src/chain.rs": [
+      4,
+      7
+    ],
+    "services/common/src/tx.rs": [
+      4,
+      7
+    ],
+    "services/keeper/src/budget.rs": [
+      7
+    ],
+    "services/keeper/src/coverage.rs": [
+      7
+    ],
+    "services/keeper/src/decide.rs": [
+      4,
+      7,
+      12
+    ],
+    "services/keeper/src/fees.rs": [
+      7
+    ],
+    "services/keeper/src/graduation.rs": [
+      4,
+      7,
+      12
+    ],
+    "services/keeper/src/ixs.rs": [
+      4,
+      7
+    ],
+    "services/keeper/src/monitor.rs": [
+      7
+    ],
+    "services/keeper/src/pda.rs": [
+      7
+    ],
+    "services/keeper/src/pool_monitor.rs": [
+      7,
+      11
+    ],
+    "services/keeper/src/sweep.rs": [
+      4,
+      7,
+      12
+    ],
+    "services/keeper/src/venue.rs": [
+      7
+    ],
+    "services/keeper/src/view.rs": [
+      4,
+      7,
+      11
+    ]
+  },
+  "pending": [],
+  "full_coverage_evidence_by_file": {
+    "crates/shortwin-math/src/bounds.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:8",
+        "record": "./crates/shortwin-math/src/bounds.rs: default, ref_liquidity, guarded_ema_liquidity, spot_liquidity, ref_depth_cap, kappa_eff, liq_reference, above_u128, expiry_reference, pi_ref, scaled, s1_budget, max_in_liq, max_in_exp"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:23",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/bounds.rs\t1-355\t405-759"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:10",
+        "record": "source 1-355; bundle 405-759; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "crates/shortwin-math/src/caps.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:9",
+        "record": "./crates/shortwin-math/src/caps.rs: isqrt_ratio, max_q_position, max_total_q, fee_cap, fee_size_cap, fee_oi_cap, oi_cap, util_ok, curve_gamma_ok, curve_gamma_max_q, wallet_ok, notional_ok, conservative_x0, spot_near_ema, position_cap, carried_q_bound, open_fee_mark, carried_phi, fits, carried_fit"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:24",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/caps.rs\t1-406\t1117-1522"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:18",
+        "record": "all non-test production items"
+      }
+    ],
+    "crates/shortwin-math/src/consts.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:10",
+        "record": "./crates/shortwin-math/src/consts.rs:"
+      }
+    ],
+    "crates/shortwin-math/src/error.rs": [
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:8",
+        "record": "./crates/shortwin-math/src/error.rs:1-173 [bundle 2006-2178]"
+      }
+    ],
+    "crates/shortwin-math/src/fees.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:11",
+        "record": "./crates/shortwin-math/src/fees.rs: saturating_u32, exceeds_cap, above_cap, new, ppm, oneway_ppm, oneway_bps, capped, fee_tier, pump_curve, pump_curve_at_supply, curve_fees_at, pump_amm, apply_cap, ray_v4, cpmm"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:27",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/fees.rs\t1-457\t2184-2640"
+      }
+    ],
+    "crates/shortwin-math/src/lib.rs": [
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:9",
+        "record": "./crates/shortwin-math/src/lib.rs:1-45 [bundle 2975-3019]"
+      }
+    ],
+    "crates/shortwin-math/src/num/mod.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:12",
+        "record": "./crates/shortwin-math/src/num/mod.rs: flip, bump, div, div_floor, div_ceil, div_u64, div_i128, mul_div, mul_div_u64, mul_div_u256, mul_div_i128, mul_wad, div_wad, mul_bps, mul_bps_u64, mul_ppm, mul_ppm_u64, sqrt_u128, sqrt_u256, mul_le, saturating_u64, overflow_to_max, cast, to_u64, to_u128, to_i128, i128_to_u128"
+      }
+    ],
+    "crates/shortwin-math/src/num/u256.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:13",
+        "record": "./crates/shortwin-math/src/num/u256.rs: widen, lo64, hi64, join, significant, shl_small, shr_small, mul_limbs, div_rem_limbs, first4, from_limbs, to_limbs, from_u64, from_u128, from_parts, low_u128, high_u128, to_u128, to_u64, from_product, to_le_bytes, from_le_bytes, is_zero, leading_zeros, bits, overflowing_add, overflowing_sub, checked_add, checked_sub, mul_wide, checked_mul, div_rem, checked_div, checked_rem, div_rem_u128, checked_div_u128, checked_rem_u128, mul_div_floor, shl_bits, shr_bits, checked_shl, checked_shr, shl_exact, isqrt, cmp, partial_cmp, from, try_from, write_str, fmt, from_str"
+      }
+    ],
+    "crates/shortwin-math/src/observe.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:14",
+        "record": "./crates/shortwin-math/src/observe.rs: is_open, clear, is_set, is_fresh, new, mark_restart, warmed, reprojected, check, len, is_empty, slot, get, newest, iter, push, validate, default, new_raydium, roll, record, rewrite_liquidity, nonzero, integrate, price_up_bound, price_down_bound, steady_step, warm_step, guard_clears, lows_median_after, lower_median, ring_liq_lower_median, ring_liq_upper_median, coverage_gap, elapsed, aggregate, weighted, robust_spot, sustained_growth, ring_medians"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:31",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/observe.rs\t1-989\t4131-5119"
+      }
+    ],
+    "crates/shortwin-math/src/params.rs": [
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:10",
+        "record": "./crates/shortwin-math/src/params.rs:1-1572 [bundle 5920-7491]"
+      }
+    ],
+    "crates/shortwin-math/src/persist.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:15",
+        "record": "./crates/shortwin-math/src/persist.rs: liq_ema_leg"
+      }
+    ],
+    "crates/shortwin-math/src/pool.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:16",
+        "record": "./crates/shortwin-math/src/pool.rs: bit, sweep_destination, new, is_wipe_live, token_claims, default, buckets, clear_fwd, is_full_wipe, den, ratio, ovf, add_u128, sub_u128, add_u64, sub_u64, add_i128, sub_i128, add_i64, den_of, to_unsigned, to_i64, diff_u128, accrued, divmod_floor, ceil_div_i64, day_of, slot, claims_va, shares_vs, record_idx, get, set_rem, converted, convert_shares, cal_advance, norm_at, live_slot, cal_add, cal_sub, lock_until_for, release_in, release, vest_in, vest, commit_record, credit_pos, credit_in, credit, top_up, credit_r_in, credit_r, convert_in, convert_steps, to_pot, lag_part, accrued_r, fwd_part, fwd_walk, touch_in, touch_tail, convert, commit_rems, touch, touch_pot, closable, tokens_for_shares, shares_for_tokens, token_value, lock_of, locked_total, allowance, allowance_view, withdraw_in, withdraw, resolve_in, resolve, deposit_in, deposit, claim, cover, accrue, sweep, borrow, close_pos, rent_top_up, true_up, repay, settle, flush_vest_in, maybe_roll_in, maybe_roll"
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:7",
+        "record": "- crates/shortwin-math/src/pool.rs: production lines 1-2535; bundle section 7589-11027."
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:34",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/pool.rs\t1-2535\t7592-10126"
+      }
+    ],
+    "crates/shortwin-math/src/pool_select.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:17",
+        "record": "./crates/shortwin-math/src/pool_select.rs: lambda_bps, locked_depth, lock_share_ok, locked_floor_ok, position_floor_ok, depth_at_lambda, eligible, eligible_with_positions, dominates, fast_path_qualifies, at_least_bps"
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:24",
+        "record": "crates/shortwin-math/src/pool_select.rs:1-210 (bundle 11031-11240)"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:29",
+        "record": "all non-test production items"
+      }
+    ],
+    "crates/shortwin-math/src/quote/cpmm.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:18",
+        "record": "./crates/shortwin-math/src/quote/cpmm.rs: pre, split_creator, shares_ok, carved, buy_exact_out, sell_exact_in"
+      }
+    ],
+    "crates/shortwin-math/src/quote/mod.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:19",
+        "record": "./crates/shortwin-math/src/quote/mod.rs: muldiv, fee_up, to_u64"
+      }
+    ],
+    "crates/shortwin-math/src/quote/pricing.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:20",
+        "record": "./crates/shortwin-math/src/quote/pricing.rs: buy, sell, buy_repriced, capped, oneway_ppm, oneway_bps, liquidation_price"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:38",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/quote/pricing.rs\t1-241\t11777-12017"
+      }
+    ],
+    "crates/shortwin-math/src/quote/ray_v4.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:21",
+        "record": "./crates/shortwin-math/src/quote/ray_v4.rs: buy_exact_out, sell_exact_in"
+      }
+    ],
+    "crates/shortwin-math/src/quote/reprice.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:22",
+        "record": "./crates/shortwin-math/src/quote/reprice.rs: liquidity, reprice, reprice_token, of, curve_reprice"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:40",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/quote/reprice.rs\t1-90\t12393-12482"
+      }
+    ],
+    "crates/shortwin-math/src/quote/sol_leg.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:23",
+        "record": "./crates/shortwin-math/src/quote/sol_leg.rs: buy_exact_out, curve_charge_exact_out, pre_fee, with_fees, sell_exact_in"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:41",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/quote/sol_leg.rs\t1-107\t12545-12651"
+      }
+    ],
+    "crates/shortwin-math/src/quote/straddle.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:24",
+        "record": "./crates/shortwin-math/src/quote/straddle.rs: migrated_pool, migration_boost, curve_straddle, curve_synthetic, curve_two_leg, migrating_fv_price, migrating_fv"
+      }
+    ],
+    "crates/shortwin-math/src/rent.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:25",
+        "record": "./crates/shortwin-math/src/rent.rs: coefficients, folded, add, sub, check_util, check_share, utilization_bps, rate_x1e4, rate_bps, bps_part_ceil, accrue, div_to_u64, dot_div, delta_since, q_coef, accrued, due, credited_for, lender_credit, lender_credit_carried, min_rent"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:43",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/rent.rs\t1-442\t13406-13847"
+      }
+    ],
+    "crates/shortwin-math/src/risk.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:26",
+        "record": "./crates/shortwin-math/src/risk.rs: exceeded_by, v_eff, cr_bps, cr_below, ring_below, liquidation_price, spot_leg, liquidatable, buyback_allowed, price_wad, sigma, sigma_xy, margin_d4, open_fee, fv_rate_bps, fair_value, k_s, k_e"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:8",
+        "record": "crates/shortwin-math/src/risk.rs:1-422 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:44",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/risk.rs\t1-422\t14081-14502"
+      }
+    ],
+    "crates/shortwin-math/src/settle.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:27",
+        "record": "./crates/shortwin-math/src/settle.rs: point, is_point, contains, box_of, box_of_capped, cost, sigma, fv_cost, s1_legs, s2_legs, refuted, not_liquidatable, pprime, amount_at, amount_ok, s3_due, is_live, expired, v_eff, evaluate, settlement, s3_no_route, pool_fail, chain_step"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:45",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/settle.rs\t1-754\t14644-15397"
+      }
+    ],
+    "crates/shortwin-math/src/tier.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:28",
+        "record": "./crates/shortwin-math/src/tier.rs: index, from_u8, defaults, locked_sol, liquidity_lamports, below_threshold, below_threshold_wide, assign"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:46",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/tier.rs\t1-388\t16040-16427"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:40",
+        "record": "all non-test production items"
+      }
+    ],
+    "crates/shortwin-math/src/waterfall.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:29",
+        "record": "./crates/shortwin-math/src/waterfall.rs: validate, total, conserved, check_bps, bps_of, split_rent, after_buyback_and_rent, close, base, liquidate, expire, settle, immediate_cap"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:47",
+        "record": "FULL_PRODUCTION\t./crates/shortwin-math/src/waterfall.rs\t1-388\t16729-17116"
+      }
+    ],
+    "crates/shortwin-venue-state/src/bytes.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:8",
+        "record": "crates/shortwin-venue-state/src/bytes.rs: 1-71 (cfg(test) from 72 excluded as findings)."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:189",
+        "record": "FULL FILE\tcrates/shortwin-venue-state/src/bytes.rs\tread lines: 1-108"
+      }
+    ],
+    "crates/shortwin-venue-state/src/lib.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:9",
+        "record": "crates/shortwin-venue-state/src/lib.rs: complete production file."
+      }
+    ],
+    "crates/shortwin-venue-state/src/mint.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:10",
+        "record": "crates/shortwin-venue-state/src/mint.rs: 1-271."
+      }
+    ],
+    "crates/shortwin-venue-state/src/program_data.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:11",
+        "record": "crates/shortwin-venue-state/src/program_data.rs: 1-154."
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:45",
+        "record": "all non-test production items"
+      }
+    ],
+    "crates/shortwin-venue-state/src/pump.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:12",
+        "record": "crates/shortwin-venue-state/src/pump.rs: 1-778."
+      }
+    ],
+    "crates/shortwin-venue-state/src/pump_amm.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:13",
+        "record": "crates/shortwin-venue-state/src/pump_amm.rs: 1-528."
+      }
+    ],
+    "crates/shortwin-venue-state/src/pyth.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:14",
+        "record": "crates/shortwin-venue-state/src/pyth.rs: 1-397."
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:48",
+        "record": "all non-test production items"
+      }
+    ],
+    "crates/shortwin-venue-state/src/raydium_cpmm.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:15",
+        "record": "crates/shortwin-venue-state/src/raydium_cpmm.rs: 1-444."
+      }
+    ],
+    "crates/shortwin-venue-state/src/raydium_v4.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:16",
+        "record": "crates/shortwin-venue-state/src/raydium_v4.rs: 1-280."
+      }
+    ],
+    "crates/shortwin-venue-state/src/token_account.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:17",
+        "record": "crates/shortwin-venue-state/src/token_account.rs: 1-122."
+      }
+    ],
+    "programs/shortwin/src/constants.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:18",
+        "record": "programs/shortwin/src/constants.rs: 1-315."
+      }
+    ],
+    "programs/shortwin/src/engine/arming.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:35",
+        "record": "programs/shortwin/src/engine/arming.rs: full production section, RiskQuotes, BoxQuotes implementation, terms, s3_chain, inputs and create_pda_account."
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:9",
+        "record": "programs/shortwin/src/engine/arming.rs:1-345 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:46",
+        "record": "./programs/shortwin/src/engine/arming.rs:1-393 [bundle 23606-23998]"
+      }
+    ],
+    "programs/shortwin/src/engine/bounds.rs": [
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:60",
+        "record": "FULL_PRODUCTION\t./programs/shortwin/src/engine/bounds.rs\t1-151\t24004-24154"
+      }
+    ],
+    "programs/shortwin/src/engine/caps.rs": [
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:61",
+        "record": "FULL_PRODUCTION\t./programs/shortwin/src/engine/caps.rs\t1-143\t24160-24302"
+      }
+    ],
+    "programs/shortwin/src/engine/guard.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:46",
+        "record": "- programs/shortwin/src/engine/guard.rs: all production guards: mint_guard, open_static, latch, candidate_guard_mask, candidate_latch, candidate_latched."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:203",
+        "record": "FULL PRODUCTION\tprograms/shortwin/src/engine/guard.rs\tread lines: 1-190"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:56",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/engine/lender.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:47",
+        "record": "- programs/shortwin/src/engine/lender.rs: production functions load_records, store_records, reads_rebase, init_if_new, rewards_required, tracked, pay_sol, check_vault_floor, pot_draw. The test module was context only."
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:10",
+        "record": "programs/shortwin/src/engine/lender.rs:1-244 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:8",
+        "record": "- programs/shortwin/src/engine/lender.rs: production lines 1-244; bundle section 24633-25032."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:50",
+        "record": "./programs/shortwin/src/engine/lender.rs: production through the #[cfg(test)] boundary; bundle 24633-24897. Remaining test module unread."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:204",
+        "record": "FULL PRODUCTION\tprograms/shortwin/src/engine/lender.rs\tread lines: 1-245"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:11",
+        "record": "source 1-244; bundle 24636-24879; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/engine/observe.rs": [
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:65",
+        "record": "FULL_PRODUCTION\t./programs/shortwin/src/engine/observe.rs\t1-98\t25073-25170"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:59",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/engine/prologue.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:11",
+        "record": "programs/shortwin/src/engine/prologue.rs:1-271 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:9",
+        "record": "- programs/shortwin/src/engine/prologue.rs: production lines 1-271; bundle section 26693-27111."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:51",
+        "record": "./programs/shortwin/src/engine/prologue.rs: production through the #[cfg(test)] boundary; bundle 26693-26970. Remaining test module unread."
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:13",
+        "record": "source 1-271; bundle 26696-26966; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/engine/tier.rs": [
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:69",
+        "record": "FULL_PRODUCTION\t./programs/shortwin/src/engine/tier.rs\t1-109\t27306-27414"
+      }
+    ],
+    "programs/shortwin/src/engine/trader.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:48",
+        "record": "- programs/shortwin/src/engine/trader.rs: all production source, including normalise_pdas, close_trader_ata, sweep_base_ata, base_ata_state, sweep_trader_lamports, and TraderAccounts normalise/open_wsol/close_wsol/pay_from_trader/post_conditions."
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:12",
+        "record": "programs/shortwin/src/engine/trader.rs:1-505 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:10",
+        "record": "- programs/shortwin/src/engine/trader.rs: production lines 1-506; bundle section 27417-27927."
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:19",
+        "record": "programs/shortwin/src/engine/trader.rs: complete production file."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:211",
+        "record": "FULL FILE\tprograms/shortwin/src/engine/trader.rs\tread lines: 1-506"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:15",
+        "record": "source 1-506; bundle 27420-27925; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/engine/waterfall.rs": [
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:11",
+        "record": "- programs/shortwin/src/engine/waterfall.rs: production lines 1-140; bundle section 27928-28072."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:47",
+        "record": "./programs/shortwin/src/engine/waterfall.rs:1-140 [bundle 27931-28070]"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:71",
+        "record": "FULL_PRODUCTION\t./programs/shortwin/src/engine/waterfall.rs\t1-140\t27931-28070"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:16",
+        "record": "source 1-140; bundle 27931-28070; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/instructions/add_margin.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:11",
+        "record": "programs/shortwin/src/instructions/add_margin.rs"
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:12",
+        "record": "- programs/shortwin/src/instructions/add_margin.rs: production lines 1-105; bundle section 29186-29295."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:24",
+        "record": "./programs/shortwin/src/instructions/add_margin.rs:1-105 [bundle 29189-29293]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:215",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/add_margin.rs\tread lines: 1-105"
+      }
+    ],
+    "programs/shortwin/src/instructions/apply_config.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:12",
+        "record": "programs/shortwin/src/instructions/apply_config.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:25",
+        "record": "./programs/shortwin/src/instructions/apply_config.rs:1-125 [bundle 29299-29423]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:216",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/apply_config.rs\tread lines: 1-125"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:69",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/instructions/cancel_config.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:13",
+        "record": "programs/shortwin/src/instructions/cancel_config.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:26",
+        "record": "./programs/shortwin/src/instructions/cancel_config.rs:1-59 [bundle 29429-29487]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:217",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/cancel_config.rs\tread lines: 1-59"
+      }
+    ],
+    "programs/shortwin/src/instructions/claim_sol.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:14",
+        "record": "programs/shortwin/src/instructions/claim_sol.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:20",
+        "record": "programs/shortwin/src/instructions/claim_sol.rs:1-136 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:13",
+        "record": "- programs/shortwin/src/instructions/claim_sol.rs: production lines 1-137; bundle section 29490-29631."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:27",
+        "record": "./programs/shortwin/src/instructions/claim_sol.rs:1-137 [bundle 29493-29629]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:218",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/claim_sol.rs\tread lines: 1-137"
+      }
+    ],
+    "programs/shortwin/src/instructions/close_short.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:15",
+        "record": "programs/shortwin/src/instructions/close_short.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:14",
+        "record": "programs/shortwin/src/instructions/close_short.rs:1-355 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:14",
+        "record": "- programs/shortwin/src/instructions/close_short.rs: production lines 1-356; bundle section 29632-29992."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:28",
+        "record": "./programs/shortwin/src/instructions/close_short.rs:1-356 [bundle 29635-29990]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:219",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/close_short.rs\tread lines: 1-356"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:19",
+        "record": "source 1-356; bundle 29635-29990; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/instructions/cover_deficit.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:16",
+        "record": "programs/shortwin/src/instructions/cover_deficit.rs"
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:15",
+        "record": "- programs/shortwin/src/instructions/cover_deficit.rs: production lines 1-115; bundle section 29993-30112."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:29",
+        "record": "./programs/shortwin/src/instructions/cover_deficit.rs:1-115 [bundle 29996-30110]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:220",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/cover_deficit.rs\tread lines: 1-115"
+      }
+    ],
+    "programs/shortwin/src/instructions/crank_price.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:17",
+        "record": "programs/shortwin/src/instructions/crank_price.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:30",
+        "record": "./programs/shortwin/src/instructions/crank_price.rs:1-267 [bundle 30116-30382]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:221",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/crank_price.rs\tread lines: 1-267"
+      }
+    ],
+    "programs/shortwin/src/instructions/crank_sol_usd.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:18",
+        "record": "programs/shortwin/src/instructions/crank_sol_usd.rs"
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:26",
+        "record": "programs/shortwin/src/instructions/crank_sol_usd.rs: 1-115."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:222",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/crank_sol_usd.rs\tread lines: 1-139"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:75",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/instructions/create_market.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:19",
+        "record": "programs/shortwin/src/instructions/create_market.rs"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:223",
+        "record": "FULL PRODUCTION\tprograms/shortwin/src/instructions/create_market.rs\tread lines: 1-720"
+      }
+    ],
+    "programs/shortwin/src/instructions/deposit.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:20",
+        "record": "programs/shortwin/src/instructions/deposit.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:18",
+        "record": "programs/shortwin/src/instructions/deposit.rs:1-209 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:16",
+        "record": "- programs/shortwin/src/instructions/deposit.rs: production lines 1-210; bundle section 31332-31546."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:25",
+        "record": "programs/shortwin/src/instructions/deposit.rs:1-210 (bundle 31335-31544)"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:31",
+        "record": "./programs/shortwin/src/instructions/deposit.rs:1-210 [bundle 31335-31544]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:224",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/deposit.rs\tread lines: 1-210"
+      }
+    ],
+    "programs/shortwin/src/instructions/disable_venue.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:21",
+        "record": "programs/shortwin/src/instructions/disable_venue.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:32",
+        "record": "./programs/shortwin/src/instructions/disable_venue.rs:1-79 [bundle 31550-31628]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:225",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/disable_venue.rs\tread lines: 1-79"
+      }
+    ],
+    "programs/shortwin/src/instructions/execute_pool_switch.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:22",
+        "record": "programs/shortwin/src/instructions/execute_pool_switch.rs"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:226",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/execute_pool_switch.rs\tread lines: 1-276"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:79",
+        "record": "all non-test production items"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:20",
+        "record": "source 1-276; bundle 31634-31909; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/instructions/expire.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:23",
+        "record": "programs/shortwin/src/instructions/expire.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:16",
+        "record": "programs/shortwin/src/instructions/expire.rs:1-194 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:33",
+        "record": "./programs/shortwin/src/instructions/expire.rs:1-195 [bundle 31915-32109]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:227",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/expire.rs\tread lines: 1-195"
+      }
+    ],
+    "programs/shortwin/src/instructions/flag_unsafe_mint.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:24",
+        "record": "programs/shortwin/src/instructions/flag_unsafe_mint.rs"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:228",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/flag_unsafe_mint.rs\tread lines: 1-68"
+      }
+    ],
+    "programs/shortwin/src/instructions/flag_venue_upgraded.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:25",
+        "record": "programs/shortwin/src/instructions/flag_venue_upgraded.rs"
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:27",
+        "record": "programs/shortwin/src/instructions/flag_venue_upgraded.rs: complete production file."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:34",
+        "record": "./programs/shortwin/src/instructions/flag_venue_upgraded.rs:1-159 [bundle 32188-32346]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:229",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/flag_venue_upgraded.rs\tread lines: 1-159"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:82",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/instructions/initialize_config.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:26",
+        "record": "programs/shortwin/src/instructions/initialize_config.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:35",
+        "record": "./programs/shortwin/src/instructions/initialize_config.rs:1-197 [bundle 32352-32548]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:230",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/initialize_config.rs\tread lines: 1-197"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:83",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/instructions/liquidate.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:27",
+        "record": "programs/shortwin/src/instructions/liquidate.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:15",
+        "record": "programs/shortwin/src/instructions/liquidate.rs:1-739 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:231",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/liquidate.rs\tread lines: 1-740"
+      }
+    ],
+    "programs/shortwin/src/instructions/open_short.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:28",
+        "record": "programs/shortwin/src/instructions/open_short.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:13",
+        "record": "programs/shortwin/src/instructions/open_short.rs:1-720 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:36",
+        "record": "./programs/shortwin/src/instructions/open_short.rs:1-721 [bundle 33384-34104]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:233",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/open_short.rs\tread lines: 1-721"
+      }
+    ],
+    "programs/shortwin/src/instructions/propose_config.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:29",
+        "record": "programs/shortwin/src/instructions/propose_config.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:37",
+        "record": "./programs/shortwin/src/instructions/propose_config.rs:1-52 [bundle 34110-34161]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:234",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/propose_config.rs\tread lines: 1-52"
+      }
+    ],
+    "programs/shortwin/src/instructions/propose_pool.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:30",
+        "record": "programs/shortwin/src/instructions/propose_pool.rs"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:235",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/propose_pool.rs\tread lines: 1-348"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:88",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/instructions/revalidate_venue.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:31",
+        "record": "programs/shortwin/src/instructions/revalidate_venue.rs"
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:28",
+        "record": "programs/shortwin/src/instructions/revalidate_venue.rs: complete production file."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:38",
+        "record": "./programs/shortwin/src/instructions/revalidate_venue.rs:1-123 [bundle 34520-34642]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:236",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/revalidate_venue.rs\tread lines: 1-123"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:89",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/instructions/set_coverage_pause.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:32",
+        "record": "programs/shortwin/src/instructions/set_coverage_pause.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:39",
+        "record": "./programs/shortwin/src/instructions/set_coverage_pause.rs:1-114 [bundle 34648-34761]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:237",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/set_coverage_pause.rs\tread lines: 1-114"
+      }
+    ],
+    "programs/shortwin/src/instructions/set_pause.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:33",
+        "record": "programs/shortwin/src/instructions/set_pause.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:40",
+        "record": "./programs/shortwin/src/instructions/set_pause.rs:1-77 [bundle 34767-34843]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:238",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/set_pause.rs\tread lines: 1-77"
+      }
+    ],
+    "programs/shortwin/src/instructions/set_route_broken.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:34",
+        "record": "programs/shortwin/src/instructions/set_route_broken.rs"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:41",
+        "record": "./programs/shortwin/src/instructions/set_route_broken.rs:1-85 [bundle 34849-34933]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:239",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/set_route_broken.rs\tread lines: 1-85"
+      }
+    ],
+    "programs/shortwin/src/instructions/set_venue_extras.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:35",
+        "record": "programs/shortwin/src/instructions/set_venue_extras.rs"
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:29",
+        "record": "programs/shortwin/src/instructions/set_venue_extras.rs: complete production file."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:26",
+        "record": "programs/shortwin/src/instructions/set_venue_extras.rs:1-203 (bundle 34939-35141)"
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:42",
+        "record": "./programs/shortwin/src/instructions/set_venue_extras.rs:1-203 [bundle 34939-35141]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:240",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/set_venue_extras.rs\tread lines: 1-203"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:93",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/instructions/sol_settle.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:36",
+        "record": "programs/shortwin/src/instructions/sol_settle.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:17",
+        "record": "programs/shortwin/src/instructions/sol_settle.rs:1-550 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:17",
+        "record": "- programs/shortwin/src/instructions/sol_settle.rs: production lines 1-551; bundle section 35144-35699."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:43",
+        "record": "./programs/shortwin/src/instructions/sol_settle.rs:1-551 [bundle 35147-35697]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:241",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/sol_settle.rs\tread lines: 1-551"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:22",
+        "record": "source 1-551; bundle 35147-35697; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/instructions/sweep_protocol_fees.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:37",
+        "record": "programs/shortwin/src/instructions/sweep_protocol_fees.rs"
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:18",
+        "record": "- programs/shortwin/src/instructions/sweep_protocol_fees.rs: production lines 1-94; bundle section 35700-35798."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:242",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/sweep_protocol_fees.rs\tread lines: 1-94"
+      }
+    ],
+    "programs/shortwin/src/instructions/sweep_trader.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:38",
+        "record": "programs/shortwin/src/instructions/sweep_trader.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:21",
+        "record": "programs/shortwin/src/instructions/sweep_trader.rs:1-414 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:19",
+        "record": "- programs/shortwin/src/instructions/sweep_trader.rs: production lines 1-415; bundle section 35799-36218."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:27",
+        "record": "programs/shortwin/src/instructions/sweep_trader.rs:1-415 (bundle 35802-36216)"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:243",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/sweep_trader.rs\tread lines: 1-415"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:23",
+        "record": "source 1-415; bundle 35802-36216; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/instructions/sync_lender.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:34",
+        "record": "programs/shortwin/src/instructions/sync_lender.rs: full production section, Accounts and handler; owner-signature branch versus touch_pot and persistence."
+      },
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:39",
+        "record": "programs/shortwin/src/instructions/sync_lender.rs"
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:20",
+        "record": "- programs/shortwin/src/instructions/sync_lender.rs: production lines 1-163; bundle section 36219-36386."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:44",
+        "record": "./programs/shortwin/src/instructions/sync_lender.rs:1-163 [bundle 36222-36384]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:244",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/sync_lender.rs\tread lines: 1-163"
+      }
+    ],
+    "programs/shortwin/src/instructions/withdraw.rs": [
+      {
+        "specialist": 1,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-01-coverage.txt:33",
+        "record": "programs/shortwin/src/instructions/withdraw.rs: full production section, Accounts, requires_memo and handler; checked LastSharesBorrowed, min_tokens, min_sol and state/transfer order."
+      },
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:40",
+        "record": "programs/shortwin/src/instructions/withdraw.rs"
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:19",
+        "record": "programs/shortwin/src/instructions/withdraw.rs:1-315 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:21",
+        "record": "- programs/shortwin/src/instructions/withdraw.rs: production lines 1-316; bundle section 36387-36707."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:45",
+        "record": "./programs/shortwin/src/instructions/withdraw.rs:1-316 [bundle 36390-36705]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:245",
+        "record": "FULL FILE\tprograms/shortwin/src/instructions/withdraw.rs\tread lines: 1-316"
+      },
+      {
+        "specialist": 10,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:104",
+        "record": "FULL_PRODUCTION\t./programs/shortwin/src/instructions/withdraw.rs\t1-316\t36390-36705"
+      }
+    ],
+    "programs/shortwin/src/lamports.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:22",
+        "record": "programs/shortwin/src/lamports.rs:1-92 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:22",
+        "record": "- programs/shortwin/src/lamports.rs: production lines 1-93; bundle section 36708-36805."
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:20",
+        "record": "programs/shortwin/src/lamports.rs: complete production file."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:246",
+        "record": "FULL FILE\tprograms/shortwin/src/lamports.rs\tread lines: 1-93"
+      }
+    ],
+    "programs/shortwin/src/lib.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:7",
+        "record": "programs/shortwin/src/lib.rs:1-325 \u2014 all Anchor entrypoint forwarding and argument order."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:247",
+        "record": "FULL FILE\tprograms/shortwin/src/lib.rs\tread lines: 1-325"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:24",
+        "record": "source 1-325; bundle 36809-37133; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/mint_filter.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:50",
+        "record": "- programs/shortwin/src/mint_filter.rs: full production filter and allowlist; selected tests read only as context."
+      },
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:23",
+        "record": "- programs/shortwin/src/mint_filter.rs: production lines 1-102; bundle section 37136-37534."
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:21",
+        "record": "programs/shortwin/src/mint_filter.rs: 1-102."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:248",
+        "record": "FULL PRODUCTION\tprograms/shortwin/src/mint_filter.rs\tread lines: 1-255"
+      }
+    ],
+    "programs/shortwin/src/state/config.rs": [
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:11",
+        "record": "./programs/shortwin/src/state/config.rs:1-1176 [bundle 37538-38713]"
+      }
+    ],
+    "programs/shortwin/src/state/epoch.rs": [
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:24",
+        "record": "- programs/shortwin/src/state/epoch.rs: production lines 1-98; bundle section 38716-38856."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:12",
+        "record": "./programs/shortwin/src/state/epoch.rs:1-136 [bundle 38719-38854]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:250",
+        "record": "FULL FILE\tprograms/shortwin/src/state/epoch.rs\tread lines: 1-136"
+      }
+    ],
+    "programs/shortwin/src/state/exposure.rs": [
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:25",
+        "record": "- programs/shortwin/src/state/exposure.rs: production lines 1-22; bundle section 38857-38883."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:13",
+        "record": "./programs/shortwin/src/state/exposure.rs:1-22 [bundle 38860-38881]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:251",
+        "record": "FULL FILE\tprograms/shortwin/src/state/exposure.rs\tread lines: 1-22"
+      }
+    ],
+    "programs/shortwin/src/state/layout_asserts.rs": [
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:14",
+        "record": "./programs/shortwin/src/state/layout_asserts.rs:1-251 [bundle 38887-39137]"
+      }
+    ],
+    "programs/shortwin/src/state/lender.rs": [
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:26",
+        "record": "- programs/shortwin/src/state/lender.rs: production lines 1-116; bundle section 39140-39315."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:15",
+        "record": "./programs/shortwin/src/state/lender.rs:1-171 [bundle 39143-39313]"
+      }
+    ],
+    "programs/shortwin/src/state/market.rs": [
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:16",
+        "record": "./programs/shortwin/src/state/market.rs:1-772 [bundle 39319-40090]"
+      }
+    ],
+    "programs/shortwin/src/state/mod.rs": [
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:17",
+        "record": "./programs/shortwin/src/state/mod.rs:1-55 [bundle 40096-40150]"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:108",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/state/oracle.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:22",
+        "record": "programs/shortwin/src/state/oracle.rs: complete production file."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:18",
+        "record": "./programs/shortwin/src/state/oracle.rs:1-29 [bundle 40156-40184]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:256",
+        "record": "FULL FILE\tprograms/shortwin/src/state/oracle.rs\tread lines: 1-29"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:109",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/state/pod.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:23",
+        "record": "programs/shortwin/src/state/pod.rs: 1-141."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:19",
+        "record": "./programs/shortwin/src/state/pod.rs:1-160 [bundle 40190-40349]"
+      }
+    ],
+    "programs/shortwin/src/state/position.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:45",
+        "record": "- programs/shortwin/src/state/position.rs: full production source, including position identity/PDA, status values, lock_terms, rent/reward/exit accessors, arm state, and release_at."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:20",
+        "record": "./programs/shortwin/src/state/position.rs:1-277 [bundle 40355-40631]"
+      }
+    ],
+    "programs/shortwin/src/state/vault.rs": [
+      {
+        "specialist": 5,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-05-coverage.txt:27",
+        "record": "- programs/shortwin/src/state/vault.rs: production lines 1-98; bundle section 40634-40736."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:21",
+        "record": "./programs/shortwin/src/state/vault.rs:1-98 [bundle 40637-40734]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:259",
+        "record": "FULL FILE\tprograms/shortwin/src/state/vault.rs\tread lines: 1-98"
+      }
+    ],
+    "programs/shortwin/src/state/venue_extras.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:24",
+        "record": "programs/shortwin/src/state/venue_extras.rs: complete production file."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:22",
+        "record": "./programs/shortwin/src/state/venue_extras.rs:1-143 [bundle 40740-40882]"
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:260",
+        "record": "FULL FILE\tprograms/shortwin/src/state/venue_extras.rs\tread lines: 1-143"
+      }
+    ],
+    "programs/shortwin/src/state/venue_guard.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:25",
+        "record": "programs/shortwin/src/state/venue_guard.rs: 1-130."
+      },
+      {
+        "specialist": 8,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-08-coverage.txt:23",
+        "record": "./programs/shortwin/src/state/venue_guard.rs:1-164 [bundle 40888-41051]"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:114",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/venues/detect.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:30",
+        "record": "programs/shortwin/src/venues/detect.rs: 1-221."
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:115",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/venues/mod.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:31",
+        "record": "programs/shortwin/src/venues/mod.rs: 1-1496, including all release dispatch, parser, quote-view and leg-construction branches."
+      }
+    ],
+    "programs/shortwin/src/venues/pump_amm.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:32",
+        "record": "programs/shortwin/src/venues/pump_amm.rs: 1-1190, including state, recipient/UVA validation, CPI account construction, legs and init_uva."
+      }
+    ],
+    "programs/shortwin/src/venues/pump_curve.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:33",
+        "record": "programs/shortwin/src/venues/pump_curve.rs: 1-1092, including detection/sync, state, CPI account construction, legs and init_uva."
+      }
+    ],
+    "programs/shortwin/src/venues/raydium.rs": [
+      {
+        "specialist": 2,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:52",
+        "record": "- programs/shortwin/src/venues/raydium.rs: full production source: cached, sol_first, at, check_keys, token_of, lp_supply, Adoption, eligibility helpers, invoke_as_trader, delegate_sell, direct_buy."
+      },
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:23",
+        "record": "programs/shortwin/src/venues/raydium.rs:1-393 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:34",
+        "record": "programs/shortwin/src/venues/raydium.rs: complete production file, including all production after the embedded cfg(test) lp_tests module at line 107."
+      },
+      {
+        "specialist": 9,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:266",
+        "record": "FULL FILE\tprograms/shortwin/src/venues/raydium.rs\tread lines: 1-394"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:119",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/venues/raydium_cpmm.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:35",
+        "record": "programs/shortwin/src/venues/raydium_cpmm.rs: 1-552."
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:120",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/venues/raydium_v4.rs": [
+      {
+        "specialist": 6,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-06-coverage.txt:36",
+        "record": "programs/shortwin/src/venues/raydium_v4.rs: 1-420."
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:121",
+        "record": "all non-test production items"
+      }
+    ],
+    "services/common/src/chain.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:24",
+        "record": "services/common/src/chain.rs:1-258 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:8",
+        "record": "services/common/src/chain.rs:1-258 (bundle 47875-48132)"
+      }
+    ],
+    "services/common/src/tx.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:25",
+        "record": "services/common/src/tx.rs:1-316 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:9",
+        "record": "services/common/src/tx.rs:1-316 (bundle 48191-48506)"
+      }
+    ],
+    "services/keeper/src/budget.rs": [
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:10",
+        "record": "services/keeper/src/budget.rs:1-939 (bundle 48673-49611)"
+      }
+    ],
+    "services/keeper/src/coverage.rs": [
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:11",
+        "record": "services/keeper/src/coverage.rs:1-811 (bundle 50449-51259)"
+      }
+    ],
+    "services/keeper/src/decide.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:27",
+        "record": "services/keeper/src/decide.rs:1-540 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:12",
+        "record": "services/keeper/src/decide.rs:1-540 (bundle 52006-52545)"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:25",
+        "record": "source 1-540; bundle 52006-52545; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "services/keeper/src/fees.rs": [
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:13",
+        "record": "services/keeper/src/fees.rs:1-53 (bundle 52711-52763)"
+      }
+    ],
+    "services/keeper/src/graduation.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:28",
+        "record": "services/keeper/src/graduation.rs:1-470 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:14",
+        "record": "services/keeper/src/graduation.rs:1-470 (bundle 52806-53275)"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:26",
+        "record": "source 1-470; bundle 52806-53275; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "services/keeper/src/ixs.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:26",
+        "record": "services/keeper/src/ixs.rs:1-316 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:15",
+        "record": "services/keeper/src/ixs.rs:1-316 (bundle 53441-53756)"
+      }
+    ],
+    "services/keeper/src/monitor.rs": [
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:16",
+        "record": "services/keeper/src/monitor.rs:1-774 (bundle 53796-54569)"
+      }
+    ],
+    "services/keeper/src/pda.rs": [
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:17",
+        "record": "services/keeper/src/pda.rs:1-63 (bundle 55105-55167)"
+      }
+    ],
+    "services/keeper/src/pool_monitor.rs": [
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:18",
+        "record": "services/keeper/src/pool_monitor.rs:1-747 (bundle 55173-55919)"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:132",
+        "record": "all non-test production items"
+      }
+    ],
+    "services/keeper/src/sweep.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:29",
+        "record": "services/keeper/src/sweep.rs:1-377 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:19",
+        "record": "services/keeper/src/sweep.rs:1-377 (bundle 56584-56960)"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:27",
+        "record": "source 1-377; bundle 56584-56960; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "services/keeper/src/venue.rs": [
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:20",
+        "record": "services/keeper/src/venue.rs:1-750 (bundle 57185-57934)"
+      }
+    ],
+    "services/keeper/src/view.rs": [
+      {
+        "specialist": 4,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:30",
+        "record": "services/keeper/src/view.rs:1-389 \u2014 production source read, including instruction Accounts structs and handlers where present."
+      },
+      {
+        "specialist": 7,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-07-coverage.txt:21",
+        "record": "services/keeper/src/view.rs:1-390 (bundle 58523-58912)"
+      },
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:135",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/engine/mod.rs": [
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:58",
+        "record": "all non-test production items"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:12",
+        "record": "source 1-32; bundle 25036-25067; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/engine/pool_select.rs": [
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:60",
+        "record": "all non-test production items"
+      }
+    ],
+    "programs/shortwin/src/engine/route.rs": [
+      {
+        "specialist": 11,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-11-coverage.txt:62",
+        "record": "all non-test production items"
+      },
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:14",
+        "record": "source 1-127; bundle 27115-27241; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/errors.rs": [
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:17",
+        "record": "source 1-423; bundle 28076-28498; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/events.rs": [
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:18",
+        "record": "source 1-609; bundle 28575-29183; all production before the trailing cfg(test) module, if any."
+      }
+    ],
+    "programs/shortwin/src/instructions/mod.rs": [
+      {
+        "specialist": 12,
+        "source": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-12-coverage.txt:21",
+        "record": "source 1-80; bundle 33299-33378; all production before the trailing cfg(test) module, if any."
+      }
+    ]
+  },
+  "corrections": [
+    {
+      "kind": "attribution_downgrade",
+      "file": "programs/shortwin/src/lib.rs",
+      "specialist": 2,
+      "reason": "The existing mapping credits specialist 2 with full production coverage, but its coverage record says only all dispatch functions. Conservatively retain this as bounded dispatch coverage. Specialists 4 and 9 explicitly cover the complete production file, so union count is unaffected.",
+      "source": [
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:43",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-04-coverage.txt:7",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:247"
+      ]
+    },
+    {
+      "kind": "stale_snapshot",
+      "prior_completed_specialists": [
+        1,
+        2,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "new_completed_specialists": [
+        9,
+        10
+      ],
+      "prior_full_file_count": 109,
+      "new_full_file_count": 113,
+      "newly_full_files": [
+        "programs/shortwin/src/engine/bounds.rs",
+        "programs/shortwin/src/engine/caps.rs",
+        "programs/shortwin/src/engine/observe.rs",
+        "programs/shortwin/src/engine/tier.rs"
+      ],
+      "reason": "Specialist 10 explicitly supplies four previously pending engine files. Specialist 9 supplies additional corroborating full-file records.",
+      "source": [
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-10-coverage.txt:60-69",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:155-284"
+      ]
+    },
+    {
+      "kind": "counting_guard",
+      "reason": "The prior full_production object has 119 keys but only 109 nonempty specialist lists. Empty lists are pending, so object-key count is not the covered-file count. No file-level overclaim was found among the 109 nonempty entries."
+    },
+    {
+      "kind": "missing_attributions",
+      "reason": "Populate every explicit completed-specialist full-production/file attribution, including full claims individually nested in an otherwise bounded section; preserve bounded/search-only exclusions.",
+      "added": [
+        {
+          "file": "crates/shortwin-math/src/bounds.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/caps.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/fees.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/observe.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/pool.rs",
+          "specialist": 5
+        },
+        {
+          "file": "crates/shortwin-math/src/pool.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/pool_select.rs",
+          "specialist": 7
+        },
+        {
+          "file": "crates/shortwin-math/src/quote/pricing.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/quote/reprice.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/quote/sol_leg.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/rent.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/risk.rs",
+          "specialist": 4
+        },
+        {
+          "file": "crates/shortwin-math/src/risk.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/settle.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/tier.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-math/src/waterfall.rs",
+          "specialist": 10
+        },
+        {
+          "file": "crates/shortwin-venue-state/src/bytes.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/engine/arming.rs",
+          "specialist": 1
+        },
+        {
+          "file": "programs/shortwin/src/engine/arming.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/engine/bounds.rs",
+          "specialist": 10
+        },
+        {
+          "file": "programs/shortwin/src/engine/caps.rs",
+          "specialist": 10
+        },
+        {
+          "file": "programs/shortwin/src/engine/guard.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/engine/lender.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/engine/lender.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/engine/lender.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/engine/lender.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/engine/observe.rs",
+          "specialist": 10
+        },
+        {
+          "file": "programs/shortwin/src/engine/prologue.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/engine/prologue.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/engine/tier.rs",
+          "specialist": 10
+        },
+        {
+          "file": "programs/shortwin/src/engine/trader.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/engine/trader.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/engine/trader.rs",
+          "specialist": 6
+        },
+        {
+          "file": "programs/shortwin/src/engine/trader.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/engine/waterfall.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/engine/waterfall.rs",
+          "specialist": 10
+        },
+        {
+          "file": "programs/shortwin/src/instructions/add_margin.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/add_margin.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/add_margin.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/apply_config.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/apply_config.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/cancel_config.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/cancel_config.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/claim_sol.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/claim_sol.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/claim_sol.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/claim_sol.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/close_short.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/close_short.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/close_short.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/close_short.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/cover_deficit.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/cover_deficit.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/cover_deficit.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/crank_price.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/crank_price.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/crank_sol_usd.rs",
+          "specialist": 6
+        },
+        {
+          "file": "programs/shortwin/src/instructions/crank_sol_usd.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/create_market.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/deposit.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/deposit.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/deposit.rs",
+          "specialist": 7
+        },
+        {
+          "file": "programs/shortwin/src/instructions/deposit.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/deposit.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/disable_venue.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/disable_venue.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/execute_pool_switch.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/expire.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/expire.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/expire.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/flag_unsafe_mint.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/flag_venue_upgraded.rs",
+          "specialist": 6
+        },
+        {
+          "file": "programs/shortwin/src/instructions/flag_venue_upgraded.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/flag_venue_upgraded.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/initialize_config.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/initialize_config.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/liquidate.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/liquidate.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/open_short.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/open_short.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/open_short.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/propose_config.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/propose_config.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/propose_pool.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/revalidate_venue.rs",
+          "specialist": 6
+        },
+        {
+          "file": "programs/shortwin/src/instructions/revalidate_venue.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/revalidate_venue.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_coverage_pause.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_coverage_pause.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_pause.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_pause.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_route_broken.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_route_broken.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_venue_extras.rs",
+          "specialist": 6
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_venue_extras.rs",
+          "specialist": 7
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_venue_extras.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/set_venue_extras.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sol_settle.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sol_settle.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sol_settle.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sol_settle.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sweep_protocol_fees.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sweep_protocol_fees.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sweep_trader.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sweep_trader.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sweep_trader.rs",
+          "specialist": 7
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sweep_trader.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sync_lender.rs",
+          "specialist": 1
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sync_lender.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sync_lender.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/sync_lender.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/withdraw.rs",
+          "specialist": 1
+        },
+        {
+          "file": "programs/shortwin/src/instructions/withdraw.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/instructions/withdraw.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/instructions/withdraw.rs",
+          "specialist": 8
+        },
+        {
+          "file": "programs/shortwin/src/instructions/withdraw.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/instructions/withdraw.rs",
+          "specialist": 10
+        },
+        {
+          "file": "programs/shortwin/src/lamports.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/lamports.rs",
+          "specialist": 6
+        },
+        {
+          "file": "programs/shortwin/src/lamports.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/lib.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/mint_filter.rs",
+          "specialist": 5
+        },
+        {
+          "file": "programs/shortwin/src/mint_filter.rs",
+          "specialist": 6
+        },
+        {
+          "file": "programs/shortwin/src/mint_filter.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/state/epoch.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/state/exposure.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/state/oracle.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/state/vault.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/state/venue_extras.rs",
+          "specialist": 9
+        },
+        {
+          "file": "programs/shortwin/src/venues/raydium.rs",
+          "specialist": 4
+        },
+        {
+          "file": "programs/shortwin/src/venues/raydium.rs",
+          "specialist": 9
+        },
+        {
+          "file": "services/common/src/chain.rs",
+          "specialist": 4
+        },
+        {
+          "file": "services/common/src/tx.rs",
+          "specialist": 4
+        },
+        {
+          "file": "services/keeper/src/decide.rs",
+          "specialist": 4
+        },
+        {
+          "file": "services/keeper/src/graduation.rs",
+          "specialist": 4
+        },
+        {
+          "file": "services/keeper/src/ixs.rs",
+          "specialist": 4
+        },
+        {
+          "file": "services/keeper/src/sweep.rs",
+          "specialist": 4
+        },
+        {
+          "file": "services/keeper/src/view.rs",
+          "specialist": 4
+        }
+      ]
+    }
+  ],
+  "map_count": 12,
+  "map_counts": {
+    "all_review_leads": 75,
+    "no_signer_rows": 12,
+    "instruction_rows": 9,
+    "internal_helper_rows": 3,
+    "distinct_function_names_in_no_signer_rows": 11,
+    "no_signer_rejections_agreed_by_specialists_2_and_9": 12,
+    "no_signer_unresolved": 0,
+    "authority_not_signer_rows": 0,
+    "key_compared_no_signer_rows": 0,
+    "anchor_instruction_count": 30,
+    "automatically_matched_helper_entries": 51
+  },
+  "map_dispositions": [
+    {
+      "program": "shortwin",
+      "function": "apply_config",
+      "flag": "no-signer",
+      "reason": "Intentional public execution of the governance-signed stored proposal, constrained by its timelock and expiry.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:9",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:84",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:39-42"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "crank_price",
+      "flag": "no-signer",
+      "reason": "Intentional public observation; market/mint bindings, parsed venue ReadSet, and owner-aware readers constrain the observation.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:10",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:86",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:43-45"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "crank_sol_usd",
+      "flag": "no-signer",
+      "reason": "Intentional public refresh from the configured Pyth feed; receiver ownership, verification, freshness, and step checks validate the evidence.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:11",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:88",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:46-48"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "execute_pool_switch",
+      "flag": "no-signer",
+      "reason": "Intentional public resolution after the existing collection window; stored candidate keys and fresh verification constrain the switch.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:12",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:90",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:49-51"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "flag_unsafe_mint",
+      "flag": "no-signer",
+      "reason": "Intentional public safety flag; the bound market mint must actually fail its owner or safety-filter check.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:13",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:92",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:52-54"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "flag_venue_upgraded",
+      "flag": "no-signer",
+      "reason": "Intentional public recording of deployment evidence; pinned ProgramData address, loader owner, deployment slot, and available fingerprint constrain the update.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:14",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:94",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:55-57"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "init_uva @ ./programs/shortwin/src/venues/pump_amm.rs:1139",
+      "flag": "no-signer",
+      "reason": "Internal helper reached through create_market::pump_listing; the outer creator Signer is the CPI payer, and an empty signer-seed list adds no PDA signature.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:15",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:96",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:58-61"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "init_uva @ ./programs/shortwin/src/venues/pump_curve.rs:1025",
+      "flag": "no-signer",
+      "reason": "Internal helper reached through create_market::pump_listing; the outer creator Signer is forwarded as CPI payer, and an empty signer-seed list adds no PDA signature.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:16",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:98",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:63-65"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "propose_pool",
+      "flag": "no-signer",
+      "reason": "Intentional public candidate submission; bound accounts, mint-owner checks, candidate verification, and guarded selection constrain the mutation.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:17",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:100",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:66-69"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "pump_listing",
+      "flag": "no-signer",
+      "reason": "Internal create_market helper; CreateMarket::creator is a Signer and supplies the canonical ATA and nested UVA initialization payments.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:18",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:102",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:70-72"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "sweep_protocol_fees",
+      "flag": "no-signer",
+      "reason": "Intentional public sweep; canonical source accounts, the configured fixed fee recipient, tracked-fee debit, and vault floor prevent caller-directed payment.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:19",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:104",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:73-75"
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "sweep_trader",
+      "flag": "no-signer",
+      "reason": "Intentional public recovery into fixed market recipients; validated trader/token addresses, checked epoch records, and market PDA signatures constrain the sweep.",
+      "source": [
+        ".rust-auditor/runs/20261018-110553/account-map.md:20",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-02-coverage.txt:106",
+        "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/p1-09-coverage.txt:76-78"
+      ]
+    }
+  ],
+  "map_rejection_lines": [
+    "REJECTED MAP LEAD | shortwin::apply_config | no-signer | Intentional public execution of the governance-signed stored proposal, constrained by its timelock and expiry.",
+    "REJECTED MAP LEAD | shortwin::crank_price | no-signer | Intentional public observation; market/mint bindings, parsed venue ReadSet, and owner-aware readers constrain the observation.",
+    "REJECTED MAP LEAD | shortwin::crank_sol_usd | no-signer | Intentional public refresh from the configured Pyth feed; receiver ownership, verification, freshness, and step checks validate the evidence.",
+    "REJECTED MAP LEAD | shortwin::execute_pool_switch | no-signer | Intentional public resolution after the existing collection window; stored candidate keys and fresh verification constrain the switch.",
+    "REJECTED MAP LEAD | shortwin::flag_unsafe_mint | no-signer | Intentional public safety flag; the bound market mint must actually fail its owner or safety-filter check.",
+    "REJECTED MAP LEAD | shortwin::flag_venue_upgraded | no-signer | Intentional public recording of deployment evidence; pinned ProgramData address, loader owner, deployment slot, and available fingerprint constrain the update.",
+    "REJECTED MAP LEAD | shortwin::init_uva @ ./programs/shortwin/src/venues/pump_amm.rs:1139 | no-signer | Internal helper reached through create_market::pump_listing; the outer creator Signer is the CPI payer, and an empty signer-seed list adds no PDA signature.",
+    "REJECTED MAP LEAD | shortwin::init_uva @ ./programs/shortwin/src/venues/pump_curve.rs:1025 | no-signer | Internal helper reached through create_market::pump_listing; the outer creator Signer is forwarded as CPI payer, and an empty signer-seed list adds no PDA signature.",
+    "REJECTED MAP LEAD | shortwin::propose_pool | no-signer | Intentional public candidate submission; bound accounts, mint-owner checks, candidate verification, and guarded selection constrain the mutation.",
+    "REJECTED MAP LEAD | shortwin::pump_listing | no-signer | Internal create_market helper; CreateMarket::creator is a Signer and supplies the canonical ATA and nested UVA initialization payments.",
+    "REJECTED MAP LEAD | shortwin::sweep_protocol_fees | no-signer | Intentional public sweep; canonical source accounts, the configured fixed fee recipient, tracked-fee debit, and vault floor prevent caller-directed payment.",
+    "REJECTED MAP LEAD | shortwin::sweep_trader | no-signer | Intentional public recovery into fixed market recipients; validated trader/token addresses, checked epoch records, and market PDA signatures constrain the sweep."
+  ],
+  "map_disposition_limit": "These dispositions reject only the no-signer hypothesis. They neither promote nor dismiss separate economic, validation, or hardening candidates. All other map lead categories are outside this mechanical crosscheck.",
+  "material_limits": [
+    "No raw finding reports were read, candidates deduplicated, or findings judged.",
+    "No builds, tests, runtime PoCs, or repository edits were performed.",
+    "Production boundary spot checks preserve full-file coverage separately from test-line counts; no summed source-line assurance is asserted.",
+    "Failure of specialist 3 remains a missing specialty even where another specialist read the same file."
+  ]
+}

@@ -16,24 +16,25 @@ Compute units of every M1 instruction (ARCH §9 M1) on the SBF program (`anchor 
 | `flag_venue_upgraded` | pump, 10 MiB ProgramData (U5) | 6036 | 6036 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
 | `revalidate_venue` | pump, 109 B mock ProgramData | 8506 | 8506 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
 | `revalidate_venue` | pump, 10 MiB ProgramData (U5) | 8506 | 8506 | 400000 | §6.1 `flag_venue_upgraded` / `revalidate_venue` |
-| `create_market` | SPL Token mint, `None` venue | 54583 | 54583 | 250000 | §6.1 `create_market` |
-| `create_market` | Token-2022 mint, `None` venue | 57439 | 57439 | 250000 | §6.1 `create_market` |
+| `create_market` | SPL Token mint, `None` venue | 45583 | 45583 | 250000 | §6.1 `create_market` |
+| `create_market` | Token-2022 mint, `None` venue | 54439 | 54439 | 250000 | §6.1 `create_market` |
 | `flag_unsafe_mint` | freeze authority set | 6425 | 6425 | 60000 | no §6.1 row; crank class (§6.1 `crank_price`) |
 | `deposit` | first deposit, SPL Token | 36378 | 36378 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | first deposit, Token-2022 | 36598 | 36598 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | second deposit, SPL Token | 29717 | 29717 | 100000 | §6.1 `deposit` / `withdraw` |
-| `withdraw` | half the shares, SPL Token | 31654 | 31654 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | first deposit, Token-2022 | 38098 | 38098 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | second deposit, SPL Token | 31238 | 31238 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | half the shares, SPL Token | 31653 | 31653 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | last shares, whole carries and realised surplus to pot, SPL Token | 38264 | 38264 | 100000 | §6.1 `deposit` / `withdraw` |
 | `claim_sol` | pays a covered balance | 16418 | 16418 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `cover_deficit` | 1,000,000 lamports | 16765 | 16765 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `sync_lender` | lender on the current epoch | 14189 | 14189 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
-| `deposit` | 1 rebase record behind, written | 33369 | 33369 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | 3 rebase records behind, written | 47742 | 47742 | 100000 | §6.1 `deposit` / `withdraw` |
-| `deposit` | 8 rebase records behind, written | 68109 | 68109 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | 1 rebase record behind, written | 34848 | 34848 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | 3 rebase records behind, written | 43242 | 43242 | 100000 | §6.1 `deposit` / `withdraw` |
+| `deposit` | 8 rebase records behind, written | 69609 | 69609 | 100000 | §6.1 `deposit` / `withdraw` |
 | `deposit` | 12 rebase records behind, written | 88781 | 88781 | 100000 | §6.1 `deposit` / `withdraw` |
-| `withdraw` | 1 rebase record behind, written | 36820 | 36820 | 100000 | §6.1 `deposit` / `withdraw` |
-| `withdraw` | 3 rebase records behind, written | 46714 | 46714 | 100000 | §6.1 `deposit` / `withdraw` |
-| `withdraw` | 8 rebase records behind, written | 71581 | 71581 | 100000 | §6.1 `deposit` / `withdraw` |
-| `withdraw` | 12 rebase records behind, written | 92253 | 92253 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | 1 rebase record behind, written | 36838 | 36838 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | 3 rebase records behind, written | 46713 | 46713 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | 8 rebase records behind, written | 71580 | 71580 | 100000 | §6.1 `deposit` / `withdraw` |
+| `withdraw` | 12 rebase records behind, written | 92252 | 92252 | 100000 | §6.1 `deposit` / `withdraw` |
 | `claim_sol` | 1 rebase record behind, written | 21572 | 21572 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `claim_sol` | 3 rebase records behind, written | 31466 | 31466 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |
 | `claim_sol` | 8 rebase records behind, written | 56333 | 56333 | 60000 | §6.1 `claim_sol` / `cover_deficit` / `sync_lender` |

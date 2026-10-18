@@ -1,0 +1,171 @@
+Pass 2 specialist 4: execution trace
+Frozen repository commit: b815269224ba0f5d946f49de7e113220c4067041
+Review finished. Raw result: 0 FINDING blocks, 2 LEAD blocks.
+
+Method and limits
+- Static review only. No repository edits, builds, tests, runtime reproduction, or protocol interactions.
+- Initial production reads used the assigned frozen bundle. Cross-file searches used rg in the repository.
+- The 58,914-line source bundle was NOT fully read.
+- Root program/math overflow checks are ON. The services workspace has no release override.
+- No subagents were used.
+- Test sections shown beside production were context only and were not audited.
+
+Complete production portions reviewed
+- crates/shortwin-math/src/settle.rs: production lines 1-754; tests excluded from audit; bundle file range 14641-16036.
+- programs/shortwin/src/engine/arming.rs: production lines 1-345; tests excluded from audit; bundle file range 23603-24000.
+- programs/shortwin/src/engine/trader.rs: complete production file, lines 1-505; bundle file range 27417-27927.
+- programs/shortwin/src/instructions/add_margin.rs: complete production file, lines 1-104; bundle file range 29186-29295.
+- programs/shortwin/src/instructions/close_short.rs: complete production file, lines 1-355; bundle file range 29632-29992.
+- programs/shortwin/src/instructions/expire.rs: complete production file, lines 1-194; bundle file range 31912-32111.
+- programs/shortwin/src/instructions/liquidate.rs: complete production file, lines 1-739; bundle file range 32551-33295.
+- programs/shortwin/src/instructions/sol_settle.rs: complete production file, lines 1-550; bundle file range 35144-35699.
+- programs/shortwin/src/instructions/sweep_protocol_fees.rs: complete production file, lines 1-93; bundle file range 35700-35798.
+- programs/shortwin/src/lamports.rs: complete production file, lines 1-92; bundle file range 36708-36805.
+- programs/shortwin/src/state/position.rs: complete production file, lines 1-276; bundle file range 40352-40633.
+- services/keeper/src/budget.rs: production lines 1-939; tests excluded from audit; bundle file range 48670-50445.
+- services/keeper/src/decide.rs: production lines 1-540; tests excluded from audit; bundle file range 52003-52707.
+
+Bounded production reads
+- crates/shortwin-math/src/bounds.rs: lines 1-248; no claim of full file coverage.
+- crates/shortwin-math/src/risk.rs: lines 1-410; no claim of full file coverage.
+
+Cross-file search coverage
+- programs/shortwin/src and services/keeper/src: POSITION_OPEN, POSITION_EXIT_IN_PROGRESS, and status assignments.
+- services/keeper/src/{budget,coverage,graduation,sweep}.rs and services/common/src/{tx,chain}.rs: production function boundaries and cfg(test) boundaries.
+- programs/shortwin/src, services/keeper/src: sigma_xy and sigma call-site searches.
+- engine/arming.rs, exit account structs, and settle.rs: live-liquidity, status, and settlement call-site searches.
+- Search hits were navigation evidence only. These searches do not constitute complete source reads.
+- One attempted quote.rs path did not exist; no coverage is claimed for that path.
+
+Out-of-scope context inspected
+- services/keeper/src/keeper.rs: lines 417-490, report/result type context only. The keeper runner was not audited in full.
+- anchor-lang 1.2.0 src/common.rs: lines 7-40, close and is_closed.
+- anchor-lang 1.2.0 src/accounts/account.rs: lines 255-280, exit_with_expected_owner.
+
+Execution traces checked
+- sol_settle evaluation, no-op arm writes, epoch-record creation, payout order, exposure close, position close, and event CPIs.
+- liquidate/expire: the shared plan, trader normalization, buyback boundary, measured token return, payout order, aggregate removal, and exposure close.
+- close_short: the borrower signature, maximum spend, venue result checks, pool booking, direct lamports, and close semantics.
+- Trader helpers: prefunded PDA sweep, WSOL creation, direct position debit with CPI account visibility, close, fresh token reads, and delegate postcondition.
+- Settlement math: warm-up, restart evidence, stale-reference behavior, arming lapse, persistence updates, and S3 timing.
+- Keeper decide: projected state and selection among buyback, wait, observation, and settlement.
+- Keeper budget: reservation admission, refusal refund, settlement adjustment, release, day rollover, class change, and restricted-balance return.
+
+Limits on conclusions
+- Venue adapters, full keeper orchestration, RPC transport, and runtime internals were not read end-to-end.
+- No full-path CPI key validation claim is made beyond the reviewed account structs and trader helpers.
+- No new confirmed execution defect was found in the reviewed paths.
+- Two known leads were independently re-encountered and reported with exact appendix labels.
+- The temporary-withdrawal lead remains bounded by the source-documented AIR-20 residual; no new borrower loss was proved.
+
+Metadata read
+- Complete build-context manifests read: crates/shortwin-math/Cargo.toml, crates/shortwin-venue-state/Cargo.toml, programs/shortwin/Cargo.toml, services/common/Cargo.toml, services/keeper/Cargo.toml, Cargo.toml, Anchor.toml, services/Cargo.toml.
+- Pass-2 notes, specialist prompt, build context, execution-trace specialty, shared report rules, and known-findings appendix.
+- Relevant account-map leads and selected exploit entries, especially CPI, duplicates, close/revival, stale reads, sysvars, and System transfer restrictions.
+- Several combined metadata outputs were truncated by the display; relevant rules were reread in smaller ranges. No complete account-map or catalogue read is claimed.
+
+Files not substantively read (some received cross-file searches only)
+- crates/shortwin-math/src/caps.rs: unread.
+- crates/shortwin-math/src/consts.rs: unread.
+- crates/shortwin-math/src/error.rs: unread.
+- crates/shortwin-math/src/fees.rs: unread.
+- crates/shortwin-math/src/lib.rs: unread.
+- crates/shortwin-math/src/num/mod.rs: unread.
+- crates/shortwin-math/src/num/u256.rs: unread.
+- crates/shortwin-math/src/observe.rs: unread.
+- crates/shortwin-math/src/params.rs: unread.
+- crates/shortwin-math/src/persist.rs: unread.
+- crates/shortwin-math/src/pool.rs: unread.
+- crates/shortwin-math/src/pool_select.rs: unread.
+- crates/shortwin-math/src/quote/cpmm.rs: unread.
+- crates/shortwin-math/src/quote/mod.rs: unread.
+- crates/shortwin-math/src/quote/pricing.rs: unread.
+- crates/shortwin-math/src/quote/ray_v4.rs: unread.
+- crates/shortwin-math/src/quote/reprice.rs: unread.
+- crates/shortwin-math/src/quote/sol_leg.rs: unread.
+- crates/shortwin-math/src/quote/straddle.rs: unread.
+- crates/shortwin-math/src/rent.rs: unread.
+- crates/shortwin-math/src/tier.rs: unread.
+- crates/shortwin-math/src/waterfall.rs: unread.
+- crates/shortwin-venue-state/src/bytes.rs: unread.
+- crates/shortwin-venue-state/src/lib.rs: unread.
+- crates/shortwin-venue-state/src/mint.rs: unread.
+- crates/shortwin-venue-state/src/program_data.rs: unread.
+- crates/shortwin-venue-state/src/pump.rs: unread.
+- crates/shortwin-venue-state/src/pump_amm.rs: unread.
+- crates/shortwin-venue-state/src/pyth.rs: unread.
+- crates/shortwin-venue-state/src/raydium_cpmm.rs: unread.
+- crates/shortwin-venue-state/src/raydium_v4.rs: unread.
+- crates/shortwin-venue-state/src/token_account.rs: unread.
+- programs/shortwin/src/constants.rs: search-only; production body unread.
+- programs/shortwin/src/engine/bounds.rs: search-only; production body unread.
+- programs/shortwin/src/engine/caps.rs: search-only; production body unread.
+- programs/shortwin/src/engine/guard.rs: search-only; production body unread.
+- programs/shortwin/src/engine/lender.rs: search-only; production body unread.
+- programs/shortwin/src/engine/mod.rs: search-only; production body unread.
+- programs/shortwin/src/engine/observe.rs: search-only; production body unread.
+- programs/shortwin/src/engine/pool_select.rs: search-only; production body unread.
+- programs/shortwin/src/engine/prologue.rs: search-only; production body unread.
+- programs/shortwin/src/engine/route.rs: search-only; production body unread.
+- programs/shortwin/src/engine/tier.rs: search-only; production body unread.
+- programs/shortwin/src/engine/waterfall.rs: search-only; production body unread.
+- programs/shortwin/src/errors.rs: search-only; production body unread.
+- programs/shortwin/src/events.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/apply_config.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/cancel_config.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/claim_sol.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/cover_deficit.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/crank_price.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/crank_sol_usd.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/create_market.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/deposit.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/disable_venue.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/execute_pool_switch.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/flag_unsafe_mint.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/flag_venue_upgraded.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/initialize_config.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/mod.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/open_short.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/propose_config.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/propose_pool.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/revalidate_venue.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/set_coverage_pause.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/set_pause.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/set_route_broken.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/set_venue_extras.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/sweep_trader.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/sync_lender.rs: search-only; production body unread.
+- programs/shortwin/src/instructions/withdraw.rs: search-only; production body unread.
+- programs/shortwin/src/lib.rs: search-only; production body unread.
+- programs/shortwin/src/mint_filter.rs: search-only; production body unread.
+- programs/shortwin/src/state/config.rs: search-only; production body unread.
+- programs/shortwin/src/state/epoch.rs: search-only; production body unread.
+- programs/shortwin/src/state/exposure.rs: search-only; production body unread.
+- programs/shortwin/src/state/layout_asserts.rs: search-only; production body unread.
+- programs/shortwin/src/state/lender.rs: search-only; production body unread.
+- programs/shortwin/src/state/market.rs: search-only; production body unread.
+- programs/shortwin/src/state/mod.rs: search-only; production body unread.
+- programs/shortwin/src/state/oracle.rs: search-only; production body unread.
+- programs/shortwin/src/state/pod.rs: search-only; production body unread.
+- programs/shortwin/src/state/vault.rs: search-only; production body unread.
+- programs/shortwin/src/state/venue_extras.rs: search-only; production body unread.
+- programs/shortwin/src/state/venue_guard.rs: search-only; production body unread.
+- programs/shortwin/src/venues/detect.rs: search-only; production body unread.
+- programs/shortwin/src/venues/mod.rs: search-only; production body unread.
+- programs/shortwin/src/venues/pump_amm.rs: search-only; production body unread.
+- programs/shortwin/src/venues/pump_curve.rs: search-only; production body unread.
+- programs/shortwin/src/venues/raydium.rs: search-only; production body unread.
+- programs/shortwin/src/venues/raydium_cpmm.rs: search-only; production body unread.
+- programs/shortwin/src/venues/raydium_v4.rs: search-only; production body unread.
+- services/common/src/chain.rs: search-only; production body unread.
+- services/common/src/tx.rs: search-only; production body unread.
+- services/keeper/src/coverage.rs: search-only; production body unread.
+- services/keeper/src/fees.rs: search-only; production body unread.
+- services/keeper/src/graduation.rs: search-only; production body unread.
+- services/keeper/src/ixs.rs: search-only; production body unread.
+- services/keeper/src/monitor.rs: search-only; production body unread.
+- services/keeper/src/pda.rs: search-only; production body unread.
+- services/keeper/src/pool_monitor.rs: search-only; production body unread.
+- services/keeper/src/sweep.rs: search-only; production body unread.
+- services/keeper/src/venue.rs: search-only; production body unread.
+- services/keeper/src/view.rs: search-only; production body unread.

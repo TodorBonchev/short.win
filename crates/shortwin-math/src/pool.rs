@@ -132,7 +132,7 @@ pub struct Pool {
     pub acc_r: u128,
     /// Undistributed remainder of `acc_r` allocations, lamports·WAD.
     pub carry_r: u128,
-    /// Carries dropped at epoch rolls, lamports·WAD (stay in the vault, unowned).
+    /// Carries dropped at epoch rolls and sub-lamport residues at last exits, lamports·WAD.
     pub dust: i128,
     /// `T`: unborrowed tokens (internal counter; donations ignored).
     pub tokens_free: u64,
@@ -1906,6 +1906,21 @@ fn withdraw_in(
     l.shares = sub_u128(l.shares, shares)?;
     p.total_shares = sub_u128(p.total_shares, shares)?;
     if p.total_shares == 0 {
+        // Both carries are unallocated credits, not future lenders' income. As with the
+        // vest, give their whole lamports to the last holder and drop only each index's
+        // sub-lamport residue. Realised and entitlement carry can differ after share
+        // changes: return any realised surplus to the pot for earlier lenders' claims.
+        let pending = add_i128(i128::from(l.pending), p.carry / WAD_I)?;
+        let mut real = add_i128(i128::from(l.real), to_i128(p.carry_r / WAD)?)?;
+        to_pot(v, l.claimed, pending, &mut real)?;
+        l.pending = to_i64(pending)?;
+        l.real = to_unsigned(real)?;
+        p.dust = add_i128(
+            add_i128(p.dust, p.carry % WAD_I)?,
+            to_i128(p.carry_r % WAD)?,
+        )?;
+        p.carry = 0;
+        p.carry_r = 0;
         // AIR-08: the market has no lender again; SOL that reaches the trader from now on is
         // the protocol's (KI-10), so the next deposit waits for the sweeps, as after a wipe.
         p.wipe_swept = 0;
@@ -1926,7 +1941,9 @@ fn withdraw_in(
 /// `b_min = ΣB_Q` (V2-3) and `Π = WAD` (AIR-12). A live lock's term leaves its calendar bucket;
 /// the new term `⌊new_lock·WAD/Π⌋` (floor) enters the bucket of `lock_until`, which a
 /// lock increase moves to `max(lock_until, lock_until_for(now))` (R3B-1, R4A-2, R4A-8).
-/// If the burn takes `S` to 0 the unreleased vest is released to the lender first (R3B-2);
+/// If the burn takes `S` to 0 the unreleased vest is released to the lender first (R3B-2),
+/// and each carry's whole lamports are credited to it, with only sub-lamport residues
+/// dropped into `dust`. Any realised surplus moves to the pot for earlier lenders;
 /// the burn takes `S` to 0 only when no other position holds or will hold a share (no
 /// rebase orphans, KI-65: a lender behind still counts in `S`, see [`convert`]), and it clears
 /// the sweep bits, so the next deposit waits for the sweeps (AIR-08, see [`deposit`]). The

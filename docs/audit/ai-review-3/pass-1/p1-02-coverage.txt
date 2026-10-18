@@ -1,0 +1,123 @@
+PASS 1 / SPECIALIST 2: ACCESS CONTROL
+Frozen source: b815269224ba0f5d946f49de7e113220c4067041
+Primary input: .audit-mZFuf8/agent-2-bundle.md
+Report: /tmp/shortwin-audit-results-20261018/p1-02-access.md
+Result: 1 FINDING; 1 hardening LEAD. No missing-signer exploit confirmed.
+Method: Static source review only. Repository remained read-only. No build, test, deployment, or runtime PoC ran.
+
+ACTUAL SOURCE COVERAGE
+
+Read every non-test Accounts struct and handler in these thirty instruction modules from the frozen bundle. Also read their local production helpers, including create_pool_vault, pump_listing, candidate_kind_of, incumbent, fitting_candidate, assess, plan, keeper_exit, close_exposure, SolSettle evaluate, requires_memo, ExtraEntryArg::to_entry, and the flag-venue hash helpers:
+  programs/shortwin/src/instructions/add_margin.rs
+  programs/shortwin/src/instructions/apply_config.rs
+  programs/shortwin/src/instructions/cancel_config.rs
+  programs/shortwin/src/instructions/claim_sol.rs
+  programs/shortwin/src/instructions/close_short.rs
+  programs/shortwin/src/instructions/cover_deficit.rs
+  programs/shortwin/src/instructions/crank_price.rs
+  programs/shortwin/src/instructions/crank_sol_usd.rs
+  programs/shortwin/src/instructions/create_market.rs
+  programs/shortwin/src/instructions/deposit.rs
+  programs/shortwin/src/instructions/disable_venue.rs
+  programs/shortwin/src/instructions/execute_pool_switch.rs
+  programs/shortwin/src/instructions/expire.rs
+  programs/shortwin/src/instructions/flag_unsafe_mint.rs
+  programs/shortwin/src/instructions/flag_venue_upgraded.rs
+  programs/shortwin/src/instructions/initialize_config.rs
+  programs/shortwin/src/instructions/liquidate.rs
+  programs/shortwin/src/instructions/open_short.rs
+  programs/shortwin/src/instructions/propose_config.rs
+  programs/shortwin/src/instructions/propose_pool.rs
+  programs/shortwin/src/instructions/revalidate_venue.rs
+  programs/shortwin/src/instructions/set_coverage_pause.rs
+  programs/shortwin/src/instructions/set_pause.rs
+  programs/shortwin/src/instructions/set_route_broken.rs
+  programs/shortwin/src/instructions/set_venue_extras.rs
+  programs/shortwin/src/instructions/sol_settle.rs
+  programs/shortwin/src/instructions/sweep_protocol_fees.rs
+  programs/shortwin/src/instructions/sweep_trader.rs
+  programs/shortwin/src/instructions/sync_lender.rs
+  programs/shortwin/src/instructions/withdraw.rs
+
+Other source examined:
+- programs/shortwin/src/lib.rs: all dispatch functions. No hidden authority-recovery or general CPI instruction appears in this entrypoint list.
+- programs/shortwin/src/state/config.rs: lines 1-378 and 573-933, including GlobalConfig fields, role checks, check_change, apply, PendingChange, ConfigChange encode/decode/check_shape, check_authorities, check_timelock, check_fee_recipient, validate_param_set, and InitConfigArgs. The omitted middle section contains parameter conversions/defaults; it was not fully reviewed.
+- programs/shortwin/src/state/position.rs: full production source, including position identity/PDA, status values, lock_terms, rent/reward/exit accessors, arm state, and release_at.
+- programs/shortwin/src/engine/guard.rs: all production guards: mint_guard, open_static, latch, candidate_guard_mask, candidate_latch, candidate_latched.
+- programs/shortwin/src/engine/lender.rs: production functions load_records, store_records, reads_rebase, init_if_new, rewards_required, tracked, pay_sol, check_vault_floor, pot_draw. The test module was context only.
+- programs/shortwin/src/engine/trader.rs: all production source, including normalise_pdas, close_trader_ata, sweep_base_ata, base_ata_state, sweep_trader_lamports, and TraderAccounts normalise/open_wsol/close_wsol/pay_from_trader/post_conditions.
+- programs/shortwin/src/engine/prologue.rs: lines 1-265, through the start of roll_only. Read sync_market_params, accrue, run, and refresh_locked_depth. No full review of its tests or numerical dependencies.
+- programs/shortwin/src/mint_filter.rs: full production filter and allowlist; selected tests read only as context.
+- programs/shortwin/src/venues/mod.rs: extras-selection types, Placeholders, parse_extras, derive_with_bump, initial derive_template section, check_read/check_trade dispatch, parse, Leg and trader_accounts assembly through its base-side construction. This was partial, not a full review of pricing or all helper bodies.
+- programs/shortwin/src/venues/raydium.rs: full production source: cached, sol_first, at, check_keys, token_of, lp_supply, Adoption, eligibility helpers, invoke_as_trader, delegate_sell, direct_buy.
+- programs/shortwin/src/venues/raydium_cpmm.rs: leg_vaults, swap, sell, buy; selected source around them. Did not fully review the candidate or price reader.
+- programs/shortwin/src/venues/raydium_v4.rs: swap, sell, buy; selected source around them. Did not fully review the candidate or price reader.
+- programs/shortwin/src/venues/pump_amm.rs: trade_accounts, trade_cpi, base_side, sell, buy, init_uva. Earlier parsing/canonical pool validation was not fully reviewed.
+- programs/shortwin/src/venues/pump_curve.rs: TRADE_CPI_ORDER, trade_accounts, trade_data, trade_cpi, base_side, sell, buy, init_uva, spot. Earlier parsing/transition/quote helpers were not fully reviewed.
+- crates/shortwin-venue-state/src/pyth.rs: source through check, including read, verified_full, freshness, exponent, confidence, scaling, step checks. The encoding helper and tests were not fully reviewed.
+- programs/shortwin/src/constants.rs: searched/read relevant timing definitions; not a full constant-by-constant review.
+- Cross-file searches over the frozen bundle for public roles, stored authority writes, Signer/is_signer/has_one, CPI signer construction, and public dispatch names. Search hits in unread functions do not count as a full review.
+
+Framework source examined outside the repository:
+- anchor-lang 1.2.0 accounts/signer.rs: Signer::try_from / try_accounts enforce info.is_signer.
+- anchor-lang 1.2.0 accounts/account_loader.rs: try_from checks account owner and discriminator; unchecked initialization still checks owner; data size checks shown.
+- anchor-syn 1.2.0 codegen/accounts/constraints.rs: generate_create_account_or_fund_allocate_assign at lines 1769-1819 handles pre-funded addresses through top-up, allocate, and assign with PDA seeds. Also searched the init_if_needed generated branches.
+
+AUTHORITY MODEL CHECKED
+
+- Global singleton bootstrap: InitializeConfig authority is a Signer. Its program_data is the canonical PDA under the upgradeable loader for crate::ID and has upgrade_authority_address == authority.key(). The globals use init, not init_if_needed.
+- Governance config changes: ProposeConfig requires the stored governance Signer. ApplyConfig executes only the recorded proposal in its timelock/application window. The report isolates the missing successor acceptance as unsafe-authority-transfer, not a missing current-admin check.
+- Emergency actions: cancel_config, set_pause, set_route_broken, and set_venue_extras require the stored emergency/governance Signer. disable_venue and revalidate_venue require the stored emergency Signer. Authority and timelock cancellations stay governance-only. disable_venue removes a pending re-enable for its bit.
+- Coverage: set_coverage_pause authenticates the enabled coverage key or emergency clear-only path. The keeper cannot change governance, fee recipients, or general settings through it.
+- User positions: lender mutation/payment paths bind the lender PDA to owner Signer; short open/close/add-margin bind borrower Signer. Keeper exits bind the position and exposure to the stored borrower and send residual/rent to that borrower. Keeper rewards are explicitly payable to any keeper Signer.
+- sync_lender: the unsigned owner slot is intentional. owner.is_signer selects convert/touch; unsigned calls use touch_pot, then enforce no rebase conversion and no record mutation. No instruction lets an unrelated signer claim that lender's SOL.
+- PDA custody: market, trader, trader_wsol, pool_vault, position, and exposure are scoped to market/mint/user as appropriate. A shared market vault is a pool asset, not a private user vault. Withdraw first debits authenticated lender shares and signs only for that market's pool vault.
+- Venue signer forwarding: trade CPI constructors explicitly mark only trader as signer. Borrower/keeper and market PDA signatures do not reach venue swap constructors. Extras reject signers, shortwin-owned accounts, and supplied denylist keys and produce nonsigner metas. Fixed token/System/ATA program types or IDs constrain the standard CPIs examined.
+- Token custody: listing creates the pool-vault PDA instead of adopting a user token account. Pump base ATA checks owner, mint, delegate, close authority, and frozen state. The mint allowlist rejects freeze authority and every extension except six metadata/group extensions, so permanent delegates, transfer hooks, transfer fees, and mint-close authority are rejected.
+- Pre-creation: pool vault and ephemeral WSOL creation handle pre-funded PDAs. Pump base ATA uses create_idempotent. Both UVA helpers skip already initialized venue-owned accounts. No B26 path was confirmed in these helpers.
+- Honest admin parameter hazards: kink changes wait until no position is open; existing positions lock rent rates, keeper rewards, penalty splits, exit bounds, and settlement terms. OracleFeed application clears the old cache. No retroactive-rate finding was established in the examined call paths.
+
+SIGNER-MAP DISPOSITION: ALL FLAGGED ROWS
+
+The Review leads table contains twelve no-signer rows. It contains no separate authority-not-signer or key-compared-no-signer row. The exact twelve dispositions follow. These reject the signer hypothesis only; they do not certify the numerical/venue behavior of unread dependencies.
+
+1. apply_config / no-signer: Intended public executor, explicitly stated in apply_config.rs:1-8 and lib.rs:91. apply_config.rs:61-81 requires an existing pending proposal, checks not_before and the 14-day expiry, decodes/revalidates that proposal, applies it, and clears it. propose_config.rs:19-25 authenticates the only proposal writer. No caller-supplied governance key authorizes execution. Reported separately: a proposed successor never accepts the role (unsafe-authority-transfer).
+
+2. crank_price / no-signer: crank_price.rs:1-9 explicitly permits anyone. The market PDA/has_one constraints bind mint; handler checks mint.owner against market.token_program and calls venues::parse with Carry::ReadSet. Its writes are prologue/observation/tier/venue cache state, not an asserted caller authority or caller-selected payout. No missing signer established.
+
+3. crank_sol_usd / no-signer: crank_sol_usd.rs:1 explicitly permits anyone. Its Accounts require the configured price_update address and PYTH_RECEIVER_ID owner. The handler parses read and calls pyth::check. pyth.rs read checks owner/discriminator, and check requires Full verification, configured feed, bounded age/exponent/confidence/step, and a newer publish time. No unsigned authority-key comparison grants write authority over the oracle publisher.
+
+4. execute_pool_switch / no-signer: execute_pool_switch.rs:1-17 explicitly permits anyone after a collection window. The handler requires a supported market with fp_t0, derives the due time, matches every candidate ReadSet key with fp_keys, then re-verifies candidate fitness or clears the window. It does not authorize via a supplied operator key. No missing signer established; full candidate economics lie beyond this pass.
+
+5. flag_unsafe_mint / no-signer: flag_unsafe_mint.rs:1-18 explicitly permits anyone. Its market PDA binds the supplied mint by has_one. Handler requires the flag to be clear and the actual mint owner/filter test to fail before it sets the flag. A safe actual mint yields MintSafe. The compared mint is a subject, not an authority.
+
+6. flag_venue_upgraded / no-signer: flag_venue_upgraded.rs:1-30 explicitly permits anyone. ProgramData address equals the compiled venue key and owner equals the upgradeable loader. The handler reads its real deploy slot, requires a different slot, and checks the stored ELF fingerprint when available. The public call records objective external state. No missing signer established. This pass did not verify live deployed ELF sizes or runtime loader behavior.
+
+7. pump_amm::init_uva / no-signer: pump_amm.rs:1139-1189 is an internal helper, not a lib.rs instruction. Its only examined production caller is create_market::pump_listing, which passes creator from CreateMarket's mutable Signer. The helper checks fixed executable PumpSwap program, expected derived UVA, and event authority. Its CPI marks payer signer and trader nonsigner. invoke_signed(..., &[]) adds no PDA signer group. The outer signer and runtime CPI signer check supply payment authority.
+
+8. pump_curve::init_uva / no-signer: pump_curve.rs:1025-1075 has the same internal caller and signer proof. It pins the executable Pump program, derived trader UVA, and event authority, and marks payer signer in the CPI. The empty signer-seed slice grants no global PDA privilege.
+
+9. propose_pool / no-signer: propose_pool.rs:1-14 expressly says anyone and no signer. Canonical config/guard/market accounts and mint-owner check constrain the state. incumbent key-checks the existing venue/detection set; verify_candidate, candidate latch, decide, window floor, and carried_fit determine allowed changes. No caller authority slot exists to forge. Full selection formulas are not certified here.
+
+10. create_market::pump_listing / no-signer: create_market.rs:430 is an internal helper, never dispatched independently. CreateMarket::creator is Signer at create_market.rs:192; handler calls pump_listing only through validated creation. The helper uses that creator for create_idempotent ATA and init_uva payments. The trader is a PDA, not an unsigned human authority. No missing signer.
+
+11. sweep_protocol_fees / no-signer: sweep_protocol_fees.rs:1-9 explicitly says anyone. Canonical config/market/vault constraints bind the source. fee_recipient is address-constrained to config.fee_recipient, and the handler transfers only accounted protocol_fees while preserving tracked lender SOL and rent. The recipient is only credited and need not authorize receipt. No signer omission gives the caller the funds.
+
+12. sweep_trader / no-signer: sweep_trader.rs:1-4 explicitly permits anyone. The market is PDA-validated, its vault/trader/trader_wsol have stored-key checks, and trader_wsol_ata plus each token-leg key are checked in the handler. PDA signatures use that market key. SOL goes only to its MarketVault; base tokens go only to its pool_vault; wipe records pass lender::load_records. No user authority is compared without authentication and no caller-selected recipient receives the sweep.
+
+ADDITIONAL UNSIGNED-KEY CHECKS
+
+- sync_lender owner: explicit is_signer branch plus RebaseNeedsOwner post-condition, described above; not an overlooked has_one-to-authority path.
+- liquidate/expire/sol_settle borrower: stored borrower match constrains a payout destination; permission comes from the risk/expiry/settlement conditions. No borrower consent is required by the documented liquidation model.
+- market.trader: the program derives its PDA signature from that market; it is intentionally not a transaction Signer.
+- Remaining-account identity readers and accessors are internal helpers. This pass did not infer missing transaction signers merely from their function signatures.
+
+MATERIAL LIMITS
+
+- The 61,402-line bundle was not reviewed line by line in full. All thirty on-chain entrypoint handlers and their account structs were read, but most shortwin-math source, service/keeper source, and several venue/decode helpers were not reviewed. Those files are not claimed as covered.
+- The detailed source ranges/functions above, not the account-map summaries, define coverage. Account-map completion notes were treated as leads only.
+- No historical audit report supplied current proof. Comments about previous fixes were checked against the code where used, rather than accepted as validation.
+- No chain RPC, deployed program ELF, live authority configuration, off-chain Squads setup, loader implementation, or end-to-end transaction execution was checked.
+- The non-production mock adapter under test-venue was not fully reviewed. Feature-gated branches inside the examined production files were read, but that is not full test-venue coverage.
+- Tests read for context were excluded from findings. No exhaustive math, state-machine, compute-budget, or economic safety conclusion follows from this access-control pass.
+- The unified diff is a proposed source patch, not an applied or compiled change. No repository file was created, edited, or deleted by this pass.

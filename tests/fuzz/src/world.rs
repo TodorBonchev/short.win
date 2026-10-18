@@ -4856,9 +4856,11 @@ impl World {
     ///   allocation (`acc_r`) is the two accumulators' different carries, up to `S/WAD`
     ///   lamports: thousands of lamports
     ///   once `S` exceeds 10²¹ (10¹⁵ raw units with the share price fallen toward the rebase
-    ///   bound of `R_MAX` = 10⁶ shares per unit, ECON §9.5), and its SOL stays in `lender_sol`
-    ///   as `carry_r`, allocated to no lender, once the last shares leave (1,033 and 2,646
-    ///   lamports owed on CPMM);
+    ///   bound of `R_MAX` = 10⁶ shares per unit, ECON §9.5). Before 1.0.3, realised carry
+    ///   stayed unallocated after the last shares left (1,033 and 2,646 lamports owed on CPMM).
+    ///   The final exit now allocates whole carries and returns realised surplus to the pot;
+    ///   the historical CPMM corpus leaves nobody unpaid. The bound still covers rounding
+    ///   from earlier share epochs, whose rolls drop carries into dust;
     /// - `lender_sol` must be at most the hooks' liveness dust cap. Before KI-65 a rebase floored
     ///   every lender's shares and `S` separately, so up to one share per lender stayed in `S`
     ///   that no lender held; SOL credited to it was claimable by nobody, and once every lender

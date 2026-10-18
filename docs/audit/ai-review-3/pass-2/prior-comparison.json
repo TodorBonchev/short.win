@@ -1,0 +1,1165 @@
+{
+  "metadata": {
+    "purpose": "Read-only comparison of pass-2 causal mechanisms with pre-run project records; not an audit gate, candidate disposition, severity assessment, confidence vote or promotion.",
+    "source_commit": "b815269224ba0f5d946f49de7e113220c4067041",
+    "candidate_file": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-2/candidates.json",
+    "candidate_sha256": "d79e2ac96920873b967037723264ea381304cdda14929b705adfd2dec7005d52",
+    "pass1_comparison_file": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json",
+    "pass1_comparison_sha256": "606083e47be9ea519719470763c2c72b3239315d1ca9973d7794127d993fcd3b",
+    "pass1_decisions_file": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/decisions.json",
+    "existing_issues_file": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/existing-issues.json",
+    "existing_issue_rows": 92,
+    "candidate_rows": 47,
+    "canonical_groups": 22,
+    "relation_counts": {
+      "exact_known": 34,
+      "related_distinct_extension": 11,
+      "new_to_register": 2
+    },
+    "canonical_relation_counts": {
+      "exact_known": 14,
+      "related_distinct_extension": 6,
+      "new_to_register": 2
+    },
+    "run_relation_counts": {
+      "repeat_of_pass1_canonical_group": 46,
+      "first_seen_in_pass2": 1
+    },
+    "relation_definitions": {
+      "exact_known": "The same causal mechanism is explicitly recorded in a prior issue or precise prior raw/triage source. This says nothing about acceptance, validity, remediation or exploitability.",
+      "related_distinct_extension": "An earlier issue/policy/lead is related, but the candidate reaches a distinct remaining component, boundary, trigger, or bound that should not be folded into the prior disposition.",
+      "new_to_register": "No exact earlier causal mechanism identified after comparison with the supplied register and relevant linked reviews; retain as a separately registerable candidate subject to the independent judges.",
+      "uncertain": "The prior/current scope relationship cannot be resolved from the inspected record."
+    },
+    "novelty_basis": "relation compares against project records predating this rust-auditor run. A pass-1 repeat retains its prior project relation rather than becoming exact_known merely because this run already reported it. run_relation separately records within-run repetition.",
+    "rust_auditor_new_semantics": {
+      "starting_ledger": "empty",
+      "source": ".rust-auditor/runs/20261018-110553/pass-1/decisions.json:2089",
+      "meaning": "rust-auditor NEW denotes absence from the empty run-start local ledger, not absence from earlier project records. This artifact assigns no gate or ledger disposition."
+    },
+    "new_to_register_rows": [
+      "p2-a07-b01",
+      "p2-a07-b07"
+    ],
+    "new_to_register_canonical_keys": [
+      "shortwin-keeper|score|stale-lp-counter",
+      "shortwin-keeper|next_rank_batch|ranked-batch-lost-on-rpc-error"
+    ],
+    "search_for_new_key": {
+      "key": "shortwin-keeper|next_rank_batch|ranked-batch-lost-on-rpc-error",
+      "reviewed_records": [
+        "docs/audit/ai-review/**/*.md",
+        "docs/audit/ai-review-2/**/*.md",
+        "docs/audit/known-issues.md",
+        "docs/audit/findings.md",
+        "existing-issues.json"
+      ],
+      "terms": [
+        "next_rank_batch",
+        "rank_queue",
+        "finish_rank_batch",
+        "lost batch",
+        "batch lost",
+        "ranking queue",
+        "ranking batch",
+        "RPC error",
+        "RPC fail",
+        "pool_monitor",
+        "rank",
+        "ranking",
+        "ranked",
+        "discovery",
+        "retry",
+        "retries",
+        "rpc"
+      ],
+      "closest_context": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:67",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "docs/audit/known-issues.md:119"
+      ],
+      "result": "No exact prior cause located. General RPC/pool-duty coverage is context, not a duplicate issue or accepted residual."
+    },
+    "limitations": [
+      "No builds, tests, runtime reproductions, executable PoCs, live RPC, network access, source edits, audit gate decisions or subagents were used. Only the requested /tmp JSON artifact was written.",
+      "Frozen HEAD was verified at b815269224ba0f5d946f49de7e113220c4067041. Pass-1 canonical decisions were used for naming/alias and source lineage only, not a new gate judgment.",
+      "Forty-six raw rows reuse prior comparison evidence after mechanism comparison with pass-2 descriptions. The queue-loss mechanism received targeted prior-record search and static source inspection.",
+      "Empty issue_ids with exact_known means the exact earlier raw/triage source lacks an identified formal issue ID. No synthetic issue IDs were invented.",
+      "issue_ids can include related context and historical issue IDs referenced within register rows. Each reason distinguishes exact raw leads from accepted residuals, fixed components and broader unproven bounds.",
+      "New-to-register means no matching pre-run project record was identified in inspected materials, not proof of absence from unpublished/unlinked records or of validity/severity.",
+      "Queue-loss caller services/keeper/src/keeper.rs is contextual/outside the frozen in-scope source bundle; inclusion does not confer an in-scope finding designation."
+    ]
+  },
+  "rows": [
+    {
+      "raw_id": "p2-a01-b01",
+      "canonical_key": "shortwin-math|withdraw_in|carry-crosses-empty-pool",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-5-math-core.md:320",
+        "docs/audit/known-issues.md:182",
+        "docs/audit/known-issues.md:69",
+        "docs/audit/known-issues.md:70",
+        "crates/shortwin-math/src/pool.rs:1897",
+        "crates/shortwin-math/src/pool.rs:1908"
+      ],
+      "reason": "The original report-5-math-core lead explicitly says the last burn leaves carry/carry_r at S=0 and the first post-deposit credit divides the old remainder among new shares. Current withdraw_in confirms the same empty-cohort transition. The new candidate adds a detailed no-borrow, source-sweep-aware production trace and numeric bounds; preserve that evidence. Generic FUZZ-M10-24H-A carry residuals, KI-09 vest forfeiture and KI-10 empty-period protocol income are NOT sufficient duplicate/acceptance grounds on their own. Exact-known here refers only to the precise older raw lead, which has no formal issue ID or recorded adjudication located; it does not mean fixed, accepted, or covered by a historical dust bound. Pass 2 preserves the same carry/carry_r transition while refining bounded integer traces. The exact older raw lead lacks an identified formal issue ID; generic historical dust bounds or owner acceptance are not imported.",
+      "pass1_source_ids": [
+        "p1-a05-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:147"
+      ]
+    },
+    {
+      "raw_id": "p2-a01-b02",
+      "canonical_key": "shortwin|sync_lender|repeated-accrual-truncation",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-68"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:81",
+        "programs/shortwin/src/instructions/sync_lender.rs:126",
+        "crates/shortwin-math/src/pool.rs:1474"
+      ],
+      "reason": "KI-68 identifies the same unsigned touch of current/parked lenders, floor(shares*(acc-snap)/WAD), snapshot advancement, and lost entitlement/realised fractions per touch. The candidate requires no rebase and supplies no mechanism beyond that disclosed per-touch rounding; it is distinct from AIR-03 market rent-credit remainder and KI-65 conversion ordering. Pass 2 keeps the per-touch flooring and snapshot-advance cause. Its bounded examples do not themselves establish an economically material aggregate beyond the disclosed per-touch loss.",
+      "pass1_source_ids": [
+        "p1-a01-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:48"
+      ]
+    },
+    {
+      "raw_id": "p2-a02-b01",
+      "canonical_key": "shortwin|apply_config|unsafe-authority-transfer",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-70",
+        "AIR-04",
+        "AIR2-06"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:145",
+        "docs/audit/known-issues.md:221",
+        "docs/audit/findings.md:42",
+        "programs/shortwin/src/instructions/apply_config.rs:80",
+        "programs/shortwin/src/state/config.rs:193"
+      ],
+      "reason": "All three prior entries describe installing a governance successor without its signature or acceptance, including an unusable governance key and recovery by upgrade. apply_config still checks the approved change and applies it without successor control. Choosing the config PDA makes the already-recorded unreachable-key mechanism concrete; it does not add a distinct authority-transfer mechanism. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:61"
+      ]
+    },
+    {
+      "raw_id": "p2-a02-b02",
+      "canonical_key": "shortwin|flag_venue_upgraded|unhashed-slot-upgrade-latch",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-69",
+        "AIR-01"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:144",
+        "docs/audit/known-issues.md:218",
+        "programs/shortwin/src/instructions/flag_venue_upgraded.rs:126"
+      ],
+      "reason": "KI-69 residual (a) expressly says initialize_config records no fingerprint, revalidation without a hash leaves none, and a permissionless extension then latches the venue until Emergency revalidation. The if-let fingerprint branch in flag_venue_upgraded is the same fallthrough. This is separate from AIR2-07 chosen-pair collisions and KI-73 loader one-slot unavailability. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a11-b05"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:485"
+      ]
+    },
+    {
+      "raw_id": "p2-a02-b03",
+      "canonical_key": "shortwin|close_short|hardening-position-status-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:30",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:46",
+        "docs/audit/ai-review/report-1-instructions.md:377",
+        "programs/shortwin/src/state/position.rs:18",
+        "programs/shortwin/src/instructions/close_short.rs:84"
+      ],
+      "reason": "Earlier L20/L36 and the original instruction report identify the same missing POSITION_OPEN predicates in the four exits while add_margin checks status. The reserved ExitInProgress state remains a future writer obligation; successful exits close accounts. This is prior hardening coverage, not prior owner acceptance of a current exploit. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b02",
+        "p1-a08-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:78",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:361"
+      ]
+    },
+    {
+      "raw_id": "p2-a02-b04",
+      "canonical_key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:40",
+        "docs/audit/ai-review-2/report.md:626",
+        "docs/audit/ai-review-2/triage-pass2-2026-10-18.md:80",
+        "programs/shortwin/src/instructions/deposit.rs:94"
+      ],
+      "reason": "L35 and the implied-owner pass-2 group record the same canonical lending-vault construction invariant: create_market initializes the PDA with mint/authority and later loaders rely on that identity. Deposit has the same seeds/bump-only token-account load. A hypothetical future importer breaks this shared invariant, rather than introducing a new currently replaceable vault path. This is prior hardening coverage, not a statement that arbitrary future importers are safe. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a09-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:374"
+      ]
+    },
+    {
+      "raw_id": "p2-a02-b05",
+      "canonical_key": "shortwin|init_uva|hardening-existing-uva-validation",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-3-venues.md:128",
+        "programs/shortwin/src/venues/pump_curve.rs:1047"
+      ],
+      "reason": "The original venue report specifically identifies both init_uva implementations skipping CPI for a nonempty venue-owned canonical UVA without decoding/user checks, despite stricter trade-time validation. The same branch remains in pump_curve::init_uva. The candidate is a prior raw hardening lead with a future venue-layout precondition, not a new project mechanism. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a09-b03"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:399"
+      ]
+    },
+    {
+      "raw_id": "p2-a02-b06",
+      "canonical_key": "shortwin|sweep_trader|external-cashback-recovery-dependency",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/report.md:667",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:64",
+        "programs/shortwin/src/instructions/sweep_trader.rs:248"
+      ],
+      "reason": "AI2 L76 already traces a donation into pump UVA/PumpSwap cashback ATA, a future claim-interface change requiring unavailable trader authorization, rewards_clear never becoming true, and WipeSweepPending after wipe or last-lender exit. This is the same retained external-claim dependency. AIR2-12 alternate-destination cashback is a different current-account routing problem and is not a substitute duplicate reason. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a07-b04"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:336"
+      ]
+    },
+    {
+      "raw_id": "p2-a02-b07",
+      "canonical_key": "shortwin|elf_fingerprint_of|hardening-truncated-elf-digest",
+      "relation": "exact_known",
+      "issue_ids": [
+        "AIR2-07",
+        "KI-69"
+      ],
+      "sources": [
+        "docs/audit/findings.md:43",
+        "docs/audit/known-issues.md:144",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:12",
+        "programs/shortwin/src/state/venue_guard.rs:45",
+        "programs/shortwin/src/instructions/flag_venue_upgraded.rs:130"
+      ],
+      "reason": "AIR2-07 already distinguishes the 96-bit fixed-hash second-preimage cost from the 48-bit generic chosen-pair collision bound of the 12-byte fingerprint. Current guard storage remains 12 bytes. The earlier review also requires changed ProgramData length to suppress a flag; an unchanged-length slot move flags regardless. KI-69 alone is not acceptance of the chosen-pair extension, but AIR2-07 is an exact existing open record. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a06-b04",
+        "p1-a11-b06"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:218",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:499"
+      ]
+    },
+    {
+      "raw_id": "p2-a03-b01",
+      "canonical_key": "shortwin|inputs|transaction-controlled-settlement-legs",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-75",
+        "AIR-20"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:85",
+        "docs/audit/known-issues.md:237",
+        "programs/shortwin/src/engine/arming.rs:29",
+        "programs/shortwin/src/engine/arming.rs:208"
+      ],
+      "reason": "KI-75/AIR-20 expressly retain raw live liquidity and live buyback/sigma for S1/S2, with only the CR spot gate floored at EMA liquidity. Their withdrawal-wrapped settlement outside the honest box is exactly the candidate path. The candidate supplies no independently expanded current amount or condition beyond those prior disclosures. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a04-b03"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:118"
+      ]
+    },
+    {
+      "raw_id": "p2-a04-b01",
+      "canonical_key": "shortwin|close_short|hardening-position-status-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:30",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:46",
+        "docs/audit/ai-review/report-1-instructions.md:377",
+        "programs/shortwin/src/state/position.rs:18",
+        "programs/shortwin/src/instructions/close_short.rs:84"
+      ],
+      "reason": "Earlier L20/L36 and the original instruction report identify the same missing POSITION_OPEN predicates in the four exits while add_margin checks status. The reserved ExitInProgress state remains a future writer obligation; successful exits close accounts. This is prior hardening coverage, not prior owner acceptance of a current exploit. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b02",
+        "p1-a08-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:78",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:361"
+      ]
+    },
+    {
+      "raw_id": "p2-a04-b02",
+      "canonical_key": "shortwin|inputs|transaction-controlled-settlement-legs",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-75",
+        "AIR-20"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:85",
+        "docs/audit/known-issues.md:237",
+        "programs/shortwin/src/engine/arming.rs:29",
+        "programs/shortwin/src/engine/arming.rs:208"
+      ],
+      "reason": "KI-75/AIR-20 expressly retain raw live liquidity and live buyback/sigma for S1/S2, with only the CR spot gate floored at EMA liquidity. Their withdrawal-wrapped settlement outside the honest box is exactly the candidate path. The candidate supplies no independently expanded current amount or condition beyond those prior disclosures. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a04-b03"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:118"
+      ]
+    },
+    {
+      "raw_id": "p2-a05-b01",
+      "canonical_key": "shortwin-math|withdraw_in|carry-crosses-empty-pool",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-5-math-core.md:320",
+        "docs/audit/known-issues.md:182",
+        "docs/audit/known-issues.md:69",
+        "docs/audit/known-issues.md:70",
+        "crates/shortwin-math/src/pool.rs:1897",
+        "crates/shortwin-math/src/pool.rs:1908"
+      ],
+      "reason": "The original report-5-math-core lead explicitly says the last burn leaves carry/carry_r at S=0 and the first post-deposit credit divides the old remainder among new shares. Current withdraw_in confirms the same empty-cohort transition. The new candidate adds a detailed no-borrow, source-sweep-aware production trace and numeric bounds; preserve that evidence. Generic FUZZ-M10-24H-A carry residuals, KI-09 vest forfeiture and KI-10 empty-period protocol income are NOT sufficient duplicate/acceptance grounds on their own. Exact-known here refers only to the precise older raw lead, which has no formal issue ID or recorded adjudication located; it does not mean fixed, accepted, or covered by a historical dust bound. Pass 2 preserves the same carry/carry_r transition while refining bounded integer traces. The exact older raw lead lacks an identified formal issue ID; generic historical dust bounds or owner acceptance are not imported.",
+      "pass1_source_ids": [
+        "p1-a05-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:147"
+      ]
+    },
+    {
+      "raw_id": "p2-a05-b02",
+      "canonical_key": "shortwin|sync_lender|repeated-accrual-truncation",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-68"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:81",
+        "programs/shortwin/src/instructions/sync_lender.rs:126",
+        "crates/shortwin-math/src/pool.rs:1474"
+      ],
+      "reason": "KI-68 identifies the same unsigned touch of current/parked lenders, floor(shares*(acc-snap)/WAD), snapshot advancement, and lost entitlement/realised fractions per touch. The candidate requires no rebase and supplies no mechanism beyond that disclosed per-touch rounding; it is distinct from AIR-03 market rent-credit remainder and KI-65 conversion ordering. Pass 2 keeps the per-touch flooring and snapshot-advance cause. Its bounded examples do not themselves establish an economically material aggregate beyond the disclosed per-touch loss.",
+      "pass1_source_ids": [
+        "p1-a01-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:48"
+      ]
+    },
+    {
+      "raw_id": "p2-a05-b03",
+      "canonical_key": "shortwin|deposit|donation-extends-deposit-hold",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "AIR2-04",
+        "AIR2-05",
+        "AIR-02"
+      ],
+      "sources": [
+        "docs/audit/findings.md:40",
+        "docs/audit/findings.md:41",
+        "docs/audit/known-issues.md:219",
+        "docs/audit/findings.md:74",
+        "docs/audit/findings.md:79",
+        "programs/shortwin/src/instructions/deposit.rs:130",
+        "crates/shortwin-math/src/pool.rs:965"
+      ],
+      "reason": "AIR2-04/05 expressly make deposits wait for the actual shared vest, including later-credit/split-claim extensions, so extension alone is known. The candidate adds recurrent one-lamport donations near expiry as a cheap continuing deposit-availability trigger. This also differs from fixed AIR-02: vest_in now floors the weighted end, while the candidate waits until the residual vest is tiny and still extends that floor result. The new liveness cost/recurrence is not an owner-accepted bound merely because general extensions are documented. Pass 2 retains donor-selected renewal and uncertainty about sustained blocking/cost. Preserve the related-distinct classification against AIR2-04/05; general documented extension is not acceptance of this trigger or bound.",
+      "pass1_source_ids": [
+        "p1-a05-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:161"
+      ]
+    },
+    {
+      "raw_id": "p2-a05-b04",
+      "canonical_key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:40",
+        "docs/audit/ai-review-2/report.md:626",
+        "docs/audit/ai-review-2/triage-pass2-2026-10-18.md:80",
+        "programs/shortwin/src/instructions/deposit.rs:94"
+      ],
+      "reason": "L35 and the implied-owner pass-2 group record the same canonical lending-vault construction invariant: create_market initializes the PDA with mint/authority and later loaders rely on that identity. Deposit has the same seeds/bump-only token-account load. A hypothetical future importer breaks this shared invariant, rather than introducing a new currently replaceable vault path. This is prior hardening coverage, not a statement that arbitrary future importers are safe. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a09-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:374"
+      ]
+    },
+    {
+      "raw_id": "p2-a06-b01",
+      "canonical_key": "shortwin|apply_config|unsafe-authority-transfer",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-70",
+        "AIR-04",
+        "AIR2-06"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:145",
+        "docs/audit/known-issues.md:221",
+        "docs/audit/findings.md:42",
+        "programs/shortwin/src/instructions/apply_config.rs:80",
+        "programs/shortwin/src/state/config.rs:193"
+      ],
+      "reason": "All three prior entries describe installing a governance successor without its signature or acceptance, including an unusable governance key and recovery by upgrade. apply_config still checks the approved change and applies it without successor control. Choosing the config PDA makes the already-recorded unreachable-key mechanism concrete; it does not add a distinct authority-transfer mechanism. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:61"
+      ]
+    },
+    {
+      "raw_id": "p2-a06-b02",
+      "canonical_key": "shortwin-venue-state|read_base|hardening-mint-type-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-4-venue-state.md:89",
+        "docs/audit/ai-review-2/triage-math-2026-10-18.md:27",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:76",
+        "crates/shortwin-venue-state/src/mint.rs:169",
+        "programs/shortwin/src/venues/mod.rs:1094"
+      ],
+      "reason": "The original venue-state report names read_base itself, minimum length without SPL exact-length/Token-2022 type checks, crafted token-account bytes, and constrained current caller keys. L38 subsequently hardened the Raydium LP helper, not this generic base reader. The candidate repeats that exact remaining helper-boundary hardening mechanism. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a06-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:180"
+      ]
+    },
+    {
+      "raw_id": "p2-a06-b03",
+      "canonical_key": "shortwin|parse|hardening-vault-authority-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:58",
+        "docs/audit/ai-review-2/report.md:656",
+        "docs/audit/ai-review/report-3-venues.md:137",
+        "programs/shortwin/src/venues/raydium_v4.rs:146",
+        "programs/shortwin/src/venues/raydium_cpmm.rs:169"
+      ],
+      "reason": "L65 and both older venue reports already separate adoption-time vault token-authority verification from cached read-time key/mint/program checks. The candidate retains the same future venue-authorized authority change precondition; it introduces no different substitution path. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a06-b02",
+        "p1-a09-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:193",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:386"
+      ]
+    },
+    {
+      "raw_id": "p2-a06-b04",
+      "canonical_key": "shortwin-keeper|decode_zc|hardening-version-unchecked",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:43",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:48",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:50",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "services/keeper/src/view.rs:48",
+        "services/keeper/src/view.rs:263",
+        "services/keeper/src/view.rs:284"
+      ],
+      "reason": "Earlier version hardening added VenueGuard constraints to on-chain readers. The candidate concerns keeper decode_zc/load_with_positions using GlobalConfig and Market without comparing their versions: owner/discriminator/minimum length still pass. Thus the generic upgrade-compatibility pattern is known but the keeper account types and interpretation boundary are a distinct remaining extension; the on-chain VenueGuard fix does not cover it. Pass-1 decisions merge keeper|load_with_positions|hardening-version-unchecked into this canonical key. The keeper interpretation boundary remains distinct from fixed on-chain VenueGuard checks.",
+      "pass1_source_ids": [
+        "p1-a04-b02",
+        "p1-a11-b07"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:103",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:515"
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b01",
+      "canonical_key": "shortwin-keeper|score|stale-lp-counter",
+      "relation": "new_to_register",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "services/keeper/src/pool_monitor.rs:174",
+        "services/keeper/src/pool_monitor.rs:232",
+        "services/keeper/src/pool_monitor.rs:252",
+        "services/keeper/src/pool_monitor.rs:259"
+      ],
+      "reason": "The keeper discovery object retains an earlier venue LP counter, then rank_keys fetches only the later reserve vault and LP mint; score subtracts that later supply from the old counter and rank drops zero scores before complete verification. The older services review acknowledges multi-RPC state reads but does not identify this cached-counter/updated-supply subtraction and pre-verification exclusion. AIR2-09 changes whole-bps arithmetic on coherent inputs, so it does not address this separate temporal-state mechanism. Pass-1 decisions merge keeper|score|stale-lp-counter and shortwin-keeper|score|mixed-snapshot-lp-ranking into this canonical key. This repeats within the run but remains new_to_register against pre-run project records.",
+      "pass1_source_ids": [
+        "p1-a07-b01",
+        "p1-a11-b04"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:293",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:471"
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b02",
+      "canonical_key": "shortwin-keeper|score|rounded-lock-share-ranking",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "AIR2-09"
+      ],
+      "sources": [
+        "docs/audit/findings.md:45",
+        "docs/audit/ai-review-2/triage-math-2026-10-18.md:22",
+        "crates/shortwin-math/src/pool_select.rs:31",
+        "services/keeper/src/pool_monitor.rs:232",
+        "services/keeper/src/pool_monitor.rs:252",
+        "services/keeper/src/pool_monitor.rs:259"
+      ],
+      "reason": "AIR2-09 replaced on-chain locked_depth with the raw locked-LP ratio, retaining lambda_bps as a display/threshold helper. Keeper score still multiplies the whole-bps lambda_bps by reserve SOL and rank removes zeros. Thus the same premature-rounding pattern remains in the separate preselection service and can omit a pool that the fixed on-chain verifier would accept; do not label it already fixed under AIR2-09. It is also separate from mixed-snapshot LP inputs. Pass-1 decisions merge keeper|score|premature-lock-share-rounding into this canonical key. The keeper preselection score remains distinct from the on-chain AIR2-09 raw-ratio fix.",
+      "pass1_source_ids": [
+        "p1-a07-b02",
+        "p1-a11-b03"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:307",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:455"
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b03",
+      "canonical_key": "shortwin-keeper|evaluate|wrong-window-floor-reference",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "KI-17"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:93",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "programs/shortwin/src/engine/pool_select.rs:363",
+        "programs/shortwin/src/engine/pool_select.rs:376",
+        "programs/shortwin/src/instructions/propose_pool.rs:315",
+        "services/keeper/src/pool_monitor.rs:376"
+      ],
+      "reason": "KI-17 and M4R-2 specify the proposal floor at min(P_ema,P_cand); the execution intentionally uses P_ema. Keeper evaluate instead supplies P_ema to its proposal window_floor verdict. The prior register discusses the deliberate on-chain policy and candidate manipulation, not the keeper selecting a candidate that the same proposal refuses. This cross-component mismatch is a distinct extension; earlier shared-verifier review prose does not cover the wrong argument. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a11-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:424"
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b04",
+      "canonical_key": "shortwin-keeper|plan|false-window-floor-monotonicity",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "KI-17"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:93",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "programs/shortwin/src/engine/pool_select.rs:376",
+        "services/keeper/src/pool_monitor.rs:538",
+        "services/keeper/src/pool_monitor.rs:548"
+      ],
+      "reason": "The proposal policy documented under KI-17 uses candidate-dependent min(EMA,spot), so candidate floor validity is not ordered by depth alone. Keeper plan expressly assumes one common EMA price and exits when the deepest pool fails the floor, instead of searching shallower passing pools as it does for carried-fit failures. This is a distinct remaining planner extension beyond p1-a11-b01: correcting evaluate alone exposes rather than removes this early return. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a11-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:440"
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b05",
+      "canonical_key": "shortwin-keeper|resolve_entry|unsupported-coin-creator-placeholder",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:69",
+        "docs/audit/ai-review-2/report.md:673",
+        "docs/audit/ai-review/report-3-venues.md:134",
+        "programs/shortwin/src/venues/mod.rs:1266",
+        "services/keeper/src/venue.rs:656"
+      ],
+      "reason": "L82 describes on-chain coin_creator resolution missing for PumpCurve. Here the on-chain parser supplies the PumpSwap creator from its cache, but keeper resolve_entry lacks that placeholder altogether and drops the configured set. The venue, resolver and failing boundary differ; prior curve-only template hardening cannot close this keeper/PumpSwap omission. Pass 2 repeats pass 1 after canonicalizing keeper to shortwin-keeper. The concrete template still concerns keeper/PumpSwap rather than the earlier on-chain/PumpCurve resolver.",
+      "pass1_source_ids": [
+        "p1-a07-b03"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:323"
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b06",
+      "canonical_key": "shortwin-keeper|decode_zc|hardening-version-unchecked",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:43",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:48",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:50",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "services/keeper/src/view.rs:48",
+        "services/keeper/src/view.rs:263",
+        "services/keeper/src/view.rs:284"
+      ],
+      "reason": "Earlier version hardening added VenueGuard constraints to on-chain readers. The candidate concerns keeper decode_zc/load_with_positions using GlobalConfig and Market without comparing their versions: owner/discriminator/minimum length still pass. Thus the generic upgrade-compatibility pattern is known but the keeper account types and interpretation boundary are a distinct remaining extension; the on-chain VenueGuard fix does not cover it. Pass-1 decisions merge keeper|load_with_positions|hardening-version-unchecked into this canonical key. The keeper interpretation boundary remains distinct from fixed on-chain VenueGuard checks.",
+      "pass1_source_ids": [
+        "p1-a04-b02",
+        "p1-a11-b07"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:103",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:515"
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b07",
+      "canonical_key": "shortwin-keeper|next_rank_batch|ranked-batch-lost-on-rpc-error",
+      "relation": "new_to_register",
+      "issue_ids": [],
+      "sources": [
+        "services/keeper/src/pool_monitor.rs:668",
+        "services/keeper/src/pool_monitor.rs:681",
+        "services/keeper/src/pool_monitor.rs:690",
+        "services/keeper/src/pool_monitor.rs:697",
+        "services/keeper/src/keeper.rs:3241",
+        "services/keeper/src/keeper.rs:3243",
+        "services/keeper/src/keeper.rs:3250",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:67",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "docs/audit/known-issues.md:119"
+      ],
+      "reason": "No exact earlier causal mechanism was identified in the supplied 92-row register, docs/audit/known-issues.md, docs/audit/findings.md, or Markdown sources under docs/audit/ai-review and docs/audit/ai-review-2. Earlier services triage discusses multi-RPC reads, per-market error isolation, submission retry and shared pool verifiers; KI-38 concerns serial-RPC throughput. None describes removing candidates from rank_queue before a fallible account read, then skipping finish_rank_batch on error so later completion can publish an incomplete ranking or retain old candidates until rediscovery. This queue-lifecycle cause is distinct from stale LP snapshots, rounded scores and proposal-floor mismatches. The helper drain and caller await/question-mark occur in frozen source, but this comparison does not adjudicate outer recovery, deployed delay, adversarial triggering, severity or promotion. keeper.rs is caller context outside the frozen in-scope source bundle. No prior issue ID is assigned for generic RPC adjacency.",
+      "pass1_source_ids": [],
+      "run_relation": "first_seen_in_pass2",
+      "comparison_lineage": []
+    },
+    {
+      "raw_id": "p2-a07-b08",
+      "canonical_key": "shortwin|read_state_boxed_for_exit|curve-risk-fee-at-spot",
+      "relation": "exact_known",
+      "issue_ids": [
+        "AIR-10",
+        "KI-77"
+      ],
+      "sources": [
+        "docs/audit/ai-review-2/report.md:622",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:37",
+        "docs/audit/known-issues.md:227",
+        "docs/audit/known-issues.md:84",
+        "programs/shortwin/src/venues/mod.rs:1078",
+        "programs/shortwin/src/venues/pump_curve.rs:454"
+      ],
+      "reason": "Prior AI2 L31/raw report already identifies a sale moving the ordinary curve spot fee while exit readers resolve EMA fees only for PumpSwap, conditional on multiple curve tiers. This is an exact prior open lead. AIR-10/KI-77 are related context, not grounds to call the sale case accepted as the burn residual: a fixed supply prevents a supply change, not a spot-price sale. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a06-b08"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:276"
+      ]
+    },
+    {
+      "raw_id": "p2-a08-b01",
+      "canonical_key": "shortwin|apply_config|unsafe-authority-transfer",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-70",
+        "AIR-04",
+        "AIR2-06"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:145",
+        "docs/audit/known-issues.md:221",
+        "docs/audit/findings.md:42",
+        "programs/shortwin/src/instructions/apply_config.rs:80",
+        "programs/shortwin/src/state/config.rs:193"
+      ],
+      "reason": "All three prior entries describe installing a governance successor without its signature or acceptance, including an unusable governance key and recovery by upgrade. apply_config still checks the approved change and applies it without successor control. Choosing the config PDA makes the already-recorded unreachable-key mechanism concrete; it does not add a distinct authority-transfer mechanism. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:61"
+      ]
+    },
+    {
+      "raw_id": "p2-a08-b02",
+      "canonical_key": "shortwin|close_short|hardening-position-status-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:30",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:46",
+        "docs/audit/ai-review/report-1-instructions.md:377",
+        "programs/shortwin/src/state/position.rs:18",
+        "programs/shortwin/src/instructions/close_short.rs:84"
+      ],
+      "reason": "Earlier L20/L36 and the original instruction report identify the same missing POSITION_OPEN predicates in the four exits while add_margin checks status. The reserved ExitInProgress state remains a future writer obligation; successful exits close accounts. This is prior hardening coverage, not prior owner acceptance of a current exploit. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b02",
+        "p1-a08-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:78",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:361"
+      ]
+    },
+    {
+      "raw_id": "p2-a08-b03",
+      "canonical_key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:40",
+        "docs/audit/ai-review-2/report.md:626",
+        "docs/audit/ai-review-2/triage-pass2-2026-10-18.md:80",
+        "programs/shortwin/src/instructions/deposit.rs:94"
+      ],
+      "reason": "L35 and the implied-owner pass-2 group record the same canonical lending-vault construction invariant: create_market initializes the PDA with mint/authority and later loaders rely on that identity. Deposit has the same seeds/bump-only token-account load. A hypothetical future importer breaks this shared invariant, rather than introducing a new currently replaceable vault path. This is prior hardening coverage, not a statement that arbitrary future importers are safe. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a09-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:374"
+      ]
+    },
+    {
+      "raw_id": "p2-a08-b04",
+      "canonical_key": "shortwin|deposit|donation-extends-deposit-hold",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "AIR2-04",
+        "AIR2-05",
+        "AIR-02"
+      ],
+      "sources": [
+        "docs/audit/findings.md:40",
+        "docs/audit/findings.md:41",
+        "docs/audit/known-issues.md:219",
+        "docs/audit/findings.md:74",
+        "docs/audit/findings.md:79",
+        "programs/shortwin/src/instructions/deposit.rs:130",
+        "crates/shortwin-math/src/pool.rs:965"
+      ],
+      "reason": "AIR2-04/05 expressly make deposits wait for the actual shared vest, including later-credit/split-claim extensions, so extension alone is known. The candidate adds recurrent one-lamport donations near expiry as a cheap continuing deposit-availability trigger. This also differs from fixed AIR-02: vest_in now floors the weighted end, while the candidate waits until the residual vest is tiny and still extends that floor result. The new liveness cost/recurrence is not an owner-accepted bound merely because general extensions are documented. Pass 2 retains donor-selected renewal and uncertainty about sustained blocking/cost. Preserve the related-distinct classification against AIR2-04/05; general documented extension is not acceptance of this trigger or bound.",
+      "pass1_source_ids": [
+        "p1-a05-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:161"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b01",
+      "canonical_key": "shortwin|apply_config|unsafe-authority-transfer",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-70",
+        "AIR-04",
+        "AIR2-06"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:145",
+        "docs/audit/known-issues.md:221",
+        "docs/audit/findings.md:42",
+        "programs/shortwin/src/instructions/apply_config.rs:80",
+        "programs/shortwin/src/state/config.rs:193"
+      ],
+      "reason": "All three prior entries describe installing a governance successor without its signature or acceptance, including an unusable governance key and recovery by upgrade. apply_config still checks the approved change and applies it without successor control. Choosing the config PDA makes the already-recorded unreachable-key mechanism concrete; it does not add a distinct authority-transfer mechanism. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:61"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b02",
+      "canonical_key": "shortwin|flag_venue_upgraded|unhashed-slot-upgrade-latch",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-69",
+        "AIR-01"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:144",
+        "docs/audit/known-issues.md:218",
+        "programs/shortwin/src/instructions/flag_venue_upgraded.rs:126"
+      ],
+      "reason": "KI-69 residual (a) expressly says initialize_config records no fingerprint, revalidation without a hash leaves none, and a permissionless extension then latches the venue until Emergency revalidation. The if-let fingerprint branch in flag_venue_upgraded is the same fallthrough. This is separate from AIR2-07 chosen-pair collisions and KI-73 loader one-slot unavailability. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a11-b05"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:485"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b03",
+      "canonical_key": "shortwin|init_uva|hardening-existing-uva-validation",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-3-venues.md:128",
+        "programs/shortwin/src/venues/pump_curve.rs:1047"
+      ],
+      "reason": "The original venue report specifically identifies both init_uva implementations skipping CPI for a nonempty venue-owned canonical UVA without decoding/user checks, despite stricter trade-time validation. The same branch remains in pump_curve::init_uva. The candidate is a prior raw hardening lead with a future venue-layout precondition, not a new project mechanism. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a09-b03"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:399"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b04",
+      "canonical_key": "shortwin|sweep_trader|external-cashback-recovery-dependency",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/report.md:667",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:64",
+        "programs/shortwin/src/instructions/sweep_trader.rs:248"
+      ],
+      "reason": "AI2 L76 already traces a donation into pump UVA/PumpSwap cashback ATA, a future claim-interface change requiring unavailable trader authorization, rewards_clear never becoming true, and WipeSweepPending after wipe or last-lender exit. This is the same retained external-claim dependency. AIR2-12 alternate-destination cashback is a different current-account routing problem and is not a substitute duplicate reason. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a07-b04"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:336"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b05",
+      "canonical_key": "shortwin|close_short|hardening-position-status-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:30",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:46",
+        "docs/audit/ai-review/report-1-instructions.md:377",
+        "programs/shortwin/src/state/position.rs:18",
+        "programs/shortwin/src/instructions/close_short.rs:84"
+      ],
+      "reason": "Earlier L20/L36 and the original instruction report identify the same missing POSITION_OPEN predicates in the four exits while add_margin checks status. The reserved ExitInProgress state remains a future writer obligation; successful exits close accounts. This is prior hardening coverage, not prior owner acceptance of a current exploit. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a02-b02",
+        "p1-a08-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:78",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:361"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b06",
+      "canonical_key": "shortwin|deposit|hardening-pool-vault-fields-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:40",
+        "docs/audit/ai-review-2/report.md:626",
+        "docs/audit/ai-review-2/triage-pass2-2026-10-18.md:80",
+        "programs/shortwin/src/instructions/deposit.rs:94"
+      ],
+      "reason": "L35 and the implied-owner pass-2 group record the same canonical lending-vault construction invariant: create_market initializes the PDA with mint/authority and later loaders rely on that identity. Deposit has the same seeds/bump-only token-account load. A hypothetical future importer breaks this shared invariant, rather than introducing a new currently replaceable vault path. This is prior hardening coverage, not a statement that arbitrary future importers are safe. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a09-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:374"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b07",
+      "canonical_key": "shortwin|parse|hardening-vault-authority-unchecked",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:58",
+        "docs/audit/ai-review-2/report.md:656",
+        "docs/audit/ai-review/report-3-venues.md:137",
+        "programs/shortwin/src/venues/raydium_v4.rs:146",
+        "programs/shortwin/src/venues/raydium_cpmm.rs:169"
+      ],
+      "reason": "L65 and both older venue reports already separate adoption-time vault token-authority verification from cached read-time key/mint/program checks. The candidate retains the same future venue-authorized authority change precondition; it introduces no different substitution path. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a06-b02",
+        "p1-a09-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:193",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:386"
+      ]
+    },
+    {
+      "raw_id": "p2-a09-b08",
+      "canonical_key": "shortwin|elf_fingerprint_of|hardening-truncated-elf-digest",
+      "relation": "exact_known",
+      "issue_ids": [
+        "AIR2-07",
+        "KI-69"
+      ],
+      "sources": [
+        "docs/audit/findings.md:43",
+        "docs/audit/known-issues.md:144",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:12",
+        "programs/shortwin/src/state/venue_guard.rs:45",
+        "programs/shortwin/src/instructions/flag_venue_upgraded.rs:130"
+      ],
+      "reason": "AIR2-07 already distinguishes the 96-bit fixed-hash second-preimage cost from the 48-bit generic chosen-pair collision bound of the 12-byte fingerprint. Current guard storage remains 12 bytes. The earlier review also requires changed ProgramData length to suppress a flag; an unchanged-length slot move flags regardless. KI-69 alone is not acceptance of the chosen-pair extension, but AIR2-07 is an exact existing open record. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a06-b04",
+        "p1-a11-b06"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:218",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:499"
+      ]
+    },
+    {
+      "raw_id": "p2-a10-b01",
+      "canonical_key": "shortwin-math|pump_curve|hardening-fixed-supply-fee-basis",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-77"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:84",
+        "docs/audit/ai-review/report-6-math-rest.md:362",
+        "docs/audit/ai-review/report-3-venues.md:138",
+        "crates/shortwin-math/src/fees.rs:164",
+        "programs/shortwin/src/venues/pump_curve.rs:454"
+      ],
+      "reason": "The original math and venue reports already record fixed 10^15 supply for ordinary curve fees against live-supply venue fees after burns under hypothetical multiple tiers. KI-77 retains this ordinary basis while adding separate live-supply synthetic fees. This is the same mechanism as p1-a01-b01, with a different entry point, not project-new merely because the new ledger starts empty. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a10-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:409"
+      ]
+    },
+    {
+      "raw_id": "p2-a11-b01",
+      "canonical_key": "shortwin-keeper|resolve_entry|unsupported-coin-creator-placeholder",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:69",
+        "docs/audit/ai-review-2/report.md:673",
+        "docs/audit/ai-review/report-3-venues.md:134",
+        "programs/shortwin/src/venues/mod.rs:1266",
+        "services/keeper/src/venue.rs:656"
+      ],
+      "reason": "L82 describes on-chain coin_creator resolution missing for PumpCurve. Here the on-chain parser supplies the PumpSwap creator from its cache, but keeper resolve_entry lacks that placeholder altogether and drops the configured set. The venue, resolver and failing boundary differ; prior curve-only template hardening cannot close this keeper/PumpSwap omission. Pass 2 repeats pass 1 after canonicalizing keeper to shortwin-keeper. The concrete template still concerns keeper/PumpSwap rather than the earlier on-chain/PumpCurve resolver.",
+      "pass1_source_ids": [
+        "p1-a07-b03"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:323"
+      ]
+    },
+    {
+      "raw_id": "p2-a11-b02",
+      "canonical_key": "shortwin-keeper|decode_zc|hardening-version-unchecked",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:43",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:48",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:50",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "services/keeper/src/view.rs:48",
+        "services/keeper/src/view.rs:263",
+        "services/keeper/src/view.rs:284"
+      ],
+      "reason": "Earlier version hardening added VenueGuard constraints to on-chain readers. The candidate concerns keeper decode_zc/load_with_positions using GlobalConfig and Market without comparing their versions: owner/discriminator/minimum length still pass. Thus the generic upgrade-compatibility pattern is known but the keeper account types and interpretation boundary are a distinct remaining extension; the on-chain VenueGuard fix does not cover it. Pass-1 decisions merge keeper|load_with_positions|hardening-version-unchecked into this canonical key. The keeper interpretation boundary remains distinct from fixed on-chain VenueGuard checks.",
+      "pass1_source_ids": [
+        "p1-a04-b02",
+        "p1-a11-b07"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:103",
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:515"
+      ]
+    },
+    {
+      "raw_id": "p2-a12-b01",
+      "canonical_key": "shortwin-math|withdraw_in|carry-crosses-empty-pool",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-5-math-core.md:320",
+        "docs/audit/known-issues.md:182",
+        "docs/audit/known-issues.md:69",
+        "docs/audit/known-issues.md:70",
+        "crates/shortwin-math/src/pool.rs:1897",
+        "crates/shortwin-math/src/pool.rs:1908"
+      ],
+      "reason": "The original report-5-math-core lead explicitly says the last burn leaves carry/carry_r at S=0 and the first post-deposit credit divides the old remainder among new shares. Current withdraw_in confirms the same empty-cohort transition. The new candidate adds a detailed no-borrow, source-sweep-aware production trace and numeric bounds; preserve that evidence. Generic FUZZ-M10-24H-A carry residuals, KI-09 vest forfeiture and KI-10 empty-period protocol income are NOT sufficient duplicate/acceptance grounds on their own. Exact-known here refers only to the precise older raw lead, which has no formal issue ID or recorded adjudication located; it does not mean fixed, accepted, or covered by a historical dust bound. Pass 2 preserves the same carry/carry_r transition while refining bounded integer traces. The exact older raw lead lacks an identified formal issue ID; generic historical dust bounds or owner acceptance are not imported.",
+      "pass1_source_ids": [
+        "p1-a05-b01"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:147"
+      ]
+    },
+    {
+      "raw_id": "p2-a12-b02",
+      "canonical_key": "shortwin|deposit|donation-extends-deposit-hold",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "AIR2-04",
+        "AIR2-05",
+        "AIR-02"
+      ],
+      "sources": [
+        "docs/audit/findings.md:40",
+        "docs/audit/findings.md:41",
+        "docs/audit/known-issues.md:219",
+        "docs/audit/findings.md:74",
+        "docs/audit/findings.md:79",
+        "programs/shortwin/src/instructions/deposit.rs:130",
+        "crates/shortwin-math/src/pool.rs:965"
+      ],
+      "reason": "AIR2-04/05 expressly make deposits wait for the actual shared vest, including later-credit/split-claim extensions, so extension alone is known. The candidate adds recurrent one-lamport donations near expiry as a cheap continuing deposit-availability trigger. This also differs from fixed AIR-02: vest_in now floors the weighted end, while the candidate waits until the residual vest is tiny and still extends that floor result. The new liveness cost/recurrence is not an owner-accepted bound merely because general extensions are documented. Pass 2 retains donor-selected renewal and uncertainty about sustained blocking/cost. Preserve the related-distinct classification against AIR2-04/05; general documented extension is not acceptance of this trigger or bound.",
+      "pass1_source_ids": [
+        "p1-a05-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:161"
+      ]
+    },
+    {
+      "raw_id": "p2-a12-b03",
+      "canonical_key": "shortwin|sync_lender|repeated-accrual-truncation",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-68"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:81",
+        "programs/shortwin/src/instructions/sync_lender.rs:126",
+        "crates/shortwin-math/src/pool.rs:1474"
+      ],
+      "reason": "KI-68 identifies the same unsigned touch of current/parked lenders, floor(shares*(acc-snap)/WAD), snapshot advancement, and lost entitlement/realised fractions per touch. The candidate requires no rebase and supplies no mechanism beyond that disclosed per-touch rounding; it is distinct from AIR-03 market rent-credit remainder and KI-65 conversion ordering. Pass 2 keeps the per-touch flooring and snapshot-advance cause. Its bounded examples do not themselves establish an economically material aggregate beyond the disclosed per-touch loss.",
+      "pass1_source_ids": [
+        "p1-a01-b02"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:48"
+      ]
+    },
+    {
+      "raw_id": "p2-a12-b04",
+      "canonical_key": "shortwin|sweep_trader|external-cashback-recovery-dependency",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/report.md:667",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:64",
+        "programs/shortwin/src/instructions/sweep_trader.rs:248"
+      ],
+      "reason": "AI2 L76 already traces a donation into pump UVA/PumpSwap cashback ATA, a future claim-interface change requiring unavailable trader authorization, rewards_clear never becoming true, and WipeSweepPending after wipe or last-lender exit. This is the same retained external-claim dependency. AIR2-12 alternate-destination cashback is a different current-account routing problem and is not a substitute duplicate reason. Pass 2 restates the same causal mechanism as the matched pass-1 canonical group; its revised explanation or example does not change the relationship to the cited pre-existing project record.",
+      "pass1_source_ids": [
+        "p1-a07-b04"
+      ],
+      "run_relation": "repeat_of_pass1_canonical_group",
+      "comparison_lineage": [
+        ".rust-auditor/runs/20261018-110553/pass-1/prior-comparison.json:336"
+      ]
+    }
+  ]
+}

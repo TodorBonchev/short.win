@@ -1,0 +1,145 @@
+Specialist11 trust-gap, pass1; static audit only.
+Frozen program commit b815269224ba0f5d946f49de7e113220c4067041; auditor 6c41e1d46386de7fd9b1fa48c847e876ac8b2676.
+Initial production reads used agent-11-bundle.md. Source-index metadata is not source review.
+No builds, tests, runtime reproduction, repository writes, or child agents. Python evaluated integer arithmetic and wrote /tmp artifacts only.
+Read Build context: Anchor1.2.0; on-chain release overflow checks enabled; services release overflow checks unset.
+Read specialty, shared output rules, report language, incident patterns and account-map leads. One oversized output was truncated; omitted CPMM production text and shared rules were reread in bounded chunks.
+FULL_PRODUCTION means all non-test production items were manually read. It does not claim each test module was reviewed.
+BOUNDED means only the stated production range was read. SEARCH_ONLY means names or matching lines were seen, not complete functions. UNREAD means no production review.
+No claim that all58,914 source lines or all bundled files were reviewed.
+
+Prioritized production complete: engine/mod.rs, engine/route.rs, engine/pool_select.rs.
+Trust guards checked: real receiver/feed/Pyth verification and time/order checks; candidate pinned program owners and cached keys; Raydium vault/mint identities; LP locked-depth acceptance; failure-chain/window gates; carried-position caps; emergency signer and ProgramData keys; delegate and CPI signer limits.
+Actual authorities: upgrade authority initializes short.win; pause_authority revalidates venue upgrades; governance or pause_authority updates extras; external Raydium admins control venue state; ordinary callers propose/crank/resolve and ordinary LPs change candidate liquidity.
+Fallback limit: on-chain validation rejects invalid keeper plans, but the keeper does not rotate away from the offending top candidate after a refusal.
+
+Per-file coverage:
+UNREAD	crates/shortwin-math/src/bounds.rs	not manually reviewed
+FULL_PRODUCTION	crates/shortwin-math/src/caps.rs	all non-test production items
+UNREAD	crates/shortwin-math/src/consts.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/error.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/fees.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/lib.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/num/mod.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/num/u256.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/observe.rs	not manually reviewed
+SEARCH_ONLY	crates/shortwin-math/src/params.rs	matching lines/function signatures only
+UNREAD	crates/shortwin-math/src/persist.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/pool.rs	not manually reviewed
+FULL_PRODUCTION	crates/shortwin-math/src/pool_select.rs	all non-test production items
+UNREAD	crates/shortwin-math/src/quote/cpmm.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/quote/mod.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/quote/pricing.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/quote/ray_v4.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/quote/reprice.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/quote/sol_leg.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/quote/straddle.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/rent.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/risk.rs	not manually reviewed
+UNREAD	crates/shortwin-math/src/settle.rs	not manually reviewed
+FULL_PRODUCTION	crates/shortwin-math/src/tier.rs	all non-test production items
+UNREAD	crates/shortwin-math/src/waterfall.rs	not manually reviewed
+UNREAD	crates/shortwin-venue-state/src/bytes.rs	not manually reviewed
+UNREAD	crates/shortwin-venue-state/src/lib.rs	not manually reviewed
+UNREAD	crates/shortwin-venue-state/src/mint.rs	not manually reviewed
+FULL_PRODUCTION	crates/shortwin-venue-state/src/program_data.rs	all non-test production items
+UNREAD	crates/shortwin-venue-state/src/pump.rs	not manually reviewed
+UNREAD	crates/shortwin-venue-state/src/pump_amm.rs	not manually reviewed
+FULL_PRODUCTION	crates/shortwin-venue-state/src/pyth.rs	all non-test production items
+UNREAD	crates/shortwin-venue-state/src/raydium_cpmm.rs	not manually reviewed
+UNREAD	crates/shortwin-venue-state/src/raydium_v4.rs	not manually reviewed
+UNREAD	crates/shortwin-venue-state/src/token_account.rs	not manually reviewed
+SEARCH_ONLY	programs/shortwin/src/constants.rs	matching lines/function signatures only
+UNREAD	programs/shortwin/src/engine/arming.rs	not manually reviewed
+UNREAD	programs/shortwin/src/engine/bounds.rs	not manually reviewed
+UNREAD	programs/shortwin/src/engine/caps.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/engine/guard.rs	all non-test production items
+UNREAD	programs/shortwin/src/engine/lender.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/engine/mod.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/engine/observe.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/engine/pool_select.rs	all non-test production items
+UNREAD	programs/shortwin/src/engine/prologue.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/engine/route.rs	all non-test production items
+UNREAD	programs/shortwin/src/engine/tier.rs	not manually reviewed
+UNREAD	programs/shortwin/src/engine/trader.rs	not manually reviewed
+UNREAD	programs/shortwin/src/engine/waterfall.rs	not manually reviewed
+SEARCH_ONLY	programs/shortwin/src/errors.rs	matching lines/function signatures only
+UNREAD	programs/shortwin/src/events.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/add_margin.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/instructions/apply_config.rs	all non-test production items
+UNREAD	programs/shortwin/src/instructions/cancel_config.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/claim_sol.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/close_short.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/cover_deficit.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/crank_price.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/instructions/crank_sol_usd.rs	all non-test production items
+SEARCH_ONLY	programs/shortwin/src/instructions/create_market.rs	matching lines/function signatures only
+UNREAD	programs/shortwin/src/instructions/deposit.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/disable_venue.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/instructions/execute_pool_switch.rs	all non-test production items
+UNREAD	programs/shortwin/src/instructions/expire.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/flag_unsafe_mint.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/instructions/flag_venue_upgraded.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/instructions/initialize_config.rs	all non-test production items
+UNREAD	programs/shortwin/src/instructions/liquidate.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/mod.rs	not manually reviewed
+SEARCH_ONLY	programs/shortwin/src/instructions/open_short.rs	matching lines/function signatures only
+UNREAD	programs/shortwin/src/instructions/propose_config.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/instructions/propose_pool.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/instructions/revalidate_venue.rs	all non-test production items
+UNREAD	programs/shortwin/src/instructions/set_coverage_pause.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/set_pause.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/set_route_broken.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/instructions/set_venue_extras.rs	all non-test production items
+UNREAD	programs/shortwin/src/instructions/sol_settle.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/sweep_protocol_fees.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/sweep_trader.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/sync_lender.rs	not manually reviewed
+UNREAD	programs/shortwin/src/instructions/withdraw.rs	not manually reviewed
+UNREAD	programs/shortwin/src/lamports.rs	not manually reviewed
+UNREAD	programs/shortwin/src/lib.rs	not manually reviewed
+UNREAD	programs/shortwin/src/mint_filter.rs	not manually reviewed
+BOUNDED	programs/shortwin/src/state/config.rs	source lines 1-138 (bundle37538-37675)
+UNREAD	programs/shortwin/src/state/epoch.rs	not manually reviewed
+UNREAD	programs/shortwin/src/state/exposure.rs	not manually reviewed
+UNREAD	programs/shortwin/src/state/layout_asserts.rs	not manually reviewed
+UNREAD	programs/shortwin/src/state/lender.rs	not manually reviewed
+SEARCH_ONLY	programs/shortwin/src/state/market.rs	matching lines/function signatures only
+FULL_PRODUCTION	programs/shortwin/src/state/mod.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/state/oracle.rs	all non-test production items
+UNREAD	programs/shortwin/src/state/pod.rs	not manually reviewed
+UNREAD	programs/shortwin/src/state/position.rs	not manually reviewed
+UNREAD	programs/shortwin/src/state/vault.rs	not manually reviewed
+UNREAD	programs/shortwin/src/state/venue_extras.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/state/venue_guard.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/venues/detect.rs	all non-test production items
+UNREAD	programs/shortwin/src/venues/mod.rs	not manually reviewed
+UNREAD	programs/shortwin/src/venues/pump_amm.rs	not manually reviewed
+UNREAD	programs/shortwin/src/venues/pump_curve.rs	not manually reviewed
+FULL_PRODUCTION	programs/shortwin/src/venues/raydium.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/venues/raydium_cpmm.rs	all non-test production items
+FULL_PRODUCTION	programs/shortwin/src/venues/raydium_v4.rs	all non-test production items
+UNREAD	services/common/src/chain.rs	not manually reviewed
+UNREAD	services/common/src/tx.rs	not manually reviewed
+UNREAD	services/keeper/src/budget.rs	not manually reviewed
+UNREAD	services/keeper/src/coverage.rs	not manually reviewed
+UNREAD	services/keeper/src/decide.rs	not manually reviewed
+UNREAD	services/keeper/src/fees.rs	not manually reviewed
+UNREAD	services/keeper/src/graduation.rs	not manually reviewed
+UNREAD	services/keeper/src/ixs.rs	not manually reviewed
+BOUNDED	services/keeper/src/monitor.rs	source lines 1-175 (bundle53796-53970)
+SEARCH_ONLY	services/keeper/src/pda.rs	matching lines/function signatures only
+FULL_PRODUCTION	services/keeper/src/pool_monitor.rs	all non-test production items
+SEARCH_ONLY	services/keeper/src/sweep.rs	matching lines/function signatures only
+SEARCH_ONLY	services/keeper/src/venue.rs	matching lines/function signatures only
+FULL_PRODUCTION	services/keeper/src/view.rs	all non-test production items
+
+Counts: FULL_PRODUCTION=27, BOUNDED=2, SEARCH_ONLY=9, UNREAD=81
+
+Out-of-scope static context read:
+- services/keeper/src/keeper.rs:3240-3253,3270-3345,3495-3595; candidate evaluation, rank snapshots, retry behavior.
+- services/keeper/src/config.rs:350-399; max_candidates=8, rank_keys_per_tick=200 and discovery cadence.
+- services/common/src/rpc.rs:250-285; getMultipleAccounts chunk boundary and bank snapshot grouping.
+- ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-bpf-loader-program-4.2.2/src/lib.rs:793-1005; permissionless ExtendProgram, bounds, authority branch and deploy-slot write.
+No external deployment state was queried.
+Artifacts: p1-11-trust.md contains5 FINDING blocks (1 explicitly masked) and2 LEAD blocks.

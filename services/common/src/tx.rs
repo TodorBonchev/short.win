@@ -305,7 +305,9 @@ pub fn parse_lookup_table(
     if tag != Some(1) {
         bail!("{key} is not an initialized lookup table");
     }
-    let body = data.get(ALT_META_SIZE..).unwrap_or(&[]);
+    let body = data
+        .get(ALT_META_SIZE..)
+        .with_context(|| format!("{key}: truncated lookup table metadata"))?;
     if body.len() % 32 != 0 {
         bail!("{key}: truncated lookup table");
     }
@@ -471,6 +473,27 @@ mod tests {
         assert_eq!(t.addresses, vec![a]);
         assert!(parse_lookup_table(key, &Pubkey::new_unique(), &data).is_err());
         data[0] = 0;
+        assert!(parse_lookup_table(key, &ALT_PROGRAM_ID, &data).is_err());
+    }
+
+    #[test]
+    fn lookup_tables_require_the_complete_metadata_header() {
+        let key = Pubkey::new_unique();
+        let mut data = vec![0u8; ALT_META_SIZE];
+        data[0] = 1;
+        for len in 4..ALT_META_SIZE {
+            assert!(
+                parse_lookup_table(key, &ALT_PROGRAM_ID, &data[..len]).is_err(),
+                "accepted a truncated {len}-byte metadata header"
+            );
+        }
+        assert!(
+            parse_lookup_table(key, &ALT_PROGRAM_ID, &data)
+                .unwrap()
+                .addresses
+                .is_empty()
+        );
+        data.push(0);
         assert!(parse_lookup_table(key, &ALT_PROGRAM_ID, &data).is_err());
     }
 }

@@ -1,0 +1,178 @@
+Specialist: pass1-04 execution-trace
+Frozen bundle: .audit-mZFuf8/agent-4-bundle.md
+Commit supplied by coordinator: b815269224ba0f5d946f49de7e113220c4067041
+Result: 0 FINDING blocks; 4 LEAD blocks.
+
+FULL PRODUCTION READS (cfg(test) was context only; no test execution)
+programs/shortwin/src/lib.rs:1-325 — all Anchor entrypoint forwarding and argument order.
+crates/shortwin-math/src/risk.rs:1-422 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/engine/arming.rs:1-345 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/engine/lender.rs:1-244 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/engine/prologue.rs:1-271 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/engine/trader.rs:1-505 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/open_short.rs:1-720 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/close_short.rs:1-355 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/liquidate.rs:1-739 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/expire.rs:1-194 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/sol_settle.rs:1-550 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/deposit.rs:1-209 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/withdraw.rs:1-315 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/claim_sol.rs:1-136 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/instructions/sweep_trader.rs:1-414 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/lamports.rs:1-92 — production source read, including instruction Accounts structs and handlers where present.
+programs/shortwin/src/venues/raydium.rs:1-393 — production source read, including instruction Accounts structs and handlers where present.
+services/common/src/chain.rs:1-258 — production source read, including instruction Accounts structs and handlers where present.
+services/common/src/tx.rs:1-316 — production source read, including instruction Accounts structs and handlers where present.
+services/keeper/src/ixs.rs:1-316 — production source read, including instruction Accounts structs and handlers where present.
+services/keeper/src/decide.rs:1-540 — production source read, including instruction Accounts structs and handlers where present.
+services/keeper/src/graduation.rs:1-470 — production source read, including instruction Accounts structs and handlers where present.
+services/keeper/src/sweep.rs:1-377 — production source read, including instruction Accounts structs and handlers where present.
+services/keeper/src/view.rs:1-389 — production source read, including instruction Accounts structs and handlers where present.
+
+FULL BUILD CONTEXT READS
+crates/shortwin-math/Cargo.toml
+crates/shortwin-venue-state/Cargo.toml
+programs/shortwin/Cargo.toml
+services/common/Cargo.toml
+services/keeper/Cargo.toml
+Cargo.toml
+Anchor.toml
+services/Cargo.toml
+
+BOUNDED PRODUCTION READS
+services/keeper/src/budget.rs:1-758
+programs/shortwin/src/venues/mod.rs:1-319, 934-1496
+programs/shortwin/src/venues/pump_amm.rs:339-624, 894-1190
+programs/shortwin/src/venues/pump_curve.rs:298-441, 588-1092
+programs/shortwin/src/venues/raydium_cpmm.rs:122-197, 437-552
+programs/shortwin/src/venues/raydium_v4.rs:109-142, 314-420
+
+EXAMINED FUNCTION / FLOW INVENTORY
+open_short / close_short / liquidate / expire: signer and PDA bindings, remaining-account partition, prologue-before-trade, exact sold/bought token deltas, custody funding/refunds, final accounting, exposure close, event CPIs, and rollback.
+sol_settle: evaluate/handler no-op persistence, graduation no-op, arm state stores, ShareEpoch PDA creation, lamport ordering, manual position/exposure close.
+deposit / withdraw / claim_sol: init_if_needed state retention, ShareEpoch loading/stores, memo CPI, transfer authority, pool_vault.reload, vault rent floor, and manual close.
+sweep_trader: trader WSOL ATA close, native/token normalization, rewards_clear snapshot, wipe-record booking and key checks, empty-sweep behavior.
+engine/trader: token_state, base_ata_state, normalise_pdas, sweep_base_ata, close_trader_ata, normalise, open_wsol, wsol_amount, close_wsol, pay_from_trader, post_conditions.
+lamports: move_lamports_above, move_lamports_in_leg, rent_min, excess_over_rent; duplicate source/destination and ownership checks.
+engine/lender: load_records, store_records, reads_rebase, init_if_new, rewards_required, tracked, pay_sol, check_vault_floor, pot_draw.
+engine/prologue: market_now, sync_market_params, accrue, run, refresh_locked_depth, roll_only.
+engine/arming: RiskQuotes, inputs, terms, s3_chain, create_pda_account; risk.rs primitive formula context.
+venues/mod: parse_extras, derive_template, dispatch checks/read wrappers, mint_supply, risk_quoter, pool_denylist, parse, trader_accounts, sell/buy dispatch. Quoter body and most VenueState methods were not fully read.
+PumpCurve: check_read/check_trade, sync and sync_after_leg, exit checks, check_uva, trade_accounts/trade_data/trade_cpi, sell/buy, init_uva. Pricing/read_state implementation was not fully read.
+PumpSwap: cache-write tail, check_read/check_trade and existence helpers, trade_accounts/trade_cpi, sell/buy, init_uva. Pricing/read_state implementation was not fully read.
+Raydium shared: invoke_as_trader, delegate_sell/direct_buy, eligibility/adoption helpers. V4/CPMM: bounded identity checks, selected parser context, swap/sell/buy account composition.
+common/chain: Chain contract, TxError conversion, transaction outcomes and bundle semantics. common/tx: build, signer selection, cu_limit/priority fee, size/fits, decompile/account_keys, parse_lookup_table.
+keeper/ixs: all builders, trade_remaining, read_only/read_only_keys, ABI account lists and extras composition.
+keeper/decide: project, evaluate/evaluate_all, market_needs; compared liquidation/expiry and buyback gates with on-chain plan/assess.
+keeper/graduation: migration keys/migrate_v2_ix, idempotent ATA builder, UVA builders, migration/transition detection and transition_ixs ordering.
+keeper/sweep: SweepFacts, claim_ixs/post_wipe_ixs, sweep_trader_ix and missing-UVA creation order.
+keeper/view: account decoders, with_account_infos, venue_state, mint_supply, open_positions and staged load_with_positions.
+keeper/budget bounded prefix: types, parameters, roll, rank/classify, join/leave/top-up/re-estimate, and admission prefix; settlement/release and later production not read.
+
+DEPENDENCY CONTEXT (outside audited source bundle)
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-lang-1.2.0/src/accounts/account.rs:245-280 — exit_with_expected_owner skips a closed account; name search also located reload and close.
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-lang-1.2.0/src/common.rs:1-21 — close assigns System and resizes zero; is_closed checks System owner plus empty data.
+
+SEARCH-ONLY CONTEXT (not full review)
+Whole bundle rg for sell/buy/swap/invoke/transfer/fund/finish definitions, cfg(test), get_return_data, reload, ignored invoke and .ok() sites.
+Cross-file rg for AIR-20, FITX-1 and borrower-loss references in tests/, services/keeper-litesvm/, and arming.rs. Hits included tests/litesvm/README.md, services/keeper-litesvm/tests/scenarios/freeze.rs, tests/litesvm/tests/pamm_it/lock.rs, and venue attack test files. Test bodies were not reviewed.
+Prompt, Build context, specialist SOP, shared rules/report language, relevant exploit patterns, account-map Review leads and completion notes were read. Some long metadata outputs were truncated; no completeness claim is made for all 61,398 bundle lines.
+
+UNREAD SOURCE AREAS (not reviewed in this pass)
+crates/shortwin-math/src/bounds.rs
+crates/shortwin-math/src/caps.rs
+crates/shortwin-math/src/consts.rs
+crates/shortwin-math/src/error.rs
+crates/shortwin-math/src/fees.rs
+crates/shortwin-math/src/lib.rs
+crates/shortwin-math/src/num/mod.rs
+crates/shortwin-math/src/num/u256.rs
+crates/shortwin-math/src/observe.rs
+crates/shortwin-math/src/params.rs
+crates/shortwin-math/src/persist.rs
+crates/shortwin-math/src/pool.rs
+crates/shortwin-math/src/pool_select.rs
+crates/shortwin-math/src/quote/cpmm.rs
+crates/shortwin-math/src/quote/mod.rs
+crates/shortwin-math/src/quote/pricing.rs
+crates/shortwin-math/src/quote/ray_v4.rs
+crates/shortwin-math/src/quote/reprice.rs
+crates/shortwin-math/src/quote/sol_leg.rs
+crates/shortwin-math/src/quote/straddle.rs
+crates/shortwin-math/src/rent.rs
+crates/shortwin-math/src/settle.rs
+crates/shortwin-math/src/tier.rs
+crates/shortwin-math/src/waterfall.rs
+crates/shortwin-venue-state/src/bytes.rs
+crates/shortwin-venue-state/src/lib.rs
+crates/shortwin-venue-state/src/mint.rs
+crates/shortwin-venue-state/src/program_data.rs
+crates/shortwin-venue-state/src/pump.rs
+crates/shortwin-venue-state/src/pump_amm.rs
+crates/shortwin-venue-state/src/pyth.rs
+crates/shortwin-venue-state/src/raydium_cpmm.rs
+crates/shortwin-venue-state/src/raydium_v4.rs
+crates/shortwin-venue-state/src/token_account.rs
+programs/shortwin/src/constants.rs
+programs/shortwin/src/engine/bounds.rs
+programs/shortwin/src/engine/caps.rs
+programs/shortwin/src/engine/guard.rs
+programs/shortwin/src/engine/mod.rs
+programs/shortwin/src/engine/observe.rs
+programs/shortwin/src/engine/pool_select.rs
+programs/shortwin/src/engine/route.rs
+programs/shortwin/src/engine/tier.rs
+programs/shortwin/src/engine/waterfall.rs
+programs/shortwin/src/errors.rs
+programs/shortwin/src/events.rs
+programs/shortwin/src/instructions/add_margin.rs
+programs/shortwin/src/instructions/apply_config.rs
+programs/shortwin/src/instructions/cancel_config.rs
+programs/shortwin/src/instructions/cover_deficit.rs
+programs/shortwin/src/instructions/crank_price.rs
+programs/shortwin/src/instructions/crank_sol_usd.rs
+programs/shortwin/src/instructions/create_market.rs
+programs/shortwin/src/instructions/disable_venue.rs
+programs/shortwin/src/instructions/execute_pool_switch.rs
+programs/shortwin/src/instructions/flag_unsafe_mint.rs
+programs/shortwin/src/instructions/flag_venue_upgraded.rs
+programs/shortwin/src/instructions/initialize_config.rs
+programs/shortwin/src/instructions/mod.rs
+programs/shortwin/src/instructions/propose_config.rs
+programs/shortwin/src/instructions/propose_pool.rs
+programs/shortwin/src/instructions/revalidate_venue.rs
+programs/shortwin/src/instructions/set_coverage_pause.rs
+programs/shortwin/src/instructions/set_pause.rs
+programs/shortwin/src/instructions/set_route_broken.rs
+programs/shortwin/src/instructions/set_venue_extras.rs
+programs/shortwin/src/instructions/sweep_protocol_fees.rs
+programs/shortwin/src/instructions/sync_lender.rs
+programs/shortwin/src/mint_filter.rs
+programs/shortwin/src/state/config.rs
+programs/shortwin/src/state/epoch.rs
+programs/shortwin/src/state/exposure.rs
+programs/shortwin/src/state/layout_asserts.rs
+programs/shortwin/src/state/lender.rs
+programs/shortwin/src/state/market.rs
+programs/shortwin/src/state/mod.rs
+programs/shortwin/src/state/oracle.rs
+programs/shortwin/src/state/pod.rs
+programs/shortwin/src/state/position.rs
+programs/shortwin/src/state/vault.rs
+programs/shortwin/src/state/venue_extras.rs
+programs/shortwin/src/state/venue_guard.rs
+programs/shortwin/src/venues/detect.rs
+services/keeper/src/coverage.rs
+services/keeper/src/fees.rs
+services/keeper/src/monitor.rs
+services/keeper/src/pda.rs
+services/keeper/src/pool_monitor.rs
+services/keeper/src/venue.rs
+Also unread: all portions outside listed bounded ranges, plus cfg(test) correctness as an audit target.
+
+MATERIAL LIMITS
+No builds, tests, transaction submissions, network/ELF validation, or repository mutations ran. Only the final report/coverage artifacts were written under /tmp.
+No independent exploit was proved in this pass. Economic residuals AIR-20/FITX-1 remain leads because current numeric end-to-end proofs were not reconstructed.
+Actual RPC send/fallback orchestration in services/common/src/rpc.rs and keeper scheduling/batching in services/keeper/src/keeper.rs are outside the supplied source index and were not reviewed; builders/contracts alone do not prove runtime send behavior.
+Token/venue downstream deployed programs were not independently disassembled or audited. The trace checks protocol-owned account validation, pinned CPI destinations, observed deltas, and rollback behavior in the supplied integration code.
+No line outside the full/bounded coverage above is claimed reviewed merely because a search returned it.

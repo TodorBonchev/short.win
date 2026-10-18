@@ -371,13 +371,17 @@ fn deficit_tripwire_on_fuzz_m7_24h_3() {
 }
 
 /// M10 (FUZZ-M10-24H-A, KI-65): the wind-down's second claim pass leaves exactly ECON §9.4's
-/// I-P6 residue — rounding — and the final-tree 24 h runs' reproducers pass. On CPMM the last
-/// lender, its shares all withdrawn, stays owed more than `CLAIM_DUST` of the accumulators'
-/// carry while none of its realised SOL is left and the pot is empty (`wind-down-owed-rounding`:
-/// 2,149 lamports; since AIR-07's vest flush the recorded list left 943, so its action 45 now
+/// I-P6 residue — rounding — and the final-tree 24 h runs' reproducers pass. Before 1.0.3,
+/// the last CPMM lender, its shares all withdrawn, stayed owed more than `CLAIM_DUST` of the
+/// accumulators' carry with no realised allocation left and an empty pot
+/// (`wind-down-owed-rounding`: 2,149 lamports; since AIR-07's vest flush the recorded list left
+/// 943, so its action 45 now
 /// sells; since AI2's stale-EMA guard a fresh observation precedes its first late
 /// `stale_receivable` open; AI2's dust-source gate now requires an explicit trader sweep before
-/// the original action 60 deposit). The rebase-orphan credit the oracle used to accept above the hooks'
+/// the original action 60 deposit). The 1.0.3 last-exit payout clears both carries and returns
+/// realised surplus to the pot: the unchanged corpus now leaves nobody unpaid and only
+/// 9 lamports in the vault. Pin that recovery, with leftover SOL bounded by `CLAIM_DUST`.
+/// The rebase-orphan credit the oracle used to accept above the hooks'
 /// dust cap (`wind-down-orphan-credit`) is gone with KI-65's cumulative conversion (ECON
 /// §9.5): on the curve corpus file, and on run B's three largest cases — 19,131,900,419 lamports
 /// left on the mock, 890,963,742 on CPMM, 552,350,825 on PumpSwap, each with `S = 1` orphan
@@ -412,11 +416,17 @@ fn wind_down_residue_on_fuzz_m10_24h_a() {
     };
     let c = read("corpus/fuzz-m10-24h-a-cpmm-carry-owed.json");
     let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
-    assert!(
-        check("cpmm-carry-owed", &o) > 0,
-        "no `wind-down-owed-rounding`"
+    assert_eq!(
+        check("cpmm-carry-owed", &o),
+        0,
+        "the final carry payout must retire the previously unpaid entitlement"
     );
-    assert!(o.stats.wind_down_unpaid_max > CLAIM_DUST);
+    assert_eq!(o.stats.wind_down_unpaid_max, 0);
+    assert!(
+        o.stats.wind_down_lender_sol_max <= CLAIM_DUST,
+        "whole carry must be paid, not merely stranded: {} lamports remain",
+        o.stats.wind_down_lender_sol_max
+    );
     let c = read("corpus/fuzz-m10-24h-a-curve-orphan-credit.json");
     let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
     check("curve-orphan-credit (KI-65)", &o);

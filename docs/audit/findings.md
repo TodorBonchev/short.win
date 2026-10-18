@@ -49,6 +49,86 @@ Status is one of: open, in progress, fixed, acknowledged, duplicate of KI-n, inv
 | AIR2-13 | Keeper receives zero after rent-first liquidation | — | not assessed | `waterfall::liquidate` | open | — | `ai2_accounting`: rent exhaustion | pending | Zero keeper payout reproduced; economic liveness and priority/reserve policy remain open, not automatically accepted under KI-03. |
 | AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | — | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | pending | 670,224 versus 336,779 raw tokens in the loss-control case, beyond KI-13. Draft cap uses the value of unlocked shares. |
 | AIR2-P2-02 | Pot pays a first claimant against unpaid receivable | — | not assessed | `pool::claim` | open | — | `ai2_accounting`: receivable/pot allocation | pending | 75/25 SOL split from 100 SOL repayment with 100 SOL still receivable; report’s proposed current-share subtraction does not repair it. Historical entitlement design remains unresolved. |
+| AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` / `withdraw_in` | open | — | Independent public-API legacy-state probe | Q1 conditional | Pre-fix S=0 state with 1,000 lamports in both carries pays the next cohort 1,001 after only 1 new lamport. New withdrawal reset does not migrate existing empty pools. No affected deployment asserted; requires inventory proof or an ownership-preserving migration. [Review](ai-review-3/independent-accounting-1.0.3.md), [treatment](ai-review-3/unresolved-1.0.3.md). |
+
+## AI review 3: draft 1.0.3 (2026-10-18)
+
+The [immutable audit archive](ai-review-3/README.md) covers `b815269`, the preceding
+draft 1.0.2 source. Two passes produced eight findings and 23 leads; all findings have
+confidence 75, **not a severity rating**. One first-pass specialist failed and second-pass
+coverage was narrower. The [31-item triage](ai-review-3/triage.md) gives every item a
+decision and prior-issue relationship. This follow-up does not certify that every lead is
+exploitable or that the remaining program is safe.
+
+| ID | Draft action / disposition | Status | Evidence |
+|---|---|---|---|
+| AI3-F01 | Use `min(P_ema, P_candidate)` for the keeper window floor, matching the program | in progress | Candidate-price regressions in `pool_monitor` |
+| AI3-F02 | Continue searching after a candidate-specific floor failure, including an existing window chain | in progress | Deeper failing / shallower passing candidate regressions |
+| AI3-F03 | Resolve PumpSwap coin-creator placeholder 4 from the cached creator | in progress | Current/previous extras and stable cached-key regression in `venue` |
+| AI3-F04 | Multiply the raw locked LP fraction before rounding SOL depth | in progress | Sub-basis-point positive-depth and current-supply regression |
+| AI3-F05 | Refresh the pool LP counter with the vault and LP mint, in complete groups of at most 99 accounts | in progress | Pool-34 boundary and production keeper ranking scenarios |
+| AI3-F06 | Assign whole-lamport entitlement and realised carries to the final departing lender, normalize surplus and clear both carries | in progress | `pool_carry` conservation and real-transaction `lender_it` regressions |
+| AI3-F07 | Existing unsigned successor-key behavior | duplicate of KI-70 | AIR-04 / AIR2-06 and owner decision of 2026-10-12; no new bound |
+| AI3-F08 | Existing hashless ProgramData extension latch | duplicate of KI-69(a) | AIR-01 residual; retain immediate hashed bootstrap and revalidation procedure |
+| AI3-L01 | Reject an ALT shorter than its complete metadata header | in progress | `tx::tests::lookup_tables_require_the_complete_metadata_header` fails before / passes after |
+| AI3-L03 | Reject unsupported versions at the keeper's typed account readers | in progress | Typed-reader regressions in `view` |
+| AI3-L04 | Preserve all pending rank candidates until every RPC group succeeds | in progress | First/second-group failure and successful retry without rediscovery |
+
+These rows describe draft implementations, not the tracker’s strict **fixed** state.
+Exact-ref full CI passed on `9b91060`; the 2026-10-19 independent AI fix review accepts
+Q2/Q3/Q4 and conditionally accepts Q1, retaining the newly identified legacy migration
+finding AI3-FR01. The 24-hour fuzz and full release conditions remain open.
+There is no release tag or deployment. The earlier
+AIR-01 … AIR-24 fuzz waiver does not cover this batch. The package and its lock entries
+are 1.0.3; account layouts, instruction formats and program identity are unchanged.
+
+The remaining 20 leads have explicit dispositions in the triage register. Existing
+canonical-key and creation constraints block the account-substitution hypotheses in
+L07/L11/L14/L17; their omitted defense-in-depth checks remain documented. L09 depends
+on a future writer persisting a non-open position. Economic and venue-fee leads remain
+open where their production trigger or bound is incomplete. In particular, no draft
+change relaxes the deposit hold (L10), changes pot entitlement (AIR2-P2-02), or treats
+the one-lamport sync truncation trace (L23) as a solved accounting problem. Full-digest
+guard migration (AIR2-07), creator/risk fees and exit budgets (AIR2-10/11), cashback
+recovery (AIR2-12), and keeper incentives (AIR2-13) remain open.
+
+### Independent fix review and unresolved treatment (2026-10-19)
+
+The [independent review](ai-review-3/independent-fix-review-1.0.3.md) identifies the
+candidate and verified CI artifacts, source comparisons, newly executed checks and each
+packet answer. Q2 accepts F01–F05, Q3 accepts L03/L04 and Q4 accepts L01. Q1 accepts
+F06's post-fix final-withdrawal behavior only conditionally for an upgrade: an already-empty
+pre-fix pool is not migrated (AI3-FR01). This is independent AI review work, not an
+external firm's sign-off or a full-system audit. Implemented rows remain **in progress**.
+
+The [written treatment](ai-review-3/unresolved-1.0.3.md) and
+[known-issues §8](known-issues.md#8-open-items-from-the-103-fix-review) cover the six
+prior open findings, all 20 unimplemented review-3 leads, and the carry allocation/migration
+boundaries. They give the evidence limits, rationale and completion requirements. None is
+newly **acknowledged**, and no older KI acceptance is broadened. Release still requires
+resolution or explicit owner sign-off on the exact residuals, the final-program ≥24 h fuzz
+evidence and the remaining integrated-revision gates.
+
+### Carry ownership at the final withdrawal
+
+Both accumulator carries hold value not yet assigned to individual lenders. At high raw
+token/share supplies they can contain whole lamports; retaining them after `S = 0`
+lets a later cohort receive the preceding cohort's income. The draft first flushes the
+vest and touches the final lender, assigns `carry / WAD` to pending and `carry_r / WAD`
+to realised SOL, then normalizes any realised surplus into the existing unmatched pot.
+It clears both carries and adds only their sub-lamport remainders to diagnostic dust.
+Existing zero-share lenders keep their allocated pending claims and backing. This follows
+the existing final-holder vest rule; it does not reconstruct historical pro-rata ownership
+of unallocated carry among lenders who left earlier. Partial withdrawals,
+rebase records and the prohibition on removing all shares while tokens remain borrowed
+retain their existing behavior. This is not a redesign of the historical pot policy.
+
+The regression against the previous release ELF completes two cohorts with signed
+deposits/withdrawals and actual System donations plus permissionless trader sweeps. It
+fails because the departing lender receives 1,000,000 instead of 1,001,000 lamports;
+the next cohort receives the missing 1,000. Unit negative controls also fail for carry
+mismatches and sub-lamport residue handling. Implementation checks and final-code gate
+evidence are separated in the [1.0.3 validation record](ai-review-3/validation-1.0.3.md).
 
 ## AI review 2 working-tree batch (2026-10-18)
 
@@ -129,12 +209,12 @@ Canonical `anchor build --tools-version v1.57 --arch v3 --ignore-keys` and
 These earlier 1.0.1-versioned test artifacts are superseded by the broader 1.0.2 candidate.
 They are not verifiable-build evidence or hashes of the current working tree.
 
-### Current draft 1.0.2 validation
+### Draft 1.0.2 validation (historical)
 
 After the broader fixes and the legacy/split-claim source-accounting follow-up, the canonical
 builds produced these local artifacts. AUDIT §0 records their sizes and executable hashes.
 
-| Current local artifact | SHA-256 |
+| Historical local artifact | SHA-256 |
 |---|---|
 | `target/deploy/shortwin.so` | `a6ecd6f763f9549eee5913a08d57effbcd69dd312d59217a44cc386f03e62b5e` |
 | `target/test-venue/deploy/shortwin.so` | `7449c9917d63652a7d36b9cded09a8c26137f38ce9c1513dfb7ed0d19f1505e7` |

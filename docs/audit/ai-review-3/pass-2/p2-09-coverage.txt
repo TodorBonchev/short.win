@@ -1,0 +1,190 @@
+Pass 2, specialist 9: account validation
+Repository: /home/todor_dev/Projects/short.win
+Frozen commit supplied by the orchestrator: b815269224ba0f5d946f49de7e113220c4067041
+Review completed. Raw result: 2 FINDING blocks and 6 LEAD blocks.
+All reported blocks reuse the exact known-appendix labels for the same causes.
+No new exploitable account-substitution path was proved in the bounded review.
+
+METHOD AND LIMITS
+I read production source from the frozen bundle. I used repository rg only for cross-file locations and pattern checks.
+I did not read the entire 61,619-line bundle or claim complete coverage of its 58,914-line source portion.
+I made no repository edits, builds, tests, runtime reproductions, transactions, or subagent requests.
+The report's unified diffs were generated from frozen text and remain unapplied and uncompiled.
+Initial combined outputs exceeded the tool display budget. I then reread the required rule ranges and the audited production ranges in bounded outputs.
+The ranges below record explicit production-source reads. A range can include adjacent test or comment context; tests are not the basis of findings.
+Coverage is account-boundary coverage, not a complete economic, timing, or numerical audit of a fully read file.
+Build context checked: Anchor/anchor-spl 1.2.0; root release overflow checks ON; services has no release override.
+Instructions/SOP checked: assigned pass-2 notes and prompt, account-validation specialty, shared output and language rules, review-leads table, source index, known-findings appendix.
+Catalogue entries read: P1-P3, P7, P9, B1-B9, B12-B13, B20-B26. Other catalogue entries were search/navigation context only.
+
+EXPLICIT DISPOSITION OF THE 12 NO-SIGNER MAP LEADS
+1. apply_config — The public executor is intentional (apply_config.rs:1). The canonical config holds a proposal authorized by governance Signer and equality constraints in propose_config.rs:19-27. apply_config.rs:57-81 requires a pending proposal, elapsed timelock, expiry window, and valid change. The caller cannot supply new change data. Disposition: no executor-authorization bypass. A separate successor-acceptance defect is reported as unsafe-authority-transfer.
+2. crank_price — The public market prologue is intentional (crank_price.rs:1). The config, market, and oracle cache have owner/discriminator and PDA checks. Market has_one mint and the handler's mint owner check bind the raw mint (crank_price.rs:62-93). venues::parse checks ordered cached remaining-account keys and exact lengths. Clock::get supplies time. Disposition: public maintenance, no missing authority signature proved.
+3. crank_sol_usd — Anyone may refresh the price (crank_sol_usd.rs:1). Config and cache PDAs are fixed. The raw update is constrained to config.pyth_sol_usd and PYTH_RECEIVER_ID; pyth::read and pyth::check validate the update and freshness before the cache write (crank_sol_usd.rs:49-115). The lower-level Pyth implementation was not separately audited in this pass. Disposition: public authenticated-data refresh, no signer defect proved.
+4. execute_pool_switch — Anyone may resolve an elapsed collection window (execute_pool_switch.rs:1). It checks the canonical market/config/guard/cache, token owner, due time, incumbent keys, exact candidate count, every cached fp_key, fresh candidate verification, eligibility, floor, position fit, and latch (execute_pool_switch.rs:148-278). Disposition: public constrained state transition, no missing signer.
+5. flag_unsafe_mint — The persistent tripwire is public (flag_unsafe_mint.rs:1). The market PDA and has_one mint prevent substitution. The flag is written only when the authentic mint has a different owner or check_mint_safety fails; a safe mint returns MintSafe (flag_unsafe_mint.rs:42-57). The lower-level mint filter was not fully audited here. Disposition: public evidence-based flag, no signer defect.
+6. flag_venue_upgraded — Public flagging is intentional (flag_venue_upgraded.rs:1). The guard PDA/version/index and the ProgramData's compile-time key, loader owner, and tag constrain the input (flag_venue_upgraded.rs:48-74). No administrator's identity is impersonated. Disposition: no missing-signer class confirmed. The authentic input's permissionless slot mutation is a distinct proved defect, reported as unhashed-slot-upgrade-latch.
+7. pump_amm::init_uva — This is an internal helper, not an exposed instruction. Its only reviewed production caller is pump_listing from create_market. CreateMarket.creator is a mutable Signer (create_market.rs:192). The helper pins the executable PumpSwap program, expected derived UVA, and event authority. Its CPI marks payer signer; invoke_signed(..., &[]) adds no PDA signer group (pump_amm.rs:1139-1190). Disposition: no signer omission. Existing-UVA validation is reported separately.
+8. pump_curve::init_uva — The same internal create_market signer path applies. The helper pins Pump, the derived UVA, and event authority. It marks payer signer and supplies no PDA signer group (pump_curve.rs:1025-1076). Disposition: no signer omission. Existing-UVA validation shares the init_uva hardening lead.
+9. propose_pool — The source explicitly permits any caller (propose_pool.rs:1-14). The canonical market/config/guard/cache and mint owner are checked. The incumbent/detection set is keyed; the candidate is verified through the Raydium readers; adoption/window rules, pool inequality, latch, floor, and position fit constrain writes (propose_pool.rs:165-350). Disposition: public constrained selection, no signer omission.
+10. pump_listing — This is an internal function that receives CreateMarket, whose creator is already a Signer (create_market.rs:430-476). Its idempotent ATA creation uses the creator as payer, the derived trader as authority, the checked mint and program, and then validates the token account. It passes that same signed payer to init_uva. Disposition: false native-handler match, no missing signer.
+11. sweep_protocol_fees — The source authorizes anyone to trigger a transfer to the configured fee recipient (sweep_protocol_fees.rs:1). It constrains market and vault PDAs, market.has_one vault, and fee_recipient.address = config.fee_recipient. It debits only tracked fees and preserves rent plus lender SOL (sweep_protocol_fees.rs:30-94). The caller cannot choose the payout destination. Disposition: intentional public execution, no signer omission.
+12. sweep_trader — The public recovery is explicit (sweep_trader.rs:1). Market/vault PDAs and has_one fields bind trader accounts; the WSOL ATA and every remaining token leg key match cache entries. normalise_pdas requires empty System accounts and signs only the market-specific trader seeds. Token-side sweeps validate token mint, authority, delegates, close authority, and freeze state; epoch records have owner/discriminator/market/PDA checks. All proceeds go to market accounting, not the caller (sweep_trader.rs:184-417; engine/trader.rs:138-280). Disposition: no missing authority signature. External reward recovery remains a separate lead.
+
+OTHER ACCOUNT BOUNDARIES REVIEWED
+- initialize_config requires shortwin's own loader-derived ProgramData and its recorded upgrade-authority Signer. Canonical init bumps are stored; a third party cannot select singleton governance at first use.
+- create_market binds the market and custody accounts to the mint, checks the detection-set keys, verifies Raydium candidates, and creates the pool vault through a prefunding-tolerant allocate/assign path. Pump base ATA creation is idempotent.
+- Remaining venue parsing enforces segment sizes and ordered keys. Extras load the program-owned VenueExtras account, check its discriminator/version/venue/PDA, bound count, enforce expected keys and exact writability, reject signers and shortwin-owned accounts, and apply instruction/pool denylists.
+- Extra-template bumps must be canonical: derive_template rejects every caller bump when a higher off-curve bump exists. Governance templates are not attacker-supplied seed programs.
+- The reviewed open/close/keeper-exit denylists cover protocol custody, positions, exposure, trader, and borrower accounts. Extra CPI metas always set is_signer = false.
+- Pump and Raydium trade lists pin program IDs and executable venue programs. The internal listing CPI forwards only its explicit payer signature. Empty invoke_signed seed lists do not create a global signer.
+- load_records checks shortwin owner, ShareEpoch discriminator, market, PDA derived from stored epoch/bump, and consecutive epochs. Duplicate epoch entries fail the consecutive-epoch test. store_records checks writable and bounds its 16-byte store.
+- ShareEpoch uses Borsh, not repr(C). conv_rem starts at 8 + 32 + 4 + 5*16 + 3 = 127 and ends at 143. The direct store matches its serialized layout.
+- sol_settle's new ShareEpoch address is canonical, requires empty System-owned input, and is created before direct payouts. Only its account-boundary portions were read; its settlement mathematics were not audited.
+- sync_lender binds owner by lender seeds and has_one, reads is_signer at runtime, and permits the public branch only through touch_pot plus the no-rebase/no-record-change postcondition.
+- Close destinations are tied to position.borrower. Anchor 1.2.0 close assigns System ownership and clears data, so the reviewed close paths do not preserve a usable old account after refunding it.
+- The reviewed Clock and Rent inputs use their get() sysvar APIs. No caller-supplied unvalidated instructions sysvar was reached.
+
+FULL SOURCE FILES EXPLICITLY READ
+programs/shortwin/src/instructions/add_margin.rs:1-104
+programs/shortwin/src/instructions/apply_config.rs:1-124
+programs/shortwin/src/instructions/cancel_config.rs:1-58
+programs/shortwin/src/instructions/close_short.rs:1-355
+programs/shortwin/src/instructions/crank_price.rs:1-266
+programs/shortwin/src/instructions/crank_sol_usd.rs:1-138
+programs/shortwin/src/instructions/deposit.rs:1-209
+programs/shortwin/src/instructions/execute_pool_switch.rs:1-275
+programs/shortwin/src/instructions/expire.rs:1-194
+programs/shortwin/src/instructions/flag_unsafe_mint.rs:1-67
+programs/shortwin/src/instructions/flag_venue_upgraded.rs:1-158
+programs/shortwin/src/instructions/initialize_config.rs:1-196
+programs/shortwin/src/instructions/propose_config.rs:1-51
+programs/shortwin/src/instructions/propose_pool.rs:1-347
+programs/shortwin/src/instructions/revalidate_venue.rs:1-122
+programs/shortwin/src/instructions/sweep_protocol_fees.rs:1-93
+programs/shortwin/src/instructions/sweep_trader.rs:1-414
+programs/shortwin/src/instructions/sync_lender.rs:1-162
+programs/shortwin/src/state/epoch.rs:1-135
+programs/shortwin/src/state/venue_guard.rs:1-163
+
+BOUNDED SOURCE RANGES EXPLICITLY READ
+crates/shortwin-math/src/pool.rs: 1999-2042
+programs/shortwin/src/engine/guard.rs: 1-93, 103-156
+programs/shortwin/src/engine/lender.rs: 1-248
+programs/shortwin/src/engine/trader.rs: 1-281
+programs/shortwin/src/instructions/create_market.rs: 1-649
+programs/shortwin/src/instructions/liquidate.rs: 71-202, 489-577
+programs/shortwin/src/instructions/open_short.rs: 1-297
+programs/shortwin/src/instructions/sol_settle.rs: 64-229, 344-550
+programs/shortwin/src/state/config.rs: 103-233, 723-848
+programs/shortwin/src/state/market.rs: 477-502
+programs/shortwin/src/state/position.rs: 1-61, 156-179
+programs/shortwin/src/venues/mod.rs: 114-297, 929-1004, 1199-1469
+programs/shortwin/src/venues/pump_amm.rs: 394-624, 779-809, 1119-1204
+programs/shortwin/src/venues/pump_curve.rs: 308-421, 1008-1081
+programs/shortwin/src/venues/raydium_cpmm.rs: 112-235, 335-467
+programs/shortwin/src/venues/raydium_v4.rs: 104-192, 242-360
+
+Total explicitly displayed Rust source lines in the union above: 7791.
+
+SEARCH-ONLY AREAS AND INCIDENTAL CODE
+Whole-bundle searches located functions, headings, status writes, authority assignments, remaining-account validators, and known labels.
+Repository cross-file rg confirmed location anchors in the reviewed instruction/state/venue files.
+No complete program-wide sysvar/CPI inventory was claimed from these searches.
+math_tiers allocation helpers appeared adjacent to Pump account validators. Their fee-state decoder limits were not followed in this account review.
+The economic implementations behind crank_price, pool selection, sync_lender, settlement, risk quotes, and vesting were not audited except the cited deposit reward-bit gate.
+
+UNREAD PRODUCTION FILES (A SEARCH HIT IS NOT A PRODUCTION READ)
+crates/shortwin-math/src/bounds.rs
+crates/shortwin-math/src/caps.rs
+crates/shortwin-math/src/consts.rs
+crates/shortwin-math/src/error.rs
+crates/shortwin-math/src/fees.rs
+crates/shortwin-math/src/lib.rs
+crates/shortwin-math/src/num/mod.rs
+crates/shortwin-math/src/num/u256.rs
+crates/shortwin-math/src/observe.rs
+crates/shortwin-math/src/params.rs
+crates/shortwin-math/src/persist.rs
+crates/shortwin-math/src/pool_select.rs
+crates/shortwin-math/src/quote/cpmm.rs
+crates/shortwin-math/src/quote/mod.rs
+crates/shortwin-math/src/quote/pricing.rs
+crates/shortwin-math/src/quote/ray_v4.rs
+crates/shortwin-math/src/quote/reprice.rs
+crates/shortwin-math/src/quote/sol_leg.rs
+crates/shortwin-math/src/quote/straddle.rs
+crates/shortwin-math/src/rent.rs
+crates/shortwin-math/src/risk.rs
+crates/shortwin-math/src/settle.rs
+crates/shortwin-math/src/tier.rs
+crates/shortwin-math/src/waterfall.rs
+crates/shortwin-venue-state/src/bytes.rs
+crates/shortwin-venue-state/src/lib.rs
+crates/shortwin-venue-state/src/mint.rs
+crates/shortwin-venue-state/src/program_data.rs
+crates/shortwin-venue-state/src/pump.rs
+crates/shortwin-venue-state/src/pump_amm.rs
+crates/shortwin-venue-state/src/pyth.rs
+crates/shortwin-venue-state/src/raydium_cpmm.rs
+crates/shortwin-venue-state/src/raydium_v4.rs
+crates/shortwin-venue-state/src/token_account.rs
+programs/shortwin/src/constants.rs
+programs/shortwin/src/engine/arming.rs
+programs/shortwin/src/engine/bounds.rs
+programs/shortwin/src/engine/caps.rs
+programs/shortwin/src/engine/mod.rs
+programs/shortwin/src/engine/observe.rs
+programs/shortwin/src/engine/pool_select.rs
+programs/shortwin/src/engine/prologue.rs
+programs/shortwin/src/engine/route.rs
+programs/shortwin/src/engine/tier.rs
+programs/shortwin/src/engine/waterfall.rs
+programs/shortwin/src/errors.rs
+programs/shortwin/src/events.rs
+programs/shortwin/src/instructions/claim_sol.rs
+programs/shortwin/src/instructions/cover_deficit.rs
+programs/shortwin/src/instructions/disable_venue.rs
+programs/shortwin/src/instructions/mod.rs
+programs/shortwin/src/instructions/set_coverage_pause.rs
+programs/shortwin/src/instructions/set_pause.rs
+programs/shortwin/src/instructions/set_route_broken.rs
+programs/shortwin/src/instructions/set_venue_extras.rs
+programs/shortwin/src/instructions/withdraw.rs
+programs/shortwin/src/lamports.rs
+programs/shortwin/src/lib.rs
+programs/shortwin/src/mint_filter.rs
+programs/shortwin/src/state/exposure.rs
+programs/shortwin/src/state/layout_asserts.rs
+programs/shortwin/src/state/lender.rs
+programs/shortwin/src/state/mod.rs
+programs/shortwin/src/state/oracle.rs
+programs/shortwin/src/state/pod.rs
+programs/shortwin/src/state/vault.rs
+programs/shortwin/src/state/venue_extras.rs
+programs/shortwin/src/venues/detect.rs
+programs/shortwin/src/venues/raydium.rs
+services/common/src/chain.rs
+services/common/src/tx.rs
+services/keeper/src/budget.rs
+services/keeper/src/coverage.rs
+services/keeper/src/decide.rs
+services/keeper/src/fees.rs
+services/keeper/src/graduation.rs
+services/keeper/src/ixs.rs
+services/keeper/src/monitor.rs
+services/keeper/src/pda.rs
+services/keeper/src/pool_monitor.rs
+services/keeper/src/sweep.rs
+services/keeper/src/venue.rs
+services/keeper/src/view.rs
+
+DEPENDENCY SOURCE READS
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-lang-1.2.0/src/accounts/account_loader.rs:110-205
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-lang-1.2.0/src/accounts/signer.rs:40-65
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-lang-1.2.0/src/common.rs:1-21
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-spl-1.2.0/src/token_interface.rs:1-65
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-bpf-loader-program-4.2.2/src/lib.rs:780-1010
+/home/todor_dev/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-loader-v3-interface-6.1.1/src/instruction.rs:170-225
+These reads confirmed loader authority behavior, signer enforcement, account owner/discriminator checks, token interface ownership, and close semantics.
+No dependency executable or deployed ELF was run.

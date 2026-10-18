@@ -646,6 +646,13 @@ export async function crankPrice(m: MarketInfo): Promise<Signature> {
     return send(await signerFor('payer'), [{ ...crank, accounts: [...crank.accounts, ...mockReadSet(m)] }]);
 }
 
+/** Complete an honest, current price bucket before a browser open on a long-lived seeded market. */
+export async function freshOpenPrice(m: MarketInfo): Promise<void> {
+    await crankPrice(m);
+    await waitForClock((await marketAccount(m)).bSec + 1n);
+    await crankPrice(m);
+}
+
 /**
  * `open_short` once the market admits it (after a gap the EMA must come within
  * `open_ema_dev_bps` of the spot): a crank, then the open, every 2 s until it lands or

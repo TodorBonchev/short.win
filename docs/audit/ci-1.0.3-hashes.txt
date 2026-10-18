@@ -1,0 +1,19 @@
+Draft 1.0.3 exact-ref build artifacts (unreleased)
+candidate commit: 9b910602ed076a6d4359c496960b3ffc0e7c6af8
+CI: https://github.com/TodorBonchev/short.win/actions/runs/39144291500
+event: workflow_dispatch; attempt: 1
+conclusion: success; 25 jobs passed, 1 scheduled fuzz job skipped, 0 failed
+solana-verify: 0.5.2
+image: solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f
+args: --arch v3 --cargo-build-sbf-args="--tools-version v1.57"
+
+# artifact  SHA-256(file)  executable-hash(trailing zeros trimmed)  bytes
+release shortwin.so  b88aa520c24301522b45871e73622a4d498603dc03a8f34ff8bbb557d7fa0647  22d1cda5be8eaae7aa00f45b8a17f64edfb5b4d84d21e3f7ad545f966b83ea1a  1642664
+test-venue shortwin.so  994ad12c468f465937af21080ec3c48678bb1f197ab143ab44f91f98ca56132b  282998677eea81be8b7711c79177e0424ed8544db3cec28d1ba4289f5e43c682  1673696
+mock_cpamm.so  4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9  -  281240
+
+The CI verifiable-build job reported this commit and reproduced the release file and
+executable hashes. Its downloaded ELF compares byte-for-byte equal to the release ELF
+downloaded from this run's anchor-build job. The test-venue and mock file hashes above
+were measured from that anchor-build artifact; no verifier build covers those test-only
+artifacts. The earlier local canonical build has the same file hashes and byte sizes.

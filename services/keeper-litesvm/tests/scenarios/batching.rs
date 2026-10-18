@@ -89,14 +89,17 @@ fn a_cluster_without_v1_gets_v0_batches_of_four() {
 fn a_failing_crank_is_dropped_from_its_batch_and_sent_alone() {
     let (mut h, mms) = setup(3, KeeperConfig::default());
     seven_markets(&h, &mms);
-    // Corrupt the middle market's layout version: its crank fails (`ConfigVersion`).
+    // Corrupt the middle market's PDA bump: it still loads, but its crank fails
+    // (`ConstraintSeeds`). Unsupported layout versions are rejected before batching.
     let bad = mms[1].market();
     h.with_env(|env| {
         let mut acc = env.svm.get_account(&bad).unwrap();
-        acc.data[8] = 99;
+        let bump = 8 + core::mem::offset_of!(shortwin::state::Market, bump);
+        acc.data[bump] ^= 1;
         env.svm.set_account(bad, acc).unwrap();
     });
     let r = h.second().clone();
+    assert!(r.errors.is_empty(), "{:?}", r.errors);
     let mut cranked = r.cranked.clone();
     cranked.sort();
     let mut want = vec![mms[0].market(), mms[2].market()];
@@ -104,8 +107,13 @@ fn a_failing_crank_is_dropped_from_its_batch_and_sent_alone() {
     assert_eq!(cranked, want, "{r:?}");
     assert_eq!(r.batches.len(), 1);
     assert_eq!(r.batches[0].markets.len(), 2);
+    assert_eq!(r.crank_failed.len(), 1, "{:?}", r.crank_failed);
+    assert_eq!(r.crank_failed[0].0, bad);
+    let seeds_error = anchor_lang::error::ErrorCode::ConstraintSeeds as u32;
     assert!(
-        r.crank_failed.iter().any(|(k, _)| *k == bad),
+        r.crank_failed[0]
+            .1
+            .contains(&format!("code: {seeds_error}")),
         "{:?}",
         r.crank_failed
     );

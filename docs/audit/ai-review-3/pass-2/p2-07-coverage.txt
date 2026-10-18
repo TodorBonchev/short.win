@@ -1,0 +1,61 @@
+Pass 2 specialist 7 / first principles — bounded static review completed.
+Frozen repository commit: b815269224ba0f5d946f49de7e113220c4067041.
+Output: /tmp/shortwin-audit-results-20261018/p2-07-first-principles.md.
+Counts: 5 FINDING blocks; 3 LEAD blocks.
+
+Work limits observed:
+- No repository edits, builds, tests, runtime reproduction, network interaction, or subagents.
+- Only the two requested /tmp artifacts were written.
+- Proposed unified diffs were generated from in-memory text replacements. They remain unapplied and uncompiled.
+- No full-bundle coverage claim. The bundle has 58,914 source/manifests lines plus audit material; most source was not read.
+- Root release overflow checks are on; services has no override. No finding relies on an assumed arithmetic profile.
+
+Full production portions read:
+- services/keeper/src/pool_monitor.rs:1-747 (all before #[cfg(test)]); bundle 55170-55920. A small test prefix was context only.
+- services/keeper/src/decide.rs:1-540 (all before #[cfg(test)]); bundle 52003-52546.
+- services/keeper/src/view.rs: complete production file; bundle 58520-58914.
+- services/common/src/chain.rs: complete production portion; bundle 47872-48187 also exposed tests as context.
+- programs/shortwin/src/instructions/propose_pool.rs: complete production file; bundle 34164-34516.
+- programs/shortwin/src/venues/detect.rs: production portion before #[cfg(test)]; bundle 41054-41485 also exposed test context.
+- crates/shortwin-math/src/pool_select.rs: production portion before #[cfg(test)]; bundle 11028-11260 also exposed a test prefix.
+
+Other bounded source reads, not whole-file coverage:
+- programs/shortwin/src/engine/pool_select.rs: bundle 25173-25800, through adoption logic. Read decide, reference_price, window_floor_ok, window_price, carried_caps, carried_fit, window bookkeeping and adopt. Later test/code ranges not systematically reviewed.
+- services/keeper/src/venue.rs: bundle 57815-57935 (extras resolution and candidate selection); 57550-57675 (creator preparation and account requirements). An earlier 57182-57770 request was truncated in aggregate output: only visible portions were considered, and it is not credited as complete coverage.
+- programs/shortwin/src/venues/mod.rs: bundle 41610-41675 (Placeholders and parse_extras prefix), 42745-42805 (trade parser and cached coin creator), 42500-42670 (read dispatch, exit/open wrappers and risk fallback), 42000-42125 (curve pricing-stage representation and pricing setup).
+- programs/shortwin/src/venues/pump_curve.rs: bundle 45205-45475 (parse_curve, math_tiers, pricing_inputs, read_state, sync prefix). Fee-tier allocation, fixed supply and external fee schedules were not fully investigated; no separate conclusion on those mechanisms.
+- crates/shortwin-math/src/risk.rs: bundle 14078-14485 (production through fair-value/keeper-reward vicinity). Checked the apparent sigma versus sigma_xy divergence: sigma_xy calls sigma with the same floored price, so no discrepancy was established.
+- programs/shortwin/src/instructions/liquidate.rs: source 320-385 and 549-615 for assess and read/prologue order; the whole instruction was not reviewed.
+
+Out-of-bundle caller/backend context read:
+- services/keeper/src/keeper.rs:3150-3385 (select_market ranking/evaluation and action gating). The outer tick recovery loop and the rest of the large file were not reviewed.
+- services/common/src/rpc.rs:130-215,255-292; searches identified MULTIPLE_ACCOUNTS_MAX=100 at :49 and account read chunks at :265. No claim of full RPC backend review.
+- services/keeper/src/config.rs:350-400 and 608-628; confirmed default max_candidates=8, rank_keys_per_tick=200, rediscovery intervals and validation.
+
+Search-only / partial context:
+- rank_keys, score, next_rank_batch, evaluate call sites across services/keeper/src/*.rs.
+- read_state_boxed_for_exit, risk_quoter, assess call sites in liquidate, expire and sol_settle.
+- PLACEHOLDER_COIN_CREATOR and coin_creator occurrences in venues/mod.rs and state/venue_extras.rs.
+- cached helper and cache names in venues/pump_amm.rs.
+- read_base/supply symbol locations in shortwin-venue-state/src/mint.rs; the mint parser was not audited.
+- max_liq_slip_bps and selected risk/price symbols in params/config/venues.
+- Five source files were reread in memory only to generate exact unified diffs; this is not additional semantic coverage.
+
+Audit materials read:
+- /tmp/shortwin-audit-pass2-agent-notes.txt and p2-agent-7-prompt.txt.
+- Bundle build-context portion 1-260; full source-index.tsv.
+- Senior mindset and specialist instructions, shared output/grouping/language rules via bounded reads around 58915-59335 and 59085-59112. One large initial combined request truncated; later focused reads recovered the output and report-language requirements.
+- Known-findings appendix via tail read through 61531; exact keys retained for every reported known cause.
+- Review-leads table 60003-60096 and visible account-map completion notes from tail read. propose_pool's no-signer and market PDA entries were not findings: the instruction explicitly permits anyone, and the market is keyed to the mint.
+- Relevant exploit catalogue entries P2/P3, B3/B13/B14/B18/B25 and B15 context. No claim of full catalogue or complete account-map review.
+
+Report conclusions and limits:
+- Five independently confirmed known correctness causes: score/stale-lp-counter; score/rounded-lock-share-ranking; evaluate/wrong-window-floor-reference; plan/false-window-floor-monotonicity; resolve_entry/unsupported-coin-creator-placeholder.
+- plan/false-window-floor-monotonicity is explicitly masked by evaluate/wrong-window-floor-reference today; the proof assumes the latter is repaired.
+- The stale-counter proposal keeps each pool/vault/mint triple inside a 99-key RPC request, so the 100-key backend split cannot separate candidate 34.
+- Known hardening-version-unchecked and curve-risk-fee-at-spot remain leads; no current exploit was established.
+- New ranked-batch-lost-on-rpc-error is a lead because the caller lies outside the frozen in-scope source and deployed outer recovery behavior was not reviewed.
+- No new proven on-chain quote or feature mismatch was found in this bounded review.
+
+Unread remainder:
+All production files and ranges not listed above remain unread or search-only. This includes most math, venue-state decoders, on-chain instructions, lender/accounting paths, coverage/budget/monitor/sweep/graduation implementations, complete venue adapters, and service orchestration. Test output was context only and yielded no reported finding.

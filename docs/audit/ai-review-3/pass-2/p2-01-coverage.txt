@@ -1,0 +1,145 @@
+PASS 2 / specialist 1 / math precision
+Frozen source commit: b815269224ba0f5d946f49de7e113220c4067041
+Source: .audit-mZFuf8/agent-1-bundle.md through source-index.tsv; no source checkout edits.
+Method: bounded static source reads, cross-file searches, exact integer calculator only.
+Result: zero NEW finding/lead blocks; one independently reverified known FINDING and one strengthened known LEAD.
+No builds, tests, PoCs, runtime reproduction, external APIs or subagents.
+Coverage is not a full 58,914-line source read. Earlier aggregate instruction-only output was truncated and is not credited as production coverage.
+
+FULL PRODUCTION READS (comments and imports included; test modules excluded):
+crates/shortwin-math/src/bounds.rs:1-355
+crates/shortwin-math/src/caps.rs:1-406
+crates/shortwin-math/src/fees.rs:1-457
+crates/shortwin-math/src/num/mod.rs:1-241
+crates/shortwin-math/src/num/u256.rs:1-653
+crates/shortwin-math/src/quote/cpmm.rs:1-153
+crates/shortwin-math/src/quote/mod.rs:1-89
+crates/shortwin-math/src/quote/pricing.rs:1-241
+crates/shortwin-math/src/quote/ray_v4.rs:1-63
+crates/shortwin-math/src/quote/reprice.rs:1-90
+crates/shortwin-math/src/quote/sol_leg.rs:1-107
+crates/shortwin-math/src/quote/straddle.rs:1-315
+crates/shortwin-math/src/rent.rs:1-442
+crates/shortwin-math/src/risk.rs:1-422
+crates/shortwin-math/src/waterfall.rs:1-388
+programs/shortwin/src/engine/caps.rs:1-143
+programs/shortwin/src/instructions/sync_lender.rs:1-162
+programs/shortwin/src/mint_filter.rs:1-102
+programs/shortwin/src/state/lender.rs:1-116
+
+BOUNDED RANGES (all unlisted parts of these files unread except named searches):
+programs/shortwin/src/engine/trader.rs:100-220
+crates/shortwin-math/src/pool.rs:1-150,185-260,570-650,895-995,1000-1155,1305-1408,1435-1515,1640-1815,1820-1935,1990-2135,2170-2265,2475-2512
+programs/shortwin/src/engine/prologue.rs:80-260
+programs/shortwin/src/instructions/deposit.rs:80-200
+programs/shortwin/src/instructions/open_short.rs:180-580
+programs/shortwin/src/instructions/sweep_trader.rs:150-375
+programs/shortwin/src/instructions/withdraw.rs:100-285
+
+SEARCH ONLY:
+crates/shortwin-math/src/consts.rs: P_OPEN_MAX and limit names; no full production review.
+crates/shortwin-math/src/params.rs: utilization, minimum notional, rent-rate and lump_vest_s defaults/bounds; no complete configuration-validator review.
+services/common/src and services/keeper/src files listed below: broad narrowing-cast, multiplication, wrapping and saturation searches across bundle ranges 47872-58914; no production block was fully read.
+services/common/src/chain.rs
+services/common/src/tx.rs
+services/keeper/src/budget.rs
+services/keeper/src/coverage.rs
+services/keeper/src/decide.rs
+services/keeper/src/fees.rs
+services/keeper/src/graduation.rs
+services/keeper/src/ixs.rs
+services/keeper/src/monitor.rs
+services/keeper/src/pda.rs
+services/keeper/src/pool_monitor.rs
+services/keeper/src/sweep.rs
+services/keeper/src/venue.rs
+services/keeper/src/view.rs
+
+UNREAD IN-SCOPE PRODUCTION FILES:
+crates/shortwin-math/src/error.rs
+crates/shortwin-math/src/lib.rs
+crates/shortwin-math/src/observe.rs
+crates/shortwin-math/src/persist.rs
+crates/shortwin-math/src/pool_select.rs
+crates/shortwin-math/src/settle.rs
+crates/shortwin-math/src/tier.rs
+crates/shortwin-venue-state/src/bytes.rs
+crates/shortwin-venue-state/src/lib.rs
+crates/shortwin-venue-state/src/mint.rs
+crates/shortwin-venue-state/src/program_data.rs
+crates/shortwin-venue-state/src/pump.rs
+crates/shortwin-venue-state/src/pump_amm.rs
+crates/shortwin-venue-state/src/pyth.rs
+crates/shortwin-venue-state/src/raydium_cpmm.rs
+crates/shortwin-venue-state/src/raydium_v4.rs
+crates/shortwin-venue-state/src/token_account.rs
+programs/shortwin/src/constants.rs
+programs/shortwin/src/engine/arming.rs
+programs/shortwin/src/engine/bounds.rs
+programs/shortwin/src/engine/guard.rs
+programs/shortwin/src/engine/lender.rs
+programs/shortwin/src/engine/mod.rs
+programs/shortwin/src/engine/observe.rs
+programs/shortwin/src/engine/pool_select.rs
+programs/shortwin/src/engine/route.rs
+programs/shortwin/src/engine/tier.rs
+programs/shortwin/src/engine/waterfall.rs
+programs/shortwin/src/errors.rs
+programs/shortwin/src/events.rs
+programs/shortwin/src/instructions/add_margin.rs
+programs/shortwin/src/instructions/apply_config.rs
+programs/shortwin/src/instructions/cancel_config.rs
+programs/shortwin/src/instructions/claim_sol.rs
+programs/shortwin/src/instructions/close_short.rs
+programs/shortwin/src/instructions/cover_deficit.rs
+programs/shortwin/src/instructions/crank_price.rs
+programs/shortwin/src/instructions/crank_sol_usd.rs
+programs/shortwin/src/instructions/create_market.rs
+programs/shortwin/src/instructions/disable_venue.rs
+programs/shortwin/src/instructions/execute_pool_switch.rs
+programs/shortwin/src/instructions/expire.rs
+programs/shortwin/src/instructions/flag_unsafe_mint.rs
+programs/shortwin/src/instructions/flag_venue_upgraded.rs
+programs/shortwin/src/instructions/initialize_config.rs
+programs/shortwin/src/instructions/liquidate.rs
+programs/shortwin/src/instructions/mod.rs
+programs/shortwin/src/instructions/propose_config.rs
+programs/shortwin/src/instructions/propose_pool.rs
+programs/shortwin/src/instructions/revalidate_venue.rs
+programs/shortwin/src/instructions/set_coverage_pause.rs
+programs/shortwin/src/instructions/set_pause.rs
+programs/shortwin/src/instructions/set_route_broken.rs
+programs/shortwin/src/instructions/set_venue_extras.rs
+programs/shortwin/src/instructions/sol_settle.rs
+programs/shortwin/src/instructions/sweep_protocol_fees.rs
+programs/shortwin/src/lamports.rs
+programs/shortwin/src/lib.rs
+programs/shortwin/src/state/config.rs
+programs/shortwin/src/state/epoch.rs
+programs/shortwin/src/state/exposure.rs
+programs/shortwin/src/state/layout_asserts.rs
+programs/shortwin/src/state/market.rs
+programs/shortwin/src/state/mod.rs
+programs/shortwin/src/state/oracle.rs
+programs/shortwin/src/state/pod.rs
+programs/shortwin/src/state/position.rs
+programs/shortwin/src/state/vault.rs
+programs/shortwin/src/state/venue_extras.rs
+programs/shortwin/src/state/venue_guard.rs
+programs/shortwin/src/venues/detect.rs
+programs/shortwin/src/venues/mod.rs
+programs/shortwin/src/venues/pump_amm.rs
+programs/shortwin/src/venues/pump_curve.rs
+programs/shortwin/src/venues/raydium.rs
+programs/shortwin/src/venues/raydium_cpmm.rs
+programs/shortwin/src/venues/raydium_v4.rs
+
+READ-COVERAGE NOTES:
+Initial bundle range 1-480 covered all build manifests and bounds.rs:1-76; bounds was later completed with bounded reads.
+Some requested bounded ranges included test lines; these were treated as context, not production findings or extra production coverage.
+SOP, specialist rules, shared rules, report-language rules, relevant exploit patterns, account-map review leads and known-findings appendix informed the lens. No claim of reading the entire account map or unrelated catalogue entries.
+No new confirmed cause in fee rounding/caps/risk/quote/waterfall helper production reads. This is not a proof of absence.
+Important refutation: math withdraw permits zero-token share burns that could leave S=0,B>0 in isolation, but instructions/withdraw.rs:205-209 rejects that state; no finding emitted.
+Important limit: raw-token quote math was checked without assuming token UI decimals; venue-adapter supply-basis leads were not retraced in full.
+The mutable share-count boundary prevents presenting a naive cumulative-floor patch for the sync lead as a validated repair.
+Readlog: /tmp/shortwin-audit-results-20261018/p2-01-readlog.tsv

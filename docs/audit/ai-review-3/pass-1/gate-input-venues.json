@@ -1,0 +1,178 @@
+[
+  {
+    "id": "p1-a01-b01",
+    "agent": 1,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "pricing_inputs",
+    "bug_class": "hardening-fixed-supply-fee-tier",
+    "artifact": "p1-01-math.md",
+    "raw": "LEAD | program: shortwin | function: pricing_inputs | bug_class: hardening-fixed-supply-fee-tier | group_key: shortwin | pricing_inputs | hardening-fixed-supply-fee-tier\nfile: programs/shortwin/src/venues/pump_curve.rs:454\nrelated_locations: crates/shortwin-math/src/fees.rs:45; crates/shortwin-math/src/fees.rs:164; crates/shortwin-math/src/fees.rs:177; programs/shortwin/src/venues/pump_curve.rs:470; crates/shortwin-math/src/quote/straddle.rs:194\ntitle: The curve adapter uses a fixed supply for fees.\ncode_smells: The adapter selects ordinary curve fees with fixed supply; synthetic fees use live supply; the parser accepts multiple fee tiers.\npath: A future pump fee schedule contains multiple tiers \u2192 a token holder burns tokens \u2192 pricing_inputs selects ordinary fees using 10^15 supply \u2192 q <= rT quotes and fee gates use a different tier from the venue's live-supply tier.\nproof: This is a conditional arithmetic example, not a verified current venue configuration. Set vt = 536,500,000,000,000 raw tokens, vq = 60,000,000,000 lamports, live supply = 900,000,000,000,000, and q = 1,000,000,000,000 <= rT. A two-tier schedule with protocol fee 200 bps below 105,000,000,000 lamports and 100 bps at or above it gives fixed-supply market cap floor(vq * 10^15 / vt) = 111,835,973,904, but live-supply market cap = 100,652,376,514. Ordinary short.win quotes select 100 bps: ceil(q*vq/(vt-q))+1 = 112,044,819; total = 113,165,268. The curve charge formula documented in sol_leg.rs with 200 bps gives floor(q*vq/(vt-q))+1 = 112,044,818; total = 114,285,715, or 1,120,447 lamports above the quote. All products fit u128. pricing_inputs already receives live supply, but uses it only for synthetic_fees. read_state's executable predicate does not constrain the schedule to one tier.\ndescription: The curve adapter selects the wrong fee after burns if pump adds tiers; this review does not verify such a current schedule.\nfix: Use live mint supply for ordinary curve fees and the fee at the EMA price.\nunverified: fees.rs:45-50 explicitly says the deployed curve schedule has only threshold 0; no live multi-tier schedule or unprivileged schedule change was verified. This is a future-configuration hardening lead, not a present exploit finding.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a06-b01",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin-venue-state",
+    "function": "read_base",
+    "bug_class": "hardening-mint-type-unchecked",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin-venue-state | function: read_base | bug_class: hardening-mint-type-unchecked | group_key: shortwin-venue-state | read_base | hardening-mint-type-unchecked\nfile: crates/shortwin-venue-state/src/mint.rs:169\ntitle: The base mint reader omits account type checks.\ncode_smells: The reader accepts every length above 81 bytes and does not inspect the Token-2022 account type.\ndescription: A future caller that skips mint identity checks can accept token-account bytes as mint supply; current callers use constrained keys.\nsource_argument: read_base checks only owner in {TOKEN_PROGRAM, TOKEN_2022_PROGRAM}, data.len() >= 82, and base_of. In contrast, mint::check rejects legacy lengths other than 82, length 355, nonzero extension padding, and account type other than Mint. The program's authoritative check_mint_safety uses StateWithExtensions<Mint>::unpack, which performs the structural checks. A 166-byte buffer with valid base COption tags, byte 45 = 1 and byte 165 = 2 passes read_base but fails the strict type check. This is a parser counterexample, not an attacker-created, Token-2022-owned account.\ncallers: programs/shortwin/src/venues/pump_amm.rs:419 lp_mint_supply calls read_base without an additional length or type check; venues/mod.rs:1091 mint_supply does the same. Raydium's lp_supply separately requires exactly 82 bytes. PumpSwap ties the LP key to pool.lp_mint, and the named mint is constrained elsewhere.\nverification_gap: This pass found no way for an outsider to replace an accepted named mint or canonical LP mint with the counterexample. Current key constraints prevent the proposed substitution.\nminimal_fix: Add mint account length, padding, and type checks to read_base without applying the extension allowlist or freeze-authority policy to LP mints.",
+    "canonical_program": "shortwin-venue-state"
+  },
+  {
+    "id": "p1-a06-b02",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "parse",
+    "bug_class": "hardening-vault-authority-unchecked",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin | function: parse | bug_class: hardening-vault-authority-unchecked | group_key: shortwin | parse | hardening-vault-authority-unchecked\nfile: programs/shortwin/src/venues/raydium_v4.rs:146; programs/shortwin/src/venues/raydium_cpmm.rs:169\ntitle: The Raydium state readers omit vault authority checks.\ncode_smells: Both parsers validate vault keys, token-program owners, and mints but omit the token authorities that their candidate verifiers check.\ndescription: A future venue change can leave the readers to report an executable pool with invalid vault authorities; this pass found no current authority-change path.\nsource_argument: raydium_v4::parse accepts coin and pc when token_of succeeds and their mints match the pool. raydium_cpmm::parse does the same for v0 and v1. Their verify functions additionally require t.owner == the constant venue authority. read_state subsequently calls parse and state_of without that requirement. PumpSwap's vault_of performs the authority comparison on each read. These are separate loaders with different validation strength.\nverification_gap: The recorded vault keys were checked at adoption. This pass did not prove that the deployed venues expose a way to change those vault authorities. A venue CPI would also reject an invalid authority rather than authorize token theft.\nminimal_fix: Require both decoded vault token authorities to equal the corresponding Raydium authority inside each parse function.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a06-b03",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "math_tiers",
+    "bug_class": "unbounded-tier-allocation",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin | function: math_tiers | bug_class: unbounded-tier-allocation | group_key: shortwin | math_tiers | unbounded-tier-allocation\nfile: programs/shortwin/src/venues/pump_curve.rs:404; programs/shortwin/src/venues/pump_amm.rs:608\ntitle: The adapters copy each fee tier into the program heap.\ncode_smells: The shared fee reader bounds tier vectors by account length, while both adapters collect every tier into a Vec without a local count limit.\ndescription: A fee-config expansion can exhaust the program heap before a reader returns no route; this pass did not prove a reachable failing tier count.\nsource_argument: pump::tiers_at checks offset arithmetic and slice bounds but no tier-count ceiling. pump_curve::pricing_inputs collects the curve tiers and uses Rc::from(math_tiers(pfc.fee_tiers)) for the pool tiers. pump_amm::read_state also collects its whole tier vector. open_short reads venue state before its prologue and again after its sell. The linked solana-program-entrypoint 3.1.1 defaults to HEAP_LENGTH = 32 * 1024, and BumpAllocator::dealloc is a no-op. Dropped vectors therefore do not restore heap space during the instruction. The documented 4097-byte FeeConfig allocation can structurally contain 100 forty-byte tiers plus both vector lengths and trailing fees, but that structural capacity does not prove the venue's setter permits that count.\nverification_gap: No test or build ran. This pass did not establish the deployed fee-config setter's maximum tier count, the maximum allocation trace of an instruction, or a count that exhausts the heap. The current fixture schedules were not assessed as failing.\nminimal_fix: Stream selection through the shared FeeTiers reader where possible and establish a measured bound for schedules retained by curve risk quotes.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a06-b04",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "elf_fingerprint_of",
+    "bug_class": "hardening-truncated-elf-digest",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin | function: elf_fingerprint_of | bug_class: hardening-truncated-elf-digest | group_key: shortwin | elf_fingerprint_of | hardening-truncated-elf-digest\nfile: programs/shortwin/src/state/venue_guard.rs:48\ntitle: The upgrade latch stores only twelve bytes of each hash.\ncode_smells: The guard stores 12 of 32 SHA-256 bytes and compares only that prefix after an extension.\ndescription: A venue authority can bypass the latch with paired ELF hashes that share twelve bytes; this pass found no such collision.\nsource_argument: GUARD_ELF_LEN = 12; elf_fingerprint_of copies only that prefix; VenueGuard.guard_elf holds four 12-byte arrays. flag_venue_upgraded::is_upgrade treats a changed ProgramData length as unchanged code when the new trimmed hash has the stored prefix. Thus an authority that controls two candidate ELFs can search a 96-bit collision before the first review, then combine the second upgrade with a later extension. A chosen pair has the generic birthday scale of 2^48 hashes, whereas replacing a fixed reviewed ELF has the much larger 2^96 second-preimage scale. Neither is an actual collision proof.\nverification_gap: No colliding executable pair, practical work estimate, or deployed bypass was demonstrated. This is a hardening lead only. The source identifies AIR2-07 as an unresolved full-digest migration; that disclosure does not establish closure.\nminimal_fix: Store and compare the full SHA-256 digest through an explicit account-layout migration.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a06-b05",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "exit_risk_cap_bps",
+    "bug_class": "live-supply-risk-fee",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin | function: exit_risk_cap_bps | bug_class: live-supply-risk-fee | group_key: shortwin | exit_risk_cap_bps | live-supply-risk-fee\nfile: programs/shortwin/src/venues/mod.rs:822; programs/shortwin/src/venues/pump_amm.rs:702\ntitle: A supply burn can raise the PumpSwap risk fee.\ncode_smells: PumpSwap resolves both its live and EMA fee tiers from the current mint supply; the EMA price does not fix the supply input.\ndescription: A holder can burn tokens before liquidation and raise its risk fee; this pass did not prove a profitable liquidation.\nsource_argument: pump_amm::read_state sets PammFeeSchedule.base_supply to its supplied live mint supply. It resolves fee_ema using quote = floor(P_ema * base / WAD) and that same schedule. PoolVenue.fee_ppm_at_ema feeds exit_risk_cap_bps, which limits risk quotes to min(hard_cap_bps, ceil(fee_ppm_at_ema / 100)). A burn lowers supply and market cap without changing P_ema, so a decreasing fee schedule can raise this cap. The source's exit_risk_cap_bps comment explicitly retains the burn residual as KI-72. The exposure is current for multi-tier PumpSwap schedules; the description does not assert an unexamined size or profit bound.\nverification_gap: This pass did not construct or execute a concrete healthy position, burn, liquidation, and net-profit trace. The existing disclosure and its referenced test were located but were not treated as an independent reproduced proof.\nminimal_fix: Resolve the risk-view fee from a supply value fixed before the current observation interval while execution quotes retain the live supply.\nknown_status: Source-disclosed KI-72; retained as a current source-supported lead, not closed by disclosure.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a06-b06",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "pricing_inputs",
+    "bug_class": "live-supply-synthetic-risk-fee",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin | function: pricing_inputs | bug_class: live-supply-synthetic-risk-fee | group_key: shortwin | pricing_inputs | live-supply-synthetic-risk-fee\nfile: programs/shortwin/src/venues/pump_curve.rs:470\ntitle: A burn can raise the curve's synthetic risk fee.\ncode_smells: The live curve's synthetic fee reads the current mint supply, and curve risk quotes retain it under the position's hard cap.\ndescription: A holder can raise the synthetic risk fee after a burn under multiple tiers; this pass did not prove a liquidation.\nsource_argument: pricing_inputs resolves synthetic_fees with fees::pump_curve_at_supply(live.vt, live.vq, s, &schedule), where s is the live mint supply. CurvePricingInputs::curve_pricing forwards that value into CurvePricing.synthetic. Quoter::capped caps the resulting pricing at the position's cap but does not fix the market-cap supply. Quoter::buy_live and buy_xy use the synthetic route past rT. A supply burn can therefore change the fee used on the live and hypothetical risk paths in the same transaction under a multi-tier curve schedule. This differs from PumpSwap's exit cap and is not closed by its EMA cap.\nverification_gap: The code documents a single flat curve tier in the pinned venue configuration, so this effect requires a fee-schedule change. This pass did not construct a liquidation at a tier boundary or measure a profitable burn.\nminimal_fix: Resolve synthetic risk fees from a supply value fixed before the current observation interval while execution pricing follows the live supply.\nknown_status: Source-disclosed KI-77(a); conditional on a multi-tier curve fee configuration, not claimed as an active flat-schedule exploit.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a06-b07",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "pricing_inputs",
+    "bug_class": "synthetic-fee-gate-basis-mismatch",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin | function: pricing_inputs | bug_class: synthetic-fee-gate-basis-mismatch | group_key: shortwin | pricing_inputs | synthetic-fee-gate-basis-mismatch\nfile: programs/shortwin/src/venues/pump_curve.rs:454; programs/shortwin/src/venues/mod.rs:796\ntitle: The curve fee gates use a different supply basis.\ncode_smells: The ordinary curve fee uses the fixed 10^15 supply, while an exit past rT resolves its synthetic fee from the live supply.\ndescription: The curve fee gates can admit a lower fee than a synthetic exit pays; this requires a tier boundary between the two supply bases.\nsource_argument: pricing_inputs first obtains fees through fees::pump_curve, whose documented supply basis is PUMP_CURVE_MCAP_SUPPLY = 10^15, and separately obtains synthetic_fees through pump_curve_at_supply. read_state writes st.fee_ppm from inputs.fees; cap_fee_ppm compares that ordinary fee with the ordinary fee at P_ema. These fee-gate inputs do not select the synthetic fee when the position's buyback crosses rT. Thus a burned supply and a multi-tier schedule can produce ordinary fee phi below synthetic fee phi_s; the route/open fee checks use phi while the synthetic exit uses phi_s. The source explicitly documents this retained distinction as KI-77(b).\nverification_gap: This pass did not construct a current on-chain multi-tier curve schedule or a complete open/exit trace. The pinned flat curve schedule removes the difference today. The reported numerical jump in the old disclosure was not independently verified here.\nminimal_fix: Make fee gates account for the fee of each buyback route that an admitted position can require, while retaining conservative execution quotes.\nknown_status: Source-disclosed KI-77(b); retained separately from the burn's effect on risk fees because changing the supply snapshot alone does not align the gates.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a06-b08",
+    "agent": 6,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "read_state_boxed_for_exit",
+    "bug_class": "curve-risk-fee-at-spot",
+    "artifact": "p1-06-periphery.md",
+    "raw": "LEAD | program: shortwin | function: read_state_boxed_for_exit | bug_class: curve-risk-fee-at-spot | group_key: shortwin | read_state_boxed_for_exit | curve-risk-fee-at-spot\nfile: programs/shortwin/src/venues/mod.rs:1078; programs/shortwin/src/venues/pump_curve.rs:454\ntitle: Curve exit risk quotes retain the fee resolved at spot.\ncode_smells: read_state_boxed_for_exit enables ema_fee only for PumpSwap; ordinary curve risk quotes reuse fees resolved from the live virtual reserves.\ndescription: A keeper can raise the curve risk fee with a sale under multiple tiers; this pass did not prove a liquidation.\nsource_argument: read_state_boxed_for_exit sets ema_fee = kind == VenueKind::PumpSwap. pump_curve::pricing_inputs always resolves its ordinary fee from live.vt and live.vq; without ema_fee it leaves fee_ppm_at_ema at u32::MAX. exit_risk_cap_bps has only the PumpSwap branch. Curve Quoter::buy_xy reprojects cached reserves but retains c.pricing's already-resolved fee, so an earlier sale can move the fee tier used for both live and hypothetical risk quotes. A fixed supply prevents a burn from changing this ordinary fee basis, but does not prevent a sale from changing its reserve ratio. This candidate concerns the ordinary curve fee and is separate from KI-77's synthetic live-supply fee.\nverification_gap: The pinned curve schedule is flat. This pass did not establish a full liquidation trace under a venue-admin update to multiple tiers or prove the absence of every downstream assessment guard.\nminimal_fix: Resolve and cap ordinary curve risk fees at the stored EMA market cap, separately from the synthetic execution fee.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a07-b04",
+    "agent": 7,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "sweep_trader",
+    "bug_class": "external-cashback-recovery-dependency",
+    "artifact": "p1-07-first-principles.md",
+    "raw": "LEAD | program: shortwin | function: sweep_trader | bug_class: external-cashback-recovery-dependency | group_key: shortwin | sweep_trader | external-cashback-recovery-dependency\nfile: programs/shortwin/src/instructions/sweep_trader.rs:248\nlocation: shortwin::sweep_trader\ntitle: Cashback cleanup still depends on venue claims.\ncode_smells: The sweep clears the rewards bit only after external cashback balances reach zero; the keeper relies on venue claim instructions to empty them.\nassumption: The pump and PumpSwap cashback claim interfaces remain available after a market wipe or last-lender exit.\nviolation: A venue changes or removes its claim interface while cashback exists, or a stranger donates cashback after that change.\npath: Wipe or last-lender exit clears source bits -> someone funds the pump UVA or PumpSwap cashback ATA -> claim fails under the changed venue -> sweep never marks rewards clear -> deposit rejects WipeSweepPending.\nproof: sweep_trader.rs:248-261 computes rewards_clear from the pump UVA lamports above rent and PumpSwap cashback ATA balance. The handler only sets SweepSource::VenueRewards when that predicate holds. engine/lender.rs::rewards_required requires this bit for pump venues and any market with a pump UVA; math pool.rs::deposit_in rejects p.wipe_swept & need != need. keeper sweep.rs:35-43 explicitly records that a WSOL donation turns removal of pAMM claim_cashback into a lasting deposit lock. This source disclosure does not supply a recovery path. The pump comments that no CPI means no interface deadlock overstate what off-chain bundling guarantees.\ndescription: A venue upgrade can leave donated cashback unclaimable and keep deposits closed; the current claim interfaces still work.\nunverified: No currently deployed failing claim interface is proved. This is a retained dependency lead, not a present exploit finding; a safe fallback needs a protocol decision about old lenders' cashback.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a09-b01",
+    "agent": 9,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "deposit",
+    "bug_class": "hardening-pool-vault-fields-unchecked",
+    "artifact": "p1-09-accounts.md",
+    "raw": "LEAD | program: shortwin | function: deposit | bug_class: hardening-pool-vault-fields-unchecked | group_key: shortwin | deposit | hardening-pool-vault-fields-unchecked\ntitle: Pool vault loads rely on creation-time mint, authority, and program checks\nfile: programs/shortwin/src/instructions/deposit.rs:94\nlocations: programs/shortwin/src/instructions/withdraw.rs:127; programs/shortwin/src/instructions/open_short.rs:167; programs/shortwin/src/instructions/close_short.rs:102; programs/shortwin/src/instructions/liquidate.rs:140; programs/shortwin/src/instructions/expire.rs:101\nboundary: A caller supplies the pool_vault InterfaceAccount to an instruction that reads its balance or transfers its tokens.\ncode_smells: The constraints bind pool_vault to the market PDA and stored key, but omit token::mint, token::authority, and token::token_program on that account. InterfaceAccount accepts either token program. The creation path establishes the missing relationships.\nproof: deposit.rs:94-99 checks mut and seeds=[POOL_VAULT_SEED, market.key()] with the stored bump. Its mint uses mint::token_program at :85 and owner_token_account uses token::mint and token::token_program at :90-91. withdraw.rs:127-132 repeats the weaker pool_vault constraint. create_market.rs:281-349 creates the canonical PDA under the chosen token program and initializes its mint and market authority. Anchor SPL 1.2.0 token_interface.rs:15,31-35 permits both supported owners.\ncurrent_blocker: The current program creates this canonical vault itself. The caller cannot replace it with another key or change its mint. Token CPIs also validate the operating token program and authority. No current account substitution or balance-credit exploit was proved.\ndescription: A future vault importer could let callers credit the wrong asset because loaders do not check the vault mint, authority, and token program.\nfix: Add token::mint, token::authority, and token::token_program constraints to each pool_vault InterfaceAccount.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a09-b02",
+    "agent": 9,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "parse",
+    "bug_class": "hardening-vault-authority-unchecked",
+    "artifact": "p1-09-accounts.md",
+    "raw": "LEAD | program: shortwin | function: parse | bug_class: hardening-vault-authority-unchecked | group_key: shortwin | parse | hardening-vault-authority-unchecked\ntitle: Raydium read loaders omit vault-authority checks present at adoption\nfile: programs/shortwin/src/venues/raydium_v4.rs:146\nlocations: programs/shortwin/src/venues/raydium_cpmm.rs:169\nboundary: ReadSets for an already adopted Raydium pool feed permissionless price observations and trade decisions.\ncode_smells: Both parse functions validate pool owner/layout, vault keys, token program owners, and mints, but omit each token account's authority. Both verify functions check that authority at adoption.\nproof: raydium_v4.rs:160-164 loads the two token accounts and compares their mints; :304-310 additionally requires t.owner == RAYDIUM_V4_AUTHORITY during verify. raydium_cpmm.rs:185-190 loads both vaults and compares their mints; :393-403 additionally requires t.owner == RAYDIUM_CPMM_AUTHORITY during verify. read_state uses parse at raydium_v4.rs:214-221 and raydium_cpmm.rs:289-299.\ncurrent_blocker: Adoption validates the authorities, stored keys bind the later ReadSet, and outside callers cannot change the venue-controlled token authorities. No current attacker-controlled authority transition was proved.\ndescription: A future venue authority change could let callers refresh price state from vaults that the configured swap authority cannot spend.\nfix: Apply the adoption-time vault-authority checks in each shared parse function.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a09-b03",
+    "agent": 9,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "init_uva",
+    "bug_class": "hardening-existing-uva-validation",
+    "artifact": "p1-09-accounts.md",
+    "raw": "LEAD | program: shortwin | function: init_uva | bug_class: hardening-existing-uva-validation | group_key: shortwin | init_uva | hardening-existing-uva-validation\ntitle: Existing Pump user-volume accounts bypass trade-time decoding at listing\nfile: programs/shortwin/src/venues/pump_curve.rs:1047\nlocations: programs/shortwin/src/venues/pump_amm.rs:1161\nboundary: create_market calls each venue's init_uva helper for its derived trader user-volume accumulator.\ncode_smells: The already-existing account branch returns success after an owner check and nonempty-data check. The trading path decodes the discriminator and compares the stored user with the trader.\nproof: pump_curve.rs:1041 pins the key, but :1047-1048 returns Ok for owner==PUMP_PROGRAM_ID and nonempty data. pump_amm.rs:1155 pins the key, but :1161-1162 has the same early return. Compare pump_curve.rs:766-780 and pump_amm.rs:469-478, which decode the accumulator and validate its user. The raw decoder checks owner and discriminator at crates/shortwin-venue-state/src/pump.rs:765-773; the PumpSwap wrapper checks its own owner at pump_amm.rs:497-500.\ncurrent_blocker: The caller supplies a derived venue PDA and cannot assign arbitrary bytes to a Pump-owned account there. The creator signs create_market; these helpers are not externally dispatched instructions. No current unauthorized write or missing-signer path was proved.\ndescription: A future venue layout change could let a caller list a market with an existing UVA that later fails the stricter trade checks.\nfix: Decode each existing UVA and compare its user with the trader before returning success.",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a10-b01",
+    "agent": 10,
+    "kind": "LEAD",
+    "program": "shortwin-math",
+    "function": "pump_curve",
+    "bug_class": "hardening-fixed-supply-fee-basis",
+    "artifact": "p1-10-numerical.md",
+    "raw": "LEAD | program: shortwin-math | function: pump_curve | bug_class: hardening-fixed-supply-fee-basis | group_key: shortwin-math | pump_curve | hardening-fixed-supply-fee-basis\ntitle: Normal curve quotes use the original mint supply\nfile: crates/shortwin-math/src/fees.rs:164\nrelated_locations: crates/shortwin-math/src/fees.rs:44-51,178-185; programs/shortwin/src/venues/pump_curve.rs:425-483; crates/shortwin-math/src/quote/pricing.rs:139-144; crates/shortwin-venue-state/src/pump.rs:695-730\nseam: boundary\u00d7invariant; the supply basis selects a piecewise fee tier and differs between the ordinary and synthetic paths.\ncode_smells: The normal curve fee uses a fixed supply; the synthetic fee uses the live supply; the reader accepts multiple fee tiers.\ndescription: A token holder gets inaccurate curve quotes after a burn if Pump adds fee tiers; the source says its current single tier prevents this.\npath: Conditional future schedule with distinct tiers \u2192 holder burns circulating tokens \u2192 normal quote selects the tier at the original supply \u2192 its execution and risk costs use a different fee from the venue.\nproof: The source explicitly says the deployed curve uses the live mint supply. `pump_curve` instead calls `curve_fees_at(vt, vq, PUMP_CURVE_MCAP_SUPPLY, s)`, where the constant is 1,000,000,000,000,000. The production adapter calls this resolver for `fees` and the EMA fee. It calls `pump_curve_at_supply` only for `CurveStage::Live.synthetic_fees`. `CurvePricing::buy` dispatches to `curve_synthetic`, whose `q <= rT` branch uses the normal `curve_fees`.\nnumeric_proof: Use a standard-offset live curve with vT = 400,000,000,000,000, vQ = 80,475,000,000, rT = 120,100,000,000,000 and rQ = 50,475,000,000. After a holder burns 100,000,000,000,000 circulating units, live supply is 900,000,000,000,000. The fixed-supply market cap is 201,187,500,000 lamports; the live-supply cap is 181,068,750,000. A hypothetical schedule with protocol fees of 100 bps from threshold 0 and 50 bps from threshold 190,000,000,000 selects different tiers. Set LP and creator fees to zero. For q = 1,000,000,000,000, q <= rT, and the conservative net is ceil(q*vQ/(vT-q))+1 = 201,691,731. The normal quote costs 202,700,190 lamports at 50 bps. The same formula at the live-supply tier costs 203,708,649, a difference of 1,008,459 lamports. Integer arithmetic checked this calculation; no protocol code ran.\nguards_and_limits: The documented deployed curve schedule has one tier at threshold zero. That schedule makes both resolutions equal today. No real multi-tier curve schedule was established in this static pass. Account ownership and discriminator checks prevent a caller from supplying the hypothetical schedule directly. This is not a confirmed production exploit.\nimpact_if_activated: Quotes can understate or overstate ordinary curve execution costs, margin, fee-scaled caps, and risk costs after a supply burn crosses a fee threshold.\nfix: Use the live mint supply for all curve fee tiers and the EMA fee view.\nvalidation: Static source trace and pure integer arithmetic only; no build, test, simulation, or runtime reproduction.",
+    "canonical_program": "shortwin-math"
+  },
+  {
+    "id": "p1-a11-b05",
+    "agent": 11,
+    "kind": "FINDING",
+    "program": "shortwin",
+    "function": "flag_venue_upgraded",
+    "bug_class": "unhashed-slot-upgrade-latch",
+    "artifact": "p1-11-trust.md",
+    "raw": "FINDING | program: shortwin | function: flag_venue_upgraded | bug_class: unhashed-slot-upgrade-latch | group_key: shortwin | flag_venue_upgraded | unhashed-slot-upgrade-latch\nfile: programs/shortwin/src/instructions/flag_venue_upgraded.rs:126\ntitle: An extension can block opens when the guard lacks a fingerprint\nseam: access\u00d7asymmetry\nactor: Any fee payer after initialization or an honest revalidation without an ELF hash.\nroot_cause: The program enables an unflagged venue with no fingerprint and then treats any changed deploy slot as an upgrade.\npath: initialize_config sets upgraded=0 and no fingerprints, or revalidate_venue accepts a zero hash and clears one \u2192 an outsider extends a growable venue ProgramData \u2192 flag_venue_upgraded sees a different slot and sets its bit \u2192 opens and that venue's proposals fail until Emergency revalidation.\nproof: initialize_config.rs:156-160 assigns upgraded=0 and guard_slot but no guard_len or guard_elf. VenueGuard::elf_fingerprint returns None when guard_len=0. revalidate_venue.rs:72-83 accepts expected_elf_hash=[0;32] when expected_slot matches; lines104-108 then clear the fingerprint and latch. flag_venue_upgraded.rs:128-136 skips is_upgrade if that fingerprint is absent and sets the bit on slot inequality. In the locally installed solana-bpf-loader-program 4.2.2 source, lib.rs:793-794 calls common_extend_program(...,false); :926-937 checks the authority only if check_authority; :973-996 grows the account and sets slot=clock_slot. An outsider funds a legal extension (10 KiB works with the optional minimum-size feature), without the venue's upgrade signer. Raydium bits 3 and 4 share GUARD_MASK_RAYDIUM, so either extension blocks opens on both Raydium kinds. This state is explicitly documented in the source and remains reachable; acknowledgement does not add a guard. Current program data lengths are not queried here; the trace uses the growable venues that this source itself identifies.\nguards: Fixed ProgramData keys, loader ownership, and tag3 prevent account substitution. Fingerprinted venues detect an unchanged ELF correctly. Exits do not read this latch, so this finding does not claim existing positions become permanently locked.\neconomic_delta: The outsider obtains a veto over new Raydium opens and one venue's candidate adoption for the cost of extension rent and transaction fees.\ndescription: An outsider can block new opens with a program extension while the venue guard has no ELF fingerprint.\nfix: Keep growable venues latched until revalidation supplies an ELF hash, and reject later hashless revalidation.\nminimal_diff:\n```diff\n--- a/programs/shortwin/src/instructions/initialize_config.rs\n+++ b/programs/shortwin/src/instructions/initialize_config.rs\n@@ -156,7 +156,8 @@\n         let mut g = ctx.accounts.venue_guard.load_init()?;\n         g.version = VENUE_GUARD_VERSION;\n         g.bump = ctx.bumps.venue_guard;\n-        g.upgraded = 0;\n+        g.upgraded = ((1u32 << crate::state::GUARD_ELF_VENUES) - 1)\n+            << crate::state::GUARD_ELF_FIRST;\n         g.guard_slot = args.guard_slot;\n     }\n     let extras = [\n--- a/programs/shortwin/src/instructions/revalidate_venue.rs\n+++ b/programs/shortwin/src/instructions/revalidate_venue.rs\n@@ -72,6 +72,7 @@\n     let slot = read_deploy_slot(&ctx.accounts.program_data)?;\n     let hashed = expected_elf_hash != [0u8; 32];\n     let fingerprinted = VenueGuard::elf_index(venue).is_some();\n+    require!(!fingerprinted || hashed, ShortwinError::InvalidParams);\n     if slot != expected_slot {\n         // AIR-01: the reviewed deploy, only extended since, still holds the reviewed ELF.\n         require!(hashed && fingerprinted, ShortwinError::VenueSlotMismatch);\n```",
+    "canonical_program": "shortwin"
+  },
+  {
+    "id": "p1-a11-b06",
+    "agent": 11,
+    "kind": "LEAD",
+    "program": "shortwin",
+    "function": "elf_fingerprint_of",
+    "bug_class": "truncated-upgrade-fingerprint",
+    "artifact": "p1-11-trust.md",
+    "raw": "LEAD | program: shortwin | function: elf_fingerprint_of | bug_class: truncated-upgrade-fingerprint | group_key: shortwin | elf_fingerprint_of | truncated-upgrade-fingerprint\nfile: programs/shortwin/src/state/venue_guard.rs:52\ntitle: The guard compares only twelve bytes of the reviewed hash\nseam: access\u00d7economics\nactor: A venue upgrade authority that can choose both the reviewed and later ELF files.\ncode_smells: The guard stores a 96-bit fingerprint, and a grown ProgramData account passes the unchanged-ELF test when those 96 bits match.\ntrace: VenueGuard::GUARD_ELF_LEN=12 \u2192 revalidate_venue stores elf_fingerprint_of(expected_elf_hash) \u2192 flag_venue_upgraded::is_upgrade compares only those 12 bytes after an extension. A malicious venue authority could search an ELF pair with one prefix, obtain review of the first, then extend and upgrade to the second. The generic chosen-pair collision work is about 2^48 hashes; this audit supplies no collision or practical budget. The source's AIR2-07 comment already identifies the reduced bound.\ndescription: A venue authority can seek two ELF files with one fingerprint; this review does not prove a practical collision.",
+    "canonical_program": "shortwin"
+  }
+]

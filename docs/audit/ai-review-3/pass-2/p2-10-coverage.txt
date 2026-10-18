@@ -1,0 +1,56 @@
+Pass 2 specialist 10 — numerical-gap
+Review completed against frozen bundle agent-10-bundle.md for b815269224ba0f5d946f49de7e113220c4067041.
+FINDING: 0
+LEAD: 1
+Known label reused: shortwin-math | pump_curve | hardening-fixed-supply-fee-basis.
+
+Method and limits
+- Read the assignment and pass-2 notes, build context, numerical-gap specialty, shared output/report-language rules, relevant exploit-pattern entries, visible account-map completion material, and the Known findings appendix.
+- Initial wide metadata/SOP reads were truncated. They do not count as full bundle or production-source coverage. Subsequent production reads below were bounded and untruncated.
+- Read source from the assigned frozen bundle. Used source-index.tsv and cross-file searches for mapping/call sites.
+- No repository writes, builds, tests, runtime reproduction, live protocol interaction, or subagents. Used one pure integer arithmetic calculation for the lead.
+- Root release overflow checks are ON for program/math. Services has no override. No services implementation was reviewed under an assumption that it shares the root profile.
+
+Full production portions read (tests excluded from coverage claim)
+- crates/shortwin-math/src/bounds.rs:1-355
+- crates/shortwin-math/src/fees.rs:1-457
+- crates/shortwin-math/src/quote/cpmm.rs:1-153
+- crates/shortwin-math/src/quote/pricing.rs:1-241
+- crates/shortwin-math/src/quote/ray_v4.rs:1-63
+- crates/shortwin-math/src/quote/reprice.rs:1-90
+- crates/shortwin-math/src/quote/sol_leg.rs:1-107
+- crates/shortwin-math/src/quote/straddle.rs:1-315
+- crates/shortwin-math/src/rent.rs:1-442
+- crates/shortwin-math/src/risk.rs:1-422
+- crates/shortwin-math/src/waterfall.rs:1-388
+- programs/shortwin/src/engine/caps.rs:1-143
+These include production comments, executable bodies, and production const assertions before the first cfg(test) module. Some adjacent test lines appeared as context only.
+
+Bounded production portions read (bundle coordinates are exact)
+- math/caps.rs: bundle 1114-1420 (source 1-304); later carried-fit logic unread.
+- math/params.rs: bundle 5917-6120, 6440-6595, 7100-7185. Reviewed parameter types/default introduction, minimum-notional derivation, selected bound declarations, CR relationships and relational checks. Did not read the complete parameter module.
+- math/settle.rs: bundle 14641-15376. Reviewed settlement box construction, S1/S2 legs, refutation, pprime, amount check, S3 timing, arming, evaluate, settlement and the beginning of route helpers. Remaining route helpers and tests unread.
+- instructions/open_short.rs: bundle 33381-33990. Reviewed accounts, q > 0, static/prologue guards, fee/price/warm-up guards, caps, sell minimum, post-open notional, D4 margin, open fee and start of position booking. Remaining booking/end-of-handler code unread.
+- venues/pump_curve.rs: bundle 44985-45175 and 45235-45370. The first range covered cache/account key helpers; the second covered pricing_inputs and the start of read_state. Remaining adapter production code unread.
+- state/config.rs: bundle 38380-38405. Confirmed validate_param_set calls both validate and validate_econ.
+
+Search-only areas
+- Bundle-wide searches for casts, saturating arithmetic, pump_curve call sites, pump_curve_at_supply, pricing_inputs, minimum-notional bounds and validation definitions.
+- The casts/saturating search was deliberately limited to its first 100 matches; it was not a complete audit of all matches.
+- source-index.tsv used as the file/range inventory, not evidence that each source file was read.
+
+Refutations and scope boundaries
+- q = 0 quotes do not reach open_short: the handler requires q > 0. Quote methods reject zero reserves, q at/above available exact-out reserves, undefined migration states, and amounts that fail checked conversions.
+- x0 + q and borrowed_q + q use checked addition in engine::caps::check_open. Overflow refuses the open instead of wrapping. Root release checks also remain enabled.
+- Caps use widened cross-products and checked/saturating conversions only where an excess cap does not bind. Zero fee-scaled caps cannot admit a positive q.
+- The normal open performs a post-sale minimum-notional check. params sets MIN_NOTIONAL_FLOOR to 53_000_000 and validates the configured floor. This refutes a tiny-q zero-reward argument without ignoring the caller guards.
+- Budget comparisons widen b_hat + ert to u128. CR compares widened products. k_s is capped by V; k_e by its cap and remaining waterfall funds.
+- Every reviewed waterfall builds nonnegative legs and checks their sum against V. Its capped payouts and immediate-cap saturation preserve the relevant minimum.
+- Rent's exact kink formula is continuous at the kink. Display-only rate flooring does not define charged rent. Lender credit carries its fractional remainder, and position true-ups use ceilings.
+- The source explicitly permits the one-raw-unit market-impact rounding difference, the curve quote's conservative epsilon, fee-component rounding dips on sales, and the straddle's documented migration dip. Those statements prevented inventing an unintended-discontinuity finding.
+- Live curve buys use curve_synthetic; curve_straddle applies to migrating-state pricing. Settlement evaluate gates S1/S2 on executable venues. A generic straddle discontinuity alone did not establish an executable S1/S2 attack.
+- Fair-value and budget arithmetic clamps are directional by documented design. No incorrect conservation result was reached.
+- The reviewed shared library and adapter independently showed the known fixed-supply fee basis. The source states a single current curve tier, so the report retains it as a hardening lead.
+
+Unread production
+All production files and source ranges not listed above remain unread, including pool.rs, observe.rs, tier.rs, pool_select.rs, numeric primitive implementations, remaining instructions/adapters/readers, all keeper/common implementations, and most state modules. No claim of complete 58,914-line source-bundle coverage is made.

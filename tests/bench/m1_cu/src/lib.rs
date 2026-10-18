@@ -504,6 +504,95 @@ fn withdraw_half_spl() -> Prepared {
     s.prepared(ix)
 }
 
+/// Final withdrawal with unequal whole-lamport carries (1.0.3). A earned 3,000 lamports
+/// before B joined; repayment allocated the realised credit over both holders. The fixture
+/// installs that settled accounting and its SOL backing, then A really withdraws, retaining
+/// a 2,000-lamport pending claim. B's measured exit gets 1,000 lamports from the carries,
+/// returns the 2,000-lamport realised surplus to the pot, transfers tokens and closes B.
+fn withdraw_last_carry_surplus_spl() -> Prepared {
+    use shortwin::state::{LenderPosition, MarketVault};
+
+    let mut env = Env::initialized();
+    let (k, authority) = env.install_market(TokenProgram::Spl, 6);
+    let payer = env.payer.insecure_clone();
+    let a_tokens = 2_000_000_000_000_000_000;
+    let b_tokens = 3_000_000_000_000_000_000;
+    let a = tokens::holder(
+        &mut env.svm,
+        &payer,
+        &k.mint,
+        &authority,
+        a_tokens,
+        TokenProgram::Spl,
+    );
+    let b = tokens::holder(
+        &mut env.svm,
+        &payer,
+        &k.mint,
+        &authority,
+        b_tokens,
+        TokenProgram::Spl,
+    );
+    let keys = |h: &Holder| LenderKeys {
+        owner: h.owner.pubkey(),
+        mint: k.mint,
+        token_program: k.token_program,
+        owner_token_account: h.token_account,
+    };
+    ok(env.send(&[ix::deposit(&keys(&a), a_tokens, 0)], &[&a.owner]));
+    ok(env.send(&[ix::deposit(&keys(&b), b_tokens, 0)], &[&b.owner]));
+
+    let mut m = env.market(&k.market);
+    let mut p = m.pool();
+    p.acc = 1;
+    p.carry = 1_000 * WAD as i128;
+    p.carry_r = 3_000 * WAD;
+    m.set_pool(&p);
+    fixtures::set_zc(&mut env.svm, &k.market, &m, 0);
+    let mut l = env.lender(&k.market, &b.owner.pubkey()).expect("B");
+    l.snap = 1; // B joined after the entitlement accrual.
+    fixtures::set_borsh(
+        &mut env.svm,
+        &pda::lender(&k.market, &b.owner.pubkey()).0,
+        &l,
+        LenderPosition::SPACE,
+        0,
+    );
+    let mut v = env.market_vault(&k.market);
+    let held_lamports = env
+        .svm
+        .get_account(&k.market_vault)
+        .expect("vault")
+        .lamports;
+    let rent = env
+        .svm
+        .minimum_balance_for_rent_exemption(MarketVault::SPACE);
+    v.lender_sol = 3_000;
+    fixtures::set_zc(
+        &mut env.svm,
+        &k.market_vault,
+        &v,
+        held_lamports - rent + 3_000,
+    );
+    env.assert_invariants();
+
+    let a_shares = env.lender(&k.market, &a.owner.pubkey()).expect("A").shares;
+    ok(env.send(&[ix::withdraw(&keys(&a), a_shares, 0)], &[&a.owner]));
+    let old = env.lender(&k.market, &a.owner.pubkey()).expect("A's claim");
+    assert_eq!(
+        (old.shares, old.pending, old.real, old.claimed),
+        (0, 2_000, 0, 0)
+    );
+    let p = env.market(&k.market).pool();
+    assert_eq!(
+        (p.borrowed_q, p.receivable, p.total_shares),
+        (0, 0, l.shares)
+    );
+    assert_eq!((p.carry, p.carry_r), (1_000 * WAD as i128, 3_000 * WAD));
+    let ix = ix::withdraw_with(&keys(&b), l.shares, b_tokens, 1_000, false);
+    prepared(env, ix, &[&b.owner])
+}
+
 fn cover_deficit() -> Prepared {
     let s = LenderEnv::deposited(TokenProgram::Spl);
     let ix = ix::cover_deficit(&s.h.owner.pubkey(), &s.k.market, COVER);
@@ -1052,6 +1141,12 @@ pub fn cases() -> Vec<Case> {
             "half the shares, SPL Token",
             LENDER_TOKENS,
             withdraw_half_spl,
+        ),
+        case(
+            "withdraw",
+            "last shares, whole carries and realised surplus to pot, SPL Token",
+            LENDER_TOKENS,
+            withdraw_last_carry_surplus_spl,
         ),
         case("claim_sol", "pays a covered balance", LENDER_SOL, claim_sol),
         case(

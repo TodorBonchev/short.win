@@ -1,0 +1,544 @@
+{
+  "metadata": {
+    "purpose": "Read-only prior-issue mechanism comparison; not an audit gate, candidate judgement, severity assessment or confidence vote.",
+    "source_commit": "b815269224ba0f5d946f49de7e113220c4067041",
+    "candidate_file": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/pass-1/candidates.json",
+    "candidate_sha256": "7ff2b6e5a885676fc0852479e091f11efcc0cab3b4e4cf18ee3f71888fc2cdfc",
+    "existing_issues_file": "/home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/existing-issues.json",
+    "existing_issue_rows": 92,
+    "candidate_rows": 36,
+    "relation_counts": {
+      "exact_known": 24,
+      "new_to_register": 3,
+      "related_distinct_extension": 9
+    },
+    "relation_definitions": {
+      "exact_known": "The same causal mechanism is explicitly recorded in a prior issue or precise prior raw/triage source. This says nothing about acceptance, validity, remediation or exploitability.",
+      "related_distinct_extension": "An earlier issue/policy/lead is related, but the candidate reaches a distinct remaining component, boundary, trigger, or bound that should not be folded into the prior disposition.",
+      "new_to_register": "No exact earlier causal mechanism identified after comparison with the supplied register and relevant linked reviews; retain as a separately registerable candidate subject to the independent judges.",
+      "uncertain": "The prior/current scope relationship cannot be resolved from the inspected record."
+    },
+    "limitations": [
+      "No builds, tests, executable PoCs, live-RPC calls, network access, repository writes, subagents, fixes or approval actions were performed. Only this requested /tmp JSON artifact was written.",
+      "All production source comparisons use the current checkout verified at the frozen commit. Existing untracked audit directories were left untouched.",
+      "Formal registry absence is not project novelty: earlier raw reports and linked triage were compared at mechanism level. In particular p1-a05-b01 has an exact earlier raw lead at ai-review/report-5-math-core.md:320, separate from generic carry-dust residuals.",
+      "Prior raw leads can lack formal issue IDs; empty issue_ids with exact_known means the precise sources carry the match. No synthetic issue IDs were invented.",
+      "issue_ids can include related context; the reason specifies which record is exact and which must not be treated as blanket acceptance. Earlier open leads remain open; accepted residuals are not extended to new triggers or larger unverified bounds.",
+      "Relations are evaluated against the reviewed sources, not proof that no unpublished or unlinked project record exists. Candidate arithmetic, reachability, practical consequences and proposed patches were not independently judged here.",
+      "p1-a12-b01 uses keeper.rs as contextual source outside the run source bundle; its prior-comparison relation is not an in-scope finding designation."
+    ]
+  },
+  "rows": [
+    {
+      "raw_id": "p1-a01-b01",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-77"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:84",
+        "docs/audit/ai-review/report-3-venues.md:138",
+        "docs/audit/ai-review/report-4-venue-state.md:88",
+        "programs/shortwin/src/venues/pump_curve.rs:454",
+        "crates/shortwin-math/src/fees.rs:164"
+      ],
+      "reason": "The original venue/math review already describes ordinary curve quotes selecting a tier on fixed 10^15 rather than burned live supply, conditional on a multi-tier schedule. KI-77(b) explicitly retains fixed-supply quotes up to rT; current pricing_inputs still separates ordinary fees from live-supply synthetic_fees. The new arithmetic example does not make the mechanism project-new. KI-77 acceptance of its synthetic/gate residual should not be stretched into an unbounded assertion about every ordinary-quote effect."
+    },
+    {
+      "raw_id": "p1-a01-b02",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-68"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:81",
+        "programs/shortwin/src/instructions/sync_lender.rs:126",
+        "crates/shortwin-math/src/pool.rs:1474"
+      ],
+      "reason": "KI-68 identifies the same unsigned touch of current/parked lenders, floor(shares*(acc-snap)/WAD), snapshot advancement, and lost entitlement/realised fractions per touch. The candidate requires no rebase and supplies no mechanism beyond that disclosed per-touch rounding; it is distinct from AIR-03 market rent-credit remainder and KI-65 conversion ordering."
+    },
+    {
+      "raw_id": "p1-a02-b01",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-70",
+        "AIR-04",
+        "AIR2-06"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:145",
+        "docs/audit/known-issues.md:221",
+        "docs/audit/findings.md:42",
+        "programs/shortwin/src/instructions/apply_config.rs:80",
+        "programs/shortwin/src/state/config.rs:193"
+      ],
+      "reason": "All three prior entries describe installing a governance successor without its signature or acceptance, including an unusable governance key and recovery by upgrade. apply_config still checks the approved change and applies it without successor control. Choosing the config PDA makes the already-recorded unreachable-key mechanism concrete; it does not add a distinct authority-transfer mechanism."
+    },
+    {
+      "raw_id": "p1-a02-b02",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:30",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:46",
+        "docs/audit/ai-review/report-1-instructions.md:377",
+        "programs/shortwin/src/state/position.rs:18",
+        "programs/shortwin/src/instructions/close_short.rs:84"
+      ],
+      "reason": "Earlier L20/L36 and the original instruction report identify the same missing POSITION_OPEN predicates in the four exits while add_margin checks status. The reserved ExitInProgress state remains a future writer obligation; successful exits close accounts. This is prior hardening coverage, not prior owner acceptance of a current exploit."
+    },
+    {
+      "raw_id": "p1-a04-b01",
+      "relation": "new_to_register",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:71",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:31",
+        "services/common/src/tx.rs:295",
+        "services/common/src/tx.rs:308"
+      ],
+      "reason": "The older ALT findings concern market-table selection/extension and caching addresses at keeper startup. Current parse_lookup_table instead turns a missing 56-byte metadata slice into an empty address list after only checking the state tag. This malformed-header acceptance is a different parser boundary from the previously reviewed ALT lifecycle. No exact prior mechanism was identified in the supplied register and linked review material; this relation is not a reachability verdict."
+    },
+    {
+      "raw_id": "p1-a04-b02",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:43",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:48",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:50",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "services/keeper/src/view.rs:48",
+        "services/keeper/src/view.rs:263",
+        "services/keeper/src/view.rs:284"
+      ],
+      "reason": "Earlier version hardening added VenueGuard constraints to on-chain readers. The candidate concerns keeper decode_zc/load_with_positions using GlobalConfig and Market without comparing their versions: owner/discriminator/minimum length still pass. Thus the generic upgrade-compatibility pattern is known but the keeper account types and interpretation boundary are a distinct remaining extension; the on-chain VenueGuard fix does not cover it."
+    },
+    {
+      "raw_id": "p1-a04-b03",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-75",
+        "AIR-20"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:85",
+        "docs/audit/known-issues.md:237",
+        "programs/shortwin/src/engine/arming.rs:29",
+        "programs/shortwin/src/engine/arming.rs:208"
+      ],
+      "reason": "KI-75/AIR-20 expressly retain raw live liquidity and live buyback/sigma for S1/S2, with only the CR spot gate floored at EMA liquidity. Their withdrawal-wrapped settlement outside the honest box is exactly the candidate path. The candidate supplies no independently expanded current amount or condition beyond those prior disclosures."
+    },
+    {
+      "raw_id": "p1-a04-b04",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-23"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:99",
+        "programs/shortwin/src/instructions/liquidate.rs:35",
+        "programs/shortwin/src/instructions/liquidate.rs:356",
+        "services/keeper/src/coverage.rs:47"
+      ],
+      "reason": "The held withdrawal followed by withdraw-wrapped observations preserving the genuinely reached low is FITX-1/KI-23. assess uses the same liquidity-history floor and the source explicitly retains this path. This is not the distinct pre-AIR-17 guarded bucket-low contest, and the candidate provides no new bound beyond KI-23."
+    },
+    {
+      "raw_id": "p1-a05-b01",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-5-math-core.md:320",
+        "docs/audit/known-issues.md:182",
+        "docs/audit/known-issues.md:69",
+        "docs/audit/known-issues.md:70",
+        "crates/shortwin-math/src/pool.rs:1897",
+        "crates/shortwin-math/src/pool.rs:1908"
+      ],
+      "reason": "The original report-5-math-core lead explicitly says the last burn leaves carry/carry_r at S=0 and the first post-deposit credit divides the old remainder among new shares. Current withdraw_in confirms the same empty-cohort transition. The new candidate adds a detailed no-borrow, source-sweep-aware production trace and numeric bounds; preserve that evidence. Generic FUZZ-M10-24H-A carry residuals, KI-09 vest forfeiture and KI-10 empty-period protocol income are NOT sufficient duplicate/acceptance grounds on their own. Exact-known here refers only to the precise older raw lead, which has no formal issue ID or recorded adjudication located; it does not mean fixed, accepted, or covered by a historical dust bound."
+    },
+    {
+      "raw_id": "p1-a05-b02",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "AIR2-04",
+        "AIR2-05",
+        "AIR-02"
+      ],
+      "sources": [
+        "docs/audit/findings.md:40",
+        "docs/audit/findings.md:41",
+        "docs/audit/known-issues.md:219",
+        "docs/audit/findings.md:74",
+        "docs/audit/findings.md:79",
+        "programs/shortwin/src/instructions/deposit.rs:130",
+        "crates/shortwin-math/src/pool.rs:965"
+      ],
+      "reason": "AIR2-04/05 expressly make deposits wait for the actual shared vest, including later-credit/split-claim extensions, so extension alone is known. The candidate adds recurrent one-lamport donations near expiry as a cheap continuing deposit-availability trigger. This also differs from fixed AIR-02: vest_in now floors the weighted end, while the candidate waits until the residual vest is tiny and still extends that floor result. The new liveness cost/recurrence is not an owner-accepted bound merely because general extensions are documented."
+    },
+    {
+      "raw_id": "p1-a06-b01",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-4-venue-state.md:89",
+        "docs/audit/ai-review-2/triage-math-2026-10-18.md:27",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:76",
+        "crates/shortwin-venue-state/src/mint.rs:169",
+        "programs/shortwin/src/venues/mod.rs:1094"
+      ],
+      "reason": "The original venue-state report names read_base itself, minimum length without SPL exact-length/Token-2022 type checks, crafted token-account bytes, and constrained current caller keys. L38 subsequently hardened the Raydium LP helper, not this generic base reader. The candidate repeats that exact remaining helper-boundary hardening mechanism."
+    },
+    {
+      "raw_id": "p1-a06-b02",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:58",
+        "docs/audit/ai-review-2/report.md:656",
+        "docs/audit/ai-review/report-3-venues.md:137",
+        "programs/shortwin/src/venues/raydium_v4.rs:146",
+        "programs/shortwin/src/venues/raydium_cpmm.rs:169"
+      ],
+      "reason": "L65 and both older venue reports already separate adoption-time vault token-authority verification from cached read-time key/mint/program checks. The candidate retains the same future venue-authorized authority change precondition; it introduces no different substitution path."
+    },
+    {
+      "raw_id": "p1-a06-b03",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:41",
+        "docs/audit/ai-review-2/report.md:633",
+        "programs/shortwin/src/venues/pump_curve.rs:404",
+        "programs/shortwin/src/venues/pump_amm.rs:608"
+      ],
+      "reason": "L42 explicitly records copying both fee-tier lists into Vec allocations and the unresolved maximum valid schedule/heap bound. The adapters retain those collections. This is the same resource-expansion lead, not a new proven tier-count limit."
+    },
+    {
+      "raw_id": "p1-a06-b04",
+      "relation": "exact_known",
+      "issue_ids": [
+        "AIR2-07",
+        "KI-69"
+      ],
+      "sources": [
+        "docs/audit/findings.md:43",
+        "docs/audit/known-issues.md:144",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:12",
+        "programs/shortwin/src/state/venue_guard.rs:45",
+        "programs/shortwin/src/instructions/flag_venue_upgraded.rs:130"
+      ],
+      "reason": "AIR2-07 already distinguishes the 96-bit fixed-hash second-preimage cost from the 48-bit generic chosen-pair collision bound of the 12-byte fingerprint. Current guard storage remains 12 bytes. The earlier review also requires changed ProgramData length to suppress a flag; an unchanged-length slot move flags regardless. KI-69 alone is not acceptance of the chosen-pair extension, but AIR2-07 is an exact existing open record."
+    },
+    {
+      "raw_id": "p1-a06-b05",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-72",
+        "AIR-10"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:83",
+        "docs/audit/known-issues.md:227",
+        "programs/shortwin/src/venues/mod.rs:822",
+        "programs/shortwin/src/venues/pump_amm.rs:702"
+      ],
+      "reason": "KI-72 expressly covers burning live mint supply before PumpSwap liquidation, moving the EMA-market-cap fee tier and raising the otherwise sale-capped risk fee. The source uses the live supply for this same tier. The candidate states no broader mechanism or independently enlarged threshold bound."
+    },
+    {
+      "raw_id": "p1-a06-b06",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-77"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:84",
+        "programs/shortwin/src/venues/pump_curve.rs:470",
+        "programs/shortwin/src/venues/mod.rs:822"
+      ],
+      "reason": "KI-77(a) specifically covers live-supply synthetic fees past rT, including burns increasing risk quotes under a future multi-tier curve schedule with no supply snapshot. pricing_inputs still feeds pump_curve_at_supply into synthetic_fees. This is not the separate ordinary fixed-supply quote issue or PumpSwap-only KI-72."
+    },
+    {
+      "raw_id": "p1-a06-b07",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-77"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:84",
+        "programs/shortwin/src/venues/pump_curve.rs:454",
+        "programs/shortwin/src/venues/pump_curve.rs:470",
+        "programs/shortwin/src/venues/mod.rs:796"
+      ],
+      "reason": "KI-77(b) explicitly states phi_s >= phi because synthetic fees use live supply while ordinary fee gates/no-route/cap terms retain 10^15, allowing a lower gate tier than a synthetic exit pays under multiple tiers. The candidate follows these same two source fields and does not add a separate gate or threshold mechanism."
+    },
+    {
+      "raw_id": "p1-a06-b08",
+      "relation": "exact_known",
+      "issue_ids": [
+        "AIR-10",
+        "KI-77"
+      ],
+      "sources": [
+        "docs/audit/ai-review-2/report.md:622",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:37",
+        "docs/audit/known-issues.md:227",
+        "docs/audit/known-issues.md:84",
+        "programs/shortwin/src/venues/mod.rs:1078",
+        "programs/shortwin/src/venues/pump_curve.rs:454"
+      ],
+      "reason": "Prior AI2 L31/raw report already identifies a sale moving the ordinary curve spot fee while exit readers resolve EMA fees only for PumpSwap, conditional on multiple curve tiers. This is an exact prior open lead. AIR-10/KI-77 are related context, not grounds to call the sale case accepted as the burn residual: a fixed supply prevents a supply change, not a spot-price sale."
+    },
+    {
+      "raw_id": "p1-a07-b01",
+      "relation": "new_to_register",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "services/keeper/src/pool_monitor.rs:174",
+        "services/keeper/src/pool_monitor.rs:232",
+        "services/keeper/src/pool_monitor.rs:252",
+        "services/keeper/src/pool_monitor.rs:259"
+      ],
+      "reason": "The keeper discovery object retains an earlier venue LP counter, then rank_keys fetches only the later reserve vault and LP mint; score subtracts that later supply from the old counter and rank drops zero scores before complete verification. The older services review acknowledges multi-RPC state reads but does not identify this cached-counter/updated-supply subtraction and pre-verification exclusion. AIR2-09 changes whole-bps arithmetic on coherent inputs, so it does not address this separate temporal-state mechanism."
+    },
+    {
+      "raw_id": "p1-a07-b02",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "AIR2-09"
+      ],
+      "sources": [
+        "docs/audit/findings.md:45",
+        "docs/audit/ai-review-2/triage-math-2026-10-18.md:22",
+        "crates/shortwin-math/src/pool_select.rs:31",
+        "services/keeper/src/pool_monitor.rs:232",
+        "services/keeper/src/pool_monitor.rs:252",
+        "services/keeper/src/pool_monitor.rs:259"
+      ],
+      "reason": "AIR2-09 replaced on-chain locked_depth with the raw locked-LP ratio, retaining lambda_bps as a display/threshold helper. Keeper score still multiplies the whole-bps lambda_bps by reserve SOL and rank removes zeros. Thus the same premature-rounding pattern remains in the separate preselection service and can omit a pool that the fixed on-chain verifier would accept; do not label it already fixed under AIR2-09. It is also separate from mixed-snapshot LP inputs."
+    },
+    {
+      "raw_id": "p1-a07-b03",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:69",
+        "docs/audit/ai-review-2/report.md:673",
+        "docs/audit/ai-review/report-3-venues.md:134",
+        "programs/shortwin/src/venues/mod.rs:1266",
+        "services/keeper/src/venue.rs:656"
+      ],
+      "reason": "L82 describes on-chain coin_creator resolution missing for PumpCurve. Here the on-chain parser supplies the PumpSwap creator from its cache, but keeper resolve_entry lacks that placeholder altogether and drops the configured set. The venue, resolver and failing boundary differ; prior curve-only template hardening cannot close this keeper/PumpSwap omission."
+    },
+    {
+      "raw_id": "p1-a07-b04",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/report.md:667",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:64",
+        "programs/shortwin/src/instructions/sweep_trader.rs:248"
+      ],
+      "reason": "AI2 L76 already traces a donation into pump UVA/PumpSwap cashback ATA, a future claim-interface change requiring unavailable trader authorization, rewards_clear never becoming true, and WipeSweepPending after wipe or last-lender exit. This is the same retained external-claim dependency. AIR2-12 alternate-destination cashback is a different current-account routing problem and is not a substitute duplicate reason."
+    },
+    {
+      "raw_id": "p1-a07-b05",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-23"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:99",
+        "services/keeper/src/coverage.rs:33",
+        "services/keeper/src/coverage.rs:47",
+        "programs/shortwin/src/instructions/liquidate.rs:356"
+      ],
+      "reason": "The coverage source explicitly preserves a genuinely reached low during subsequent withdraw-wrapped cranks, the same FITX-1/KI-23 held-drain residual. Per-second honest coverage prevents new attacker-only dragging but cannot raise that historical low. The candidate adds no distinct coverage trigger or established larger bound."
+    },
+    {
+      "raw_id": "p1-a08-b01",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:30",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:46",
+        "docs/audit/ai-review/report-1-instructions.md:377",
+        "programs/shortwin/src/state/position.rs:18",
+        "programs/shortwin/src/instructions/close_short.rs:84"
+      ],
+      "reason": "Earlier L20/L36 and the original instruction report identify the same missing POSITION_OPEN predicates in the four exits while add_margin checks status. The reserved ExitInProgress state remains a future writer obligation; successful exits close accounts. This is prior hardening coverage, not prior owner acceptance of a current exploit."
+    },
+    {
+      "raw_id": "p1-a09-b01",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:40",
+        "docs/audit/ai-review-2/report.md:626",
+        "docs/audit/ai-review-2/triage-pass2-2026-10-18.md:80",
+        "programs/shortwin/src/instructions/deposit.rs:94"
+      ],
+      "reason": "L35 and the implied-owner pass-2 group record the same canonical lending-vault construction invariant: create_market initializes the PDA with mint/authority and later loaders rely on that identity. Deposit has the same seeds/bump-only token-account load. A hypothetical future importer breaks this shared invariant, rather than introducing a new currently replaceable vault path. This is prior hardening coverage, not a statement that arbitrary future importers are safe."
+    },
+    {
+      "raw_id": "p1-a09-b02",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:58",
+        "docs/audit/ai-review-2/report.md:656",
+        "docs/audit/ai-review/report-3-venues.md:137",
+        "programs/shortwin/src/venues/raydium_v4.rs:146",
+        "programs/shortwin/src/venues/raydium_cpmm.rs:169"
+      ],
+      "reason": "L65 and both older venue reports already separate adoption-time vault token-authority verification from cached read-time key/mint/program checks. The candidate retains the same future venue-authorized authority change precondition; it introduces no different substitution path."
+    },
+    {
+      "raw_id": "p1-a09-b03",
+      "relation": "exact_known",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-3-venues.md:128",
+        "programs/shortwin/src/venues/pump_curve.rs:1047"
+      ],
+      "reason": "The original venue report specifically identifies both init_uva implementations skipping CPI for a nonempty venue-owned canonical UVA without decoding/user checks, despite stricter trade-time validation. The same branch remains in pump_curve::init_uva. The candidate is a prior raw hardening lead with a future venue-layout precondition, not a new project mechanism."
+    },
+    {
+      "raw_id": "p1-a10-b01",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-77"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:84",
+        "docs/audit/ai-review/report-6-math-rest.md:362",
+        "docs/audit/ai-review/report-3-venues.md:138",
+        "crates/shortwin-math/src/fees.rs:164",
+        "programs/shortwin/src/venues/pump_curve.rs:454"
+      ],
+      "reason": "The original math and venue reports already record fixed 10^15 supply for ordinary curve fees against live-supply venue fees after burns under hypothetical multiple tiers. KI-77 retains this ordinary basis while adding separate live-supply synthetic fees. This is the same mechanism as p1-a01-b01, with a different entry point, not project-new merely because the new ledger starts empty."
+    },
+    {
+      "raw_id": "p1-a11-b01",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "KI-17"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:93",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "programs/shortwin/src/engine/pool_select.rs:363",
+        "programs/shortwin/src/engine/pool_select.rs:376",
+        "programs/shortwin/src/instructions/propose_pool.rs:315",
+        "services/keeper/src/pool_monitor.rs:376"
+      ],
+      "reason": "KI-17 and M4R-2 specify the proposal floor at min(P_ema,P_cand); the execution intentionally uses P_ema. Keeper evaluate instead supplies P_ema to its proposal window_floor verdict. The prior register discusses the deliberate on-chain policy and candidate manipulation, not the keeper selecting a candidate that the same proposal refuses. This cross-component mismatch is a distinct extension; earlier shared-verifier review prose does not cover the wrong argument."
+    },
+    {
+      "raw_id": "p1-a11-b02",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "KI-17"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:93",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "programs/shortwin/src/engine/pool_select.rs:376",
+        "services/keeper/src/pool_monitor.rs:538",
+        "services/keeper/src/pool_monitor.rs:548"
+      ],
+      "reason": "The proposal policy documented under KI-17 uses candidate-dependent min(EMA,spot), so candidate floor validity is not ordered by depth alone. Keeper plan expressly assumes one common EMA price and exits when the deepest pool fails the floor, instead of searching shallower passing pools as it does for carried-fit failures. This is a distinct remaining planner extension beyond p1-a11-b01: correcting evaluate alone exposes rather than removes this early return."
+    },
+    {
+      "raw_id": "p1-a11-b03",
+      "relation": "related_distinct_extension",
+      "issue_ids": [
+        "AIR2-09"
+      ],
+      "sources": [
+        "docs/audit/findings.md:45",
+        "docs/audit/ai-review-2/triage-math-2026-10-18.md:22",
+        "crates/shortwin-math/src/pool_select.rs:31",
+        "services/keeper/src/pool_monitor.rs:232",
+        "services/keeper/src/pool_monitor.rs:252",
+        "services/keeper/src/pool_monitor.rs:259"
+      ],
+      "reason": "AIR2-09 replaced on-chain locked_depth with the raw locked-LP ratio, retaining lambda_bps as a display/threshold helper. Keeper score still multiplies the whole-bps lambda_bps by reserve SOL and rank removes zeros. Thus the same premature-rounding pattern remains in the separate preselection service and can omit a pool that the fixed on-chain verifier would accept; do not label it already fixed under AIR2-09. It is also separate from mixed-snapshot LP inputs."
+    },
+    {
+      "raw_id": "p1-a11-b04",
+      "relation": "new_to_register",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+        "services/keeper/src/pool_monitor.rs:174",
+        "services/keeper/src/pool_monitor.rs:232",
+        "services/keeper/src/pool_monitor.rs:252",
+        "services/keeper/src/pool_monitor.rs:259"
+      ],
+      "reason": "The keeper discovery object retains an earlier venue LP counter, then rank_keys fetches only the later reserve vault and LP mint; score subtracts that later supply from the old counter and rank drops zero scores before complete verification. The older services review acknowledges multi-RPC state reads but does not identify this cached-counter/updated-supply subtraction and pre-verification exclusion. AIR2-09 changes whole-bps arithmetic on coherent inputs, so it does not address this separate temporal-state mechanism."
+    },
+    {
+      "raw_id": "p1-a11-b05",
+      "relation": "exact_known",
+      "issue_ids": [
+        "KI-69",
+        "AIR-01"
+      ],
+      "sources": [
+        "docs/audit/known-issues.md:144",
+        "docs/audit/known-issues.md:218",
+        "programs/shortwin/src/instructions/flag_venue_upgraded.rs:126"
+      ],
+      "reason": "KI-69 residual (a) expressly says initialize_config records no fingerprint, revalidation without a hash leaves none, and a permissionless extension then latches the venue until Emergency revalidation. The if-let fingerprint branch in flag_venue_upgraded is the same fallthrough. This is separate from AIR2-07 chosen-pair collisions and KI-73 loader one-slot unavailability."
+    },
+    {
+      "raw_id": "p1-a11-b06",
+      "relation": "exact_known",
+      "issue_ids": [
+        "AIR2-07",
+        "KI-69"
+      ],
+      "sources": [
+        "docs/audit/findings.md:43",
+        "docs/audit/known-issues.md:144",
+        "docs/audit/ai-review-2/triage-venues-2026-10-18.md:12",
+        "programs/shortwin/src/state/venue_guard.rs:45",
+        "programs/shortwin/src/instructions/flag_venue_upgraded.rs:130"
+      ],
+      "reason": "AIR2-07 already distinguishes the 96-bit fixed-hash second-preimage cost from the 48-bit generic chosen-pair collision bound of the 12-byte fingerprint. Current guard storage remains 12 bytes. The earlier review also requires changed ProgramData length to suppress a flag; an unchanged-length slot move flags regardless. KI-69 alone is not acceptance of the chosen-pair extension, but AIR2-07 is an exact existing open record."
+    },
+    {
+      "raw_id": "p1-a11-b07",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:43",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:48",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:50",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+        "services/keeper/src/view.rs:48",
+        "services/keeper/src/view.rs:263",
+        "services/keeper/src/view.rs:284"
+      ],
+      "reason": "Earlier version hardening added VenueGuard constraints to on-chain readers. The candidate concerns keeper decode_zc/load_with_positions using GlobalConfig and Market without comparing their versions: owner/discriminator/minimum length still pass. Thus the generic upgrade-compatibility pattern is known but the keeper account types and interpretation boundary are a distinct remaining extension; the on-chain VenueGuard fix does not cover it."
+    },
+    {
+      "raw_id": "p1-a12-b01",
+      "relation": "related_distinct_extension",
+      "issue_ids": [],
+      "sources": [
+        "docs/audit/ai-review/report-3-venues.md:115",
+        "docs/audit/ai-review-2/triage-services-2026-10-18.md:57",
+        "services/keeper/src/keeper.rs:2235",
+        "services/keeper/src/keeper.rs:2240",
+        "services/keeper/src/graduation.rs:398",
+        "programs/shortwin/src/venues/pump_amm.rs:503"
+      ],
+      "reason": "The older venue report already identifies missing UVA/recipient ATAs causing trade validation to refuse while the pool read remains executable, with permissionless account creation as recovery. The candidate adds the keeper pamm_ready list cache: identical keys return before checking whether an external account still exists, so preparation does not recreate a closed recipient ATA. That persistent recovery omission is a distinct keeper extension, not established by the older missing-account observation alone; keeper.rs is contextual/outside this run source bundle."
+    }
+  ]
+}

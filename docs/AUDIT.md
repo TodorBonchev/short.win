@@ -62,6 +62,12 @@ to build and test the code, what the code relies on, and what we already know ab
   [`audit/findings.md`](audit/findings.md). Unresolved findings and release gates remain open.
   The original unjudged reports are preserved; the follow-up does not replace the missing
   judge run, pass 3 or an independent audit.
+- **AI review 3 of draft 1.0.2** ([`audit/ai-review-3/`](audit/ai-review-3/README.md);
+  2026-10-18; source `b815269`): two passes yielded eight findings and 23 leads.
+  The archive preserves the failed first-pass lens, per-file coverage and prior-issue
+  comparison. Draft **1.0.3** implements selected corrections; decisions and validation
+  are in the [findings tracker](audit/findings.md#ai-review-3-draft-103-2026-10-18).
+  This is AI-assisted static review, not an independent audit or release approval.
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -76,6 +82,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | [`docs/audit/known-issues.md`](audit/known-issues.md) | the known-issues register (KI-01 …): accepted and disclosed residuals, each with its bound |
 | [`docs/audit/ai-review/`](audit/ai-review/README.md) | the AI-assisted review of v1.0.0 (not a formal audit): its issues and leads (AIR-01 … AIR-24), their fixes and regression tests, and the owner's decisions of 2026-10-12 and 2026-10-13 |
 | [`docs/audit/ai-review-2/`](audit/ai-review-2/README.md) | AI review 2, of short.win 1.0.1 (not a formal audit; stopped after pass 1 of 3): its report, proofs of concept, pass 2's unjudged agent reports and what it did not cover |
+| [`docs/audit/ai-review-3/`](audit/ai-review-3/README.md) | Two-pass review of draft 1.0.2 at `b815269`: immutable reports, coverage, dispositions and the draft 1.0.3 triage register |
 | [`docs/audit/findings.md`](audit/findings.md) | the findings tracker (the auditors' findings and their resolution) |
 | [`docs/audit/README.md`](audit/README.md) | the folder index |
 | [`SECURITY.md`](../SECURITY.md) | the vulnerability disclosure policy |
@@ -87,7 +94,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | Item | Value |
 |---|---|
 | Audit commit / tag | **`e4895c2`, tagged `audit-1` / `v1.0.0`** (2026-10-11), the head of `m1-core` at the tag: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration), then the **FE-30 batch** (branch `m10/fe30`, 2026-10-08: the web and the indexer only, owner decisions of the ninth round; the program bytes unchanged), then the fuzzer fix `9861c5a` (run D's two oracle findings, FUZZ-24D-A and FUZZ-M10-24H-D-B: `tests/fuzz` and docs), then the **M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10: phone and tablet layouts, the desktop terminal's fixes; the owner's twelfth round; approved as built in the thirteenth round, 2026-10-10) and the **round-13 UX batch** (m1-core `7a64dcd`, 2026-10-11: O-1 lend order, O-2 coverage notice once, O-3 newcomer help, O-4 12 px floor, O-5 Claim wording; its 143 new strings and the `borrower.liquidation` ¶3 amendment approved by the owner on 2026-10-11) — the web only; then the evidence sync `04c5236` (docs), the lint fix `7b2121d` (the web's lint configuration, M10-CI-LINT) and the CI record `e4895c2` (docs). The program bytes are those of the KI-66 full / KI-67 batch. **Tagged on 2026-10-11** (the owner's decision of that day; owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x); its program hashes are the table below (CI run 38125079869's verifiable build on `7b2121d`; `e4895c2` changes only docs) |
-| Package version | At the tag `shortwin` and `complete_curve` were both 1.0.0. The released source since 2026-10-16 is `shortwin` 1.0.1 (§13); `complete_curve` is retired. The draft AI review 2 candidate is **1.0.2** (`source_release` `v1.0.2`), with no release tag or deployment |
+| Package version | At the tag `shortwin` and `complete_curve` were both 1.0.0. The released source since 2026-10-16 is `shortwin` 1.0.1 (§13); `complete_curve` is retired. AI review 3 scanned the 1.0.2 candidate at `b815269`; the current unreleased gate candidate is **1.0.3** (`source_release` `v1.0.3`), with no release tag or deployment |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
 | TEST-ONLY mock venue | `BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7` (`tests/mock_cpamm`; never deployed; out of scope, §2) |
@@ -202,7 +209,7 @@ committed 1.0.1 program, not the draft AI review 2 fixes or the full release gat
 
 ---
 
-**Unreleased candidate: short.win 1.0.2 (2026-10-18).** The broader AI review 2
+**Historical unreleased candidate: short.win 1.0.2 (2026-10-18, `b815269`).** The broader AI review 2
 batch changes the program, math, models and clients. It includes reserved-byte migrations for
 legacy deposit holds and settlement arms without changing Market's 3,104-byte size. The
 [findings tracker](audit/findings.md#ai-review-2-working-tree-batch-2026-10-18) records the fixes,
@@ -219,6 +226,39 @@ These are local test artifacts, **not verifiable-build or deployment evidence**.
 including mutations, passed on committed 1.0.1. It does not cover this candidate. Release
 still requires resolution or acceptance of the open findings, the full
 gate on that revision, an exact-tree verifiable build, ≥24 h fuzz and auditor fix review.
+
+**Current unreleased draft: short.win 1.0.3 (2026-10-18).** AI review 3 adds the
+final-withdrawal carry correction and keeper/parser fixes to `b815269`. Account layouts
+and instruction formats are unchanged; the IDL version and WASM/client artifacts were
+regenerated. The same canonical build commands produced:
+
+| Candidate artifact (local and CI) | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
+|---|---|---|---|
+| `target/deploy/shortwin.so` | `b88aa520c24301522b45871e73622a4d498603dc03a8f34ff8bbb557d7fa0647` | `22d1cda5be8eaae7aa00f45b8a17f64edfb5b4d84d21e3f7ad545f966b83ea1a` | 1,642,664 |
+| `target/test-venue/deploy/shortwin.so` | `994ad12c468f465937af21080ec3c48678bb1f197ab143ab44f91f98ca56132b` | `282998677eea81be8b7711c79177e0424ed8544db3cec28d1ba4289f5e43c682` | 1,673,696 |
+
+Both are SBPF v3. A49 passes, and the release ELF's `security.txt` names `v1.0.3`.
+The pinned solana-verify 0.5.2 image rebuilt the release program from an isolated
+snapshot of these program sources and reproduced the release file and executable hashes
+byte for byte. The exact-ref CI verifier job on `9b91060` also passed and its downloaded
+ELF compares byte-for-byte equal to that run's Anchor artifact; the
+[CI hash record](audit/ci-1.0.3-hashes.txt) records the image and both build artifacts.
+[Exact-ref CI run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
+passed on `9b91060`: 25 jobs successful, with only the scheduled fuzz job skipped.
+These are not deployment evidence.
+The [draft validation record](audit/ai-review-3/validation-1.0.3.md) lists the checks
+and remaining release gates; the older build and CI evidence above does not cover
+these bytes.
+
+**Independent fix review (2026-10-19):** the
+[separate AI review](audit/ai-review-3/independent-fix-review-1.0.3.md) accepts the
+keeper, reader/retry and ALT corrections (packet Q2/Q3/Q4). Q1's carry correction is
+accepted conditionally: an already-empty pre-fix pool is not migrated, recorded as
+**AI3-FR01 open**. The [written unresolved treatment](audit/ai-review-3/unresolved-1.0.3.md)
+and [known-issues §8](audit/known-issues.md#8-open-items-from-the-103-fix-review) retain
+the prior open findings and remaining leads with evidence limits and completion criteria.
+This is not external firm acceptance or new owner sign-off. The ≥24 h zero-failure fuzz
+and release gates remain required; the merge does not tag or deploy 1.0.3.
 
 ## 1. The protocol on one page
 

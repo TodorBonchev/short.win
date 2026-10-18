@@ -1,0 +1,167 @@
+[
+  {
+    "key": "shortwin-math|withdraw-in|carry-crosses-empty-pool",
+    "label": "move carry to dust at the empty transition",
+    "sha256": "a1500428566c7a7e5707473832a7dc1c5f25374b7c76f6c4efeee129ca92e4f4",
+    "sources": [
+      {
+        "raw_id": "p2-a01-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin|apply-config|unsafe-authority-transfer",
+    "label": "require governance acceptance; pause and coverage remain unchecked",
+    "sha256": "4d519ab4afbb1a04c0c313cd3b6f058e518a1eefc1fdf6f9b1fcaf717e910d56",
+    "sources": [
+      {
+        "raw_id": "p2-a02-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin|apply-config|unsafe-authority-transfer",
+    "label": "require every changed enabled authority to sign",
+    "sha256": "007961919a5297b5a1ccde1b5fafe5a73f11c720035faaf049d0a9e5388a4b81",
+    "sources": [
+      {
+        "raw_id": "p2-a06-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin|flag-venue-upgraded|unhashed-slot-upgrade-latch",
+    "label": "Require hashes before enabling fingerprint-capable venues; existing guards need bootstrap",
+    "sha256": "3aa11f29a78856c3ba23fb17e388fd189a348e8f57ba87c1c661f59ba14bf86f",
+    "sources": [
+      {
+        "raw_id": "p2-a02-b02",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin|flag-venue-upgraded|unhashed-slot-upgrade-latch",
+    "label": "Require and verify hashes; repeats hashing after a slot change and needs bootstrap",
+    "sha256": "c952551d83e86d98be131a7902844e65de832819d0786a56e54c74c8f7dfc389",
+    "sources": [
+      {
+        "raw_id": "p2-a09-b02",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin-keeper|score|stale-lp-counter",
+    "label": "Refresh each pool, vault and LP mint within one 99-key request; unapplied and uncompiled",
+    "sha256": "3915b3c783493b5f5baeb43687e9fba9400b2703411e443f49ae53d0c90e6df1",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin-keeper|score|rounded-lock-share-ranking",
+    "label": "Calculate raw locked LP times reserve before division; unapplied and uncompiled",
+    "sha256": "1d0387cf9fe5f791b113fdc6a81511cf58fcb5c8936fff9ae4caeafa46b2aae7",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b02",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin-keeper|evaluate|wrong-window-floor-reference",
+    "label": "Use the proposal-specific window_price; unapplied and uncompiled",
+    "sha256": "37006611473db25a3e529d8ce5f4565d36e22551170a8c08ec8087779390453c",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b03",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin-keeper|plan|false-window-floor-monotonicity",
+    "label": "Search each window candidate for both floor and carried fit; unapplied and uncompiled",
+    "sha256": "949b5e4da4407507ed10e1688af32d2af77767c053d4555908341a84472cb797",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b04",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin-keeper|resolve-entry|unsupported-coin-creator-placeholder",
+    "label": "resolve the cached PumpSwap creator with an expression arm; unapplied and uncompiled",
+    "sha256": "38b96ea6b96bdab43a63bb82120bccf734080e55df8fc580a9f6ab4305594295",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b05",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "key": "shortwin-keeper|resolve-entry|unsupported-coin-creator-placeholder",
+    "label": "resolve the cached PumpSwap creator with a block arm; unapplied and uncompiled",
+    "sha256": "19d3d04ffc02d14169de9cf4f11f6133deb8c71941e25ab566fdf02f4096d975",
+    "sources": [
+      {
+        "raw_id": "p2-a11-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  }
+]

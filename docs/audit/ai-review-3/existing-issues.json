@@ -1,0 +1,554 @@
+[
+  {
+    "id": "KI-01",
+    "file": "docs/audit/known-issues.md",
+    "line": 61,
+    "row": "| KI-01 | Exit sandwich under the fixed 2 % bound: a keeper that sandwiches a liquidation takes up to \u2248 2 % of the reference cost from the borrower, at the first second or later (ECON \u00a712.2) | Capped Tier A position: keeper +1.50 SOL over an honest keeper, borrower \u22122.02 SOL; on an expiry +0.35 SOL; lenders lose nothing. On the real venues (M10 WP-8b, ECON \u00a712.2): CPMM USELESS +5.34 SOL over an honest keeper (borrower \u22126.96), PumpSwap +1.05 (borrower \u22121.21); the lenders' and protocol's legs end 2,158 (USELESS), 4,177 (AMM v4), 800 (PumpSwap) and 77 (the CPMM creator-fee pool) lamports below an honest liquidation's, because the front-run's own fees lower `B\u0302_ref` by \u2248 10\u207b\u2077 | O19 | disclosed; the real-venue figures accepted (owner, 2026-10-03: CPMM's +5.34 is the figure the decision cites) |"
+  },
+  {
+    "id": "KI-02",
+    "file": "docs/audit/known-issues.md",
+    "line": 62,
+    "row": "| KI-02 | Held model: an attacker holds the pool at a manipulated price for whole seconds. A keeper can then take the remainder of a borrower who is already being liquidated (ECON \u00a712.6) | Tier A: keeper +8.36 SOL over an honest keeper, borrower \u221219.5 SOL (the sim's held plan, 2 s at +20 %, under AIR-22's lower-median growth; +5.66 SOL with the 3-s plan before AIR-22, KI-76). **On the real venues** (M10 WP-8b, ECON \u00a712.6; 3 s held at +15 % before the best sandwich, at each venue's capped test position; net of the push's cost): AMM v4 **+61.27 SOL** (atomic +22.72; borrower's remainder 237.67 \u2192 101.74), CPMM USELESS **+37.33** (atomic +13.95; 146.0 \u2192 62.5), PumpSwap **+10.20** (atomic +2.55; 25.38 \u2192 10.79); the curve's held runs stay below its atomic +0.064. The loss falls on the liquidated borrower only; the lenders' and protocol's legs are at least the honest run's (I11 holds over the lifted reference). Keeper competition is the M11 lever. The real-venue figures predate AIR-22, which lets 2 held seconds instead of 3 open the growth cap (KI-76), and are not re-measured | O19; SPEC \u00a714 O19 (2026-10-03) | accepted (owner, 2026-10-03: the real-venue figures, no program change) |"
+  },
+  {
+    "id": "KI-03",
+    "file": "docs/audit/known-issues.md",
+    "line": 63,
+    "row": "| KI-03 | A liquidation reserves nothing (v0.4.1). Lenders and protocol lose the penalty, and on aged positions the rent, that the bought-down vault no longer covers (ECON \u00a78.2) | Tier A \u22123.34 SOL fresh; \u22124.54 SOL at 25 days and 90 % utilisation (\u22122.06 / \u22128.02 SOL before AIR-22, whose lower-median growth changes the attacker's best plan; KI-76). The alternative, a rent-only reserve, costs one extra S1 in the 1,655-run battery (measured with v0.4.1's growth rule); under the lower median it keeps the rent out of reach on aged Tier B only (+0.52 instead of \u22123.94 SOL) and costs more on aged Tier A and RA (\u22129.18 / \u22122.61 instead of \u22124.54 / \u22121.26 SOL) | O19 (accept, or the rent-only reserve: a program change) | disclosed |"
+  },
+  {
+    "id": "KI-04",
+    "file": "docs/audit/known-issues.md",
+    "line": 64,
+    "row": "| KI-04 | OI-cap baskets on low-fee Raydium pools stay marginally profitable for an attacker (ECON \u00a712.5\u2013\u00a712.6) | +0.5 to +8.5 SOL at the OI cap | O19 | disclosed |"
+  },
+  {
+    "id": "KI-05",
+    "file": "docs/audit/known-issues.md",
+    "line": 65,
+    "row": "| KI-05 | Paid veto: a borrower can keep failing the robust-spot leg every second and so delay its own liquidation (ECON \u00a712.9 (b)). The flat-step veto of the sustained growth, which anyone can pay, is KI-76 (AIR-22) | Limited by the borrower's own equity. At \u00d71.00: 56 / 68 / 95 s on the A / B / C example markets, at 0.35 / 0.19 / 0.023 SOL per second | O19 | disclosed |"
+  },
+  {
+    "id": "KI-06",
+    "file": "docs/audit/known-issues.md",
+    "line": 66,
+    "row": "| KI-06 | A one-second push can move the amount of an S2 or S3 settlement (ARCH \u00a73.8; ECON \u00a712.11) | At most `fv_dev_bps` (\u00b11 %). The Emergency-flag S3 case moves +0.70 SOL | O19 | disclosed |"
+  },
+  {
+    "id": "KI-07",
+    "file": "docs/audit/known-issues.md",
+    "line": 67,
+    "row": "| KI-07 | Settlement deferral: each attacker-only second defers a settlement by \u2248 13 s. A paid contrary observation every second defers S1, or an S3 on an executable venue, for as long as it is paid (ECON \u00a75.6, \u00a712.10, \u00a712.11). The LP variant, deposits wrapped around the records of 4 of every 8 seconds, raised the box's `L_mhi` at will (G-E4 doubled `L_hi` on the fork); since AIR-15 it widens the box only up to the market's depth cap, `L_hi = max(L_ema, min(L_mhi, cap))` (the cap D on Raydium and PumpSwap; the curve takes no deposits) | 0.002 SOL/s (the RC example market) to 0.21 SOL/s (A) at a 1 % round trip. The LP variant: \u2248 2,500 lamports a second in fees plus pool-sized capital in both assets for each wrap, and `L_hi` at most the depth cap | O19 | disclosed |"
+  },
+  {
+    "id": "KI-08",
+    "file": "docs/audit/known-issues.md",
+    "line": 68,
+    "row": "| KI-08 | In degraded mode (no keeper, or a censored keeper), 5 consecutive attacker-only seconds move the settlement box's medians and flip a capped S2 into an uncapped S1 (ECON \u00a712.11) | +2.37 to +5.58 SOL for the attacker on the drained RA model cases, at a cost of 1.1\u20132.0 SOL | O19 | disclosed |"
+  },
+  {
+    "id": "KI-09",
+    "file": "docs/audit/known-issues.md",
+    "line": 69,
+    "row": "| KI-09 | A lender who exits forfeits its unreleased vest to the lenders who stay (ECON \u00a79.4). Since M10 the vest also holds the rent top-up of an exit (KI-52). A lender keeps its part by waiting until the market's `vest_end` (ECON \u00a79.5's lender guidance). The last lender's exit is paid the whole vest (R3B-2); since KI-65's fix that holds in a rebased pool too | The vest of lumps, premiums and rent top-ups: `lump_vest_s`, 6 h by default, at most 604,800 s (7 days) at the compiled bound | O19 | disclosed |"
+  },
+  {
+    "id": "KI-10",
+    "file": "docs/audit/known-issues.md",
+    "line": 70,
+    "row": "| KI-10 | SOL that arrives while a market has no lender goes to the protocol. Since AIR-08 this holds on a market every lender left by withdrawals too: a deposit into a pool without shares waits for the sweep that books that SOL to `protocol_fees` (before, `[deposit, claim_cashback, sweep_trader, withdraw]` took it) | Per arrival | O19 | disclosed |"
+  },
+  {
+    "id": "KI-11",
+    "file": "docs/audit/known-issues.md",
+    "line": 71,
+    "row": "| KI-11 | **Rebase-orphan dust (fixed, KI-65).** Before M10's KI-65 fix a rebase floored each lender's shares and `S` separately, leaving up to `n \u2212 1` shares of `S` no lender held, whose part of later credits nobody could claim (ECON \u00a79.5) | None since the fix: a lender's conversion through a rebase record rounds cumulatively (the record's `conv_rem`), so the lenders of the old epoch end with exactly the new `S`; I-P6's residue is rounding only (the hooks' I1 holds `\u03a3 shares = S` after every transaction). Before: at most `(lenders in the epoch)/S_new` of later credits while a real lender stayed (0.012\u20130.100 SOL in the final tree's 24 h fuzz's triaged reproducers) | O19; KI-65 | fixed (program, KI-65) |"
+  },
+  {
+    "id": "KI-12",
+    "file": "docs/audit/known-issues.md",
+    "line": 72,
+    "row": "| KI-12 | Sale-wrapped open (M7-SEC-4): the open records `N_open` on the reserves after the open, which a sale in the same transaction lowers. `N_open` sets the launch cap `market_max_notional`, `min_notional` and the open fee. The D4 margin is not affected (ARCH \u00a73.4). On the curve the same holds for the open fee and the notional limits (ARCH \u00a74.6 \"Residual (not changed)\") | `N_open` \u2265 0.90 of the honest quote (measured 0.9096). The launch cap can be exceeded by at most \u2248 11 % (measured +8.0 % at 25 SOL). `min_notional` can be undercut by \u2248 9 % | SPEC \u00a714 M7-11 (O19) | accepted (owner, 2026-10-01) |"
+  },
+  {
+    "id": "KI-13",
+    "file": "docs/audit/known-issues.md",
+    "line": 73,
+    "row": "| KI-13 | Run residual: lenders who withdraw just before an S1 gain over those who stay (ECON \u00a79.3). Lock decay (AIR-11, intended design): when interest fades, \u03a0 returns \u2248 94 % of the allowance within a day to the lender whose lock set `b_min`; a later lock in the same lock era inherits that `b_min` and decays only once \u03a3B_Q falls below it, otherwise at `lock_until`. This over-locks, so I-P4 holds; its value side is this row: unlocked co-lenders who exit first leave more of a later loss on the over-locked lender | The runner gains +4.3 % over fair value at 90 % utilisation and up to +11.1 % at 50 %. The inherited `b_min`: locked until \u03a3B_Q falls below it or `lock_until` (\u2248 31 days by default, \u2248 101 at most); \u2248 33 of a 100-token loss moved onto the over-locked lender in the AI review's example | O10 (standing: accepted for the MVP; a withdrawal queue in v1.1); the lock decay (AIR-11): AI review decision 7 (owner, 2026-10-12), intended design, no program change | disclosed (standing item); the lock decay accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-14",
+    "file": "docs/audit/known-issues.md",
+    "line": 74,
+    "row": "| KI-14 | Gap risk stays with the lenders. A gap that outruns the whole cushion is a lender loss (SPEC R3; ECON \u00a711.5). Gap frequencies are not calibrated (U21) | Losses start beyond \u2248 2.1\u00d7 / 2.6\u00d7 / 3.1\u00d7 / 4\u00d7 (Tier A / B / C / D). At 10\u00d7 lenders lose 78 / 73 / 68 / 58 % of the lent tokens' value | SPEC D3/D4; O9 (calibration, M10 WP-9) | by design; frequencies uncalibrated: the public-RPC crawl runs since 2026-10-02, results and the owner's review after \u2265 30 days; Tier A/B rates will be upper bounds (owner decision of 2026-10-02; ARCH \u00a712 U21) |"
+  },
+  {
+    "id": "KI-15",
+    "file": "docs/audit/known-issues.md",
+    "line": 75,
+    "row": "| KI-15 | Creator self-dealing (SPEC R1). The coin creator earns venue creator fees on every short.win leg (ECON \u00a712.8). Per-wallet caps are per key, so one actor with four wallets can fill a market's OI cap (M7-SEC-9). On CPMM, part of that fee may now go to Raydium instead (KI-58) | The per-market OI and notional caps | SPEC \u00a712 R1 | disclosed |"
+  },
+  {
+    "id": "KI-52",
+    "file": "docs/audit/known-issues.md",
+    "line": 76,
+    "row": "| KI-52 | **M10-8C-1 (fixed).** v0.4.1 credited the rent paid above what had accrued \u2014 `R_min` on an exit within `min_rent_s` of the open, and a settlement's `R_due` against a credit net of it \u2014 to the lenders at once, so a JIT depositor's `[deposit 9\u00d7, liquidate, claim_sol, withdraw]` around an early exit took about 9/10 of it. Since WP-6 batch 2 the top-up `max(0, min(principal, rent) \u2212 credited_for(pos))` vests with the lump on every exit path (`pool::rent_top_up`; close, liquidation, expiry, S1/S2/S3; ECON \u00a79.4, ARCH \u00a73.3) | Before the fix: 128,972 of the lenders' 145,549 lamports on a 3 SOL position (`lender_real_it`). After: the atomic bundle realises 0 (`lender_real_it::finding_m10_8c_1_*`); a whale holding `h` takes `h/lump_vest_s` of its share. Residuals: a lender leaving within `lump_vest_s` of an exit forfeits its part of the top-up (KI-09); past `min_rent_s` a settlement's top-up is about `rent_protocol_bps` of the rent (the protocol share `R_due` does not carry), which now vests to the lenders who stay (B2-2). Since AIR-21 an S1's take above `\u230aQ\u00b7P_ema/WAD\u230b + R_due` vests too, so S1 is no longer immediate but for its top-up; a genuine S1 loss still vests only its top-up | SPEC \u00a714 M10-8C-1; AIR-21: SPEC \u00a714 fourteenth round | fixed (owner, 2026-10-02); the vest-forfeit residual by design; the B2-2 consequence for settlements kept as built (owner, 2026-10-03); AIR-21's change to S1 confirmed (owner, 2026-10-13) |"
+  },
+  {
+    "id": "KI-53",
+    "file": "docs/audit/known-issues.md",
+    "line": 77,
+    "row": "| KI-53 | **Late-depositor shortfall.** A shortfall is debited pro rata to the shares holding when it lands, so a lender that deposits while a position carries a large credited receivable bears rent credited before it joined, and can owe more SOL than it ever received; a negative `pending` must be covered (`cover_deficit`) before withdrawing (ECON \u00a79.4; found by the 24 h fuzz, FUZZ-M7-24H-3) | \u2308receivable\u00b7shares/(S + shares)\u2309 at deposit time (receivable including the credit the deposit's own prologue books), growing if others withdraw first. FUZZ-M7-24H-3: \u2248 1,044 SOL owed, 0 received, after 3 days without a keeper on a near-cap position (\u2248 3,640 SOL receivable). Since AIR-07's drain gate (`PoolDrained`, 6108; KI-71) that exact deposit, into a pool with nothing unborrowed, is refused; the exposure remains for a deposit made while more than 1/1,000 of the claims is unborrowed: the fuzzer's revised reproducer owes 1,028.408 SOL at 1.98 \u2030 unborrowed (99.8 % utilisation; `621f8e1`). The fuzzer's deficit tripwire bounds every deficit by the lender's pro-rata share of the realised shortfall (`tests/fuzz/src/shortfall.rs`; smoke tests `deficit_tripwire_on_fuzz_m7_24h_3`, `stale_receivable_reaches_the_tripwire`). The other side of a deficit: the lenders whose shares held less of the debit keep a positive `pending` that only the deficit's cover pays in, and `cover_deficit` is the position owner's alone, so a deficit holder that never returns (a forfeit: its shares can be worth far less than its deficit) leaves them owed that much \u2014 whether or not a rebase record lies between (FUZZ-M10-24H-D-B: a lender behind a rebase record left \u221273.7 SOL by the record's own shortfall debit, the present lenders owed 73,744,534,723 lamports it backs; the pot-only touch and its chain book exactly the owner's conversion) | SPEC \u00a714 \"Late depositor\" (2026-10-03): kept as designed, no program change; the web's deposit review shows the receivable and the deposit's part, warning at \u2265 1 % of its value at `P_ema` or \u2265 1 SOL (`lender.unpaidRent`) | accepted (owner, 2026-10-03); the warning thresholds `UNPAID_RENT_WARN_BPS` 100 / `UNPAID_RENT_WARN_LAMPORTS` 1 SOL confirmed (owner, 2026-10-03); a receivable-aware share price not built |"
+  },
+  {
+    "id": "KI-65",
+    "file": "docs/audit/known-issues.md",
+    "line": 78,
+    "row": "| KI-65 | **The rebase-orphan vest (FUZZ-M10-24H-A; fixed).** v0.4.1 floored each lender's shares and `S` separately at a rebase, so shares could remain in `S` that no `LenderPosition` held (KI-11). If every real lender exited while a vest ran, those orphans were all of `S`: the last real withdrawal left `S > 0`, the last-lender flush (R3B-2) could not fire, and the crank released the whole unreleased vest, and every credit before the next deposit, to the orphans, unclaimable in `lender_sol`. **Fix (program, M10 KI-65):** each rebase record carries a conversion remainder `conv_rem` in `[0, 1,000^k)`; a lender's `s` old shares convert to `\u230a(conv_rem + s)/1,000^k\u230b` and leave the remainder in the record, which every lender instruction that converts writes back (`deposit`, `withdraw`, `claim_sol`, `cover_deficit`, `sync_lender`; the record must be passed writable, `EpochRecordReadOnly`). The quotients telescope, so whatever the order, the old epoch's lenders end with exactly `\u230as_old/1,000^k\u230b` = the new `S` (I-P1\u2032: `S` = current shares + the shares still to be minted through the records); a withdrawal of all of `S` is the exit of the only position holding or still to receive a share, so the last lender is paid the vest again, and R4B-4 is not reopened (the flush rule is unchanged; a lender that has not converted yet still counts in `S`). `ShareEpoch` grows 127 \u2192 143 B (the keeper pays 111,360 lamports more rent per record) | Rounding only (I-P6 without the orphan term), plus **the conversion-order residual** (KI65-REV-SEC1; owner decision of 2026-10-07: owner-signed conversions). The order of the conversions through a record decides who receives its rounding units (at most `n \u2212 1` shares; nobody below its `\u230as/1,000^k\u230b`). **Only a position's owner converts it through a rebase record:** a `sync_lender` the owner does not sign never converts through one \u2014 since KI-66 it stops there with the pot-only touch (`pool::touch_pot`; `RebaseNeedsOwner` 6107 stays as its post-condition, `engine::lender::reads_rebase`; plain catch-up through wipe records, the V2-12 jump, the parking and `sync_lender(0)` stay permissionless) \u2014 and `deposit`, `withdraw`, `claim_sol` and `cover_deficit` are the owner's own (their lender PDA is the signer's); no keeper or settlement path converts a lender. So no third party orders an honest lender's conversion, and an honest lender that has not converted keeps its latent unit, which counts in `S`, blocks the flush (W3) and is paid the vest when it converts. Through the program (`tests/litesvm/tests/ki65_it.rs` `order_*`): the security review's third-party orders convert no honest lender (the pot-only touch), and with the honest lenders lazy the attacker's own conversions take no unit (two 1-share Sybils and a whale: attacker 1,002,198,376 lamports, the two honest 999-share lenders 3,000,369,862; a residue-tuned whale 1,002,346,116, honest 3,000,222,122; W3 with one Sybil: the JIT depositor 0, the honest 600-share lender 6,000,099,983). **What remains:** a party orders its own conversions (Sybil positions placed before the roll, a tuned residue) and converts after an honest lender's own conversion (its claim, deposit, withdrawal, cover or signed sync) \u2014 at any later time while the record's remainder stands, no atomicity needed (each Sybil an hour after the honest claim: attacker 4,007,334,854 lamports, honest 369,862, `order_the_later_conversion_needs_no_atomicity`). Each honest conversion that leaves the remainder just below a unit hands that unit to the party's next conversion, up to `m` units with `m` positions; an honest lender holding less than one post-rebase share loses its latent unit at its first own conversion during a running vest, and claiming is the normal action after a settlement, so the figures with the honest lenders lazy are a best case, not the expected one; where the honest holders all converted to 0 shares that way (each had less than one post-rebase share), the party holds all of `S` and its last burn is paid the whole unreleased vest and later lumps (R3B-2), a JIT depositor's too with one Sybil placed before the roll. Measured, converting after the honest lenders' `claim_sol`: the Sybils +4,007,334,855 lamports, honest 369,862 (both honest claims first: an honest lender keeps a unit and is paid 3,000,000,000, the attacker 1,004,766,616); the tuned whale after one honest claim +4,002,346,115, honest 222,122; W3 with one Sybil after the honest lender's claim: the JIT depositor is paid the whole 3,000,000,000-lamport sweep with no time passing while the honest lender holds 0 shares. Every figure here is pinned to the lamport (`assert_eq!` in `ki65_it`). Otherwise each unit is worth \u2264 `(T + \u03a3B_Q + VA)/(S + VS)` tokens plus `1/S` of every later SOL credit. `pool_model.whale_order_demo` W2: the unit decides who is paid the 3 SOL vest \u2014 W then H, H (600 old shares, a floor of 0) is paid 3,000,083,331 lamports; H then W (the whale converting after H's own conversion), the whale is. Honest lenders never fall below their floor and never get less than v0.4.1 gave them, which stranded that SOL. The 24 h run B reproducers (19,131,900,419 / 890,963,742 / 552,350,825 lamports left with `S = 1` orphan share on the mock, CPMM, PumpSwap) and the curve corpus file replay to \u2264 0.01 SOL (`tests/fuzz/tests/smoke.rs`); `pool_model.orphan_vest_demo`: worst 3 lamports over 198 rebasing seeds (v0.4.1: 3,000,000,002) | O19; owner decisions of 2026-10-07 (fix it in the program; owner-signed conversions through a rebase record, KI65-REV-SEC1; seventh round: the web's review shows `lender.subUnitConversion` with the vest's end and advises waiting when the user's own claim, deposit, withdrawal, cover or sync can convert a sub-one-share position to 0 shares while the pool's income vests \u2014 judged on the worst case, the position's floor through the records, since other lenders' own conversions landing before the transaction move each `conv_rem` and no instruction takes a minimum of shares (the KI-66 security review) \u2014 and `lender.residuals` carries the residual) | fixed (program, M10 KI-65); third-party ordering closed (program, the owner-signed rule); the residual of converting after honest lenders disclosed; its price for the pot fixed by the pot-only touch (KI-66) |"
+  },
+  {
+    "id": "KI-66",
+    "file": "docs/audit/known-issues.md",
+    "line": 79,
+    "row": "| KI-66 | **A surplus behind a rebase record reached the pot only when its owner returned** (the price of KI65-REV-SEC1, found by the KI-65 follow-up's spec review; **fixed: the pot-only touch** (owner decision of 2026-10-07, seventh round) **and its forward chain** (KI-66 full, owner decision of 2026-10-08, eighth round)). The pot (R3A-2) is filled only when a lender holding realised SOL beyond its entitlement is touched, and the design relies on anyone's `sync_lender` touching a surplus holder that never returns (ECON R3A-2, ARCH I-P6). With the owner-signed rule a third party's sync could no longer convert a lender behind a rebase record, so its surplus stayed on the absent lender's position and the deficit lenders waited for that owner. **Fix (program, M10 KI-66):** a `sync_lender` without the owner's signature is `pool::touch_pot` \u2014 a lender whose conversion would go through a rebase record (holding shares, a lock or a lock term, the record passed) is accrued up to the values the record froze for its epoch (`acc_end`, `acc_r_end`) and its surplus moves to the pot; no share, lock, epoch or `conv_rem` moves, so it orders no conversion. **KI-66 full (program, eighth round; KI66-R3):** the seventh round left what the absent lender's unconverted shares earn after the record to its owner (`pool_model.pot_liveness_table`: 8 of 2,000 random pools left a present lender unpaid above dust, worst 2,134,755,812 lamports). The pot-only touch now also walks the lender's forward chain \u2014 the floor of its shares through the later records (`\u230as/den_E\u230b`, then `\u230aq\u00b7num/den\u230b`), which no conversion order can lower \u2014 to each record's ends and the current epoch, by cumulative floor, and moves that surplus too (`LenderPosition.fwd*`, ECON \u00a79.5); still no share, lock, epoch or `conv_rem` moves (and `sync_lender` requires the records back unchanged). Idempotent; the owner's later conversion takes the chain's accruals back exactly, so `pending`, the shares and the records end as with the owner's conversion alone, `real + unmatched` too (`pool_model.fwd_differential`, 2,000 pools; `windowed_syncs_equal_owner_alone`). The same in `pool_model._touch_pot` (vectors `pool_ext_pot`, `pot_touch_demo`, `pot_chain_demo`; exact parity). `pot_liveness_table` now: 0 of 654 runs above dust, 9 lamports in total. CU: 47,989 for an unsigned `sync_lender` with 8 records | **What remains \u2014 the latent rounding units** (besides an absent lender's deficit, which no touch can pay in: KI-53, FUZZ-M10-24H-D-B)**:** an owner's shares are its chain's floor or up to one more per record (the order of conversions decides who gets each record's unit, KI-65), and that unit's earnings after the record reach the pot only at its owner's conversion: at most one share's part of each post-record epoch per absent position. `pool_model.latent_residual_table`: 3,000 residue-tuned pools (2,134 runs) leave a present lender unpaid above dust in 31, 1,937,091 lamports in total, worst 727,760 (0 when every owner returns); the floor design's 2 \u00d7 20,000 adversarial pools (17,598 runs) leave 1 run owed more than 10,000 lamports beyond what every owner returning leaves, 16,229 in total, worst 14,894. There is no general small bound: when `S` is a few shares, one unit is a large part of an epoch's income. **Over-move:** a chain whose owner is a unit above it moves at most `(\u03c3 \u2212 q)\u00b7max(0, a \u2212 r)` per epoch more than the owner's own touch (`a`, `r` one share's entitlement and realised SOL; measured 5 of 15,756 touches, 1 lamport each: `pool_model.py`'s 5,000-pool differential line, `out/pool_model.txt`; the held-only touch moved up to `\u03c3\u00b7(\u2026)`); the owner draws it back from the pot. Someone must send the touches: the web's claim prepends those the claimant needs (KI66-R4, eighth round: \u2264 4 per claim, judged with the WASM `previewTouchPot`, read-only records; FRONTEND \u00a73.6), an operator the rest (ARCH ops item 13). `ki65_it` pins both the seventh round's figures (`a_surplus_behind_a_rebase_record_reaches_the_pot_without_its_owner`: pot 4,434,782,609, A paid in full) and the chain's (`a_surplus_after_the_rebase_record_reaches_the_pot_through_the_forward_chain`: A short 201,209,837 with the hold alone, paid in full by the chain's 201,209,836, the same end whoever converts C and when). Rebases need a pool whose token claims fell 10\u2076-fold | Owner decisions of 2026-10-07 (seventh round: the pot-only touch) and 2026-10-08 (eighth round: the full fix) | fixed (program, M10 KI-66, KI-66 full); the latent units' residual disclosed (owner item: accept, AUDIT \u00a77) |"
+  },
+  {
+    "id": "KI-67",
+    "file": "docs/audit/known-issues.md",
+    "line": 80,
+    "row": "| KI-67 | **A position paid in full by `claim_sol` after its owner's exit stayed open** (found by the KI-66 security review; latent since M1, not caused by KI-66; **fixed**, owner decision of 2026-10-08, eighth round). `withdraw` closed the `LenderPosition` and refunded its rent only when it left `shares`, `pending` and `lock` at 0, and no other instruction closed one: a lender that withdrew every share while still owed, a lender of a wiped market, or one whose sub-unit position a rebase floored to 0 shares kept an empty position and its rent (2,568,240 lamports) after `claim_sol` paid it. **Fix (program):** `claim_sol` closes the position and returns the rent to the owner when the claim leaves it `pool::closable` \u2014 current, no shares, `pending` 0, no lock, no forward chain \u2014 and `withdraw` uses the same predicate. Behaviour change: a second `claim_sol` of the closed position (also in the same transaction) fails with `AccountNotInitialized` (3012) instead of paying 0; `deposit` re-creates the position from `pool::Lender::new` (also as `[claim_sol, deposit]` in one transaction). The hooks check that a position disappears only in its owner's `withdraw` or `claim_sol`, with a closable post-state and the rent to the owner; the fuzz checks the close against the math crate (`claim-closes`, `deposit-recreates`) | **`lock_term`:** the owner's text says \"no lock term\"; the predicate does not require `lock_term == 0`, because a term without a lock is never read again (a lock of 0 is no lock; the calendar keeps its own copy until `lock_until`), and requiring it would leave open KI-67's own \"rebase floors a sub-unit position\" case (`pool_model.fwd_differential` over 5,000 pools, every lender claiming at the end: 3 of the 6,479 closable positions hold such a term; `pool_model.py`'s 5,000-pool differential line, `out/pool_model.txt`); kept as built: **confirmed by the owner (2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77)**. `ki66_sec_it` `a_dead_lock_term_does_not_keep_a_position_open` | Owner decision of 2026-10-08 (eighth round); the `lock_term` detail confirmed by the owner on 2026-10-09 (eleventh round) | fixed (program, M10 KI-67) |"
+  },
+  {
+    "id": "KI-68",
+    "file": "docs/audit/known-issues.md",
+    "line": 81,
+    "row": "| KI-68 | **A touch of a current or parked lender floors per touch** (predates KI-66; pinned by the KI-66 full security review, `fwd_dynamic_props` `ki67_parked_touch_floors_per_touch`). A lender on the current epoch, or parked on a live full-wipe record (V2-12), is accrued `\u230as\u00b7(end \u2212 snap)/WAD\u230b` at each touch (`pool::touch_tail`, the park in `convert_steps`; `pool_model._touch`), not by cumulative floor as the forward chain is (KI-66 full: `\u230aq\u00b7end/WAD\u230b \u2212 \u230aq\u00b7snap/WAD\u230b`, so any number of chain touches sums to one floor). So a touch between two credits \u2014 anyone's unsigned `sync_lender` of that lender \u2014 may floor away up to 1 lamport of its entitlement and 1 of its realised SOL, which stay in `lender_sol` as rounding: one share, top-ups of 37 lamports per share in all, are paid 37 to one touch and 0 + 36 to two. The \"no conversion order, nothing moved twice\" guarantees of the pot-only touch are unaffected; the owner's own touches floor the same way, as since M1 | \u2264 1 lamport of entitlement and \u2264 1 of realised SOL per touch between two credits or top-ups; each third-party touch costs its sender a transaction fee (5,000 lamports), so it is uneconomic as an attack | Accept and disclose (owner decision of 2026-10-08, ninth round; SPEC \u00a714, AUDIT \u00a77); the alternative, accruing current and parked lenders by cumulative floor (program, every lender's accrual; vectors regenerated), not taken | accepted (owner, 2026-10-08) |"
+  },
+  {
+    "id": "KI-71",
+    "file": "docs/audit/known-issues.md",
+    "line": 82,
+    "row": "| KI-71 | **No deposit while a pool is drained (AIR-07; `PoolDrained` 6108).** Since AIR-07 a settlement that leaves at most 1/1,000 of the token claims it found pays the whole unreleased vest to the current shares (`pool::VEST_FLUSH_RATIO`). A deposit made before it keeps its own tokens as claims, so one above 1/999 of the claims stopped that flush, and a later deposit at the collapsed share price took the vest by holding through it (4,613,534,243 lamports of a 5 SOL lump in `pool_econ`). `deposit` therefore refuses while `S > 0`, `\u03a3B_Q > 0` and `1,000\u00b7T \u2264 T + \u03a3B_Q`. The cost falls on honest depositors: they are refused, and while a pool is drained no newcomer can supply the unborrowed tokens its lenders would exit with | Deposits refused, of those attempted, in `pool_model` (default seeds): 26 of 6,653 in the ECON \u00a79.6 fuzz (90 % cap), 102 of 5,910 in the lock-heavy mix, 378 of 26,749 in the stranding table. At the program's utilisation caps (`util_cap_bps` \u2264 9,500) a pool drains only after a run, the lenders withdrawing the unborrowed part down to \u2264 0.1 %; any repayment above 0.1 % of `\u03a3B_Q` reopens deposits, and a pool without shares (`S = 0`) is exempt. Tests: `pool_econ` `a_deposit_above_a_thousandth_cannot_keep_the_vest_from_the_old_lenders` (4,613,534,243 \u2192 0), `lender_it` `air_07_residual_a_drained_pool_takes_no_deposit` | AI review decision 2 (owner, 2026-10-12): keep the gate (`00d3772`); not taken: reverting it, which leaves AIR-07's residual | accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-72",
+    "file": "docs/audit/known-issues.md",
+    "line": 83,
+    "row": "| KI-72 | **A same-transaction burn still raises the PumpSwap exit risk fee (AIR-10's residual).** Since AIR-10 the exits' risk quotes on PumpSwap (`liquidate`'s assessment, the keeper exits' `B\u0302_ref`, `sol_settle`) are capped at the pump-fees tier of `P_ema`'s market cap (`VenueState::exit_risk_cap_bps`), which a sale earlier in the same transaction cannot raise. That tier is resolved on the live mint supply, so a holder's burn earlier in the transaction still lowers the market cap and raises the tier: `[burn, liquidate]` can liquidate a position the honest state holds healthy | One tier step is 2\u20135 bps, \u2248 0.05 % of `B\u0302`: only a position within \u2248 0.05 % of `cr_liq` on both legs and all 3 ring entries, while the market cap sits just above a tier threshold, which an ordinary price tick would liquidate anyway; the largest step (25 \u2192 95 bps) only at the 420 SOL boundary on some pools (I-10's review). PumpSwap only. The burner gives up the burned tokens; the borrower pays the penalty earlier; the lenders lose nothing. Pinned: `m7_sec_it` `pumpswap::air_10_residual_a_same_transaction_burn_still_raises_the_exit_risk_fee` (a 1 % burn still liquidates) | AI review decision 3 (owner, 2026-10-12): accept and disclose; not taken: resolving the tier on a per-second supply snapshot in `Market` (reserved bytes) | accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-77",
+    "file": "docs/audit/known-issues.md",
+    "line": 84,
+    "row": "| KI-77 | **The curve's synthetic fee is resolved on the live supply; the fee gates keep 10\u00b9\u2075 (pump-final \u00a75.2, P1 correction (a)).** pump charges both parts of a buy past `rT` (the curve leg and the would-be pool's leg) at the curve tier of its pre-trade market cap on the mint's **live** supply, `\u230avQ\u00b7supply/vT\u230b` (R-PUMP Update U10; G0's tier tripwire). So a live curve's `B\u0302_v3` takes that fee, `\u03c6_s` (`CurvePricingInputs::synthetic_fees`, `fees::pump_curve_at_supply` on the named mint's supply, resolved on every read): the execution quote `B\u0302_live` and `max_in`, and every risk quote past `rT` under the position's hard cap (`CurvePricing::capped`: `liquidate`'s assessment, the keeper exits' `B\u0302_ref`, the EMA leg and the box, D4, `sol_settle`'s quotes). (a) **A burn can raise `\u03c6_s`:** under a multi-tier curve `FeeConfig` a holder's burn earlier in the same transaction lowers the supply and the market cap and can move `\u03c6_s` into a higher-fee tier, raising those risk quotes past `rT` (AIR-10's class, KI-72); there is no supply snapshot. (b) **The fee gates keep the fixed 10\u00b9\u2075:** every other curve fee \u2014 quotes up to `rT`, sales, the `\u03c6` of the fee gates and the fee-scaled caps (`CurvePricing::oneway_ppm`, `VenueState::fee_ppm`), the no-route test against a position's locked hard cap \u2014 stays `fees::pump_curve` on 10\u00b9\u2075 (ARCH \u00a74.2 as built). The live supply never exceeds 10\u00b9\u2075 and pump's tiers charge less as the market cap rises, so `\u03c6_s \u2265 \u03c6`: those gates can read a lower tier than an exit past `rT` pays. (c) Under such a schedule `B\u0302_v3` can step up at `rT` (the P1 review's recomputation, on `near166` under the tripwire tiers: 18,513,647,686 lamports at `rT` at 70 / 22 bps, 18,537,496,028 at `rT + 1` at 80 / 25 bps; pinned since the final review in `quotes_synthetic_g0::tier_tripwire_reproduces_g0`) | **None today:** pump's curve `FeeConfig` is one flat tier (protocol 95, creator 30 bps), so `\u03c6_s = \u03c6` at any supply and no quote, gate or cap differs. T-PUMP-MATH-V3 (e) is the tripwire: on G0's seven-tier test `FeeConfig` both parts of pump's charge named the live-supply tier (80 / 25 bps; the user paid 45,906,126,201), the fixed 10\u00b9\u2075 basis gave 70 / 22 bps, and a `B\u0302_v3` at the latter would have undercut the charge by 59,057,853 lamports (pump 6002) \u2014 the reason `\u03c6_s` follows the live supply. Should pump adopt several tiers: one tier step per burn, on positions past `rT` only; the burner gives up the burned tokens; the borrower pays a higher quote, the lenders lose nothing; the gates' fee at most the tier difference below `\u03c6_s`. `fees::tests` (`pump_curve_at_supply` on a burned supply), `pump_math_it::v3_tier_tripwire_pins_the_pool_parts_market_cap`, `pump_it::straddle` and the web's `state.test` (`afterSale` under the seven tiers) pin the resolution; the keeper and the web compute `\u03c6_s` the same way | The owner's pump-v3 direction, given after P1 introduced `\u03c6_s` (2026-10-14) and confirmed on 2026-10-16: disclose beside KI-72 and accept under the same decision (AI review decision 3, 2026-10-12); no code change; not taken: capping `\u03c6_s` at the fee at `P_ema` or on the 10\u00b9\u2075 basis in the risk view, or moving the fee gates to `\u03c6_s` | accepted (owner, 2026-10-16; AI review decision 3 of 2026-10-12 extended) |"
+  },
+  {
+    "id": "KI-75",
+    "file": "docs/audit/known-issues.md",
+    "line": 85,
+    "row": "| KI-75 | **An LP withdrawal inside `sol_settle` leaves the box corner as the only S1/S2 veto (AIR-20, L-4).** The S1 and S2 legs read the raw `L_live` and quote the live reserves (only the CR spot leg takes the FITS-2 floor `max(L_live, L_ema\u2032)`), so an unlocked LP's `[withdraw, sol_settle, deposit]` drains both and leaves the box corner `(P_lo, L_hi)` as their only veto. The corner vetoes what the honest robust spot vetoes while that state lies in the box, not after a reversal below `P_lo` or with depth above `L_hi` that the medians and `L_ema` have not followed yet (or third-party depth above AIR-15's cap) | No borrower loss at the defaults in the review's model runs: in the band where it bites, the borrower gets 0 under the honest liquidation too (the penalty takes the remainder); the protocol loses its rent and penalty share (0.05\u20130.37 SOL) to the lenders, and the keeper takes `K_s`. A borrower loss of up to 0.59 SOL (\u2248 1.2 % of `B\u0302`) only on a pool locked at 20 % (`pool_lock_min_bps` at its floor, the attacker owning the other 80 % of the LP) with a 1 % fee. Pinned: `settle::tests::a_drained_live_state_leaves_the_box_corner_as_the_only_s1_veto` | AI review decision 7 (owner, 2026-10-12): documented and pinned (`eb02191`), no behaviour change; not taken: the optional fix in `leads.md` (judge the S1/S2 legs at `bounds::spot_liquidity`, keeping `min(L_live, L_lo)` in the refutation) | accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-76",
+    "file": "docs/audit/known-issues.md",
+    "line": 86,
+    "row": "| KI-76 | **The sustained growth's trade-off (AIR-22).** Since AIR-22 the sustained growth `g` is the lower median of the newest `kappa_growth_n` step rates (3 by default), not their minimum: one flat step in three \u2014 an atomic `[sell to \u2264 P_ema, crank_price, buy back]`, whose straddled bucket integrates to `P_ema` \u2014 no longer holds `\u03ba_eff` at `\u03ba_base` and refuses liquidation through a genuine pump (L-6: refused every second until the pump ended, then S1 with the lenders 5\u201349 SOL below `Q\u00b7P` on the sim's markets). Two costs remain: (a) a held price opens the growth cap after 2 held seconds instead of 3, so the held sandwich (KI-02) is cheaper; (b) two flat steps among the newest `kappa_growth_n` (2 of 3; 2 of 4 at 4) still zero `g`, so the flat-step veto through a pump remains at two such bundles every 3 s instead of one | (a) The sim's held-sandwich plan against a liquidatable borrower on RA: the attacker nets +2.839 SOL instead of +1.981; the borrower loses the same remainder (5.775 SOL); lenders and protocol lose less (0.049 / 1.257 SOL instead of 0.570 / 2.272). Keeping 3 s needs `kappa_growth_n` \u2265 5, outside its compiled range [3, 4]. KI-02's Tier A sim figure is re-measured under AIR-22 (+8.36 SOL, +5.66 before; KI-03's \u22123.34 / \u22124.54 SOL); its real-venue figures were measured before AIR-22 and are not re-measured. (b) L-6 measured a flat 0.07\u20130.85 SOL/s for one bundle every 3 s; two cost about twice that (not re-measured) | AI review decision 1 (owner, 2026-10-12): keep the lower median (`6c39e58`; tests `03b7762`, `8a4df78`); not taken: reverting it, which restores the one-in-three veto | accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-16",
+    "file": "docs/audit/known-issues.md",
+    "line": 92,
+    "row": "| KI-16 | A standing minimum position can pin a Raydium market to a thinner pool (ARCH \u00a72.6, R4B-10) | Until the position closes. The remedy is an Emergency pause of opens | O18's residuals: accepted as disclosed, with O18's rules (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77) | accepted (owner, 2026-10-09, eleventh round) |"
+  },
+  {
+    "id": "KI-17",
+    "file": "docs/audit/known-issues.md",
+    "line": 93,
+    "row": "| KI-17 | M4 rule residuals (ARCH \u00a72.6 \"Residuals of the M4 rules\" (a), (b)): (a) a list-only market without a price judges the floor at the candidate's spot, which one transaction can push; (b) a fast-path candidate's spot is compared with `P_ema` only through the window floor at `min(P_ema, P_cand)` | (a) Bounded by the price warm-up (M4V-5). (b) An attacker's candidate at \u2248 29 % of `pool_d`, held at 3\u00d7, is not liquidatable before the warm-up gate (M4R) | O18's residuals: accepted as disclosed, with O18's rules (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77) | accepted (owner, 2026-10-09, eleventh round) |"
+  },
+  {
+    "id": "KI-18",
+    "file": "docs/audit/known-issues.md",
+    "line": 94,
+    "row": "| KI-18 | Warm-up in degraded mode (ECON \u00a712.12 residual 1). If all 8 warm-up buckets are attacker-only, the attacker seeds `L_ema = D`; on pools with \u03bb < 50 %, 4 such buckets suffice | A position within \u2248 2.8\u00d7 of the carried `P_ema` can be liquidated at the gate at the pumped price. This is what the same attacker-only seconds force in steady state | O18's residuals: accepted as disclosed, with O18's rules (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77) | accepted (owner, 2026-10-09, eleventh round) |"
+  },
+  {
+    "id": "KI-19",
+    "file": "docs/audit/known-issues.md",
+    "line": 95,
+    "row": "| KI-19 | Capital deposit freeze (residual 2): deposit-wrapped cranks every second hold `L_ema` | The EMA leg is delayed by at most \u2248 `(1 \u2212 H/L)\u00b7q/x` in price. The reference stays at the honest lows while the guard is set and the keeper observes every second | O18's residuals: accepted as disclosed, with O18's rules (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77) | accepted (owner, 2026-10-09, eleventh round) |"
+  },
+  {
+    "id": "KI-20",
+    "file": "docs/audit/known-issues.md",
+    "line": 96,
+    "row": "| KI-20 | Withdraw contest while the guard is set (residual 3). Before AIR-17 the guarded spot leg floored `L_live` at `min(L_ema, L_mlo)`, and an unlocked LP's `[withdraw, crank_price, deposit]` in 4 of every 8 seconds set the bucket lows' median to the drained depth even with the keeper observing every second, so a withdraw-wrapped liquidation was judged at that depth and forced positions in the spike-and-retreat band (\u2248 2.01\u20132.07\u00d7 against a 2.078\u00d7 threshold in the sims; within KI-23's envelope). Since AIR-17 the floor is `min(L_ema, L_mhi)`, the bucket highs' upper median: one honest observation keeps its second's high at the pool's depth, and lowering the median takes 5 of 8 attacker-only seconds, which the keeper's per-second coverage under the guard denies, so the wraps force no exit (a deposit push lifts the floor at most to `L_ema`: it defers, never forces) | The borrower overpays by at most \u2248 `(1/\u03bb \u2212 1)\u00b7q/x` of `B`: \u2248 0 on \u03bb \u2248 1 pools, +4.04 % (1.24 SOL) in the sim | O18's residuals: accepted as disclosed, with O18's rules (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77) | accepted (owner, 2026-10-09, eleventh round) |"
+  },
+  {
+    "id": "KI-21",
+    "file": "docs/audit/known-issues.md",
+    "line": 97,
+    "row": "| KI-21 | M4R-2 is closed only for honest dumps before the window opens (residual 4) | One pump-wrapped window-opening proposal (0.03\u20130.04 SOL) restores M4's `P_ema` judgment, which is never looser | O18's residuals: accepted as disclosed, with O18's rules (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77) | accepted (owner, 2026-10-09, eleventh round) |"
+  },
+  {
+    "id": "KI-22",
+    "file": "docs/audit/known-issues.md",
+    "line": 98,
+    "row": "| KI-22 | Price-seed bounds after a graduation (residuals 6, 17; M6-SEC-1). The seed falls by at most one v0.4.1 step per integration, counted from the running seed | Delay \u2264 \u2248 4.5 s from a seed at the pool's price. After a graduation that jumped the price: +28 s instead of +12 s (D@80 %), a 0.63\u20131.08 SOL round trip; the lenders are whole | SPEC \u00a714 M6-SEC-1 | accepted (owner, 2026-09-30) |"
+  },
+  {
+    "id": "KI-23",
+    "file": "docs/audit/known-issues.md",
+    "line": 99,
+    "row": "| KI-23 | FITX-1: withdraw-wrapped cranks freeze a genuinely reached low (ECON \u00a712.12 residual 10). Since AIR-14 the rest of residual 10 forces levels too: a drag of attacker-only seconds and missed keeper seconds | It forces only the liquidation that the same LP gets by withdrawing for good: same second, same price, the borrower no worse off. Since AIR-14 (the Raydium reference cap at `D`; ECON \u00a712.12 residual 10, (5b)) more is forced. A 3\u201320-s held drain, frozen, forces 181 levels in the sim instead of 69 at `9aade3e` (the 640- and 792-SOL pools too), each still one the LP's withdrawal for good liquidates, no earlier. A drag of attacker-only seconds under the per-second coverage, which forced nothing at `9aade3e`, forces one level (2.06\u00d7 against the honest 2.065\u00d7 at 0.79 \u00d7 the cap). A single missed keeper second forces a cap-sized 1 % position at 2.07\u00d7 against 2.078\u00d7 (20 misses: 2.01\u20132.07\u00d7; at `9aade3e` only 20 misses forced it, at 2.06\u20132.07\u00d7). The sim does not compare the drag's and the misses' levels with a withdrawal for good | SPEC \u00a714 FITX-1; AIR-14's widening: SPEC \u00a714 fourteenth round | accepted (owner, 2026-09-29) on the figures before AIR-14; AIR-14's widening accepted (owner, 2026-10-13) |"
+  },
+  {
+    "id": "KI-24",
+    "file": "docs/audit/known-issues.md",
+    "line": 100,
+    "row": "| KI-24 | A pool switch carries positions only if every one fits; otherwise the positions settle S3 at fair value at their deadline (#99, the mark FIT-3; residuals 12, 14). Healthy positions stay frozen at the pre-halt `P_ema` meanwhile. Since AIR-09 an S2 or S3 on a venue that cannot execute prices the tokens at 0 for its immediate part, so all of its take but `R_due` vests over `lump_vest_s`, and `R_due`'s rent top-up too (B2-2): only `R_due`'s credited part stays immediate. A deposit bundled around it realises nothing of the frozen mark | Lenders +6.9\u20137.1 % over `q` at the frozen price, but \u221246 % against a 2\u00d7 move during the halt. The mark lasts at most the tier term (30 / 14 / 7 d at A / B / C). A 9\u00d7 whale's `[deposit, sol_settle, claim_sol, withdraw]` around such an S3: 2,687,857,659 lamports before AIR-09, 0 after (`lender_real_it` `jit::air_09_*`); a whale that holds through `lump_vest_s` still earns its share of the vest | SPEC \u00a714 #99, M4F-1; AIR-09: SPEC \u00a714 fourteenth round | accepted (owner, 2026-09-29) on the behaviour before AIR-09; AIR-09's zero token value confirmed (owner, 2026-10-13) |"
+  },
+  {
+    "id": "KI-25",
+    "file": "docs/audit/known-issues.md",
+    "line": 101,
+    "row": "| KI-25 | Where the fit is judged (FIT-1, residual 13). After a genuine k\u00d7 pump during the halt, a carried position can be larger than a native open's cap on the adopted pool | Up to `\u03bb\u00b7\u221ak` \u00d7 the native cap (the fork: 1.085 / 1.109 / 1.366 at k 1.2 / 1.5 / 1.9). It is liquidated within 1 s of the control | O18's residuals: accepted as disclosed, with O18's rules (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77) | accepted (owner, 2026-10-09, eleventh round) |"
+  },
+  {
+    "id": "KI-26",
+    "file": "docs/audit/known-issues.md",
+    "line": 102,
+    "row": "| KI-26 | ECON residual 16 (M6D, margin part). A PumpSwap position opened while a third-party deposit is held posts its margin on the deposited depth | At Tier C's V/B edge, a pulled deposit turns a one-second 3\u00d7 gap's liquidation into an S1, with the lenders whole. The gap class loses 0.3\u20133.5 more points of `Q` | Accepted as built (owner decision of 2026-10-09, eleventh round; SPEC \u00a714, AUDIT \u00a77): the margin on the pool as it is; the alternative, pricing the open's margin on the burned depth (**a program change**), not taken | accepted (owner, 2026-10-09) |"
+  },
+  {
+    "id": "KI-27",
+    "file": "docs/audit/known-issues.md",
+    "line": 103,
+    "row": "| KI-27 | PumpSwap is sized on its burned LP only (M6D-1). Pools with genuine third-party LP get less capacity | e/acc 0.93\u00d7; \u22126.13 % capacity after 2 h (`capacity_on_the_canonical_pool_fixtures`) | SPEC \u00a714 M6D-1 | accepted (owner, 2026-09-30) |"
+  },
+  {
+    "id": "KI-28",
+    "file": "docs/audit/known-issues.md",
+    "line": 104,
+    "row": "| KI-28 | Exit delay after graduation. The keeper's tx3 records the new pool's first bucket (OWNER-M6SK-1) | Exits land 8\u201312 s after the migration (M6R-4). Tracking of a genuine \u00d73 pump slows from +9 s to +16 s (M6SK-1) | SPEC \u00a714 M6R-4; OWNER-M6SK-1 (keeper only) | M6R-4 accepted (owner, 2026-09-30); M6SK-1 open |"
+  },
+  {
+    "id": "KI-29",
+    "file": "docs/audit/known-issues.md",
+    "line": 105,
+    "row": "| KI-29 | A 211-B PumpSwap pool at minimum rent takes 304,800 lamports from the first sale (OWNER-M6R-5) | An open there needs `S_exp` \u2265 0.3048 SOL at `exec_tol_bps` 10 (\u2248 1.7 % of `X` on the 19.13-SOL legacy pool) | OWNER-M6R-5 (O18) | accepted |"
+  },
+  {
+    "id": "KI-30",
+    "file": "docs/audit/known-issues.md",
+    "line": 111,
+    "row": "| KI-30 | Degraded mode: a market the keeper no longer covers has its opens paused, and its exposure is the held-model bound (ARCH \u00a78.5; ECON \u00a75.8) | The KI-02, KI-03 and KI-08 bounds | SPEC \u00a714 O17, M7-13/-14 | accepted (owner, 2026-09-30 / 2026-10-01) |"
+  },
+  {
+    "id": "KI-31",
+    "file": "docs/audit/known-issues.md",
+    "line": 112,
+    "row": "| KI-31 | OWNER-M7-2: LP-wrapped liquidity-anomaly triggers spend the free pool. After that, each market keeps only its entitlement | \u2248 0.1\u20130.7 SOL a day of the attacker's money. With 20 covered markets and `G` = 1 SOL, the first market takes 22,720 triggers unbatched / 136,320 batched | OWNER-M7-2 ((a) accept, or (d) an hourly cap: keeper only) | open |"
+  },
+  {
+    "id": "KI-32",
+    "file": "docs/audit/known-issues.md",
+    "line": 113,
+    "row": "| KI-32 | OWNER-M7-6: exit-critical cranks are never throttled, so spending beyond `G` is an alerted overdraft | Worst case is junk above the floor held near a threshold: 14 / 3 junk markets (0 / 100,000 \u00b5lamports/CU) spend `G` = 1 SOL a day. At `V` 1 SOL this takes 40 / 8.5 SOL of capital and 0.076 / 0.016 SOL a day | OWNER-M7-6 ((a) as built, or (b) cap the overdraft: keeper only) | open |"
+  },
+  {
+    "id": "KI-33",
+    "file": "docs/audit/known-issues.md",
+    "line": 114,
+    "row": "| KI-33 | OWNER-M7-17 (3): bursts on any covered market can drain the free pool | Junk that hovers and bursts degrades every market ranked below it with 3 / 2 junk markets. At `V` 1 SOL that needs 8.5 / 5.7 SOL of capital and 0.61 / 0.41 SOL a day | OWNER-M7-17 ((a) accept, or (b) confine bursts: keeper only) | open |"
+  },
+  {
+    "id": "KI-34",
+    "file": "docs/audit/known-issues.md",
+    "line": 115,
+    "row": "| KI-34 | OWNER-M7-17 (4): honest markets below `var_floor_lamports` (1 SOL of `V`) get only the 30-s idle cadence | ECON \u00a711.3's 30-s rows: Tier C / D 10\u00d7/60 s pumps end in S1 (lenders \u221267.7 % / \u221258.3 %), where per-second coverage liquidates them (+0.9 % / +1.7 %) | OWNER-M7-17 (4): the alternative, per-second exit-critical coverage below the floor from the tail; the defaults adopted by the owner with O18 (2026-10-09, ECON \u00a714 N25) | open |"
+  },
+  {
+    "id": "KI-35",
+    "file": "docs/audit/known-issues.md",
+    "line": 116,
+    "row": "| KI-35 | OWNER-M7-3 residual: a hijacked coverage key can set the pause again after each clear, until the timelocked rotation | Rotation takes \u2265 86,400 s. Each set costs the attacker one transaction, and one Emergency clear (\u2248 8,000 CU) undoes it. Opens resume 5 s after a clear | SPEC \u00a714 M7-3 | accepted (owner, 2026-10-01) |"
+  },
+  {
+    "id": "KI-36",
+    "file": "docs/audit/known-issues.md",
+    "line": 117,
+    "row": "| KI-36 | OWNER-M7-8: crank batches also write-lock the keeper's fee payer, but `payer_cu_per_slot` (20 M) counts only exits | 200 markets \u2248 5.5 M CU a slot on the mock, against the 40 M per-writable-account limit on mainnet (ARCH \u00a76.6, U16) | OWNER-M7-8 (a separate fee payer for crank batches: keeper only) | open |"
+  },
+  {
+    "id": "KI-37",
+    "file": "docs/audit/known-issues.md",
+    "line": 118,
+    "row": "| KI-37 | OWNER-M7-4: an isolated missed covered second counts toward degraded mode only as part of 3 consecutive misses. `liq_cover_s` is 10 s | M4G-1 class: each miss adds one `L_ema` step | OWNER-M7-4 (PROPOSED until production telemetry) | open |"
+  },
+  {
+    "id": "KI-38",
+    "file": "docs/audit/known-issues.md",
+    "line": 119,
+    "row": "| KI-38 | OWNER-M7-9: the keeper makes its RPC calls one after another | One instance keeps \u2248 650 / 365 / 123 / 69 / 27 markets observed every second at 5 / 10 / 30 / 50 / 100 ms RTT (derived; UNVERIFIED on a live RPC; 683 / 374 / 125 / 69 / 27 in the 1.0.1 run of `tests/bench/m7_keeper`: the wall times vary run to run) | OWNER-M7-9 | open (accept for the beta) |"
+  },
+  {
+    "id": "KI-39",
+    "file": "docs/audit/known-issues.md",
+    "line": 120,
+    "row": "| KI-39 | Creator-ground mints: pump derives mint-dependent PDAs on every v2 trade (M5-SEC-6 residual, ARCH \u00a76.1) | \u2248 1,500 CU per extra bump. The worst measured curve open was 199,945 of the PROPOSED 250,000 CU at M5 and 202,131 on 1.0.0 (`tests/bench/m5_cu` at the tag); since 1.0.1 the v3 adapter derives no creator vault on a trade and the worst measured open is \u2248 154.6 k (`tests/bench/m5_cu`, pump-final P3) | O17 sub-item | disclosed |"
+  },
+  {
+    "id": "KI-40",
+    "file": "docs/audit/known-issues.md",
+    "line": 121,
+    "row": "| KI-40 | OWNER-M7-10 (FUZZ-M7-1): a donation to a curve market's `trader_wsol` is not swept by curve legs | No funds at risk. The lamports go to the lenders through `sweep_trader` or the first PumpSwap leg | OWNER-M7-10 | disclosed (resolved as built; confirm) |"
+  },
+  {
+    "id": "KI-41",
+    "file": "docs/audit/known-issues.md",
+    "line": 122,
+    "row": "| KI-41 | Transaction size. The PumpSwap open with 4 extras and a separate fee payer goes over v0 through A28 (OWNER-M7-1). `initialize_config` as a legacy transaction with a separate fee payer also goes over, and cannot be sent through a Squads vault (OWNER-E2E-1) | Open: 1,238\u20131,239 B through A28; 1,207\u20131,208 B through the build-alt table. `initialize_config`: 1,294 B; 1,198 B self-paid | OWNER-M7-1, OWNER-E2E-1 | open (no program change) |"
+  },
+  {
+    "id": "KI-42",
+    "file": "docs/audit/known-issues.md",
+    "line": 128,
+    "row": "| KI-42 | The venue guard pauses opens only, and only once the latch is set. An open that lands between a venue upgrade and `flag_venue_upgraded` is accepted (ARCH \u00a78.5; U26) | The keeper's reaction time, normally the next slot. LiteSVM does not model loader delay visibility | ADOPTED Q13 | by design |"
+  },
+  {
+    "id": "KI-43",
+    "file": "docs/audit/known-issues.md",
+    "line": 129,
+    "row": "| KI-43 | Healthy positions on a halted or route-broken venue can be neither closed nor settled until the route returns, an upgrade adapts the adapter (48 h), or their deadline passes (ARCH \u00a78.5, O14) | At most the tier term (\u2264 30 d). Liquidatable positions settle through S3 after `s3_wait_s` | O14 (standing: disclosed for the MVP; a borrower-initiated SOL close in v1.1) | disclosed |"
+  },
+  {
+    "id": "KI-44",
+    "file": "docs/audit/known-issues.md",
+    "line": 130,
+    "row": "| KI-44 | Upgradeable venues. pump, pAMM and pump-fees share upgrade authority `7gZuf\u2026` and upgrade several times a month. Raydium AMM v4 and CPMM use a Squads v4 multisig (3 of 4, no timelock) and have no verified builds; their pool admin can halt pools and raise fees. Token-2022 is upgradeable by `AeLmXC\u2026`. A malicious venue upgrade can harm exits (SPEC R5) | No design bound. The latch pauses opens; fee caps of 150 / 500 bps; the extras sets and S3 handle interface changes. M10: CPMM was redeployed at slot 452,376,460 (rebuilt byte for byte from `raydium-cp-swap@bdeee23`, no adapter change, every CPMM suite re-run on it; ARCH \u00a712 U12) and Jupiter at 451,957,263. pump, PumpSwap and pump-fees were redeployed on 2026-10-02 (deploy slots 452,654,932 / 452,654,882 / 452,655,002), after the M10 fixtures were dumped; the M10 pump revalidation re-dumped them (`pump_programs_2026_10`), re-ran every pump suite and the real-upgrade T-LATCH replay on them, and program batch 4 fixed the one adapter gap (PUMP-2026-10-1; ARCH \u00a712 U30 [V21]); on mainnet the latch refuses opens on them until Emergency revalidates. **pump-final (2026-10-13 \u2026 16):** pump and PumpSwap were redeployed on 2026-10-08 (454,596,459 / 454,596,406), pump-fees on 2026-10-12 (456,132,171; it had been redeployed twice since 10-02: the 10-08 build at 454,596,501 was never examined and can no longer be fetched) and pump once more on 2026-10-13 (456,494,698: `create_v2`'s quote chain only, every trade path short.win uses the same code); Jupiter at 454,465,850. They were dumped as `pump_programs_2026_10_13` / `_13b` and pinned in `VENUE_GUARD_SLOTS_2026_10_13`, and every pump, PumpSwap, graduation and latch suite re-ran on them (gates G0 and G0b, `tests/fixtures/README.md`). The curve adapter then moved to pump's v3 trades (short.win 1.0.1, AUDIT.md \"Addendum: pump v3\"; PUMP-2026-10-13-1 \u2026 -6) | SPEC \u00a712 R5; O6 | disclosed |"
+  },
+  {
+    "id": "KI-45",
+    "file": "docs/audit/known-issues.md",
+    "line": 131,
+    "row": "| KI-45 | short.win is upgradeable by the Governance multisig's vault 0 (Squads v4 3-of-5, `time_lock` 172,800 s); it is Governance's whole upgrade set since pump-final P6 (the audited 1.0.0 layout also named the straddle helper `complete_curve`, retired before it was ever deployed: owner decision D2 of 2026-10-13, and `shortwin-gov` refuses a layout that still names it). An upgrade waits only for the Squads time lock: the loader has no program timelock. A parameter change waits for both. No spending limits are created on either multisig, and `shortwin-gov verify` checks that the config authority is unset (ARCH \u00a78.5 (h)). The Squads v4 semantics the layout inherits are KI-60 \u2026 KI-63 | An upgrade: 48 h after the threshold approval. A parameter change: \u2248 96 h end to end (48 h Squads + 48 h `timelock_s`; T-SQ-2) | SPEC \u00a714 Q4 (2026-10-02) | accepted (owner, 2026-10-02: the layout) |"
+  },
+  {
+    "id": "KI-46",
+    "file": "docs/audit/known-issues.md",
+    "line": 132,
+    "row": "| KI-46 | Admin powers move no funds. Emergency has no timelock: it can pause opens, disable a venue for opens, revalidate a venue, set the route-broken flag and bounded extras (O6), and clear (never set) a coverage pause (ARCH \u00a73.1, I4). Since AIR-24 disabling a venue also cancels a pending `EnableVenues` change that would set the venue's bit (the whole change, with `ConfigCancelled`), so only a new proposal and its full timelock re-enable it | The I4 invariant after every instruction. `sweep_protocol_fees` moves at most `protocol_fees`, and only to `fee_recipient` | SPEC \u00a711; O6; M7-3 | by design |"
+  },
+  {
+    "id": "KI-54",
+    "file": "docs/audit/known-issues.md",
+    "line": 133,
+    "row": "| KI-54 | Extras denylist residual (i) (M10 batch 3; ARCH \u00a72.4 rule 4). A borrower whose wallet is a venue-wide fixed extra of the buy set (only a venue-owned wallet, such as a fee recipient, could be one) cannot be keeper-exited through that set | Callers fall back to `none` / `previous` / `stable`. If the venue requires that account, the route-broken flag leads to S3 (`sol_settle` carries no extras). The same borrower already could not open or close through that set, where it signs | SPEC \u00a714 \"Extras denylist\" (2026-10-03); Emergency extras (A41, O6) | accepted (owner, 2026-10-03) |"
+  },
+  {
+    "id": "KI-55",
+    "file": "docs/audit/known-issues.md",
+    "line": 134,
+    "row": "| KI-55 | Extras denylist residual (ii). A future venue interface change that genuinely needs one of the adopted pool's own accounts (the pool or a reserve vault) as a trailing account cannot be followed through extras | It needs a program upgrade (48 h Squads time lock), with S3 and the route-broken flag meanwhile (KI-43) | SPEC \u00a714 \"Extras denylist\"; A41, O6 | accepted (owner, 2026-10-03) |"
+  },
+  {
+    "id": "KI-56",
+    "file": "docs/audit/known-issues.md",
+    "line": 135,
+    "row": "| KI-56 | Extras denylist residual (iii). The list is not every venue account: fee recipients, creator vaults, the CPMM observation, the PumpSwap boost-vault ATA, LP mints and other pools can still be named | They arrive as non-signers, and the Emergency key cannot sign for them. Exits keep `none` / `previous` / `stable` | SPEC \u00a714 \"Extras denylist\"; A41, O6 | accepted (owner, 2026-10-03) |"
+  },
+  {
+    "id": "KI-57",
+    "file": "docs/audit/known-issues.md",
+    "line": 136,
+    "row": "| KI-57 | Extras denylist residual (iv). A denied set (`DeniedAccount`) costs one extra simulation per exit or trade until the Emergency key replaces it; nothing pre-filters it off chain | One simulation per attempt; the keeper (`liquidations_bypass_a_current_set_the_program_denies`) and the web then use the next set | SPEC \u00a714 \"Extras denylist\"; A41, O6 | accepted (owner, 2026-10-03) |"
+  },
+  {
+    "id": "KI-58",
+    "file": "docs/audit/known-issues.md",
+    "line": 137,
+    "row": "| KI-58 | CPMM creator-fee share. CPMM's 2026-10 redeploy (`raydium-cp-swap@bdeee23`, branch `feat/creator-fee-share`) adds `AmmConfig.creator_fee_share_rate` (offset 116, from padding): at collection, Raydium can keep part of a pool creator's fee (ECON \u00a712.8, ARCH \u00a712 U12) | No effect on what a short.win leg pays or on the pricing reserves (both counters are excluded), and short.win never calls `collect_creator_fee`. The rate is 0 on all 21 configs (slot 452,488,420). Only who receives a CPMM creator fee can change | ECON \u00a712.8; SPEC \u00a712 R1 | disclosed (no program change) |"
+  },
+  {
+    "id": "KI-59",
+    "file": "docs/audit/known-issues.md",
+    "line": 138,
+    "row": "| KI-59 | The Squads v4 program is trusted, not reproduced (M10-WP1-2). The mainnet ELF (immutable since slot 302,582,236, trimmed `d4866083\u20262fac`) is attributed to `Squads-Protocol/v4@64af733`, but it was not rebuilt, and verify.osec.io lists it as not verified (registered commit `3742e552`) | `squads_gov_it` and the T-OPS tests run the dumped mainnet ELF itself; the encoders are pinned to IDL 2.1.0 from `64af733` (ARCH \u00a71.1, \u00a712 U34). Squads is out of scope (AUDIT.md \u00a72) | ARCH \u00a712 U34 | disclosed |"
+  },
+  {
+    "id": "KI-60",
+    "file": "docs/audit/known-issues.md",
+    "line": 139,
+    "row": "| KI-60 | Squads semantics (a), (b) (ARCH \u00a78.5; T-SQ-7). An Approved vault transaction never expires: a year later it still executes, and a `propose_config` inside it replaces whatever change is pending then. It survives a member rotation and a threshold increase and executes with the approvals it had; only Active proposals and config transactions go stale. A time-lock increase does not stale it but delays it (Squads checks the current time lock at execution, counted from the approval) | Hygiene: cancel unwanted Approved proposals with `proposal_cancel_v2` (threshold votes); `shortwin-gov verify` warns on every Active or Approved proposal | SPEC \u00a714 Q4 (2026-10-02) and \"Squads signing\" (2026-10-03) | disclosed |"
+  },
+  {
+    "id": "KI-61",
+    "file": "docs/audit/known-issues.md",
+    "line": 140,
+    "row": "| KI-61 | Squads semantics (c). Governance cannot cancel a parameter change reactively inside the program window: its `cancel_config` executes at `not_before` at the earliest, when anyone can apply. Only the Emergency (time lock 0) can cancel a parameter change in time, and it cannot cancel `Authorities` or `Timelock` changes (M1-SEC-1) | The window is `timelock_s` (48 h). Nobody can cancel an `Authorities` or `Timelock` change reactively: Governance's cancel lands at `not_before` at the earliest, racing `apply_config` | SPEC \u00a714 Q4 | disclosed |"
+  },
+  {
+    "id": "KI-62",
+    "file": "docs/audit/known-issues.md",
+    "line": 141,
+    "row": "| KI-62 | Squads semantics (d). The Emergency cannot veto an upgrade: an upgrade needs only the Governance vault after its 48 h Squads time lock, and Emergency members cannot vote on Governance proposals (`NotAMember`) | 48 h between the threshold approval and the upgrade, in which users can exit; opens can be paused by the Emergency meanwhile | SPEC \u00a714 Q4 | disclosed |"
+  },
+  {
+    "id": "KI-63",
+    "file": "docs/audit/known-issues.md",
+    "line": 142,
+    "row": "| KI-63 | Squads semantics (f), (g). A refused vault execution stays Approved and can be re-executed later. `ExtendProgram` is permissionless in Agave 4.2: anyone can grow ProgramData, which redeploys the program \u2014 unusable for the rest of that slot (KI-73) \u2014 and moves its deploy slot (on a venue the latch tells it from an upgrade once the venue's ELF fingerprint is recorded, KI-69). An upgrade to a larger ELF needs it first, or it fails at execution after the full time lock | Runbook: extend ProgramData before staging an upgrade to a larger ELF (`services/README.md` \"Governance\"); that extension blocks the program for the rest of its own slot too. The third-party extensions' bound is KI-73 | SPEC \u00a714 Q4 | disclosed |"
+  },
+  {
+    "id": "KI-64",
+    "file": "docs/audit/known-issues.md",
+    "line": 143,
+    "row": "| KI-64 | **First-trade venue rent on short pump accounts (PUMP-2026-10-2).** Since the pump venues' 2026-10-02 redeploys the first trade on a PumpSwap pool shorter than 287 bytes, or a curve shorter than 141 (**166 since pump's 2026-10-08 build**, pump-final \u00a73.5), grows the account and charges that trade the rent; short.win nets it out of an open's proceeds `S` (on PumpSwap reported as `Open.venue_rent`; on the curve the leg cannot separate it from the proceeds, so `S` is net of it and `Open.venue_rent` is 0), so an open whose 10-bps tolerance cannot cover it fails `ProceedsBelowMin` though no price moved (ARCH \u00a78.5, T-RENT) | 81,280\u2013386,080 lamports measured on the 2026-10-02 builds: 81,280 from a 271-B pool or a 125-B curve at minimum rent, 132,080 from a 115-B curve, 386,080 from a 211-B pool. Under the default wallet cap no open on the 211-B pool at minimum rent qualifies (the cap's edge, 1.814 % of the pool's tokens, has a 337,498-lamport tolerance; 2.1 % is `CapWallet`: `pamm_it::gates::t_rent_a_short_pool_grows_on_the_sale`). **The curve to 166 B** (5,080 lamports per byte): 76,200 from 151 B, 81,280 from 150, 127,000 from 141, 208,280 from 125, 259,080 from 115, and 261,600 measured from the 49-byte legacy curve (its reserve already holds the old rent; not the 594,360 pump-final \u00a73.5 computed); pump counts the curve's rent reserve net of the fee buckets (`lamports \u2212 rQ \u2212 buckets`), so a bucketed short curve tops up its whole shortfall (`pump_math_it::a_bucketed_short_curve_grows_with_its_reserve_net_of_the_buckets`). So curve opens below \u2248 0.076\u20130.26 SOL of proceeds fail on a curve's first trade (was \u2248 0.08 SOL from 125 B). Any trade grows the account and lifts it. Exits pay it out of the buyback | SPEC \u00a714 PUMP-2026-10-2 (2026-10-03): disclose, no program change; the web explains the refusal (FRONTEND \u00a75.9) | accepted (owner, 2026-10-03) |"
+  },
+  {
+    "id": "KI-69",
+    "file": "docs/audit/known-issues.md",
+    "line": 144,
+    "row": "| KI-69 | **The venue latch's extension test and its residuals (AIR-01).** `ExtendProgram` moves a ProgramData's deploy slot without touching its ELF (KI-63), and the latch keyed on that slot alone, so anyone's `[ExtendProgram, flag_venue_upgraded]` stopped every open on a venue's markets, and re-extending before each exact-slot `revalidate_venue` refused it. Since AIR-01, for the four venues whose ProgramData can still grow (pump-fees, AMM v4, CPMM, Jupiter; pump and PumpSwap sit at the 10 MiB cap), `revalidate_venue(venue, expected_slot, expected_elf_hash)` records the account's length and a fingerprint of the named trimmed ELF, accepting a later deploy slot when the account still holds that ELF; `flag_venue_upgraded` then counts a moved slot as an upgrade only if the length is unchanged (`Upgrade` never resizes) or the trimmed ELF no longer matches. Residuals: (a) until a revalidation with a hash records the fingerprint (`initialize_config` records none, nor does a revalidation without a hash), an extension still latches the venue; (b) the fingerprint is the sha256's first 12 bytes (96 bits); (c) a revalidation at the exact deploy slot records the supplied hash unchecked; (d) while a venue is flagged, an extension refreshes `flagged_slot` / `flagged_at` like a second upgrade; (e) a flag or a revalidation after an extension hashes the trimmed ELF | (a) Until a venue's first hashed revalidation an extension latches it as before AIR-01, which pauses opens, Raydium listings (`create_market` with a pool hint) and pool-switch candidates, as an upgrade does, until the Emergency revalidates (exits, `add_margin` and withdrawals never read the guard, KI-42); the runbook revalidates all four with their hashes right after `initialize_config` (`services/README.md` \"Governance\"). (b) Another ELF with a recorded fingerprint costs \u2248 2\u2079\u2076 hashes. (c) A wrong hash only makes a later extension count as an upgrade (fail-safe), never hides an ELF the Emergency did not name; `shortwin-gov` computes the hash from the account. (d) The record and its events only: `revalidate_venue` binds to the reviewed ELF, not to `flagged_slot`. (e) \u2264 0.44 M CU measured (pump-fees 438,358 and CPMM 369,393 after one 10 KiB extension; AMM v4 with a 9.7 MB zero tail 210,386); the zero-tail scan adds \u2248 1 CU per 250 B, so pump-fees grown near the 10 MiB cap (KI-73) needs \u2248 0.48 M before Squads' own cost (estimated with the tests' cost model, not measured), and the sender requests \u2265 0.6 M CU or sizes the limit by simulation; Jupiter (no fixture) is not measured, and its sender sizes the limit by simulation (\u2264 1.4 M); a trimmed ELF above 2 MiB is not hashed and counts as an upgrade. `shortwin-gov --compute-unit-limit 600000 execute` (or `approve --execute`) supplies the outer transaction budget; staging alone does not save it. Without the option the runtime default still applies. Tests: `latch_raydium_it`, `latch_pump_it` `air01_*` | AI review decision 5 (owner, 2026-10-12): the runbook's hashed revalidations; the residuals accepted | fixed (program, AIR-01, after the tag); the residuals accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-70",
+    "file": "docs/audit/known-issues.md",
+    "line": 145,
+    "row": "| KI-70 | **New authority keys are installed unsigned (AIR-04).** For an `Authorities` change the permissionless `apply_config` checks the new `fee_recipient` account (System-owned, not executable), that `governance`, `pause_authority` and `fee_recipient` are non-zero and that the keys are pairwise distinct (SQ-G8; a zero `coverage_authority` disables it and is left out), then writes the new `governance`, `pause_authority` and `coverage_authority` with no signature from them and no accept step: a mistyped key that passed Governance's approval is installed | Only Governance's own approved change (3-of-5, \u2248 96 h in public view, KI-45) installs a key; no funds are at risk. A wrong `pause_authority` or `coverage_authority` is rotated by Governance through another timelocked change; meanwhile nobody can revalidate or disable a venue (a wrong `pause_authority`), or the keeper cannot coverage-pause a market (a wrong `coverage_authority`). A wrong `governance` freezes the Governance-only instructions until a recovery upgrade by Governance vault 0, the upgrade authority held in ProgramData, which the change does not touch, after the 48 h Squads time lock. Hygiene: stage authority changes only with `shortwin-gov stage-authorities`, which derives the keys from the layout file instead of taking typed ones | AI review decision 7 (owner, 2026-10-12): no program change; not taken: the new keys signing `apply_config`, or a two-step accept | accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-73",
+    "file": "docs/audit/known-issues.md",
+    "line": 146,
+    "row": "| KI-73 | **`ExtendProgram` blocks a program for the rest of its slot (AIR-18, L-2).** `ExtendProgram` is permissionless (Agave 4.2): anyone can grow a program's ProgramData by at least 10 KiB (SIMD-0431), once per program per slot, up to the 10 MiB cap. It redeploys the program at the current slot, and the new cache entry is visible only from the next slot: for the rest of that slot every invoke or CPI of the program fails (`UnsupportedProgramId`, \"Program is not deployed\"). On a venue that can still grow \u2014 pump-fees (which pump and PumpSwap call), AMM v4, CPMM, Token-2022; pump and PumpSwap themselves are at the cap \u2014 it fails that slot's exits that buy on it (`liquidate`, `expire`, `close_short`); `sol_settle` and `crank_price` make no venue CPI. On short.win, once deployed below the cap, it fails every instruction of the program for the rest of the slot (the retired `complete_curve` is never deployed, pump-final D2). No program change can stop third-party extensions | \u2248 0.052 SOL of rent per blocked slot plus the transaction fee (10 KiB at mainnet's 5,080 lamports/byte, left in the ProgramData; the loader charges only the shortfall below rent exemption, so on AMM v4 and Token-2022 the first \u2248 34 / \u2248 50 extensions are paid from their ProgramData's excess balance), one slot per extension, until the program reaches the 10 MiB cap, which ends it for good: \u2248 887\u2013947 slots (\u2248 44\u201349 SOL) per venue at the fixtures' ProgramData sizes, \u2248 867 slots (\u2248 45 SOL) for short.win if its ProgramData is allocated at its v1.0.0 ELF size (no `--max-len`). That is at most \u2248 5.8\u20136.3 min of blocked slots per program at 400 ms a slot (\u2248 5.1\u20135.5 min at the 350-ms slots of SIMD-0525). These bounds rest on SIMD-0431's 10 KiB minimum, active on mainnet (feature `loader_v3_minimum_extend_program_size`, slot 432,864,000 in LiteSVM 0.16's mainnet feature list); with 1-byte extensions they would be \u2248 8.9\u20139.7 M slots per program. The keeper ticks every 400 ms by default (`--tick-ms 400`, about one slot), so its next tick is always in a later slot. Since `8945087` a refusal \"Program is not deployed\" whose program's ProgramData, read as of the refused slot, shows a deploy in that slot is counted (`shortwin_keeper_not_deployed_total`) and sent again at the next tick with no alert or back-off; a run of them for one program (at most 5 s apart) lasting 30 s is paged once (`Alert::ProgramNotDeployed`); a program that stays undeployable is still alerted (`ExitRefused`) (`services/README.md` \"Governance\"). While short.win is blocked, the keeper still pages an upgrade of a fingerprinted venue in the slot it sees it, judged on the account read after its exits, and flags it in the first slot where short.win runs again (`a1edf78`); opens ordered before each extension in its slot still run. The extension also moves the deploy slot (KI-63; on a fingerprinted venue it no longer latches, KI-69) | AI review decision 4 (owner, 2026-10-12): accept the bounded griefing, the keeper retrying in a later slot; not taken: extending short.win's ProgramData to the 10 MiB cap at deployment (\u2248 45 SOL of rent) | accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-74",
+    "file": "docs/audit/known-issues.md",
+    "line": 147,
+    "row": "| KI-74 | **The market's S3-chain mark is conservative (AIR-19).** A position locks `venue_fee_hard_cap_bps` at open. Since AIR-19 a live fee above that locked cap is no route for the position under any global cap (`route::position_no_route`), and the market's S3 chain judges the live fee at `min(venue_fee_hard_cap_bps, Market.min_open_hard_cap_bps)`, the lowest cap a position locked since the market last had none open (reset when `open_positions` returns to 0). A position that has closed may have set the mark, so the chain can start on a fee that every open position's own cap still routes | The chain only times S3: a position settles S3 only when it has no route itself (here, the fee above its own locked cap) and is liquidatable or expired, `s3_wait_s` (600 s by default) after the chain started, so it can reach S3 up to `s3_wait_s` sooner than with exact tracking; its keeper exits and S1 are unchanged. Opens are not affected (their gate also needs `\u03c6 \u2264 venue_fee_cap_bps`, at most 300 bps, below any locked cap) and `pool_fail` keeps the global cap. It needs Governance to raise `venue_fee_hard_cap_bps` (range 300\u20132,000) above a locked cap and a venue fee above the mark (KI-44) | AI review decision 6 (owner, 2026-10-12): accept the conservative mark; not taken: tracking each open position's cap exactly (more `Market` state) | accepted (owner, 2026-10-12) |"
+  },
+  {
+    "id": "KI-47",
+    "file": "docs/audit/known-issues.md",
+    "line": 153,
+    "row": "| KI-47 | Per-writable-account CU limit (U16, C0-17). Every exit and crank write-locks `Market`, so a censoring attacker must fill a market's per-account budget every slot. LiteSVM enforces no block limit | 40 M CU per writable account (100 M per block): Agave master and Firedancer scale the 24 M constant \u00d7100/60 under `raise_block_limits_to_100m`, active on mainnet since slot 435,888,000 (the M10 desk check, AUDIT.md \u00a78; ARCH \u00a76.6, [V10], U16). A censoring attacker must fill it every slot: \u2248 800\u00d7 the keeper's per-slot crank cost at the same priority price | ARCH \u00a76.6 | disclosed (the design docs restated for 40 M in M10) |"
+  },
+  {
+    "id": "KI-48",
+    "file": "docs/audit/known-issues.md",
+    "line": 154,
+    "row": "| KI-48 | `CoverageGap` and the exit-path `MintSafetyTripped` are `emit!` log events, which are lost if the logs truncate (A69, IX-3) | Flagged per transaction by the indexer | A69 | by design |"
+  },
+  {
+    "id": "KI-49",
+    "file": "docs/audit/known-issues.md",
+    "line": 155,
+    "row": "| KI-49 | `withdraw` to a memo-required Token-2022 account relies on the memo instruction right before `transfer_checked` (U17). Any CPI added between the two would break memo-required withdrawals | Pinned by `security::sec_7_*` and `t_memo_control_top_level_sibling_check`, on the mainnet Token-2022 (`7ea94a02\u2026`, v11.0.0) and spl-memo v3 ELFs since M10 (ARCH \u00a712 U17) | T-MEMO | by design; verified on the mainnet build (M10 WP-3); a mainnet transaction is M11's (TMEMO-10) |"
+  },
+  {
+    "id": "KI-50",
+    "file": "docs/audit/known-issues.md",
+    "line": 156,
+    "row": "| KI-50 | The pump adapter relies on pump's undocumented trailing cap byte on buys: no byte means a revert above `rT` (U29). **Since 1.0.1 (pump-final) short.win trades v3:** it sends exactly 24 bytes, never the optional `partial_fill` byte (pump ignores it on non-mayhem coins, and short.win lists none), and a `buy_v3` past `rT` completes the curve by synthetic migration instead of reverting (PUMP-2026-10-13-3). The v2 cap byte still governs third parties' v2 buys | Pinned 0 / 1 / 2 / none on the dumped ELF (`pump_math_it`), and v3's synthetic path and its absence on the 2026-10-02 build (T-PUMP-MATH-V3 (b), (g): 6021 there). Re-checked on every pump upgrade (the latch) | ARCH \u00a712 U29 | disclosed |"
+  },
+  {
+    "id": "KI-51",
+    "file": "docs/audit/known-issues.md",
+    "line": 157,
+    "row": "| KI-51 | Keeper batches are v1 transactions, and v1 landing on mainnet is unverified (U25). Jito bundle semantics against a live block engine are unverified too (U22, U8). **Since pump-final (short.win 1.0.1) no exit uses a bundle:** a position past the curve's `rT` exits in one `buy_v3` (PUMP-2026-10-13-3; the straddle bundle and `complete_curve` are retired, D2), so U8 / U22 gate no exit any more (the keeper's block-engine transport stays, unused); U25 remains for the keeper's crank batches | v0 fallback: 3 / 4 / 4 / 5 cranks (PumpSwap / AMM v4 / CPMM / curve) per transaction | SPEC \u00a714 Q5/Q6 (2026-10-02, defaults): no mainnet spend before the audit | open until M11's probes |"
+  },
+  {
+    "id": "AIR2-01",
+    "file": "docs/audit/findings.md",
+    "line": 37,
+    "row": "| AIR2-01 | Locked lender's rounding share after rebase | \u2014 | not assessed | `pool::convert_steps` | in progress | this batch | `ai2_accounting`: converted full lock | pending | Rounding mismatch reproduced and nonzero lock rounded up; the original all-free-inventory magnitude remains unverified. |"
+  },
+  {
+    "id": "AIR2-02",
+    "file": "docs/audit/findings.md",
+    "line": 38,
+    "row": "| AIR2-02 | Stale EMA accepted at open | \u2014 | not assessed | `open_short` | in progress | this batch | `ai2_stale_ema_it` | pending | Recent integration and completed observation required; includes a preceding crank and 40-second boundary. |"
+  },
+  {
+    "id": "AIR2-03",
+    "file": "docs/audit/findings.md",
+    "line": 39,
+    "row": "| AIR2-03 | PumpSwap start sample contaminates warm-up | \u2014 | not assessed | `prologue::run` | in progress | this batch | `ai2_pumpswap_start_it` | pending | Skip recording the initial price as a warm-up bucket; KI-18/KI-22 do not cover this single-transaction start. |"
+  },
+  {
+    "id": "AIR2-04",
+    "file": "docs/audit/findings.md",
+    "line": 40,
+    "row": "| AIR2-04 | Late deposit captures halted-S3 vest | \u2014 | not assessed | `sol_settle`, `deposit`, `pool::settle` | in progress | this batch | `ai2_halted_s3_vest_it`; pool hold unit test | pending | Related to AIR-07/AIR-09 and KI-71; extends beyond the drained-pool gate. |"
+  },
+  {
+    "id": "AIR2-05",
+    "file": "docs/audit/findings.md",
+    "line": 41,
+    "row": "| AIR2-05 | Dust flush leaves unswept cashback exposed | \u2014 | not assessed | `pool::settle`, `sweep` | in progress | this batch | `ai2_accounting`; `ai2_venue_review_it`; keeper dust-flush scenario | pending | Dust flush gates deposits with surviving shares; pending-source income is credited immediately or held through split-claim vest release. Legacy source bits are rechecked, with keeper/web/indexer integration. |"
+  },
+  {
+    "id": "AIR2-06",
+    "file": "docs/audit/findings.md",
+    "line": 42,
+    "row": "| AIR2-06 | New governance key need not sign | \u2014 | \u2014 | `apply_config` | duplicate of KI-70 | \u2014 | existing AIR-04 evidence | existing owner decision | Same unsigned-authority behavior accepted on 2026-10-12; no new bound asserted. |"
+  },
+  {
+    "id": "AIR2-07",
+    "file": "docs/audit/findings.md",
+    "line": 43,
+    "row": "| AIR2-07 | Chosen-pair collision in truncated ELF fingerprint | \u2014 | not assessed | `flag_venue_upgraded` | open | \u2014 | no colliding ELF pair | pending | 96-bit second-preimage versus 48-bit chosen-pair collision bound confirmed; full-digest account migration remains unresolved. |"
+  },
+  {
+    "id": "AIR2-08",
+    "file": "docs/audit/findings.md",
+    "line": 44,
+    "row": "| AIR2-08 | Settlement arm survives venue restart | \u2014 | not assessed | `settle::evaluate` | in progress | this batch | `settle::tests::air2_08_*`; I18; legacy marker regression | pending | Persistent restart count+1 invalidates pre-restart arms even with no warm-up call; legacy arms invalidated once at first prologue. |"
+  },
+  {
+    "id": "AIR2-09",
+    "file": "docs/audit/findings.md",
+    "line": 45,
+    "row": "| AIR2-09 | Basis-point rounding lowers locked depth after LP deposit | \u2014 | not assessed | `pool_select::locked_depth` | in progress | this batch | raw-ratio unit/property tests | pending | Raw LP fraction replaces whole-bps depth; normative model and fixtures synchronized. Real AMM v4 PnL recognition remains separate. |"
+  },
+  {
+    "id": "AIR2-10",
+    "file": "docs/audit/findings.md",
+    "line": 46,
+    "row": "| AIR2-10 | Setting coin creator raises risk fee | \u2014 | not assessed | `pump_amm::read_state` | open | \u2014 | needed | pending | Current creator flag changes fee schedule; healthy-position pinned-ELF transaction and separate risk/execution treatment still needed. |"
+  },
+  {
+    "id": "AIR2-11",
+    "file": "docs/audit/findings.md",
+    "line": 47,
+    "row": "| AIR2-11 | Risk-fee cap creates an exit-budget gap | \u2014 | not assessed | `sol_settle`, `bounds` | open | \u2014 | needed | pending | Risk and live execution quotes differ; retain both liveness and AIR-10 sale-protection requirements. |"
+  },
+  {
+    "id": "AIR2-12",
+    "file": "docs/audit/findings.md",
+    "line": 48,
+    "row": "| AIR2-12 | Cashback paid into a noncanonical trader WSOL account | \u2014 | not assessed | `sweep_trader` | open | \u2014 | `ai2_venue_review_it` characterization | pending | Confirmed 545,713 lamports stranded in trader-owned noncanonical WSOL by the pinned permissionless claim. Recovery/completeness migration unresolved. |"
+  },
+  {
+    "id": "AIR2-13",
+    "file": "docs/audit/findings.md",
+    "line": 49,
+    "row": "| AIR2-13 | Keeper receives zero after rent-first liquidation | \u2014 | not assessed | `waterfall::liquidate` | open | \u2014 | `ai2_accounting`: rent exhaustion | pending | Zero keeper payout reproduced; economic liveness and priority/reserve policy remain open, not automatically accepted under KI-03. |"
+  },
+  {
+    "id": "AIR2-P2-01",
+    "file": "docs/audit/findings.md",
+    "line": 50,
+    "row": "| AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | \u2014 | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | pending | 670,224 versus 336,779 raw tokens in the loss-control case, beyond KI-13. Draft cap uses the value of unlocked shares. |"
+  },
+  {
+    "id": "AIR2-P2-02",
+    "file": "docs/audit/findings.md",
+    "line": 51,
+    "row": "| AIR2-P2-02 | Pot pays a first claimant against unpaid receivable | \u2014 | not assessed | `pool::claim` | open | \u2014 | `ai2_accounting`: receivable/pot allocation | pending | 75/25 SOL split from 100 SOL repayment with 100 SOL still receivable; report\u2019s proposed current-share subtraction does not repair it. Historical entitlement design remains unresolved. |"
+  }
+]

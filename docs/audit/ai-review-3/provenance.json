@@ -1,0 +1,102 @@
+{
+  "audited_commit": "b815269224ba0f5d946f49de7e113220c4067041",
+  "auditor_commit": "6c41e1d46386de7fd9b1fa48c847e876ac8b2676",
+  "passes_requested": 2,
+  "specialists_per_pass": 12,
+  "scope_basis": "scripts/audit_scope.py core + keeper classes; 119 Rust files; mock/test code excluded; governance and keeper rest are context only",
+  "poc_requested": false,
+  "runtime": "Codex; model inherited from orchestrator",
+  "concurrency_adaptation": "Runtime permits three child agents at once; twelve specialties run in four waves per pass. No specialty omitted by this adaptation.",
+  "source_bundle_sha256": "fac7bebb988dc161a0de16eb31c3e7450b07941d9464378a22c5e051a98ece79",
+  "scope_counts": {
+    "rust_files": 119,
+    "non_test_nloc_heuristic": 27064,
+    "anchor_instructions": 30,
+    "account_map_helper_matches": 51,
+    "account_map_review_leads": 75
+  },
+  "existing_issue_comparison": "The source repository contains earlier AI audit reports and an issue register. NEW in rust-auditor means absent from this local ledger, not necessarily previously unknown to the project. Final comparison will identify known issues separately.",
+  "validation_mode": "Static source review and arithmetic reasoning; no --poc flag, no builds or new runtime regression tests in this scan.",
+  "reading_coverage": "Each specialist receives the complete frozen source bundle and records actual full, bounded, search-only, and unread areas. A specialist completing its review does not mean it read all 58,914 source lines. Consolidated coverage and remaining limits are recorded separately.",
+  "coverage_losses": [
+    {
+      "pass": 1,
+      "specialist": 3,
+      "name": "economic-security",
+      "status": "tool safety error before final report",
+      "retried": false
+    }
+  ],
+  "supporting_evidence": {
+    "candidate_reports": "pass-N/pN-specialty reports preserve full proofs and proposed patches",
+    "coverage": "coverage-check.json plus per-specialist coverage records",
+    "prior_issues": "existing-issues.json and final comparison; rust-auditor NEW is ledger-relative",
+    "judgment": "pass-N/decisions.json preserves every candidate disposition"
+  },
+  "pass_1": {
+    "completed_specialists": 11,
+    "failed_specialist": "economic-security",
+    "raw_candidates": 36,
+    "gated_findings": 8,
+    "gated_leads": 22,
+    "full_production_files_in_union": 119,
+    "all_findings_confidence": 75,
+    "patch_validation": "All 10 proposed alternatives pass git apply --check individually; no patch applied or compiled. The stale-counter Option A still has an RPC chunk-boundary limitation recorded in the judgment and option label."
+  },
+  "pass_2_status": "Complete: all12 specialists returned;47raw candidates,8gated findings,14gated leads.",
+  "known_appendix_reporting": "Focus effort on new ground, but independently re-encountered known issues are still reported in full; this clarification was sent to the first three pass2 agents and written in shared transport notes.",
+  "pass_2": {
+    "completed_specialists": 12,
+    "raw_candidates": 47,
+    "gated_findings": 8,
+    "gated_leads": 14,
+    "full_production_file_union": 88,
+    "bounded_only_files": 8,
+    "search_only_files": 17,
+    "unread_or_search_only_ambiguous": 6,
+    "patch_validation": "All11 selected finding options pass ordinary git apply --check individually; none applied or compiled. Of19distinct raw patch texts,18pass; the four-site position-status hardening hunk fails ordinary applicability and is retained only as evidence."
+  },
+  "final_unique_items": {
+    "findings": 8,
+    "leads": 23,
+    "total": 31,
+    "all_finding_confidences": 75,
+    "confidence_is_not_severity": true,
+    "project_relation_counts": {
+      "exact_known": 21,
+      "related_distinct_extension": 7,
+      "new_to_register": 3
+    },
+    "new_to_project_register_keys": [
+      "shortwin-common|parse-lookup-table|hardening-truncated-metadata-accepted",
+      "shortwin-keeper|score|stale-lp-counter",
+      "shortwin-keeper|next-rank-batch|ranked-batch-lost-on-rpc-error"
+    ]
+  },
+  "final_coverage": {
+    "completed_specialist_reviews": 23,
+    "planned_specialist_reviews": 24,
+    "pass1_agents": "11/12",
+    "pass2_agents": "12/12",
+    "combined_full_production_files": 119,
+    "scoped_files": 119,
+    "limits": "Union coverage records actual production reading across specialists; it is not every file under every lens, runtime verification or a clean-security conclusion. Pass1economic-security tool error remains a coverage loss."
+  },
+  "patch_policy": "Draft patches are static proposals with per-option limits. In particular, clearing carry into dust does not pay former lenders/reclassify backing; hash bootstrap is required for existing hashless deployments; integration and tests remain implementation work.",
+  "artifact_policy": "The pinned upstream assemble.sh is the sole full-report producer. Raw reports, every disposition, prior comparisons, patch applicability checks and honest read coverage are preserved. Source and tracked files remain unchanged.",
+  "completed_at_utc": "2026-10-18T10:13:40.693882+00:00",
+  "temporary_bundle_removed": "/home/todor_dev/Projects/short.win/.audit-mZFuf8",
+  "assembled_report": {
+    "path": "full-report.md",
+    "sha256": "0d50668a2b76da361b44c357ae18fdff291fb1811e406a40f248f9d8a4a7e8d7",
+    "producer": "pinned upstream references/assemble.sh",
+    "counts_from_upstream_awk": {
+      "findings": 8,
+      "leads": 23,
+      "confidence_90_to_100": 0,
+      "confidence_75_to_89": 8,
+      "confidence_below_75": 0
+    }
+  },
+  "final_checks": "Every raw candidate has one disposition; run markers and assembled counts agree; all31ledger entries have scans=1; HEAD and119source hashes unchanged; no staged/tracked changes."
+}

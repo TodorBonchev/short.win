@@ -1,0 +1,168 @@
+Pass 2 specialist 5: invariant review completed.
+Frozen commit: b815269224ba0f5d946f49de7e113220c4067041.
+Review source: .audit-mZFuf8/agent-5-bundle.md; assigned notes and prompt read first.
+This is a bounded specialist review. I did not read the complete 58,914-line source bundle or all 61,550 lines of this agent bundle.
+No repository edits, builds, tests, runtime reproductions, live protocol calls, or subagents. A standalone pure-integer calculator verified only the carry example. The patch is proposed, unapplied and uncompiled.
+
+Fully read production files (test blocks do not count as production coverage):
+- ./crates/shortwin-math/src/pool.rs: 1-2535 (all production; bounded contiguous bundle reads 7589-10127)
+- ./crates/shortwin-math/src/rent.rs: 1-442 (all production; bundle 13403-13848)
+- ./programs/shortwin/src/engine/lender.rs: 1-244 (all production)
+- ./programs/shortwin/src/engine/prologue.rs: 1-271 (all production)
+- ./programs/shortwin/src/engine/waterfall.rs: all production
+- ./programs/shortwin/src/instructions/deposit.rs: all production
+- ./programs/shortwin/src/instructions/withdraw.rs: all production
+- ./programs/shortwin/src/instructions/claim_sol.rs: all production
+- ./programs/shortwin/src/instructions/cover_deficit.rs: all production
+- ./programs/shortwin/src/instructions/sync_lender.rs: all production
+- ./programs/shortwin/src/instructions/sol_settle.rs: all production
+- ./programs/shortwin/src/instructions/sweep_trader.rs: all production
+- ./programs/shortwin/src/lamports.rs: all production
+- ./programs/shortwin/src/state/lender.rs: 1-116 (all production)
+- ./programs/shortwin/src/state/epoch.rs: 1-98 (all production)
+- ./programs/shortwin/src/state/exposure.rs: all production
+- ./programs/shortwin/src/state/market.rs: 1-712 (all production)
+- ./programs/shortwin/src/state/vault.rs: all production
+
+Bounded production reads:
+- ./programs/shortwin/src/instructions/create_market.rs: 281-350 create_pool_vault; other content search-only
+
+Search-only areas:
+- ./programs/shortwin/src/mint_filter.rs: supply search only; no full production read
+- Targeted cross-file line-number searches in already reviewed pool/rent/lender instructions/state files.
+- source-index.tsv and bundle headings for navigation; account map and known appendix for scope and labels.
+
+External framework context:
+- anchor-lang 1.2.0 src/accounts/account.rs:365-385, AccountsClose delegates to common::close.
+- anchor-lang 1.2.0 src/common.rs, full 21-line close implementation: transfers all lamports, assigns System owner, resizes to zero.
+
+Tests read only as context, never executed:
+- Incidental #[cfg(test)] sections in the full lender/state bundle chunks.
+- Pool test prefix from layout checks through vesting/dust-lump examples (bundle approximately 10127-10460); remaining pool tests unread.
+- Rent test prefix and prologue test prefix from the bounded chunks; remaining tests unread.
+
+Instructions and audit metadata:
+- Build context opening, including Anchor 1.2.0 manifests; release overflow checks ON for math/program confirmed in task notes and root manifest context.
+- Specialist SOP, invariant specialty, shared rules, report-language rules read.
+- Relevant exploit catalogue entries P2/P3/P4/P5/P8, B4/B6/B8/B12/B13/B17/B20/B25, L4/L7/L9 read; other catalogue portions encountered only in bounded ranges.
+- Account-map lender/withdraw/claim/cover/sync entries and review-lead rows read. Some initial bulk metadata/tail output was truncated; no production coverage claim relies on unseen truncated content.
+- Entire Known findings appendix read; exact labels reused for all independently confirmed issues.
+
+Invariants checked:
+- Share mint/burn formulas, last-share boundary, empty-pool carry, and total-shares coupling.
+- Current and parked lender entitlement/realised claims, pot surplus moves, pot draws, partial epoch conversion, and forward-chain subtraction.
+- ShareEpoch conversion remainders, record ownership/key/sequence checks, and persistence offsets.
+- Lock calendar aggregates, per-lender expiry, rebase scaling, and survival-index lifecycle.
+- Vest release/flush, settlement deposit hold, and required post-wipe sweep bits.
+- Rent basis/coefficient snapshots, aggregate add/remove, receivable true-up, and realised backing.
+- Direct lamport debits, rent-plus-tracked vault floor, lender account close/recreation, and exposure close on SOL settlement.
+
+Rejected or bounded candidates:
+- S=0 with B>0 would underflow unrealised rent routing in pool::credit_in, but Withdraw explicitly rejects that state with LastSharesBorrowed. No distinct production path was established.
+- Epoch rebase share rounding uses persisted cumulative remainders; this bounded review found no new share-conservation defect.
+- Anchor 1.2.0 closes clear ownership and data, so the reviewed closes do not preserve old account data after refunding lamports.
+- ShareEpoch records remain needed by absent lenders and forward chains; absence of a close instruction is not a stranded-rent finding here.
+- The review did not validate external venue cashback implementations or live integration readiness; those paths remain outside this bounded invariant conclusion.
+
+Unread production files (apart from directory/headings/account-map metadata):
+- ./crates/shortwin-math/src/bounds.rs
+- ./crates/shortwin-math/src/caps.rs
+- ./crates/shortwin-math/src/consts.rs
+- ./crates/shortwin-math/src/error.rs
+- ./crates/shortwin-math/src/fees.rs
+- ./crates/shortwin-math/src/lib.rs
+- ./crates/shortwin-math/src/num/mod.rs
+- ./crates/shortwin-math/src/num/u256.rs
+- ./crates/shortwin-math/src/observe.rs
+- ./crates/shortwin-math/src/params.rs
+- ./crates/shortwin-math/src/persist.rs
+- ./crates/shortwin-math/src/pool_select.rs
+- ./crates/shortwin-math/src/quote/cpmm.rs
+- ./crates/shortwin-math/src/quote/mod.rs
+- ./crates/shortwin-math/src/quote/pricing.rs
+- ./crates/shortwin-math/src/quote/ray_v4.rs
+- ./crates/shortwin-math/src/quote/reprice.rs
+- ./crates/shortwin-math/src/quote/sol_leg.rs
+- ./crates/shortwin-math/src/quote/straddle.rs
+- ./crates/shortwin-math/src/risk.rs
+- ./crates/shortwin-math/src/settle.rs
+- ./crates/shortwin-math/src/tier.rs
+- ./crates/shortwin-math/src/waterfall.rs
+- ./crates/shortwin-venue-state/src/bytes.rs
+- ./crates/shortwin-venue-state/src/lib.rs
+- ./crates/shortwin-venue-state/src/mint.rs
+- ./crates/shortwin-venue-state/src/program_data.rs
+- ./crates/shortwin-venue-state/src/pump.rs
+- ./crates/shortwin-venue-state/src/pump_amm.rs
+- ./crates/shortwin-venue-state/src/pyth.rs
+- ./crates/shortwin-venue-state/src/raydium_cpmm.rs
+- ./crates/shortwin-venue-state/src/raydium_v4.rs
+- ./crates/shortwin-venue-state/src/token_account.rs
+- ./programs/shortwin/src/constants.rs
+- ./programs/shortwin/src/engine/arming.rs
+- ./programs/shortwin/src/engine/bounds.rs
+- ./programs/shortwin/src/engine/caps.rs
+- ./programs/shortwin/src/engine/guard.rs
+- ./programs/shortwin/src/engine/mod.rs
+- ./programs/shortwin/src/engine/observe.rs
+- ./programs/shortwin/src/engine/pool_select.rs
+- ./programs/shortwin/src/engine/route.rs
+- ./programs/shortwin/src/engine/tier.rs
+- ./programs/shortwin/src/engine/trader.rs
+- ./programs/shortwin/src/errors.rs
+- ./programs/shortwin/src/events.rs
+- ./programs/shortwin/src/instructions/add_margin.rs
+- ./programs/shortwin/src/instructions/apply_config.rs
+- ./programs/shortwin/src/instructions/cancel_config.rs
+- ./programs/shortwin/src/instructions/close_short.rs
+- ./programs/shortwin/src/instructions/crank_price.rs
+- ./programs/shortwin/src/instructions/crank_sol_usd.rs
+- ./programs/shortwin/src/instructions/disable_venue.rs
+- ./programs/shortwin/src/instructions/execute_pool_switch.rs
+- ./programs/shortwin/src/instructions/expire.rs
+- ./programs/shortwin/src/instructions/flag_unsafe_mint.rs
+- ./programs/shortwin/src/instructions/flag_venue_upgraded.rs
+- ./programs/shortwin/src/instructions/initialize_config.rs
+- ./programs/shortwin/src/instructions/liquidate.rs
+- ./programs/shortwin/src/instructions/mod.rs
+- ./programs/shortwin/src/instructions/open_short.rs
+- ./programs/shortwin/src/instructions/propose_config.rs
+- ./programs/shortwin/src/instructions/propose_pool.rs
+- ./programs/shortwin/src/instructions/revalidate_venue.rs
+- ./programs/shortwin/src/instructions/set_coverage_pause.rs
+- ./programs/shortwin/src/instructions/set_pause.rs
+- ./programs/shortwin/src/instructions/set_route_broken.rs
+- ./programs/shortwin/src/instructions/set_venue_extras.rs
+- ./programs/shortwin/src/instructions/sweep_protocol_fees.rs
+- ./programs/shortwin/src/lib.rs
+- ./programs/shortwin/src/state/config.rs
+- ./programs/shortwin/src/state/layout_asserts.rs
+- ./programs/shortwin/src/state/mod.rs
+- ./programs/shortwin/src/state/oracle.rs
+- ./programs/shortwin/src/state/pod.rs
+- ./programs/shortwin/src/state/position.rs
+- ./programs/shortwin/src/state/venue_extras.rs
+- ./programs/shortwin/src/state/venue_guard.rs
+- ./programs/shortwin/src/venues/detect.rs
+- ./programs/shortwin/src/venues/mod.rs
+- ./programs/shortwin/src/venues/pump_amm.rs
+- ./programs/shortwin/src/venues/pump_curve.rs
+- ./programs/shortwin/src/venues/raydium.rs
+- ./programs/shortwin/src/venues/raydium_cpmm.rs
+- ./programs/shortwin/src/venues/raydium_v4.rs
+- ./services/common/src/chain.rs
+- ./services/common/src/tx.rs
+- ./services/keeper/src/budget.rs
+- ./services/keeper/src/coverage.rs
+- ./services/keeper/src/decide.rs
+- ./services/keeper/src/fees.rs
+- ./services/keeper/src/graduation.rs
+- ./services/keeper/src/ixs.rs
+- ./services/keeper/src/monitor.rs
+- ./services/keeper/src/pda.rs
+- ./services/keeper/src/pool_monitor.rs
+- ./services/keeper/src/sweep.rs
+- ./services/keeper/src/venue.rs
+- ./services/keeper/src/view.rs
+
+Output: 1 FINDING and 3 LEAD blocks.
