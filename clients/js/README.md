@@ -17,6 +17,57 @@ Until 1.0.0 `idl/` also held `complete_curve.json`, the IDL of the stateless str
 deployed (design pump-final §10–§11, owner decision D2), and its IDL left with it; the audited
 1.0.0 copy stays in git history (`git show v1.0.0:clients/js/idl/complete_curve.json`).
 
+
+## Status: pre-release, program not deployed
+
+This package is published as a pre-release (`0.x.y-next.N`, npm dist-tag `next`). **The
+short.win program is not deployed on any cluster yet.** `SHORTWIN_PROGRAM_ADDRESS`
+(`5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`) is the program's declared id, but nothing
+lives at that address today. Pass `programAddress` (below) to talk to your own deployment, for
+example on a local validator. The API can change before 1.0.
+
+## Install
+
+```sh
+npm install @shortwin/client@next @solana/kit@^8.3.0
+# or: pnpm add @shortwin/client@next @solana/kit@^8.3.0
+```
+
+`@solana/kit` (^8.3.0) is a peer dependency, so your app and the client share one copy. The
+package is ESM-only and ships compiled JavaScript with type declarations (Node ≥ 20.18,
+any modern bundler). The Anchor IDL is available as `@shortwin/client/idl`.
+
+## Usage
+
+```ts
+import { address, createSolanaRpc } from '@solana/kit';
+import { SHORTWIN_PROGRAM_ADDRESS, fetchMarket, findMarketPda } from '@shortwin/client';
+
+const rpc = createSolanaRpc('http://127.0.0.1:8899');
+const mint = address('So11111111111111111111111111111111111111112');
+
+// Default program id (SHORTWIN_PROGRAM_ADDRESS):
+const [market] = await findMarketPda({ mint });
+const account = await fetchMarket(rpc, market);
+console.log(account.data);
+
+// Your own deployment: every PDA helper and instruction builder takes `programAddress`.
+const programAddress = address('<your program id>');
+const [myMarket] = await findMarketPda({ mint }, { programAddress });
+// e.g. getXxxInstruction({ ...accounts, ...args }, { programAddress })
+```
+
+Instruction builders (`get<Name>Instruction`, `get<Name>InstructionAsync`), account codecs
+and fetchers (`fetch<Account>`, `decode<Account>`), event decoders, PDA finders and the
+program's error codes are all exported from the package root.
+
+## Development
+
+`pnpm --filter @shortwin/client build` compiles `src/` to `dist/` (`tsconfig.build.json`,
+`.ts` imports rewritten to `.js`); `prepare` runs it on `pnpm install` and `prepack` before
+packing. Inside the workspace, Vite and `tsc` in `apps/web` resolve the package to `src/`
+through the `@shortwin/source` export condition, so edits apply without a rebuild.
+
 ## Regenerate after a program change
 
 ```sh
@@ -34,7 +85,7 @@ example with `CARGO_TARGET_DIR` set).
 
 Pinned devDependencies (ARCH §1.1): `codama` 1.11.0, `@codama/nodes-from-anchor` 1.5.6,
 `@codama/renderers-js` 2.5.0, plus `typescript` 5.9.3 and `@types/node` 24.19.0. The only
-runtime dependency is `@solana/kit` 8.3.0. The lockfile is the workspace's `pnpm-lock.yaml`.
+runtime dependency is the peer `@solana/kit` (^8.3.0; 8.3.0 in development). The lockfile is the workspace's `pnpm-lock.yaml`.
 
 `codama.json` (repository root) holds the renderer options and one `before` visitor. Its
 package folder argument `.` is relative to this package, because `pnpm run generate` runs the
