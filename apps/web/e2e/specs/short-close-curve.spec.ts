@@ -17,7 +17,7 @@
 import { dataValue, expect, need, requireVenueFixtures, T, test } from '../fixtures.ts';
 import { shortPosition } from '../validator/actions.ts';
 import { waitForClock } from '../validator/chain.ts';
-import { crowdBuy, curveState, listCurveMarket, marketVenue } from '../validator/curve.ts';
+import { crowdBuy, curveState, freshCurveOpenPrice, listCurveMarket, marketVenue } from '../validator/curve.ts';
 
 test.use({ wallet: 'curve' });
 
@@ -40,6 +40,9 @@ test.describe('short: a close past the curve rT (pump v3)', { tag: '@short' }, (
         // tolerance (ProceedsBelowMin). On mainnet a 166-byte curve holds its rent already.
         await crowdBuy(1_000_000_000n, 10n ** 9n);
         await waitForClock(m.createdAt + MARKET_WARMUP_S + 2n);
+        // The listing warm-up outlasts price freshness; observe and integrate the live curve
+        // before asking the browser to open against it.
+        await freshCurveOpenPrice(m);
         const q = Q_TOKENS * 10n ** DECIMALS;
 
         // The open, on the curve (`sell_v3`).
