@@ -1,0 +1,188 @@
+PASS 2 OF 2 — ACCESS CONTROL — FINISHED
+Frozen commit: b815269224ba0f5d946f49de7e113220c4067041
+Audit tool revision: 6c41e1d46386de7fd9b1fa48c847e876ac8b2676
+Reviewer: p2 specialist 2, access control
+Result: 2 independently re-encountered FINDING blocks; 5 independently re-encountered LEAD blocks; 0 new root causes.
+Review complete for this lens. This is a completed static review, not a refusal.
+Repository was read only. No build, test, benchmark, runtime reproduction, or source edit was performed anywhere.
+
+Actual coverage
+The source came from agent-2-bundle.md and source-index.tsv. The reads below are exact displayed source intervals, mapped back to original files.
+full-production means every production line in that file was read. It does not claim every test was reviewed.
+bounded means only the displayed intervals were read. Tests sometimes appear as context and remain outside findings.
+search-only means bounded symbol searches ran across that file, but no complete source block was reviewed.
+unread means this pass did not inspect that file's production source; listing its heading or index is not coverage.
+The periphery and pure-math crates were outside this specialist's completed lens. Their unread status is deliberate and explicit.
+The policy/metadata read in one initial combined tool output was truncated. It is not used to claim production coverage.
+The shared rules, report rules, signer map, and Known findings appendix were subsequently read in bounded outputs.
+Counts: {'bounded': 15, 'unread': 51, 'search-only': 24, 'full-production': 37}. Distinct displayed source lines: 11509, including test/context lines. This is not a claim to review all 58,914 source lines.
+
+Status | Frozen source path | Displayed original source lines | Count
+bounded | ./crates/shortwin-math/Cargo.toml | 1-18 | 18
+bounded | ./crates/shortwin-venue-state/Cargo.toml | 1-18 | 18
+bounded | ./programs/shortwin/Cargo.toml | 1-48 | 48
+bounded | ./services/common/Cargo.toml | 1-36 | 36
+bounded | ./services/keeper/Cargo.toml | 1-58 | 58
+bounded | ./Cargo.toml | 1-28 | 28
+unread | ./Anchor.toml | - | 0
+unread | ./services/Cargo.toml | - | 0
+unread | ./crates/shortwin-math/src/bounds.rs | - | 0
+unread | ./crates/shortwin-math/src/caps.rs | - | 0
+unread | ./crates/shortwin-math/src/consts.rs | - | 0
+unread | ./crates/shortwin-math/src/error.rs | - | 0
+unread | ./crates/shortwin-math/src/fees.rs | - | 0
+unread | ./crates/shortwin-math/src/lib.rs | - | 0
+unread | ./crates/shortwin-math/src/num/mod.rs | - | 0
+unread | ./crates/shortwin-math/src/num/u256.rs | - | 0
+unread | ./crates/shortwin-math/src/observe.rs | - | 0
+unread | ./crates/shortwin-math/src/params.rs | - | 0
+unread | ./crates/shortwin-math/src/persist.rs | - | 0
+unread | ./crates/shortwin-math/src/pool.rs | - | 0
+unread | ./crates/shortwin-math/src/pool_select.rs | - | 0
+unread | ./crates/shortwin-math/src/quote/cpmm.rs | - | 0
+unread | ./crates/shortwin-math/src/quote/mod.rs | - | 0
+unread | ./crates/shortwin-math/src/quote/pricing.rs | - | 0
+unread | ./crates/shortwin-math/src/quote/ray_v4.rs | - | 0
+unread | ./crates/shortwin-math/src/quote/reprice.rs | - | 0
+unread | ./crates/shortwin-math/src/quote/sol_leg.rs | - | 0
+unread | ./crates/shortwin-math/src/quote/straddle.rs | - | 0
+unread | ./crates/shortwin-math/src/rent.rs | - | 0
+unread | ./crates/shortwin-math/src/risk.rs | - | 0
+unread | ./crates/shortwin-math/src/settle.rs | - | 0
+unread | ./crates/shortwin-math/src/tier.rs | - | 0
+unread | ./crates/shortwin-math/src/waterfall.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/bytes.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/lib.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/mint.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/program_data.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/pump.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/pump_amm.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/pyth.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/raydium_cpmm.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/raydium_v4.rs | - | 0
+unread | ./crates/shortwin-venue-state/src/token_account.rs | - | 0
+bounded | ./programs/shortwin/src/constants.rs | 121-153 | 33
+search-only | ./programs/shortwin/src/engine/arming.rs | - | 0
+search-only | ./programs/shortwin/src/engine/bounds.rs | - | 0
+search-only | ./programs/shortwin/src/engine/caps.rs | - | 0
+full-production | ./programs/shortwin/src/engine/guard.rs | 1-243 | 243
+full-production | ./programs/shortwin/src/engine/lender.rs | 1-245 | 245
+search-only | ./programs/shortwin/src/engine/mod.rs | - | 0
+search-only | ./programs/shortwin/src/engine/observe.rs | - | 0
+search-only | ./programs/shortwin/src/engine/pool_select.rs | - | 0
+search-only | ./programs/shortwin/src/engine/prologue.rs | - | 0
+search-only | ./programs/shortwin/src/engine/route.rs | - | 0
+search-only | ./programs/shortwin/src/engine/tier.rs | - | 0
+full-production | ./programs/shortwin/src/engine/trader.rs | 1-506 | 506
+search-only | ./programs/shortwin/src/engine/waterfall.rs | - | 0
+search-only | ./programs/shortwin/src/errors.rs | - | 0
+search-only | ./programs/shortwin/src/events.rs | - | 0
+full-production | ./programs/shortwin/src/instructions/add_margin.rs | 1-105 | 105
+full-production | ./programs/shortwin/src/instructions/apply_config.rs | 1-125 | 125
+full-production | ./programs/shortwin/src/instructions/cancel_config.rs | 1-59 | 59
+full-production | ./programs/shortwin/src/instructions/claim_sol.rs | 1-137 | 137
+full-production | ./programs/shortwin/src/instructions/close_short.rs | 1-356 | 356
+full-production | ./programs/shortwin/src/instructions/cover_deficit.rs | 1-115 | 115
+full-production | ./programs/shortwin/src/instructions/crank_price.rs | 1-267 | 267
+full-production | ./programs/shortwin/src/instructions/crank_sol_usd.rs | 1-139 | 139
+full-production | ./programs/shortwin/src/instructions/create_market.rs | 1-798 | 798
+full-production | ./programs/shortwin/src/instructions/deposit.rs | 1-210 | 210
+full-production | ./programs/shortwin/src/instructions/disable_venue.rs | 1-79 | 79
+full-production | ./programs/shortwin/src/instructions/execute_pool_switch.rs | 1-276 | 276
+full-production | ./programs/shortwin/src/instructions/expire.rs | 1-195 | 195
+full-production | ./programs/shortwin/src/instructions/flag_unsafe_mint.rs | 1-68 | 68
+full-production | ./programs/shortwin/src/instructions/flag_venue_upgraded.rs | 1-159 | 159
+full-production | ./programs/shortwin/src/instructions/initialize_config.rs | 1-197 | 197
+bounded | ./programs/shortwin/src/instructions/liquidate.rs | 1-217,345-740 | 613
+search-only | ./programs/shortwin/src/instructions/mod.rs | - | 0
+bounded | ./programs/shortwin/src/instructions/open_short.rs | 1-311,407-721 | 626
+full-production | ./programs/shortwin/src/instructions/propose_config.rs | 1-52 | 52
+full-production | ./programs/shortwin/src/instructions/propose_pool.rs | 1-348 | 348
+full-production | ./programs/shortwin/src/instructions/revalidate_venue.rs | 1-123 | 123
+full-production | ./programs/shortwin/src/instructions/set_coverage_pause.rs | 1-114 | 114
+full-production | ./programs/shortwin/src/instructions/set_pause.rs | 1-77 | 77
+full-production | ./programs/shortwin/src/instructions/set_route_broken.rs | 1-85 | 85
+full-production | ./programs/shortwin/src/instructions/set_venue_extras.rs | 1-203 | 203
+full-production | ./programs/shortwin/src/instructions/sol_settle.rs | 1-551 | 551
+full-production | ./programs/shortwin/src/instructions/sweep_protocol_fees.rs | 1-94 | 94
+full-production | ./programs/shortwin/src/instructions/sweep_trader.rs | 1-415 | 415
+full-production | ./programs/shortwin/src/instructions/sync_lender.rs | 1-163 | 163
+full-production | ./programs/shortwin/src/instructions/withdraw.rs | 1-316 | 316
+full-production | ./programs/shortwin/src/lamports.rs | 1-93 | 93
+full-production | ./programs/shortwin/src/lib.rs | 1-325 | 325
+full-production | ./programs/shortwin/src/mint_filter.rs | 1-202 | 202
+full-production | ./programs/shortwin/src/state/config.rs | 1-933 | 933
+search-only | ./programs/shortwin/src/state/epoch.rs | - | 0
+search-only | ./programs/shortwin/src/state/exposure.rs | - | 0
+search-only | ./programs/shortwin/src/state/layout_asserts.rs | - | 0
+search-only | ./programs/shortwin/src/state/lender.rs | - | 0
+search-only | ./programs/shortwin/src/state/market.rs | - | 0
+search-only | ./programs/shortwin/src/state/mod.rs | - | 0
+search-only | ./programs/shortwin/src/state/oracle.rs | - | 0
+search-only | ./programs/shortwin/src/state/pod.rs | - | 0
+bounded | ./programs/shortwin/src/state/position.rs | 1-28 | 28
+search-only | ./programs/shortwin/src/state/vault.rs | - | 0
+search-only | ./programs/shortwin/src/state/venue_extras.rs | - | 0
+full-production | ./programs/shortwin/src/state/venue_guard.rs | 1-164 | 164
+search-only | ./programs/shortwin/src/venues/detect.rs | - | 0
+bounded | ./programs/shortwin/src/venues/mod.rs | 1-299,1384-1454 | 370
+bounded | ./programs/shortwin/src/venues/pump_amm.rs | 463-499,779-814,919-1029,1117-1219 | 287
+bounded | ./programs/shortwin/src/venues/pump_curve.rs | 760-788,798-908,1001-1093 | 233
+full-production | ./programs/shortwin/src/venues/raydium.rs | 1-394 | 394
+bounded | ./programs/shortwin/src/venues/raydium_cpmm.rs | 437-527 | 91
+bounded | ./programs/shortwin/src/venues/raydium_v4.rs | 324-414 | 91
+unread | ./services/common/src/chain.rs | - | 0
+unread | ./services/common/src/tx.rs | - | 0
+unread | ./services/keeper/src/budget.rs | - | 0
+unread | ./services/keeper/src/coverage.rs | - | 0
+unread | ./services/keeper/src/decide.rs | - | 0
+unread | ./services/keeper/src/fees.rs | - | 0
+unread | ./services/keeper/src/graduation.rs | - | 0
+unread | ./services/keeper/src/ixs.rs | - | 0
+unread | ./services/keeper/src/monitor.rs | - | 0
+unread | ./services/keeper/src/pda.rs | - | 0
+unread | ./services/keeper/src/pool_monitor.rs | - | 0
+unread | ./services/keeper/src/sweep.rs | - | 0
+unread | ./services/keeper/src/venue.rs | - | 0
+unread | ./services/keeper/src/view.rs | - | 0
+
+Authority/CPI conclusions
+- GlobalConfig and VenueGuard are canonical singleton PDAs. InitializeConfig authenticates the program's own loader ProgramData upgrade authority.
+- Governance alone proposes config. Emergency cannot cancel Authorities or Timelock changes. Setters authenticate their configured Signer roles.
+- Public ApplyConfig executes a validated, elapsed, unexpired proposal. Successor acceptance remains the independently reported unsafe-authority-transfer finding.
+- Lender payout instructions bind the market, owner signer, and owner-derived LenderPosition. init_if_needed initializes lender fields only while owner is default.
+- SyncLender checks the real owner is_signer before rebase conversion. Third parties take touch_pot and must preserve records; math accrual precision was not re-audited.
+- Borrower closes and margin additions bind position.borrower. Keeper exits pay a has_one-bound borrower and use risk/expiry checks before spending position funds.
+- The exits omit the reserved position status check. No current non-open status writer was found; the known hardening lead remains a lead.
+- Trader and ephemeral WSOL PDAs use market-bound seeds. Canonical vaults receive the proceeds; direct debits require this program's ownership and distinct destinations.
+- All four venue CPI builders use compiled program IDs and mark only the trader as signer. A Raydium delegate is limited to q and must be exhausted.
+- parse_extras enforces non-signers, excludes shortwin-owned accounts and denylisted keys, and constructs explicit non-signer metas.
+- Mint filtering refuses freeze authority and all extensions outside the metadata/group allowlist. Pool vault creation binds its mint and market authority.
+- No new access bypass was proved. The known hashless upgrade latch still admits an outsider's legal loader extension.
+
+Signer-map reconciliation (all 12 no-signer rows)
+1 apply_config: INTENTIONAL PUBLIC EXECUTION; apply_config.rs:57-118 checks pending payload and its time window; propose_config.rs:19-39 authenticates governance. Independent unsafe-authority-transfer finding retained. No separate confirmed no-signer bug.
+2 crank_price: INTENTIONAL PUBLIC CRANK; crank_price.rs:82-176 authenticates market/mint keys and parses the venue ReadSet, then records public market observations. No caller-selected recipient or authority assignment.
+3 crank_sol_usd: INTENTIONAL PUBLIC CRANK; crank_sol_usd.rs:33-113 binds configured feed address and Pyth owner and invokes the feed checks before caching its price.
+4 execute_pool_switch: INTENTIONAL PUBLIC EXECUTION; execute_pool_switch.rs:151-273 binds the pending candidate keys, waits for the window, reverifies eligibility and carried-position limits, and adopts or cancels.
+5 flag_unsafe_mint: INTENTIONAL PUBLIC TRIPWIRE; flag_unsafe_mint.rs:27-61 binds the mint to its market and only sets the flag if that actual mint fails safety checks.
+6 flag_venue_upgraded: INTENTIONAL PUBLIC TRIPWIRE WITH SEPARATE DEFECT; flag_venue_upgraded.rs:46-143 binds the real venue ProgramData. The missing fingerprint fallback remains unhashed-slot-upgrade-latch, not a missing caller signer.
+7 pump_amm::init_uva: INTERNAL HELPER, NOT DISPATCH; pump_amm.rs:1139-1189 checks constant venue/event keys and the derived UVA. CreateMarket.creator is a Signer; CPI payer is signer. Empty signer seeds sign for no PDA. Existing-UVA validation remains a hardening lead.
+8 pump_curve::init_uva: INTERNAL HELPER, NOT DISPATCH; pump_curve.rs:1025-1075 has the same outer creator signer and explicit CPI payer signer. Empty signer seeds sign for no PDA. Existing-UVA validation remains a hardening lead.
+9 propose_pool: INTENTIONAL PUBLIC SELECTION; propose_pool.rs:228-347 binds the market/mint, verifies the candidate, and applies stated window, eligibility, and carried-position rules. No authority key is assigned.
+10 pump_listing: INTERNAL HELPER, NOT DISPATCH; create_market.rs:430-474 runs beneath CreateMarket.creator: Signer and a canonical market init. It uses idempotent ATA creation and the fixed-program UVA helpers.
+11 sweep_protocol_fees: INTENTIONAL PUBLIC PAYOUT; sweep_protocol_fees.rs:51-92 binds the destination to config.fee_recipient and preserves lender SOL plus rent. Caller cannot redirect the payout.
+12 sweep_trader: INTENTIONAL PUBLIC RECOVERY; sweep_trader.rs:146-411 binds trader and market vault keys, checks the ATA and token leg keys, and credits the canonical lender vault. No caller-selected payout.
+All 12 dispositions replace the raw pattern-match suggestion that no Signer alone is a defect. No disposition changed from the completed pass-one interpretation.
+The account-map global-signer entry for invoke_signed(...,&[]) is also rejected: zero seed groups confer zero PDA signatures.
+
+Framework/dependency source inspected (read only)
+anchor-lang 1.2.0 accounts/signer.rs:39-65 — real is_signer check.
+anchor-lang 1.2.0 accounts/account_loader.rs:118-205 — owner/discriminator/size validation and writable mutable loads.
+anchor-lang 1.2.0 common.rs:1-21 — close transfers lamports, assigns System ownership, and resizes to zero.
+solana-bpf-loader-program 4.3.0 src/lib.rs:789-1008 — legacy ExtendProgram, conditional authority check, rent top-up, resize, and slot update.
+No framework behavior used as an assumed proof for a new finding.
+
+Out-of-scope/context reads
+Pass-one access and trust reports were consulted after independent source review to align known labels and minimal patch text.
+No test source was executed. No live deployment, RPC state, or venue bytecode was queried.

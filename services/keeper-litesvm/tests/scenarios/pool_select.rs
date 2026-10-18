@@ -1280,12 +1280,83 @@ fn junk_pools_cost_a_bounded_ranking_after_the_cranks() {
     );
 }
 
+/// A transport failure in either the first request or a later group retains the entire
+/// ranking prefix. The retry uses coherent three-account snapshots, including pool 34 at
+/// the backend's 100-key boundary, and publishes candidates only after every group succeeds.
+#[test]
+fn ranking_rpc_failure_retries_every_pool_with_coherent_groups() {
+    use shortwin_keeper::pool_monitor;
+    use shortwin_keeper_litesvm::{Rpc, block_on};
+
+    for junk in [0, 40] {
+        let (mut h, rm, _, _, best) = with_positions_and_siblings();
+        h.with_env(|env| {
+            for _ in 0..junk {
+                plant(env, &rm.pool, Plant::Cpmm, true, (1, 38_000), 0);
+            }
+        });
+        let key = rm.market();
+        let mint = market(&h, &key).mint;
+        let found = block_on(pool_monitor::discover(h.chain(), &mint)).unwrap();
+        let queued: Vec<_> = found.iter().filter(|c| c.plausible).cloned().collect();
+        assert_eq!(queued.len(), junk + 3);
+        let failed = if junk == 0 {
+            ps::pool_key(&best)
+        } else {
+            queued[33..]
+                .iter()
+                .find(|c| c.pool != ps::pool_key(&rm.pool))
+                .unwrap()
+                .pool
+        };
+        h.chain().fail_reads_of(failed, 1);
+        let first = h.second().clone();
+        assert!(
+            first.errors.iter().any(|e| e.contains("injected failure")),
+            "{:?}",
+            first.errors
+        );
+        let track = h.keeper.pool_track(&key).unwrap();
+        assert_eq!(
+            track.rank_queue, queued,
+            "failed group must not consume any queued pool"
+        );
+        assert!(track.rank_scores.is_empty() && track.candidates.is_empty());
+        let discovery = track.last_discovery;
+
+        let from = h.chain().rpc_log().len();
+        let second = h.second().clone();
+        assert!(second.errors.is_empty(), "{:?}", second.errors);
+        let track = h.keeper.pool_track(&key).unwrap();
+        assert_eq!(
+            track.last_discovery, discovery,
+            "retry without waiting for rediscovery"
+        );
+        assert!(track.rank_queue.is_empty());
+        assert!(
+            track
+                .candidates
+                .iter()
+                .any(|c| c.pool == ps::pool_key(&best))
+        );
+        let log = h.chain().rpc_log();
+        for group in queued.chunks(33) {
+            let keys: Vec<_> = group.iter().flat_map(|c| c.rank_keys()).collect();
+            assert!(keys.len() <= 99);
+            assert!(
+                log[from..]
+                    .iter()
+                    .any(|r| matches!(r, Rpc::Accounts(k) if k == &keys)),
+                "every pool/vault/mint triple belongs to a single request: {} keys",
+                keys.len()
+            );
+        }
+    }
+}
+
 /// The `getMultipleAccounts` calls the default ranking budget can add to a tick.
 fn h_budget_calls() -> usize {
-    KeeperConfig::default()
-        .pool_select
-        .rank_keys_per_tick
-        .div_ceil(100)
+    (KeeperConfig::default().pool_select.rank_keys_per_tick / 3).div_ceil(33)
 }
 
 /// The listing-window observations of a Raydium market with no position (the M4V-5 keeper

@@ -34,6 +34,7 @@ use std::collections::HashMap;
 
 use anchor_lang::prelude::{AccountInfo, Pubkey};
 use anchor_lang::{AccountDeserialize, Discriminator, ZeroCopy};
+use shortwin::constants::{CONFIG_VERSION, MARKET_VERSION, VENUE_EXTRAS_VERSION};
 use shortwin::state::{
     GlobalConfig, Market, MarketVault, OracleCache, POSITION_OPEN, ShortPosition, VenueExtras,
     VenueKind,
@@ -44,7 +45,8 @@ use shortwin_services_common::{AccountData, Chain, ChainClock, Memcmp};
 
 use crate::{pda, venue};
 
-/// Decodes a zero-copy short.win account (owner and discriminator checked).
+/// Decodes a zero-copy short.win account (owner, discriminator and size checked). Typed
+/// callers must check the layout version before interpreting accounts that have one.
 pub fn decode_zc<T: ZeroCopy>(acc: &AccountData) -> Option<T> {
     if acc.owner != shortwin::ID || !acc.data.starts_with(T::DISCRIMINATOR) {
         return None;
@@ -265,6 +267,11 @@ pub async fn load_with_positions<C: Chain>(
         .and_then(|a| a.as_ref())
         .and_then(decode_zc)
         .ok_or_else(|| anyhow::anyhow!("GlobalConfig not found"))?;
+    anyhow::ensure!(
+        config.version == CONFIG_VERSION,
+        "unsupported GlobalConfig layout version {} (expected {CONFIG_VERSION})",
+        config.version,
+    );
     let n = markets.len();
     let oracle = accs
         .get(1 + 2 * n)
@@ -295,6 +302,16 @@ pub async fn load_with_positions<C: Chain>(
             skipped.push((*key, "market or vault unreadable".to_string()));
             continue;
         };
+        if m.version != MARKET_VERSION {
+            skipped.push((
+                *key,
+                format!(
+                    "unsupported Market layout version {} (expected {MARKET_VERSION})",
+                    m.version,
+                ),
+            ));
+            continue;
+        }
         let Some(kind) = m.venue_kind() else {
             skipped.push((*key, format!("unknown venue byte {}", m.venue)));
             continue;
@@ -364,6 +381,7 @@ pub async fn load_with_positions<C: Chain>(
             .get(n_venue + i)
             .and_then(|a| a.as_ref())
             .and_then(decode_zc::<VenueExtras>)
+            .filter(|extras| extras.version == VENUE_EXTRAS_VERSION)
             .map(Box::new);
         out.push(MarketView {
             positions: positions.get(&p.key).cloned().unwrap_or_default(),

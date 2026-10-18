@@ -1,0 +1,156 @@
+Pass 1 specialist 7 — first principles
+Pinned bundle: b815269224ba0f5d946f49de7e113220c4067041
+Source: .audit-mZFuf8/agent-7-bundle.md; locations mapped with source-index.tsv.
+Restrictions honored: no repository writes, builds, tests, chain calls, external messages, or subagents. Report and coverage are the only scratch artifacts, under /tmp.
+Method: read every production line in the assigned keeper-core/common files; trace selected assumptions into the protocol source. Tests were context only. A full-bundle review is NOT claimed.
+
+FULL PRODUCTION READS — services
+services/common/src/chain.rs:1-258 (bundle 47875-48132)
+services/common/src/tx.rs:1-316 (bundle 48191-48506)
+services/keeper/src/budget.rs:1-939 (bundle 48673-49611)
+services/keeper/src/coverage.rs:1-811 (bundle 50449-51259)
+services/keeper/src/decide.rs:1-540 (bundle 52006-52545)
+services/keeper/src/fees.rs:1-53 (bundle 52711-52763)
+services/keeper/src/graduation.rs:1-470 (bundle 52806-53275)
+services/keeper/src/ixs.rs:1-316 (bundle 53441-53756)
+services/keeper/src/monitor.rs:1-774 (bundle 53796-54569)
+services/keeper/src/pda.rs:1-63 (bundle 55105-55167)
+services/keeper/src/pool_monitor.rs:1-747 (bundle 55173-55919)
+services/keeper/src/sweep.rs:1-377 (bundle 56584-56960)
+services/keeper/src/venue.rs:1-750 (bundle 57185-57934)
+services/keeper/src/view.rs:1-390 (bundle 58523-58912)
+
+FULL PRODUCTION READS — protocol traces
+crates/shortwin-math/src/pool_select.rs:1-210 (bundle 11031-11240)
+programs/shortwin/src/instructions/deposit.rs:1-210 (bundle 31335-31544)
+programs/shortwin/src/instructions/set_venue_extras.rs:1-203 (bundle 34939-35141)
+programs/shortwin/src/instructions/sweep_trader.rs:1-415 (bundle 35802-36216)
+
+BUILD CONTEXT READS
+Bundle 1-401: the full build-context header and every included manifest. Anchor 1.2.0; root release overflow checks on, services workspace has no release overflow-check override.
+
+BOUNDED PRODUCTION READS — only the stated ranges
+crates/shortwin-math/src/pool.rs: 2009-2049 (bundle 9600-9640)
+programs/shortwin/src/engine/lender.rs: 1-95 (bundle 24633-24730), 175-225 (bundle 24810-24860)
+programs/shortwin/src/instructions/crank_price.rs: 1-77 (bundle 30113-30192)
+programs/shortwin/src/venues/mod.rs: 99-359 (bundle 41610-41870), 1189-1304 (bundle 42700-42815)
+programs/shortwin/src/venues/raydium_cpmm.rs: 187-292 (bundle 46650-46755)
+
+BOUNDED OUT-OF-BUNDLE CONTEXT
+services/keeper/src/keeper.rs:3210-3335 — discover, rank, evaluation, top-candidate filtering and plan call; read with line ranges. The report generator mechanically loaded the file to calculate a diff; that is not a full semantic review.
+services/keeper/src/config.rs:350-395 and 607-625 — candidate/ranking defaults and validation; report diff mechanically loaded the file, not full semantic review.
+docs/research/raydium-amm.md:657-675 — internal counters, burned LP and locked SOL; supporting repository research, not independent review of venue binaries.
+
+RULES AND MAP CONTEXT
+Read prompt file in full; build context; senior-auditor mindset, first-principles specialty, shared scan rules, report-language rules (bundle 58915-59305). Read relevant P2/P3 and B18 catalogue material and the visible review-lead table; remaining catalogue/map details were not exhaustively reviewed. The initially oversized rules output was truncated, so no whole-suffix claim is made.
+
+SEARCH-ONLY AREAS
+Bundle cross-file searches: PLACEHOLDER_COIN_CREATOR, LP counter/locked_depth call sites, rewards_required, WipeSweepPending, wipe_swept, account-map headings and rules headings.
+services/keeper/src/keeper.rs and config.rs: ranking, graduation preparation and sweep call names; only the bounded ranges above were fully read.
+tests/, services/keeper-litesvm/, docs/: broad LP-counter/withdrawal search; result snippets were context only, not full-file review. A searched nonexistent crates/sim path produced no source.
+All cfg(test) modules in assigned files: incidental visible snippets only; no test execution or test findings.
+
+UNREAD OR NOT FULLY REVIEWED
+Within each bounded protocol file above, all other production lines remain unread for this pass. keeper.rs/config.rs beyond the stated context ranges remain unread. No dependency/framework implementation was read; none of the three concrete defects relies on a disputed Anchor constraint behavior.
+Other in-bundle production files with no full or bounded read:
+crates/shortwin-math/src/bounds.rs
+crates/shortwin-math/src/caps.rs
+crates/shortwin-math/src/consts.rs
+crates/shortwin-math/src/error.rs
+crates/shortwin-math/src/fees.rs
+crates/shortwin-math/src/lib.rs
+crates/shortwin-math/src/num/mod.rs
+crates/shortwin-math/src/num/u256.rs
+crates/shortwin-math/src/observe.rs
+crates/shortwin-math/src/params.rs
+crates/shortwin-math/src/persist.rs
+crates/shortwin-math/src/quote/cpmm.rs
+crates/shortwin-math/src/quote/mod.rs
+crates/shortwin-math/src/quote/pricing.rs
+crates/shortwin-math/src/quote/ray_v4.rs
+crates/shortwin-math/src/quote/reprice.rs
+crates/shortwin-math/src/quote/sol_leg.rs
+crates/shortwin-math/src/quote/straddle.rs
+crates/shortwin-math/src/rent.rs
+crates/shortwin-math/src/risk.rs
+crates/shortwin-math/src/settle.rs
+crates/shortwin-math/src/tier.rs
+crates/shortwin-math/src/waterfall.rs
+crates/shortwin-venue-state/src/bytes.rs
+crates/shortwin-venue-state/src/lib.rs
+crates/shortwin-venue-state/src/mint.rs
+crates/shortwin-venue-state/src/program_data.rs
+crates/shortwin-venue-state/src/pump.rs
+crates/shortwin-venue-state/src/pump_amm.rs
+crates/shortwin-venue-state/src/pyth.rs
+crates/shortwin-venue-state/src/raydium_cpmm.rs
+crates/shortwin-venue-state/src/raydium_v4.rs
+crates/shortwin-venue-state/src/token_account.rs
+programs/shortwin/src/constants.rs
+programs/shortwin/src/engine/arming.rs
+programs/shortwin/src/engine/bounds.rs
+programs/shortwin/src/engine/caps.rs
+programs/shortwin/src/engine/guard.rs
+programs/shortwin/src/engine/mod.rs
+programs/shortwin/src/engine/observe.rs
+programs/shortwin/src/engine/pool_select.rs
+programs/shortwin/src/engine/prologue.rs
+programs/shortwin/src/engine/route.rs
+programs/shortwin/src/engine/tier.rs
+programs/shortwin/src/engine/trader.rs
+programs/shortwin/src/engine/waterfall.rs
+programs/shortwin/src/errors.rs
+programs/shortwin/src/events.rs
+programs/shortwin/src/instructions/add_margin.rs
+programs/shortwin/src/instructions/apply_config.rs
+programs/shortwin/src/instructions/cancel_config.rs
+programs/shortwin/src/instructions/claim_sol.rs
+programs/shortwin/src/instructions/close_short.rs
+programs/shortwin/src/instructions/cover_deficit.rs
+programs/shortwin/src/instructions/crank_sol_usd.rs
+programs/shortwin/src/instructions/create_market.rs
+programs/shortwin/src/instructions/disable_venue.rs
+programs/shortwin/src/instructions/execute_pool_switch.rs
+programs/shortwin/src/instructions/expire.rs
+programs/shortwin/src/instructions/flag_unsafe_mint.rs
+programs/shortwin/src/instructions/flag_venue_upgraded.rs
+programs/shortwin/src/instructions/initialize_config.rs
+programs/shortwin/src/instructions/liquidate.rs
+programs/shortwin/src/instructions/mod.rs
+programs/shortwin/src/instructions/open_short.rs
+programs/shortwin/src/instructions/propose_config.rs
+programs/shortwin/src/instructions/propose_pool.rs
+programs/shortwin/src/instructions/revalidate_venue.rs
+programs/shortwin/src/instructions/set_coverage_pause.rs
+programs/shortwin/src/instructions/set_pause.rs
+programs/shortwin/src/instructions/set_route_broken.rs
+programs/shortwin/src/instructions/sol_settle.rs
+programs/shortwin/src/instructions/sweep_protocol_fees.rs
+programs/shortwin/src/instructions/sync_lender.rs
+programs/shortwin/src/instructions/withdraw.rs
+programs/shortwin/src/lamports.rs
+programs/shortwin/src/lib.rs
+programs/shortwin/src/mint_filter.rs
+programs/shortwin/src/state/config.rs
+programs/shortwin/src/state/epoch.rs
+programs/shortwin/src/state/exposure.rs
+programs/shortwin/src/state/layout_asserts.rs
+programs/shortwin/src/state/lender.rs
+programs/shortwin/src/state/market.rs
+programs/shortwin/src/state/mod.rs
+programs/shortwin/src/state/oracle.rs
+programs/shortwin/src/state/pod.rs
+programs/shortwin/src/state/position.rs
+programs/shortwin/src/state/vault.rs
+programs/shortwin/src/state/venue_extras.rs
+programs/shortwin/src/state/venue_guard.rs
+programs/shortwin/src/venues/detect.rs
+programs/shortwin/src/venues/pump_amm.rs
+programs/shortwin/src/venues/pump_curve.rs
+programs/shortwin/src/venues/raydium.rs
+programs/shortwin/src/venues/raydium_v4.rs
+
+RESULTS AND LIMITS
+3 FINDING blocks: stale LP counter, premature lock-share rounding, unsupported coin creator placeholder.
+2 retained LEAD blocks: external cashback-claim dependency and the source-disclosed held-liquidity-freeze residual.
+The ranking findings establish false candidate removal/top-eight ranking, not a proved liquidation loss or bypass of on-chain eligibility checks. The placeholder finding establishes a configured-functionality mismatch; current venue dependence on that extra is unproved. Known issues were retained where the trace reached them; disclosure was not treated as a guard.

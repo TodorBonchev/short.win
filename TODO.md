@@ -9,7 +9,35 @@ They were initially pushed with `[skip ci]`; current CI and local verification a
 below. Historical ticked items name their commits; the 2026-10-18 follow-up is committed as
 the draft 1.0.2 audit-fix batch.
 
-## Working-tree follow-up (2026-10-18)
+## AI review 3 and draft 1.0.3 (2026-10-18)
+
+This is the current unreleased gate candidate; the 1.0.2 sections below are historical.
+The two-pass rust-auditor scan reviewed `b815269`, before these changes. Its
+[archive](docs/audit/ai-review-3/README.md) preserves all reports, source hashes,
+coverage and dispositions; the [31-item register](docs/audit/ai-review-3/triage.md)
+separates prior issues from new observations and records implementation decisions.
+
+- [x] Archive eight findings and 23 leads, including the failed first-pass economic lens
+      and narrower second-pass coverage. Confidence scores are not severity ratings.
+- [x] Prepare the program package and lockfiles for **1.0.3**, an unreleased draft.
+- [x] Complete and validate the keeper floor, candidate ordering, fresh LP-counter,
+      creator-placeholder and RPC retry fixes; reject unsupported account versions.
+- [x] Close the last-withdrawal carry leak, with conservation and new-cohort regressions,
+      and synchronize the normative model, replay vectors and WASM/client artifacts.
+- [x] Reject truncated address lookup table metadata; the regression fails before the
+      parser change and all ten common-library tests pass afterward.
+- [x] Record combined validation and local artifact hashes in the
+      [findings tracker](docs/audit/findings.md#ai-review-3-draft-103-2026-10-18).
+- [ ] Complete release gates on the final revision: remaining issue decisions, full CI,
+      full browser gate, ≥24 h fuzz and external fix review. Local verifiable-build and
+      compute/size checks passed on the same program bytes; CI must confirm the final
+      revision. The earlier fuzz waiver covers AIR-01 … AIR-24 only.
+
+KI-69's hashed-bootstrap procedure and KI-70's authority-transfer behavior retain their
+existing owner decisions. No new acceptance of open fee, cashback, pot-entitlement or
+economic-liveness issues is implied. No tag, deployment or publication is part of this draft.
+
+## Working-tree follow-up (2026-10-18; historical 1.0.2)
 
 This section supersedes the older “CI has not run” notes below. The changes are committed;
 program changes remain a draft fix batch, not a released or externally reviewed patch.

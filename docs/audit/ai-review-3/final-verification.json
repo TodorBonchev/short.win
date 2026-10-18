@@ -1,0 +1,25 @@
+{
+  "passes": [
+    {
+      "pass": 1,
+      "agents_returned": 11,
+      "raw_candidates": 36,
+      "recorded_items": 30
+    },
+    {
+      "pass": 2,
+      "agents_returned": 12,
+      "raw_candidates": 47,
+      "recorded_items": 22
+    }
+  ],
+  "findings": 8,
+  "leads": 23,
+  "ledger_records": 31,
+  "ledger_scans_each": 1,
+  "audited_commit": "b815269224ba0f5d946f49de7e113220c4067041",
+  "source_hashes_unchanged": 119,
+  "tracked_and_staged_changes": false,
+  "report_sha256": "0d50668a2b76da361b44c357ae18fdff291fb1811e406a40f248f9d8a4a7e8d7",
+  "all_consistency_checks_passed": true
+}

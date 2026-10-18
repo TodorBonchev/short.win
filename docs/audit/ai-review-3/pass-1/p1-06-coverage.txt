@@ -1,0 +1,67 @@
+PASS 1 / SPECIALIST 6 / PERIPHERY
+Frozen source: b815269224ba0f5d946f49de7e113220c4067041.
+Initial in-scope reads came from .audit-mZFuf8/agent-6-bundle.md using source-index.tsv. Source ranges below are original file line ranges, not bundle line ranges.
+No builds, tests, network requests, repository writes, or subagents ran. Reports were written only under /tmp/shortwin-audit-results-20261018.
+Result: 0 FINDING blocks; 8 LEAD blocks. None asserts a reproduced exploit. Known risk-fee residuals are preserved with explicit proof limits.
+
+FULL PRODUCTION READS
+crates/shortwin-venue-state/src/bytes.rs: 1-71 (cfg(test) from 72 excluded as findings).
+crates/shortwin-venue-state/src/lib.rs: complete production file.
+crates/shortwin-venue-state/src/mint.rs: 1-271.
+crates/shortwin-venue-state/src/program_data.rs: 1-154.
+crates/shortwin-venue-state/src/pump.rs: 1-778.
+crates/shortwin-venue-state/src/pump_amm.rs: 1-528.
+crates/shortwin-venue-state/src/pyth.rs: 1-397.
+crates/shortwin-venue-state/src/raydium_cpmm.rs: 1-444.
+crates/shortwin-venue-state/src/raydium_v4.rs: 1-280.
+crates/shortwin-venue-state/src/token_account.rs: 1-122.
+programs/shortwin/src/constants.rs: 1-315.
+programs/shortwin/src/engine/trader.rs: complete production file.
+programs/shortwin/src/lamports.rs: complete production file.
+programs/shortwin/src/mint_filter.rs: 1-102.
+programs/shortwin/src/state/oracle.rs: complete production file.
+programs/shortwin/src/state/pod.rs: 1-141.
+programs/shortwin/src/state/venue_extras.rs: complete production file.
+programs/shortwin/src/state/venue_guard.rs: 1-130.
+programs/shortwin/src/instructions/crank_sol_usd.rs: 1-115.
+programs/shortwin/src/instructions/flag_venue_upgraded.rs: complete production file.
+programs/shortwin/src/instructions/revalidate_venue.rs: complete production file.
+programs/shortwin/src/instructions/set_venue_extras.rs: complete production file.
+programs/shortwin/src/venues/detect.rs: 1-221.
+programs/shortwin/src/venues/mod.rs: 1-1496, including all release dispatch, parser, quote-view and leg-construction branches.
+programs/shortwin/src/venues/pump_amm.rs: 1-1190, including state, recipient/UVA validation, CPI account construction, legs and init_uva.
+programs/shortwin/src/venues/pump_curve.rs: 1-1092, including detection/sync, state, CPI account construction, legs and init_uva.
+programs/shortwin/src/venues/raydium.rs: complete production file, including all production after the embedded cfg(test) lp_tests module at line 107.
+programs/shortwin/src/venues/raydium_cpmm.rs: 1-552.
+programs/shortwin/src/venues/raydium_v4.rs: 1-420.
+Build context: root Cargo.toml; crates/shortwin-math/Cargo.toml; crates/shortwin-venue-state/Cargo.toml; programs/shortwin/Cargo.toml. Release overflow checks are on for the on-chain workspace. Anchor and anchor-spl pin 1.2.0.
+
+BOUNDED IN-SCOPE READS
+programs/shortwin/src/state/market.rs: 1-207 (VenueKind enum, release/test feature branches and helper methods; header layout context).
+programs/shortwin/src/lib.rs: 1-87 (crate lints, declared id, module exports, feature/security.txt boundary, first entrypoint wrappers).
+crates/shortwin-math/src/fees.rs: 45-131 (supply basis, FeeBps, FeeTier and beginning of fee_tier).
+programs/shortwin/src/instructions/open_short.rs: 232-282 and 509-562 (named mint supply, pre-trade read, post-trade read, notional quote context).
+services/common/Cargo.toml: bounded top-of-bundle manifest read only; not a service implementation review.
+services/keeper/Cargo.toml: initial portion through its development-dependency context; not a service implementation review.
+Anchor.toml: build/feature context only.
+
+OUT-OF-SCOPE / DEPENDENCY CONTEXT READS
+scripts/build-test-venue.sh: complete read, no execution. Dedicated CARGO_TARGET_DIR and explicit test-venue feature; normal release artifact path remains separate by default.
+.github/workflows/ci.yml: 244-280 fully read; other release/test-venue matches searched only. CI checks normal ELF for mock id and marker, then checks the separate test artifact. No artifact execution or binary verification was performed.
+anchor-lang-1.2.0/src/accounts/account_loader.rs: 130-192. Confirmed discriminator and size checks; read owner-check context for unchecked constructor. No short-account panic was asserted.
+spl-token-2022-interface-2.1.0/src/extension/mod.rs: 518-544 and 953-980. Confirmed StateWithExtensions::unpack and account-type validation.
+solana-program-entrypoint-3.1.1/src/lib.rs: 356-378; searched HEAP_LENGTH/global allocator declarations. Confirmed no-op deallocation; maximum instruction allocation was not measured.
+Selected cfg(test) context in the files above was displayed incidentally or read for expected behavior; no test-code defect is reported and no test ran.
+
+SEARCH-ONLY
+Whole bundle searches for fee-tier conversion, read_state_boxed call sites, and production/test boundaries.
+Repository markdown search for KI-72 and KI-77 disclosed existing issue descriptions, references to regression tests, and prior review rows. These sources did not substitute for a code proof or close a current issue.
+Test-path search located tests/litesvm/tests/m7_sec_it.rs:728 and fixture fee-config files. The burn regression and fixture schedules were not fully read or run.
+Registry search located allocator and parser implementations; only ranges above received bounded reads.
+Release/test-venue grep across .github/workflows and build scripts; only ranges above received full reads.
+
+UNREAD / NOT CLAIMED REVIEWED
+All production source not listed in FULL PRODUCTION READS or BOUNDED IN-SCOPE READS remains unread for this specialist, even if a grep match or account-map summary named it.
+In particular: most shortwin-math formulas; the lender/rent/settlement engines; most instruction bodies and Accounts structs; most Market conversions and remaining state layouts; services/common and services/keeper implementation; SDK/client/frontend code; deployed external venue implementation; complete IDLs and runtime/token-program implementations.
+Mock adapter/mock venue implementations were not read: this pass checked their release feature boundaries only. cfg(test) defects are excluded from findings.
+No claim that the full 61,399-line bundle source was read. The assigned production periphery lens is complete for the files explicitly listed; broader call-graph and external-venue reachability gaps remain explicit in each lead.

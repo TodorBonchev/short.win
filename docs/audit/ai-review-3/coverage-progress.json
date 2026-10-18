@@ -1,0 +1,375 @@
+{
+  "basis": "Conservative union of explicit completed-specialist full production coverage records; not line-by-line assurance of security. Bounded coverage omitted here, retained in raw coverage files.",
+  "pass": 1,
+  "completed_specialists": [
+    1,
+    2,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "full_production": {
+    "crates/shortwin-math/src/bounds.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/caps.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/consts.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/error.rs": [
+      8
+    ],
+    "crates/shortwin-math/src/fees.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/lib.rs": [
+      8
+    ],
+    "crates/shortwin-math/src/num/mod.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/num/u256.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/observe.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/params.rs": [
+      8
+    ],
+    "crates/shortwin-math/src/persist.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/pool.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/pool_select.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/cpmm.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/mod.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/pricing.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/ray_v4.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/reprice.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/sol_leg.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/quote/straddle.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/rent.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/risk.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/settle.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/tier.rs": [
+      1
+    ],
+    "crates/shortwin-math/src/waterfall.rs": [
+      1
+    ],
+    "crates/shortwin-venue-state/src/bytes.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/lib.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/mint.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/program_data.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/pump.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/pump_amm.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/pyth.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/raydium_cpmm.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/raydium_v4.rs": [
+      6
+    ],
+    "crates/shortwin-venue-state/src/token_account.rs": [
+      6
+    ],
+    "programs/shortwin/src/constants.rs": [
+      6
+    ],
+    "programs/shortwin/src/engine/arming.rs": [
+      4
+    ],
+    "programs/shortwin/src/engine/bounds.rs": [],
+    "programs/shortwin/src/engine/caps.rs": [],
+    "programs/shortwin/src/engine/guard.rs": [
+      2
+    ],
+    "programs/shortwin/src/engine/lender.rs": [
+      2
+    ],
+    "programs/shortwin/src/engine/mod.rs": [],
+    "programs/shortwin/src/engine/observe.rs": [],
+    "programs/shortwin/src/engine/pool_select.rs": [],
+    "programs/shortwin/src/engine/prologue.rs": [
+      4
+    ],
+    "programs/shortwin/src/engine/route.rs": [],
+    "programs/shortwin/src/engine/tier.rs": [],
+    "programs/shortwin/src/engine/trader.rs": [
+      2
+    ],
+    "programs/shortwin/src/engine/waterfall.rs": [
+      5
+    ],
+    "programs/shortwin/src/errors.rs": [],
+    "programs/shortwin/src/events.rs": [],
+    "programs/shortwin/src/instructions/add_margin.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/apply_config.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/cancel_config.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/claim_sol.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/close_short.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/cover_deficit.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/crank_price.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/crank_sol_usd.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/create_market.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/deposit.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/disable_venue.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/execute_pool_switch.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/expire.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/flag_unsafe_mint.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/flag_venue_upgraded.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/initialize_config.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/liquidate.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/mod.rs": [],
+    "programs/shortwin/src/instructions/open_short.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/propose_config.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/propose_pool.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/revalidate_venue.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/set_coverage_pause.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/set_pause.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/set_route_broken.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/set_venue_extras.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/sol_settle.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/sweep_protocol_fees.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/sweep_trader.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/sync_lender.rs": [
+      2
+    ],
+    "programs/shortwin/src/instructions/withdraw.rs": [
+      2
+    ],
+    "programs/shortwin/src/lamports.rs": [
+      4
+    ],
+    "programs/shortwin/src/lib.rs": [
+      2,
+      4
+    ],
+    "programs/shortwin/src/mint_filter.rs": [
+      2
+    ],
+    "programs/shortwin/src/state/config.rs": [
+      8
+    ],
+    "programs/shortwin/src/state/epoch.rs": [
+      5,
+      8
+    ],
+    "programs/shortwin/src/state/exposure.rs": [
+      5,
+      8
+    ],
+    "programs/shortwin/src/state/layout_asserts.rs": [
+      8
+    ],
+    "programs/shortwin/src/state/lender.rs": [
+      5,
+      8
+    ],
+    "programs/shortwin/src/state/market.rs": [
+      8
+    ],
+    "programs/shortwin/src/state/mod.rs": [
+      8
+    ],
+    "programs/shortwin/src/state/oracle.rs": [
+      6,
+      8
+    ],
+    "programs/shortwin/src/state/pod.rs": [
+      6,
+      8
+    ],
+    "programs/shortwin/src/state/position.rs": [
+      2,
+      8
+    ],
+    "programs/shortwin/src/state/vault.rs": [
+      5,
+      8
+    ],
+    "programs/shortwin/src/state/venue_extras.rs": [
+      6,
+      8
+    ],
+    "programs/shortwin/src/state/venue_guard.rs": [
+      6,
+      8
+    ],
+    "programs/shortwin/src/venues/detect.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/mod.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/pump_amm.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/pump_curve.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/raydium.rs": [
+      2,
+      6
+    ],
+    "programs/shortwin/src/venues/raydium_cpmm.rs": [
+      6
+    ],
+    "programs/shortwin/src/venues/raydium_v4.rs": [
+      6
+    ],
+    "services/common/src/chain.rs": [
+      7
+    ],
+    "services/common/src/tx.rs": [
+      7
+    ],
+    "services/keeper/src/budget.rs": [
+      7
+    ],
+    "services/keeper/src/coverage.rs": [
+      7
+    ],
+    "services/keeper/src/decide.rs": [
+      7
+    ],
+    "services/keeper/src/fees.rs": [
+      7
+    ],
+    "services/keeper/src/graduation.rs": [
+      7
+    ],
+    "services/keeper/src/ixs.rs": [
+      7
+    ],
+    "services/keeper/src/monitor.rs": [
+      7
+    ],
+    "services/keeper/src/pda.rs": [
+      7
+    ],
+    "services/keeper/src/pool_monitor.rs": [
+      7
+    ],
+    "services/keeper/src/sweep.rs": [
+      7
+    ],
+    "services/keeper/src/venue.rs": [
+      7
+    ],
+    "services/keeper/src/view.rs": [
+      7
+    ]
+  },
+  "pending_full_review": [
+    "programs/shortwin/src/engine/bounds.rs",
+    "programs/shortwin/src/engine/caps.rs",
+    "programs/shortwin/src/engine/mod.rs",
+    "programs/shortwin/src/engine/observe.rs",
+    "programs/shortwin/src/engine/pool_select.rs",
+    "programs/shortwin/src/engine/route.rs",
+    "programs/shortwin/src/engine/tier.rs",
+    "programs/shortwin/src/errors.rs",
+    "programs/shortwin/src/events.rs",
+    "programs/shortwin/src/instructions/mod.rs"
+  ]
+}

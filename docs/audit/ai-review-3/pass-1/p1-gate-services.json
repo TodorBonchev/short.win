@@ -1,0 +1,695 @@
+{
+  "items": [
+    {
+      "program": "shortwin-common",
+      "function": "parse_lookup_table",
+      "bug_class": "hardening-truncated-metadata-accepted",
+      "kind": "LEAD",
+      "title": "The ALT parser accepts a truncated metadata header",
+      "description": "The parser accepts truncated metadata; a future untrusted loader could conceal malformed tables as empty tables.",
+      "source_ids": [
+        "p1-a04-b01"
+      ],
+      "gate_evidence": {
+        "gates": [
+          {
+            "gate": 1,
+            "status": "ALLOWS",
+            "evidence": "tx.rs:299 checks ALT_PROGRAM_ID; :302-306 accepts the initialized tag [1,0,0,0]; :308 replaces an absent 56-byte body with []; :309 accepts length zero. These guards allow the parser example."
+          },
+          {
+            "gate": 2,
+            "status": "DEMOTE",
+            "evidence": "No source path proves that an unprivileged caller creates a four-byte initialized ALT owned by ALT_PROGRAM_ID; Solana owner/write rules prevent simply substituting attacker-owned data. Future malformed RPC/loader input remains hardening only."
+          }
+        ],
+        "stopped_at": 2
+      },
+      "known_issue_comparison": "No matching prior issue established; the raw parse example is the proof, not prior issue context.",
+      "code_smells": [
+        "The missing metadata slice becomes an empty address list.",
+        "The owner and initialized tag checks do not validate the full metadata length."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "decode_zc",
+      "bug_class": "hardening-version-unchecked",
+      "kind": "LEAD",
+      "title": "The keeper reads layouts without their version checks",
+      "description": "The keeper accepts account layouts without version checks; a future upgrade may make the decoded fields incompatible.",
+      "source_ids": [
+        "p1-a04-b02",
+        "p1-a11-b07"
+      ],
+      "gate_evidence": {
+        "gates": [
+          {
+            "gate": 1,
+            "status": "ALLOWS",
+            "evidence": "view.rs:49 checks shortwin ownership and T::DISCRIMINATOR; :52-54 requires sizeof(T) bytes and copies them with Some(bytemuck::pod_read_unaligned(body)). A different stored version with the same discriminator and size passes. load_with_positions:263-267 and :286-299 consume the config and market without a version comparison; extras use the same loader."
+          },
+          {
+            "gate": 2,
+            "status": "DEMOTE",
+            "evidence": "The claimed incompatible layout requires a future privileged upgrade; no present unauthorized account write is proved. On-chain AccountLoader owner/discriminator checks plus CONFIG_VERSION/MARKET_VERSION constraints reject incompatible transaction accounts."
+          }
+        ],
+        "stopped_at": 2
+      },
+      "known_issue_comparison": "No matching prior issue established. Both raw blocks quote the same helper copy at view.rs:54, so the helper-name spelling rule applies.",
+      "code_smells": [
+        "decode_zc checks the owner, discriminator, and byte length, but no layout version.",
+        "load_with_positions consumes decoded GlobalConfig, Market, and VenueExtras values without their version guards."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "stale-lp-counter",
+      "kind": "FINDING",
+      "title": "Correctness: Pool ranks combine LP values from different states",
+      "description": "An LP changes liquidity after discovery, so the keeper drops eligible pools or assigns them incorrect ranks.",
+      "source_ids": [
+        "p1-a07-b01",
+        "p1-a11-b04"
+      ],
+      "gate_evidence": {
+        "source": "Frozen .audit-mZFuf8/source.md and source-index.tsv at b815269224ba0f5d946f49de7e113220c4067041; any keeper.rs/rpc.rs references are pinned out-of-bundle caller context.",
+        "gates": [
+          {
+            "gate": 1,
+            "status": "ALLOWS",
+            "evidence": "pool_monitor.rs:166-224 parses a real supported pool and stores lp_counter; :228-230 requests only the WSOL vault and LP mint. score:238 allows plausible executable pools, :241 requires both accounts, :244-248 reads the vault amount, and :249-251 requires a valid mint. None refreshes the cached counter. lambda_bps uses checked_sub; old C=50,000,000,000 and fresh S=50,000,000,001 return zero. rank:258 discards zero before evaluate runs. A proportional deposit gives current C=X=Y=75,000,000,001 and locked C-S=25,000,000,000, so current D remains 25 SOL. The inverse withdrawal can over-rank a candidate. Pinned keeper.rs:3222-3253 confirms separate discovery and ranking reads."
+          },
+          {
+            "gate": 2,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+          },
+          {
+            "gate": 3,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+          },
+          {
+            "gate": 4,
+            "status": "CORRECTNESS",
+            "evidence": "The documented score is locked SOL, but it compares different states and can remove a valid pool or displace another from the top candidates. The on-chain fresh verification cannot restore a discarded candidate. Direct proposals and later rediscovery remain; no financial loss is proved."
+          }
+        ],
+        "confidence_basis": "Fixed 75 under the correctness lane; normal partial/state/bounded deductions do not apply.",
+        "fix_limits": "Option A refreshes the discovery counter but does not keep every three-account group within RpcChain getMultipleAccounts chunk boundaries. Option B explicitly groups at most 99 keys to preserve a per-pool snapshot. Both distinct raw diffs are retained verbatim; Option B closes that additional snapshot boundary. Both require integration with the separate raw-ratio fix."
+      },
+      "known_issue_comparison": "Related AIR2-09 context concerns raw on-chain locked-depth arithmetic, not this old-counter/current-supply mismatch. Prior disclosure is not used as proof.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "Option A — refresh the counter and caller arity",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -225,9 +225,9 @@\n         })\n     }\n \n-    /// The accounts [`rank`] reads for it: its WSOL vault and its LP mint.\n-    pub fn rank_keys(&self) -> [Pubkey; 2] {\n-        [self.sol_vault, self.lp_mint]\n+    /// The accounts [`rank`] reads: its WSOL vault, LP mint and current pool state.\n+    pub fn rank_keys(&self) -> [Pubkey; 3] {\n+        [self.sol_vault, self.lp_mint, self.pool]\n     }\n }\n \n@@ -241,6 +241,16 @@\n     let (Some(Some(vault)), Some(Some(lp))) = (accounts.first(), accounts.get(1)) else {\n         return 0;\n     };\n+    let Some(fresh) = accounts\n+        .get(2)\n+        .and_then(Option::as_ref)\n+        .and_then(|a| CandidatePool::from_account(c.kind, c.pool, a))\n+    else {\n+        return 0;\n+    };\n+    if !fresh.plausible || fresh.read_keys != c.read_keys {\n+        return 0;\n+    }\n     let r = vault\n         .data\n         .get(64..72)\n@@ -249,7 +259,7 @@\n     let Ok(m) = mint::read_base(&lp.owner.to_bytes(), &lp.data) else {\n         return 0;\n     };\n-    u128::from(lambda_bps(c.lp_counter, m.supply)) * u128::from(r) / 10_000\n+    u128::from(lambda_bps(fresh.lp_counter, m.supply)) * u128::from(r) / 10_000\n }\n \n /// The best `k` candidates by score (highest first; among equals the lowest key), each with a\n@@ -688,7 +698,7 @@\n \n     /// The next pools to rank within `budget_keys` keys (at least one pool).\n     pub fn next_rank_batch(&mut self, budget_keys: usize) -> Vec<CandidatePool> {\n-        let n = (budget_keys / 2).max(1).min(self.rank_queue.len());\n+        let n = (budget_keys / 3).max(1).min(self.rank_queue.len());\n         self.rank_queue.drain(..n).collect()\n     }\n \n--- a/services/keeper/src/keeper.rs\n+++ b/services/keeper/src/keeper.rs\n@@ -3243,7 +3243,7 @@\n                 let accs = self.chain.accounts(&keys).await?;\n                 let scored: Vec<(u128, pool_monitor::CandidatePool)> = batch\n                     .into_iter()\n-                    .zip(accs.chunks(2))\n+                    .zip(accs.chunks(3))\n                     .map(|(c, a)| (pool_monitor::score(&c, a), c))\n                     .collect();\n                 let t = self.pool_tracks.entry(key).or_default();\n--- a/services/keeper/src/config.rs\n+++ b/services/keeper/src/config.rs\n@@ -362,7 +362,7 @@\n     /// M4-SEC-7: the best candidates (by locked SOL) evaluated each tick; the rest of a mint's\n     /// pools — anyone can create them — are never fetched per tick: 8.\n     pub max_candidates: usize,\n-    /// M4-SEC-7: the accounts (two per pool: its WSOL vault and LP mint) a discovery's ranking\n+    /// M4-SEC-7: the accounts (three per pool: WSOL vault, LP mint, pool) a discovery's ranking\n     /// reads per tick and market; a larger discovery is ranked over several ticks: 200.\n     pub rank_keys_per_tick: usize,\n     /// M7-SEC-8: the most markets whose pool discovery (four `getProgramAccounts` calls each) runs\n@@ -614,8 +614,8 @@\n         if p.fast_discovery_interval_s > p.discovery_interval_s {\n             bail!(\"pool_select.fast_discovery_interval_s exceeds discovery_interval_s\");\n         }\n-        if p.max_candidates == 0 || p.rank_keys_per_tick < 2 {\n-            bail!(\"pool_select.max_candidates must be positive and rank_keys_per_tick at least 2\");\n+        if p.max_candidates == 0 || p.rank_keys_per_tick < 3 {\n+            bail!(\"pool_select.max_candidates must be positive and rank_keys_per_tick at least 3\");\n         }\n         if p.discoveries_per_tick == 0 {\n             bail!(\"pool_select.discoveries_per_tick must be positive\");"
+        },
+        {
+          "label": "Option B — read each pool in one RPC snapshot",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -226,8 +226,8 @@\n     }\n \n     /// The accounts [`rank`] reads for it: its WSOL vault and its LP mint.\n-    pub fn rank_keys(&self) -> [Pubkey; 2] {\n-        [self.sol_vault, self.lp_mint]\n+    pub fn rank_keys(&self) -> [Pubkey; 3] {\n+        [self.pool, self.sol_vault, self.lp_mint]\n     }\n }\n \n@@ -238,9 +238,17 @@\n     if !c.plausible {\n         return 0;\n     }\n-    let (Some(Some(vault)), Some(Some(lp))) = (accounts.first(), accounts.get(1)) else {\n+    let (Some(Some(pool)), Some(Some(vault)), Some(Some(lp))) =\n+        (accounts.first(), accounts.get(1), accounts.get(2))\n+    else {\n         return 0;\n     };\n+    let Some(fresh) = CandidatePool::from_account(c.kind, c.pool, pool) else {\n+        return 0;\n+    };\n+    if !fresh.plausible || fresh.sol_vault != c.sol_vault || fresh.lp_mint != c.lp_mint {\n+        return 0;\n+    }\n     let r = vault\n         .data\n         .get(64..72)\n@@ -249,7 +257,7 @@\n     let Ok(m) = mint::read_base(&lp.owner.to_bytes(), &lp.data) else {\n         return 0;\n     };\n-    u128::from(lambda_bps(c.lp_counter, m.supply)) * u128::from(r) / 10_000\n+    u128::from(lambda_bps(fresh.lp_counter, m.supply)) * u128::from(r) / 10_000\n }\n \n /// The best `k` candidates by score (highest first; among equals the lowest key), each with a\n@@ -688,7 +696,7 @@\n \n     /// The next pools to rank within `budget_keys` keys (at least one pool).\n     pub fn next_rank_batch(&mut self, budget_keys: usize) -> Vec<CandidatePool> {\n-        let n = (budget_keys / 2).max(1).min(self.rank_queue.len());\n+        let n = (budget_keys / 3).max(1).min(self.rank_queue.len());\n         self.rank_queue.drain(..n).collect()\n     }\n \n--- a/services/keeper/src/keeper.rs\n+++ b/services/keeper/src/keeper.rs\n@@ -3239,13 +3239,15 @@\n             let t = self.pool_tracks.entry(key).or_default();\n             if round == 0 && !t.rank_queue.is_empty() {\n                 let batch = t.next_rank_batch(pcfg.rank_keys_per_tick);\n-                let keys: Vec<Pubkey> = batch.iter().flat_map(|c| c.rank_keys()).collect();\n-                let accs = self.chain.accounts(&keys).await?;\n-                let scored: Vec<(u128, pool_monitor::CandidatePool)> = batch\n-                    .into_iter()\n-                    .zip(accs.chunks(2))\n-                    .map(|(c, a)| (pool_monitor::score(&c, a), c))\n-                    .collect();\n+                let mut scored = Vec::with_capacity(batch.len());\n+                // Keep each pool, vault and LP mint in one getMultipleAccounts snapshot.\n+                for group in batch.chunks(33) {\n+                    let keys: Vec<Pubkey> = group.iter().flat_map(|c| c.rank_keys()).collect();\n+                    let accs = self.chain.accounts(&keys).await?;\n+                    scored.extend(group.iter().cloned().zip(accs.chunks(3)).map(|(c, a)| {\n+                        (pool_monitor::score(&c, a), c)\n+                    }));\n+                }\n                 let t = self.pool_tracks.entry(key).or_default();\n                 if t.finish_rank_batch(scored, pcfg.max_candidates) {\n                     t.last_eval = None;"
+        }
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "rounded-lock-share-ranking",
+      "kind": "FINDING",
+      "title": "Correctness: Pool ranks round positive locked SOL to zero",
+      "description": "An LP dilutes the locked share below one basis point, so the keeper excludes a pool whose locked SOL stays unchanged.",
+      "source_ids": [
+        "p1-a07-b02",
+        "p1-a11-b03"
+      ],
+      "gate_evidence": {
+        "source": "Frozen .audit-mZFuf8/source.md and source-index.tsv at b815269224ba0f5d946f49de7e113220c4067041; any keeper.rs/rpc.rs references are pinned out-of-bundle caller context.",
+        "gates": [
+          {
+            "gate": 1,
+            "status": "ALLOWS",
+            "evidence": "The score guards are the same committed score-path checks described by stale-lp-counter; all pass for a real pool and current valid accounts. score:252 computes lambda_bps(C,S)*R/10000, and rank:258 removes zero. With C=X=Y=250,000,000,000,001 and S=249,975,000,000,001, integer lambda_bps is zero but (C-S)*R/C and raw locked_depth both equal 25,000,000,000. This uses one current snapshot, so the old-counter defect is unnecessary. Math pool_select.rs:29-55 explicitly preserves raw-ratio depth under proportional deposits."
+          },
+          {
+            "gate": 2,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+          },
+          {
+            "gate": 3,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+          },
+          {
+            "gate": 4,
+            "status": "CORRECTNESS",
+            "evidence": "The score claims locked SOL but prematurely floors the LP share; an eligible 25-SOL pool receives zero rank even after rediscovery. This is a proven formula defect independent of snapshot timing. Direct proposals remain and no financial loss is proved."
+          }
+        ],
+        "confidence_basis": "Fixed 75 under the correctness lane; normal partial/state/bounded deductions do not apply."
+      },
+      "known_issue_comparison": "AIR2-09 already addresses premature basis-point rounding in the on-chain locked_depth formula; the frozen keeper score still calls lambda_bps. This is a distinct uncorrected site, proved from code.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "Option A — divide by a counter bounded to one",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -75,7 +75,7 @@\n use shortwin::errors::ShortwinError;\n use shortwin::state::{Market, VenueKind, raydium_cache};\n use shortwin::venues::detect::{self, PumpClass};\n-use shortwin_math::pool_select::{dominates, fast_path_qualifies, lambda_bps};\n+use shortwin_math::pool_select::{dominates, fast_path_qualifies};\n use shortwin_services_common::{AccountData, Chain, Memcmp};\n use shortwin_venue_state::{mint, raydium_cpmm, raydium_v4};\n \n@@ -249,7 +249,8 @@\n     let Ok(m) = mint::read_base(&lp.owner.to_bytes(), &lp.data) else {\n         return 0;\n     };\n-    u128::from(lambda_bps(c.lp_counter, m.supply)) * u128::from(r) / 10_000\n+    u128::from(c.lp_counter.saturating_sub(m.supply)) * u128::from(r)\n+        / u128::from(c.lp_counter.max(1))\n }\n \n /// The best `k` candidates by score (highest first; among equals the lowest key), each with a"
+        },
+        {
+          "label": "Option B — reject zero before raw-ratio division",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -75,7 +75,7 @@\n use shortwin::errors::ShortwinError;\n use shortwin::state::{Market, VenueKind, raydium_cache};\n use shortwin::venues::detect::{self, PumpClass};\n-use shortwin_math::pool_select::{dominates, fast_path_qualifies, lambda_bps};\n+use shortwin_math::pool_select::{dominates, fast_path_qualifies};\n use shortwin_services_common::{AccountData, Chain, Memcmp};\n use shortwin_venue_state::{mint, raydium_cpmm, raydium_v4};\n \n@@ -249,7 +249,11 @@\n     let Ok(m) = mint::read_base(&lp.owner.to_bytes(), &lp.data) else {\n         return 0;\n     };\n-    u128::from(lambda_bps(c.lp_counter, m.supply)) * u128::from(r) / 10_000\n+    let locked = c.lp_counter.saturating_sub(m.supply);\n+    if c.lp_counter == 0 {\n+        return 0;\n+    }\n+    u128::from(locked) * u128::from(r) / u128::from(c.lp_counter)\n }\n \n /// The best `k` candidates by score (highest first; among equals the lowest key), each with a"
+        }
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "resolve_entry",
+      "bug_class": "unsupported-coin-creator-placeholder",
+      "kind": "FINDING",
+      "title": "Correctness: The keeper omits supported coin creator extras",
+      "description": "The keeper drops every extras set with the supported coin creator placeholder, so it cannot construct those configured exit variants.",
+      "source_ids": [
+        "p1-a07-b03"
+      ],
+      "gate_evidence": {
+        "source": "Frozen .audit-mZFuf8/source.md and source-index.tsv at b815269224ba0f5d946f49de7e113220c4067041; any keeper.rs/rpc.rs references are pinned out-of-bundle caller context.",
+        "gates": [
+          {
+            "gate": 1,
+            "status": "ALLOWS",
+            "evidence": "SetVenueExtras:107-121 requires the authorized signer, config PDA/version, and extras PDA; an honest authorized publication satisfies them. Handler:130-175 accepts the supported venue/ix/count/version and check_entry accepts a one-seed template with PLACEHOLDER_COIN_CREATOR, zero unused bytes, and a nondefault external program. venues/mod.rs:128-137 resolves that placeholder; :1264-1268 supplies the PumpSwap cached creator. parse_extras:177-219 checks owner/PDA/version/count/canonical template address, nonsigner, external ownership, denylists and writable flag; a correctly derived external nonsigner account satisfies them. Keeper venue.rs:662-680 accepts the one placeholder seed but reaches _ => None at :676 for this supported ID; choice_of:704 propagates None and extras_candidates:738-746 omits current/previous/stable variants."
+          },
+          {
+            "gate": 2,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+          },
+          {
+            "gate": 3,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+          },
+          {
+            "gate": 4,
+            "status": "CORRECTNESS",
+            "evidence": "Every valid coin_creator template is unsupported in the keeper although the published and on-chain parsed feature exists. This is a present supported-feature mismatch, not an assertion that a current venue requires the extra, that an admin attacks users, or that liquidation loses funds."
+          }
+        ],
+        "confidence_basis": "Fixed 75 under the correctness lane; normal partial/state/bounded deductions do not apply."
+      },
+      "known_issue_comparison": "No matching prior issue established; support is proved by set_venue_extras, Placeholders::key, and the cached PumpSwap creator in the frozen source.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "Resolve the cached PumpSwap coin creator",
+          "diff": "--- a/services/keeper/src/venue.rs\n+++ b/services/keeper/src/venue.rs\n@@ -58,8 +58,8 @@\n use shortwin::state::pump_swap_cache;\n use shortwin::state::{\n     ENTRY_FIXED, ENTRY_TEMPLATE, EXTRAS_MAX_SEEDS, ExtraEntry, ExtrasSet, Market,\n-    PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_MINT, PLACEHOLDER_POOL, PLACEHOLDER_TRADER, SEED_CONST,\n-    SEED_PLACEHOLDER, VenueExtras, VenueKind,\n+    PLACEHOLDER_BONDING_CURVE, PLACEHOLDER_COIN_CREATOR, PLACEHOLDER_MINT, PLACEHOLDER_POOL,\n+    PLACEHOLDER_TRADER, SEED_CONST, SEED_PLACEHOLDER, VenueExtras, VenueKind,\n };\n use shortwin::venues::{\n     EXTRAS_SET_CURRENT, EXTRAS_SET_PREVIOUS, EXTRAS_SET_STABLE, ExtrasSel, pump_amm, pump_curve,\n@@ -672,7 +672,9 @@\n                             PLACEHOLDER_POOL => pool_placeholder(kind, market),\n                             PLACEHOLDER_TRADER => Some(market.trader),\n                             PLACEHOLDER_BONDING_CURVE => Some(market.bonding_curve),\n-                            // The coin creator is not resolvable from the market cache.\n+                            PLACEHOLDER_COIN_CREATOR if kind == VenueKind::PumpSwap => {\n+                                Some(pump_amm::cached(market, pump_swap_cache::CACHED_COIN_CREATOR))\n+                            }\n                             _ => None,\n                         }?;\n                         owned.push(key.to_bytes().to_vec());"
+        }
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "evaluate",
+      "bug_class": "wrong-window-floor-reference",
+      "kind": "FINDING",
+      "title": "Correctness: The keeper checks the proposal floor at the wrong price",
+      "description": "The keeper evaluates the floor at the wrong price, so it selects a pool that the proposal instruction rejects.",
+      "source_ids": [
+        "p1-a11-b01"
+      ],
+      "gate_evidence": {
+        "source": "Frozen .audit-mZFuf8/source.md and source-index.tsv at b815269224ba0f5d946f49de7e113220c4067041; any keeper.rs/rpc.rs references are pinned out-of-bundle caller context.",
+        "gates": [
+          {
+            "gate": 1,
+            "status": "ALLOWS",
+            "evidence": "For both pool-monitor findings the candidate identity guards are committed once: ProposePool config/guard/market PDA, owner, discriminator and version constraints; has_one mint and mint token-program owner; supported Raydium kind, incumbent ReadSet keys, no Pump precedence, and clear venue latch. Choose real separate CPMM pools, valid config, LP mint and vaults under the pinned program and authority, enabled swaps, elapsed open time, positive reserves and 25-bps fees. raydium_cpmm::verify:354-407 verifies count, pool/config owner and layout, vault/LP/config keys, WSOL/token sides and vault mint/authority; check_eligible verifies executable, fee cap and raw-depth floor. These all allow the example. On-chain proposal floor rejection is the observed keeper correctness failure, not an interrupted asset-theft claim. Failed transactions roll back, so no thin adoption or asset loss is alleged. evaluate:349-368 calls the shared verifier at the market reference; :376 alone calls window_floor_ok at P_ema, whereas propose_pool:315-318 calls window_price=min(P_ema,P_cand). With P_ema=1e18, A=(X=500e9,Y=5e9,D=50e9), B=(X=Y=D=30e9), fully burned LP, lambda_min=5000 and floor=25e9, both pass listing eligibility. Keeper floor values are 50e9/30e9; proposal values are 5e9/30e9. plan ranks A first. An armed failed incumbent with D=50e9, one q=150e6 position, L_slow=30e9, min fee=2500 and normal caps permits carried_fit for both, so that guard does not mask the floor mismatch. Pinned keeper.rs:3532-3587 backs off and alerts without selecting B."
+          },
+          {
+            "gate": 2,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+          },
+          {
+            "gate": 3,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+          },
+          {
+            "gate": 4,
+            "status": "CORRECTNESS",
+            "evidence": "The off-chain comparison contradicts the shared on-chain proposal rule and selects a rejected action while B is viable. S3 exits and direct proposals remain; no financial loss, persistent arbitrage state, or irreversible lock is proved."
+          }
+        ],
+        "confidence_basis": "Fixed 75 under the correctness lane; normal partial/state/bounded deductions do not apply."
+      },
+      "known_issue_comparison": "M4R-2 is named in the frozen proposal code and already uses the minimum price. The mismatch is established from these current expressions, not issue status.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "Use the proposal minimum price",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -373,7 +373,11 @@\n             d: a.state.locked_depth,\n             real_sol: a.state.r,\n             fee_ppm: a.state.fee_ppm,\n-            window_floor: pool_select::window_floor_ok(&a, params, p_ref),\n+            window_floor: pool_select::window_floor_ok(\n+                &a,\n+                params,\n+                pool_select::window_price(p_ref, &a),\n+            ),\n             fits: pool_select::carried_fit(market, &a, fit, p_ref, FitAt::Proposal)\n                 .is_ok_and(|f| f.fits()),\n         },"
+        }
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "plan",
+      "bug_class": "false-window-floor-monotonicity",
+      "kind": "FINDING",
+      "title": "Correctness: The keeper skips pools after a floor failure",
+      "description": "The keeper skips viable alternatives when the deepest candidate fails the proposal floor. This path works after evaluate fixes wrong-window-floor-reference.",
+      "source_ids": [
+        "p1-a11-b02"
+      ],
+      "gate_evidence": {
+        "source": "Frozen .audit-mZFuf8/source.md and source-index.tsv at b815269224ba0f5d946f49de7e113220c4067041; any keeper.rs/rpc.rs references are pinned out-of-bundle caller context.",
+        "gates": [
+          {
+            "gate": 1,
+            "status": "ALLOWS",
+            "evidence": "Apply evaluate|wrong-window-floor-reference first under the bug-is-not-a-guard rule. Reuse the committed valid-account and carried-fit guards from evaluate; no new source guard blocks this path. Corrected evaluation yields A(D=50e9,floor=false,fits=true) and B(D=30e9,floor=true,fits=true). plan:510-515 has no expired active window in this state; :519-529 retains both distinct non-incumbent pools and ranks A first. decide accepts OpenWindow for both on an armed failed incumbent with D=50e9 and fast_min_bps=2500. plan:534-540 immediately sets PoolTooThin on A; the fallback at :545-566 runs only if A fails fits, so B is never examined. Each candidate has its own minimum price, so the claimed monotonicity in D is false."
+          },
+          {
+            "gate": 2,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+          },
+          {
+            "gate": 3,
+            "status": "NOT_APPLICABLE",
+            "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+          },
+          {
+            "gate": 4,
+            "status": "CORRECTNESS",
+            "evidence": "The keeper skips an otherwise accepted pool after the prerequisite floor calculation is corrected. The plan fix changes candidate search, so the evaluate fix alone does not repair it. S3 exits and direct proposals remain; no financial loss is proved."
+          }
+        ],
+        "confidence_basis": "Fixed 75 under the correctness lane; normal partial/state/bounded deductions do not apply.",
+        "masking_dependency": "shortwin-keeper|evaluate|wrong-window-floor-reference",
+        "masking_rule": "One-level dependency on a separate finding with a printed fix. Correctness remains fixed 75 because judging.md says deductions do not apply in this lane; the prerequisite sentence is preserved."
+      },
+      "known_issue_comparison": "No matching prior issue established; the frozen monotonicity comment assumes a shared price, while the actual proposal compares a candidate-specific minimum.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "Search when either the floor or carried caps fail",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -531,18 +531,14 @@\n         return out;\n     };\n     out.best = Some((c.pool, d));\n-    // M4V-1: a window's candidate also needs the window floor, which is monotone in `D` at the\n-    // market's one `P_ema`: if the deepest candidate misses it, every candidate does.\n+    // The proposal floor also uses each candidate's spot price, so it is not monotone in D.\n     let window_floor = c.window_floor();\n     match pool_select::decide(s, d, p) {\n-        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !window_floor => {\n-            out.blocked = Some(u32::from(ShortwinError::PoolTooThin));\n-        }\n         // Switch only if all fit: the window takes the deepest candidate whose opening caps every\n         // open position fits (not monotone in `D`: the fee, the reserve and the tier count too)\n         // and that `decide` still takes for the window; with none, the positions exit on the\n         // failed pool through the S3 chain.\n-        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !c.fits() => {\n+        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !window_floor || !c.fits() => {\n             let fitting = ranked.iter().find_map(|&(d, c)| {\n                 if !(c.fits() && c.window_floor()) {\n                     return None;\n@@ -564,7 +560,13 @@\n                         expect,\n                     });\n                 }\n-                None => out.blocked = Some(u32::from(ShortwinError::CarriedPositionsTooLarge)),\n+                None => {\n+                    out.blocked = Some(u32::from(if window_floor {\n+                        ShortwinError::CarriedPositionsTooLarge\n+                    } else {\n+                        ShortwinError::PoolTooThin\n+                    }));\n+                }\n             }\n         }\n         Ok(expect) => {"
+        }
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "check_foreign",
+      "bug_class": "held-liquidity-freeze-residual",
+      "kind": "LEAD",
+      "title": "Coverage preserves an earlier liquidity low",
+      "description": "An LP can preserve an earlier liquidity low, but this pass does not prove a resulting settlement change or profit.",
+      "source_ids": [
+        "p1-a07-b05"
+      ],
+      "gate_evidence": {
+        "gates": [
+          {
+            "gate": 1,
+            "status": "UNCERTAIN_ALLOWS",
+            "evidence": "coverage.rs:36-50 documents genuine-withdrawal lows followed by wrapped observations; check_foreign:394-404 requires open positions, a positive coverage window, an unseen second and deviating liquidity before extending coverage. These checks add observations but do not restore a prior genuine low. The raw block does not complete the downstream settlement trace."
+          },
+          {
+            "gate": 2,
+            "status": "ALLOWS",
+            "evidence": "Ordinary LP withdrawal and redeposit can alter real reserve depth; the candidate does not require unauthorized program-account writes."
+          },
+          {
+            "gate": 3,
+            "status": "ALLOWS",
+            "evidence": "The LP supplies its own liquidity and transactions; no trusted short.win operator is required for the claimed observation state."
+          },
+          {
+            "gate": 4,
+            "status": "DEMOTE",
+            "evidence": "The frozen coverage code establishes the residual state but this pass does not independently establish a changed liquidation/settlement or net profit. More than an incomplete local trace is missing: downstream effect and its bounds remain unproved."
+          }
+        ],
+        "stopped_at": 4
+      },
+      "known_issue_comparison": "Matches the documented FITX-1/O18 residual and KI-23 context. Accepted/disclosed status is not a guard and is not used as proof of profit or a reason for silent rejection.",
+      "code_smells": [
+        "Per-second coverage detects foreign liquidity extremes but preserves an earlier genuinely observed low.",
+        "The resulting settlement change and profit remain unverified."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "prepare_pamm_trader",
+      "bug_class": "stale-external-account-readiness",
+      "kind": "LEAD",
+      "title": "The keeper retains readiness after external accounts close",
+      "description": "The keeper trusts cached readiness after accounts close, but the recipient’s ability to close the required ATA remains unverified.",
+      "source_ids": [
+        "p1-a12-b01"
+      ],
+      "gate_evidence": {
+        "gates": [
+          {
+            "gate": 1,
+            "status": "UNCERTAIN_ALLOWS",
+            "evidence": "Pinned out-of-bundle keeper.rs:2235-2237 returns for an unchanged pamm_ready list before missing_pamm; :2240 and :2250 populate it. In-scope venue.rs:412-449 includes recipients and their WSOL ATAs; graduation.rs:398-413 can recreate them. pump_amm.rs:535-541 requires the derived recipient ATA key and is_wsol_account; :462 rejects an empty or non-token account. The stale readiness branch therefore does not repair a later closed ATA."
+          },
+          {
+            "gate": 2,
+            "status": "UNCERTAIN_ALLOWS",
+            "evidence": "A closed token account is plausible in the runtime, but the selected recipient close-authority state was not established from the frozen scope. Changing the account list triggers another read; a restart clears the cache and anyone can recreate an ATA."
+          },
+          {
+            "gate": 3,
+            "status": "DEMOTE",
+            "evidence": "No proof shows an unprivileged actor can close the selected recipient ATA while its key stays unchanged. Token close authority/signature rules remain unverified, and the cache owner itself is outside the source bundle. Stop before impact."
+          }
+        ],
+        "stopped_at": 3
+      },
+      "known_issue_comparison": "No matching prior issue established; retained as a context-supported lead. Prior issue context and ordinary SPL close capability do not establish the selected recipient authority.",
+      "code_smells": [
+        "An unchanged pamm_ready list bypasses subsequent account reads.",
+        "The program requires recipient WSOL ATAs on each trade, but recipient closure authority and operational recovery remain unverified."
+      ]
+    }
+  ],
+  "dispositions": [
+    {
+      "raw_id": "p1-a04-b01",
+      "verdict": "LEAD",
+      "key": "shortwin-common|parse-lookup-table|hardening-truncated-metadata-accepted",
+      "reason": "Retained as a lead; No source path proves that an unprivileged caller creates a four-byte initialized ALT owned by ALT_PROGRAM_ID; Solana owner/write rules prevent simply substituting attacker-owned data. Future malformed RPC/loader input remains hardening only.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "tx.rs:299 checks ALT_PROGRAM_ID; :302-306 accepts the initialized tag [1,0,0,0]; :308 replaces an absent 56-byte body with []; :309 accepts length zero. These guards allow the parser example."
+        },
+        {
+          "gate": 2,
+          "status": "DEMOTE",
+          "evidence": "No source path proves that an unprivileged caller creates a four-byte initialized ALT owned by ALT_PROGRAM_ID; Solana owner/write rules prevent simply substituting attacker-owned data. Future malformed RPC/loader input remains hardening only."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a04-b02",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|decode-zc|hardening-version-unchecked",
+      "reason": "Retained as a lead; The claimed incompatible layout requires a future privileged upgrade; no present unauthorized account write is proved. On-chain AccountLoader owner/discriminator checks plus CONFIG_VERSION/MARKET_VERSION constraints reject incompatible transaction accounts.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "view.rs:49 checks shortwin ownership and T::DISCRIMINATOR; :52-54 requires sizeof(T) bytes and copies them with Some(bytemuck::pod_read_unaligned(body)). A different stored version with the same discriminator and size passes. load_with_positions:263-267 and :286-299 consume the config and market without a version comparison; extras use the same loader."
+        },
+        {
+          "gate": 2,
+          "status": "DEMOTE",
+          "evidence": "The claimed incompatible layout requires a future privileged upgrade; no present unauthorized account write is proved. On-chain AccountLoader owner/discriminator checks plus CONFIG_VERSION/MARKET_VERSION constraints reject incompatible transaction accounts."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a07-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|score|stale-lp-counter",
+      "reason": "Concrete source-proved correctness defect; fixed confidence 75 and no financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "pool_monitor.rs:166-224 parses a real supported pool and stores lp_counter; :228-230 requests only the WSOL vault and LP mint. score:238 allows plausible executable pools, :241 requires both accounts, :244-248 reads the vault amount, and :249-251 requires a valid mint. None refreshes the cached counter. lambda_bps uses checked_sub; old C=50,000,000,000 and fresh S=50,000,000,001 return zero. rank:258 discards zero before evaluate runs. A proportional deposit gives current C=X=Y=75,000,000,001 and locked C-S=25,000,000,000, so current D remains 25 SOL. The inverse withdrawal can over-rank a candidate. Pinned keeper.rs:3222-3253 confirms separate discovery and ranking reads."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "The documented score is locked SOL, but it compares different states and can remove a valid pool or displace another from the top candidates. The on-chain fresh verification cannot restore a discarded candidate. Direct proposals and later rediscovery remain; no financial loss is proved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a07-b02",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|score|rounded-lock-share-ranking",
+      "reason": "Concrete source-proved correctness defect; fixed confidence 75 and no financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "The score guards are the same committed score-path checks described by stale-lp-counter; all pass for a real pool and current valid accounts. score:252 computes lambda_bps(C,S)*R/10000, and rank:258 removes zero. With C=X=Y=250,000,000,000,001 and S=249,975,000,000,001, integer lambda_bps is zero but (C-S)*R/C and raw locked_depth both equal 25,000,000,000. This uses one current snapshot, so the old-counter defect is unnecessary. Math pool_select.rs:29-55 explicitly preserves raw-ratio depth under proportional deposits."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "The score claims locked SOL but prematurely floors the LP share; an eligible 25-SOL pool receives zero rank even after rediscovery. This is a proven formula defect independent of snapshot timing. Direct proposals remain and no financial loss is proved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a07-b03",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|resolve-entry|unsupported-coin-creator-placeholder",
+      "reason": "Concrete source-proved correctness defect; fixed confidence 75 and no financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "SetVenueExtras:107-121 requires the authorized signer, config PDA/version, and extras PDA; an honest authorized publication satisfies them. Handler:130-175 accepts the supported venue/ix/count/version and check_entry accepts a one-seed template with PLACEHOLDER_COIN_CREATOR, zero unused bytes, and a nondefault external program. venues/mod.rs:128-137 resolves that placeholder; :1264-1268 supplies the PumpSwap cached creator. parse_extras:177-219 checks owner/PDA/version/count/canonical template address, nonsigner, external ownership, denylists and writable flag; a correctly derived external nonsigner account satisfies them. Keeper venue.rs:662-680 accepts the one placeholder seed but reaches _ => None at :676 for this supported ID; choice_of:704 propagates None and extras_candidates:738-746 omits current/previous/stable variants."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "Every valid coin_creator template is unsupported in the keeper although the published and on-chain parsed feature exists. This is a present supported-feature mismatch, not an assertion that a current venue requires the extra, that an admin attacks users, or that liquidation loses funds."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a07-b05",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|check-foreign|held-liquidity-freeze-residual",
+      "reason": "Retained as a lead; The frozen coverage code establishes the residual state but this pass does not independently establish a changed liquidation/settlement or net profit. More than an incomplete local trace is missing: downstream effect and its bounds remain unproved.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "UNCERTAIN_ALLOWS",
+          "evidence": "coverage.rs:36-50 documents genuine-withdrawal lows followed by wrapped observations; check_foreign:394-404 requires open positions, a positive coverage window, an unseen second and deviating liquidity before extending coverage. These checks add observations but do not restore a prior genuine low. The raw block does not complete the downstream settlement trace."
+        },
+        {
+          "gate": 2,
+          "status": "ALLOWS",
+          "evidence": "Ordinary LP withdrawal and redeposit can alter real reserve depth; the candidate does not require unauthorized program-account writes."
+        },
+        {
+          "gate": 3,
+          "status": "ALLOWS",
+          "evidence": "The LP supplies its own liquidity and transactions; no trusted short.win operator is required for the claimed observation state."
+        },
+        {
+          "gate": 4,
+          "status": "DEMOTE",
+          "evidence": "The frozen coverage code establishes the residual state but this pass does not independently establish a changed liquidation/settlement or net profit. More than an incomplete local trace is missing: downstream effect and its bounds remain unproved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a11-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|evaluate|wrong-window-floor-reference",
+      "reason": "Concrete source-proved correctness defect; fixed confidence 75 and no financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "For both pool-monitor findings the candidate identity guards are committed once: ProposePool config/guard/market PDA, owner, discriminator and version constraints; has_one mint and mint token-program owner; supported Raydium kind, incumbent ReadSet keys, no Pump precedence, and clear venue latch. Choose real separate CPMM pools, valid config, LP mint and vaults under the pinned program and authority, enabled swaps, elapsed open time, positive reserves and 25-bps fees. raydium_cpmm::verify:354-407 verifies count, pool/config owner and layout, vault/LP/config keys, WSOL/token sides and vault mint/authority; check_eligible verifies executable, fee cap and raw-depth floor. These all allow the example. On-chain proposal floor rejection is the observed keeper correctness failure, not an interrupted asset-theft claim. Failed transactions roll back, so no thin adoption or asset loss is alleged. evaluate:349-368 calls the shared verifier at the market reference; :376 alone calls window_floor_ok at P_ema, whereas propose_pool:315-318 calls window_price=min(P_ema,P_cand). With P_ema=1e18, A=(X=500e9,Y=5e9,D=50e9), B=(X=Y=D=30e9), fully burned LP, lambda_min=5000 and floor=25e9, both pass listing eligibility. Keeper floor values are 50e9/30e9; proposal values are 5e9/30e9. plan ranks A first. An armed failed incumbent with D=50e9, one q=150e6 position, L_slow=30e9, min fee=2500 and normal caps permits carried_fit for both, so that guard does not mask the floor mismatch. Pinned keeper.rs:3532-3587 backs off and alerts without selecting B."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "The off-chain comparison contradicts the shared on-chain proposal rule and selects a rejected action while B is viable. S3 exits and direct proposals remain; no financial loss, persistent arbitrage state, or irreversible lock is proved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a11-b02",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|plan|false-window-floor-monotonicity",
+      "reason": "Concrete source-proved correctness defect; fixed confidence 75 and no financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "Apply evaluate|wrong-window-floor-reference first under the bug-is-not-a-guard rule. Reuse the committed valid-account and carried-fit guards from evaluate; no new source guard blocks this path. Corrected evaluation yields A(D=50e9,floor=false,fits=true) and B(D=30e9,floor=true,fits=true). plan:510-515 has no expired active window in this state; :519-529 retains both distinct non-incumbent pools and ranks A first. decide accepts OpenWindow for both on an armed failed incumbent with D=50e9 and fast_min_bps=2500. plan:534-540 immediately sets PoolTooThin on A; the fallback at :545-566 runs only if A fails fits, so B is never examined. Each candidate has its own minimum price, so the claimed monotonicity in D is false."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "The keeper skips an otherwise accepted pool after the prerequisite floor calculation is corrected. The plan fix changes candidate search, so the evaluate fix alone does not repair it. S3 exits and direct proposals remain; no financial loss is proved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a11-b03",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|score|rounded-lock-share-ranking",
+      "reason": "Concrete source-proved correctness defect; fixed confidence 75 and no financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "The score guards are the same committed score-path checks described by stale-lp-counter; all pass for a real pool and current valid accounts. score:252 computes lambda_bps(C,S)*R/10000, and rank:258 removes zero. With C=X=Y=250,000,000,000,001 and S=249,975,000,000,001, integer lambda_bps is zero but (C-S)*R/C and raw locked_depth both equal 25,000,000,000. This uses one current snapshot, so the old-counter defect is unnecessary. Math pool_select.rs:29-55 explicitly preserves raw-ratio depth under proportional deposits."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "The score claims locked SOL but prematurely floors the LP share; an eligible 25-SOL pool receives zero rank even after rediscovery. This is a proven formula defect independent of snapshot timing. Direct proposals remain and no financial loss is proved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a11-b04",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|score|stale-lp-counter",
+      "reason": "Concrete source-proved correctness defect; fixed confidence 75 and no financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "pool_monitor.rs:166-224 parses a real supported pool and stores lp_counter; :228-230 requests only the WSOL vault and LP mint. score:238 allows plausible executable pools, :241 requires both accounts, :244-248 reads the vault amount, and :249-251 requires a valid mint. None refreshes the cached counter. lambda_bps uses checked_sub; old C=50,000,000,000 and fresh S=50,000,000,001 return zero. rank:258 discards zero before evaluate runs. A proportional deposit gives current C=X=Y=75,000,000,001 and locked C-S=25,000,000,000, so current D remains 25 SOL. The inverse withdrawal can over-rank a candidate. Pinned keeper.rs:3222-3253 confirms separate discovery and ranking reads."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attack or privileged deployment state is needed to establish the mismatched computation."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Proven correctness lane; no attacker or financial victim is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "The documented score is locked SOL, but it compares different states and can remove a valid pool or displace another from the top candidates. The on-chain fresh verification cannot restore a discarded candidate. Direct proposals and later rediscovery remain; no financial loss is proved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a11-b07",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|decode-zc|hardening-version-unchecked",
+      "reason": "Retained as a lead; The claimed incompatible layout requires a future privileged upgrade; no present unauthorized account write is proved. On-chain AccountLoader owner/discriminator checks plus CONFIG_VERSION/MARKET_VERSION constraints reject incompatible transaction accounts.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "view.rs:49 checks shortwin ownership and T::DISCRIMINATOR; :52-54 requires sizeof(T) bytes and copies them with Some(bytemuck::pod_read_unaligned(body)). A different stored version with the same discriminator and size passes. load_with_positions:263-267 and :286-299 consume the config and market without a version comparison; extras use the same loader."
+        },
+        {
+          "gate": 2,
+          "status": "DEMOTE",
+          "evidence": "The claimed incompatible layout requires a future privileged upgrade; no present unauthorized account write is proved. On-chain AccountLoader owner/discriminator checks plus CONFIG_VERSION/MARKET_VERSION constraints reject incompatible transaction accounts."
+        }
+      ]
+    },
+    {
+      "raw_id": "p1-a12-b01",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|prepare-pamm-trader|stale-external-account-readiness",
+      "reason": "Retained as a lead; No proof shows an unprivileged actor can close the selected recipient ATA while its key stays unchanged. Token close authority/signature rules remain unverified, and the cache owner itself is outside the source bundle. Stop before impact.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "UNCERTAIN_ALLOWS",
+          "evidence": "Pinned out-of-bundle keeper.rs:2235-2237 returns for an unchanged pamm_ready list before missing_pamm; :2240 and :2250 populate it. In-scope venue.rs:412-449 includes recipients and their WSOL ATAs; graduation.rs:398-413 can recreate them. pump_amm.rs:535-541 requires the derived recipient ATA key and is_wsol_account; :462 rejects an empty or non-token account. The stale readiness branch therefore does not repair a later closed ATA."
+        },
+        {
+          "gate": 2,
+          "status": "UNCERTAIN_ALLOWS",
+          "evidence": "A closed token account is plausible in the runtime, but the selected recipient close-authority state was not established from the frozen scope. Changing the account list triggers another read; a restart clears the cache and anyone can recreate an ATA."
+        },
+        {
+          "gate": 3,
+          "status": "DEMOTE",
+          "evidence": "No proof shows an unprivileged actor can close the selected recipient ATA while its key stays unchanged. Token close authority/signature rules remain unverified, and the cache owner itself is outside the source bundle. Stop before impact."
+        }
+      ]
+    }
+  ],
+  "dedup_notes": [
+    "All 12 specialty workers reached the judging barrier (11 returned; economic worker failed naturally) before this pass gate. This file gates only the 12 assigned service raw candidates.",
+    "Canonical programs follow input canonical_program: keeper/shortwin_keeper/shortwin-keeper become shortwin-keeper; common becomes shortwin-common. No known-findings.md exists in this frozen bundle, so no memory vocabulary overrides these labels.",
+    "score dedup: p1-a07-b01 and p1-a11-b04 name the same old-counter/current-supply defect; stale-lp-counter is the shorter defect label. p1-a07-b02 and p1-a11-b03 name the same premature share rounding; rounded-lock-share-ranking is the shorter label. The two groups remain separate because fresh-state reads do not repair whole-bps flooring and raw-ratio arithmetic does not refresh an old counter.",
+    "Fix preservation: both distinct stale-counter diffs and both distinct raw-ratio diffs are copied verbatim from the raw agents. Each pair is presented as options; their ADD lines differ. The snapshot-boundary limitation of stale-counter Option A is recorded without rewriting its patch.",
+    "Function spelling: p1-a04-b02 labels load_with_positions but explicitly quotes view.rs:48-55, including the same pod_read_unaligned(body) line as p1-a11-b07. Canonicalized to helper decode_zc under the same-line exception. Both remain hardening leads; no hardening item was promoted or folded into a finding.",
+    "evaluate and plan remain separate: the former fixes the price passed to the floor; the latter searches alternatives after a failed floor. Applying either patch alone does not close both raw claims. plan has one prerequisite finding, and retains the required This path works after sentence. Parent confirmed correctness fixed-75 overrides deductions for this lane.",
+    "Coverage complete: 12 raw IDs have exactly one disposition; all are represented in survivor source_ids. Three synonym pairs reduce them to 9 items: 5 correctness findings and 4 leads; no rejects. The raw load_with_positions function is covered by the explicitly justified helper spelling.",
+    "Static only: source and pinned caller-context reads plus pure integer arithmetic. No tests, builds, runtime reproduction, on-chain reads, source edits, or repository writes were performed."
+  ]
+}

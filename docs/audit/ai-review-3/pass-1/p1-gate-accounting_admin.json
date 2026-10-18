@@ -1,0 +1,253 @@
+{
+  "items": [
+    {
+      "program": "shortwin",
+      "function": "sync_lender",
+      "bug_class": "repeated-accrual-truncation",
+      "kind": "LEAD",
+      "title": "Repeated sync calls discard fractional lender credits",
+      "description": "An outsider can erase less than one lamport per lender touch; material aggregate harm beyond the disclosed rounding policy remains unverified.",
+      "source_ids": [
+        "p1-a01-b02"
+      ],
+      "gate_evidence": {
+        "1": "ALLOWS: SyncLender market/PDA/owner bindings at sync_lender.rs:74-94 validate a real victim; owner.is_signer selects touch_pot at118-126. The no-rebase postcondition130-132 does not block a current-epoch touch. pool.rs:1474-1488 floors and advances snapshots.",
+        "2": "ALLOWS: current lenders and small positive index deltas exist without a forged record; the numeric example stays within integer bounds.",
+        "3": "ALLOWS: owner is UncheckedAccount, and the unsigned branch is explicitly public. No signature of the victim is needed.",
+        "4": "DEMOTE: each extra touch discards less than one lamport per accumulator. No scalable material loss is established in this scan; no current finding is inferred merely from repetition."
+      },
+      "known_issue_comparison": "KI-68; docs/design/ECONOMICS.md:1422 explicitly describes current/parked per-touch rounding.",
+      "code_smells": "per-touch floor; snapshots advance without a lender remainder"
+    },
+    {
+      "program": "shortwin",
+      "function": "apply_config",
+      "bug_class": "unsafe-authority-transfer",
+      "kind": "FINDING",
+      "title": "Authority changes accept a successor without its signature",
+      "description": "An honest governance transfer can install an unusable key, so further configuration changes require a program upgrade.",
+      "source_ids": [
+        "p1-a02-b01"
+      ],
+      "gate_evidence": {
+        "1": "ALLOWS: canonical ApplyConfig AccountLoader and timelock/expiry checks apply_config.rs:35-81 authenticate the stored proposal, not successor control. ProposeConfig requires old governance at19-25. check_authorities config.rs:769-795 only checks nonzero/distinct keys. The real config PDA can be proposed without forging its signature.",
+        "2": "ALLOWS: an otherwise valid Authorities proposal can name the config PDA and apply during its normal timelock window. No invalid account bytes or malicious upgrade are required.",
+        "3": "ALLOWS under honest-admin hazard: the currently authorized admin makes one bad-key transfer; any caller executes the valid stored proposal. This is not a claim that a malicious trusted admin is an outsider.",
+        "4": "ALLOWS bounded control loss: the config PDA cannot satisfy future governance Signer checks through an available program path. Old governance cannot reverse it, but the retained upgrade authority can recover via upgrade; user exits remain. Not permanent loss without recovery."
+      },
+      "known_issue_comparison": "KI-70 and AIR2-06 explicitly disclosed/accepted; optional successor Signer diff is an uncompiled proposal and requires IDL/client updates.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "source proposal",
+          "diff": "--- a/programs/shortwin/src/instructions/apply_config.rs\n+++ b/programs/shortwin/src/instructions/apply_config.rs\n@@ -52,6 +52,8 @@\n         bump = oracle_cache.bump\n     )]\n     pub oracle_cache: Option<Box<Account<'info, OracleCache>>>,\n+    /// The successor must accept a change of governance.\n+    pub new_governance: Option<Signer<'info>>,\n }\n \n pub fn handler(ctx: Context<ApplyConfig>) -> Result<()> {\n@@ -76,6 +78,16 @@\n         );\n         let change = c.pending.change()?;\n         c.check_change(&change)?;\n+        if let ConfigChange::Authorities { governance, .. } = &change {\n+            if *governance != c.governance {\n+                let successor = ctx\n+                    .accounts\n+                    .new_governance\n+                    .as_ref()\n+                    .ok_or_else(|| error!(ShortwinError::Unauthorized))?;\n+                require_keys_eq!(successor.key(), *governance, ShortwinError::Unauthorized);\n+            }\n+        }\n         let applied = (c.pending.kind, c.pending.hash());\n         c.apply(&change, clock.unix_timestamp)?;\n         c.pending.clear();"
+        }
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "close_short",
+      "bug_class": "hardening-position-status-unchecked",
+      "kind": "LEAD",
+      "title": "Exit instructions omit the position status check",
+      "description": "A future instruction that persists a non-open status needs matching exit checks; current writers only create open positions.",
+      "source_ids": [
+        "p1-a02-b02",
+        "p1-a08-b01"
+      ],
+      "gate_evidence": {
+        "1": "UNCERTAIN for hypothetical future status: the exit Accounts structs bind real position PDA, market and borrower but omit status, unlike add_margin. Runtime ownership/discriminator and Anchor close prevent forging/reviving current state.",
+        "2": "BLOCKS present exploit: state/position.rs:19-21 reserves status1 forv1.1; open_short.rs:616 writes only POSITION_OPEN; both reviewers searched current writers. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker",
+        "4": "NOT EVALUATED after gate2 blocker"
+      },
+      "known_issue_comparison": "Existing hardening lead comparison recorded separately.",
+      "code_smells": "close_short, liquidate, expire, sol_settle omit status guards"
+    },
+    {
+      "program": "shortwin",
+      "function": "inputs",
+      "bug_class": "transaction-controlled-settlement-legs",
+      "kind": "LEAD",
+      "title": "Temporary withdrawals change live settlement inputs",
+      "description": "An LP changes live settlement inputs with temporary withdrawals; the current arming sequence, borrower loss, and net payoff remain unverified.",
+      "source_ids": [
+        "p1-a04-b03"
+      ],
+      "gate_evidence": {
+        "1": "UNCERTAIN: genuine keyed venue reserves enter arming::inputs208-216. CR uses the floor223, box corners239 and persistence guards remain; this review has not reconstructed a transaction sequence that passes all corners and timers.",
+        "2": "UNCERTAIN: an LP can change real reserves, but the required honest state outside the box and complete subsequent observations are not independently produced here.",
+        "3": "ALLOWS conditionally: unlocked LPs are instance participants, not protocol admins; deposit/withdraw authority is their own.",
+        "4": "DEMOTE: arming.rs40-50 describes accepted cases including no borrower loss at defaults; new current borrower loss and profitability are unverified."
+      },
+      "known_issue_comparison": "AIR-20 / KI-75, source explicitly keeps raw L_live for these legs.",
+      "code_smells": "live reserves feed S1/S2; only the CR leg uses the EMA floor"
+    },
+    {
+      "program": "shortwin",
+      "function": "assess",
+      "bug_class": "manipulable-liquidity-history",
+      "kind": "LEAD",
+      "title": "Wrapped observations can preserve a low liquidity estimate",
+      "description": "An LP can preserve a low liquidity history; the current observation sequence and forced-liquidation payoff remain unverified.",
+      "source_ids": [
+        "p1-a04-b04"
+      ],
+      "gate_evidence": {
+        "1": "UNCERTAIN: liquidate::assess356-368 uses max live/guarded EMA via spot_liquidity and also checks robust spot and persistent EMA entries. A direct same-transaction drain is blocked; the claimed held-history sequence is a different path but not fully reconstructed.",
+        "2": "UNCERTAIN: a genuinely held withdrawal can lower the EMA; the full restore/wrapped-observation sequence remains unproved in this pass.",
+        "3": "ALLOWS conditionally: an ordinary LP owns the liquidity it removes and restores.",
+        "4": "DEMOTE: no independent current payoff or borrower-loss calculation beyond the disclosed FITX-1 source statement."
+      },
+      "known_issue_comparison": "FITX-1 / ECON12.12 residual10; precise register mapping recorded separately.",
+      "code_smells": "the liquidation floor trusts a prior EMA; repeated withdrawals can freeze its history"
+    },
+    {
+      "program": "shortwin-math",
+      "function": "withdraw_in",
+      "bug_class": "carry-crosses-empty-pool",
+      "kind": "FINDING",
+      "title": "The last withdrawal leaves carry for the next lender",
+      "description": "A new lender collects up to 18,446 lamports of earlier carry in the traced initial-deposit cases because the last withdrawal preserves both remainders.",
+      "source_ids": [
+        "p1-a05-b01"
+      ],
+      "gate_evidence": {
+        "1": "ALLOWS: Deposit/Withdraw signer and PDA/mint/token bindings validate genuine owners and accounts. create_market.rs658-661 initializes zero shares, swept bits and hold=-1; no list-only lending cap. deposit129-154 accrues, sees empty vest and satisfied bits. withdraw194-213 permits B=0, flushes vest via pool.rs1897-1904, burnsS, and claims0; zero shares clear only sweep bits1908-1911. A zero sweep restores the trader bit without altering carry. The next valid deposit/sweep/fullwithdraw pays the old carry through normal claim and rent-backed pay_sol. Failed min_sol would roll back; old owner uses its legitimate zero minimum.",
+        "2": "ALLOWS: A=10^18 or18e18 rawtokens fitsu64; S=1000A fitsu128. Initialized ordinary SPL mint without freeze authority is admitted. List-only market needs no open position or venue trade. Actual third-party SOL donation supplies backing; unmatched stays0. Source trace identifies each normal state write and uses no forged counters.",
+        "3": "ALLOWS: prior lender signs its normal full exit; the later lender signs only its own deposit/withdraw and uses public sweeps. An unrelated income payer supplies the old credit, so the transfer is not limited to attacker self-harm.",
+        "4": "ALLOWS bounded loss: 999 and17,999lamports of earlier income become spendable by a different owner after the prior account closes. The demonstrated amount exceeds one-lamport rounding, but is tiny and bounded by18446lamports in the initial-deposit construction; higher-ratio reachability/profit is not claimed. Treat as low-magnitude accounting transfer, not broad theft."
+      },
+      "known_issue_comparison": "Prior report-5-math-core.md:320 already raised the same carry-to-next-depositor mechanism as a lead. Current scan adds production/numeric trace; source ECON carry dust bounds are related, not an explicit assignment to the next cohort.",
+      "confidence": 75,
+      "fixes": [
+        {
+          "label": "source proposal",
+          "diff": "--- a/crates/shortwin-math/src/pool.rs\n+++ b/crates/shortwin-math/src/pool.rs\n@@ -1906,6 +1906,15 @@ fn withdraw_in(\n     l.shares = sub_u128(l.shares, shares)?;\n     p.total_shares = sub_u128(p.total_shares, shares)?;\n     if p.total_shares == 0 {\n+        l.pending = to_i64(add_i128(i128::from(l.pending), p.carry / WAD_I)?)?;\n+        l.real = add_u64(l.real, to_u64(p.carry_r / WAD)?)?;\n+        p.dust = add_i128(\n+            add_i128(p.dust, p.carry % WAD_I)?,\n+            to_i128(p.carry_r % WAD)?,\n+        )?;\n+        p.carry = 0;\n+        p.carry_r = 0;\n+\n         // AIR-08: the market has no lender again; SOL that reaches the trader from now on is\n         // the protocol's (KI-10), so the next deposit waits for the sweeps, as after a wipe.\n         p.wipe_swept = 0;"
+        }
+      ]
+    },
+    {
+      "program": "shortwin",
+      "function": "deposit",
+      "bug_class": "donation-extends-deposit-hold",
+      "kind": "LEAD",
+      "title": "Small donations can extend a settlement hold",
+      "description": "An attacker extends a held vest with small sweeps; the exact settlement setup and a fix that preserves historical rewards remain unverified.",
+      "source_ids": [
+        "p1-a05-b02"
+      ],
+      "gate_evidence": {
+        "1": "UNCERTAIN: deposit130-135 requires zero vest for a held market; sol_settle324-328 arms it; public sweep and pool::vest_in965-986 permit weighted extensions before expiry. True source bits are assumed and achievable, but full settlement-to-hold trace remains partial.",
+        "2": "UNCERTAIN: a legitimate held vest is reachable; the specific1000000lamport starting settlement was not constructed. Arithmetic verifies47\u219248/450seconds and then1\u21922/10800seconds without an expiry race.",
+        "3": "ALLOWS: any payer can donate1lamport and call sweep_trader against genuine market accounts. No victim signature needed.",
+        "4": "DEMOTE: deposits can remain unavailable while attacker continues, but claims/withdrawals/exits stay available; final withdrawal/fullwipe flushes. Source and findings.md72-89 explicitly allow later credits to extend the hold. The cheap sustained extension needs liveness triage and a safe accounting design, not deletion of the historical-reward guard."
+      },
+      "known_issue_comparison": "AIR2-04/05 documentation already states extensions prolong deposits; this low-cost repeated schedule is additional detail. AIR-02 weighted-end rounding is related but a different old defect.",
+      "code_smells": "the shared vest gates deposits; public sweeps renew the vest"
+    }
+  ],
+  "dispositions": [
+    {
+      "raw_id": "p1-a01-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|sync-lender|repeated-accrual-truncation",
+      "reason": "Gate4 DEMOTE: source trace proves a one-lamport difference over three credits, but no material aggregate harm or profitable extraction. Explicit KI-68 policy retained as a bounded lead.",
+      "gates": {
+        "1": "ALLOWS: SyncLender market/PDA/owner bindings at sync_lender.rs:74-94 validate a real victim; owner.is_signer selects touch_pot at118-126. The no-rebase postcondition130-132 does not block a current-epoch touch. pool.rs:1474-1488 floors and advances snapshots.",
+        "2": "ALLOWS: current lenders and small positive index deltas exist without a forged record; the numeric example stays within integer bounds.",
+        "3": "ALLOWS: owner is UncheckedAccount, and the unsigned branch is explicitly public. No signature of the victim is needed.",
+        "4": "DEMOTE: each extra touch discards less than one lamport per accumulator. No scalable material loss is established in this scan; no current finding is inferred merely from repetition."
+      }
+    },
+    {
+      "raw_id": "p1-a02-b01",
+      "verdict": "FINDING",
+      "key": "shortwin|apply-config|unsafe-authority-transfer",
+      "reason": "Honest-admin hazard;100-10 admin call-15 recoverable/bounded=75. Existing accepted KI-70/AIR2-06, not project-new.",
+      "gates": {
+        "1": "ALLOWS: canonical ApplyConfig AccountLoader and timelock/expiry checks apply_config.rs:35-81 authenticate the stored proposal, not successor control. ProposeConfig requires old governance at19-25. check_authorities config.rs:769-795 only checks nonzero/distinct keys. The real config PDA can be proposed without forging its signature.",
+        "2": "ALLOWS: an otherwise valid Authorities proposal can name the config PDA and apply during its normal timelock window. No invalid account bytes or malicious upgrade are required.",
+        "3": "ALLOWS under honest-admin hazard: the currently authorized admin makes one bad-key transfer; any caller executes the valid stored proposal. This is not a claim that a malicious trusted admin is an outsider.",
+        "4": "ALLOWS bounded control loss: the config PDA cannot satisfy future governance Signer checks through an available program path. Old governance cannot reverse it, but the retained upgrade authority can recover via upgrade; user exits remain. Not permanent loss without recovery."
+      }
+    },
+    {
+      "raw_id": "p1-a02-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|close-short|hardening-position-status-unchecked",
+      "reason": "Hardening lead only. Gate2 blocks a current exploit: reserved status is never written by the current program; no promotion by two-agent convergence.",
+      "gates": {
+        "1": "UNCERTAIN for hypothetical future status: the exit Accounts structs bind real position PDA, market and borrower but omit status, unlike add_margin. Runtime ownership/discriminator and Anchor close prevent forging/reviving current state.",
+        "2": "BLOCKS present exploit: state/position.rs:19-21 reserves status1 forv1.1; open_short.rs:616 writes only POSITION_OPEN; both reviewers searched current writers. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker",
+        "4": "NOT EVALUATED after gate2 blocker"
+      }
+    },
+    {
+      "raw_id": "p1-a08-b01",
+      "verdict": "LEAD",
+      "key": "shortwin|close-short|hardening-position-status-unchecked",
+      "reason": "Hardening lead only. Gate2 blocks a current exploit: reserved status is never written by the current program; no promotion by two-agent convergence.",
+      "gates": {
+        "1": "UNCERTAIN for hypothetical future status: the exit Accounts structs bind real position PDA, market and borrower but omit status, unlike add_margin. Runtime ownership/discriminator and Anchor close prevent forging/reviving current state.",
+        "2": "BLOCKS present exploit: state/position.rs:19-21 reserves status1 forv1.1; open_short.rs:616 writes only POSITION_OPEN; both reviewers searched current writers. Retain mandatory hardening LEAD.",
+        "3": "NOT EVALUATED after gate2 blocker",
+        "4": "NOT EVALUATED after gate2 blocker"
+      }
+    },
+    {
+      "raw_id": "p1-a04-b03",
+      "verdict": "LEAD",
+      "key": "shortwin|inputs|transaction-controlled-settlement-legs",
+      "reason": "Incomplete current economic path; source-disclosed AIR-20/KI-75 retained as lead, not promoted from the comment.",
+      "gates": {
+        "1": "UNCERTAIN: genuine keyed venue reserves enter arming::inputs208-216. CR uses the floor223, box corners239 and persistence guards remain; this review has not reconstructed a transaction sequence that passes all corners and timers.",
+        "2": "UNCERTAIN: an LP can change real reserves, but the required honest state outside the box and complete subsequent observations are not independently produced here.",
+        "3": "ALLOWS conditionally: unlocked LPs are instance participants, not protocol admins; deposit/withdraw authority is their own.",
+        "4": "DEMOTE: arming.rs40-50 describes accepted cases including no borrower loss at defaults; new current borrower loss and profitability are unverified."
+      }
+    },
+    {
+      "raw_id": "p1-a04-b04",
+      "verdict": "LEAD",
+      "key": "shortwin|assess|manipulable-liquidity-history",
+      "reason": "Incomplete current economic path; existing FITX-1 residual retained without claiming a new reproduction.",
+      "gates": {
+        "1": "UNCERTAIN: liquidate::assess356-368 uses max live/guarded EMA via spot_liquidity and also checks robust spot and persistent EMA entries. A direct same-transaction drain is blocked; the claimed held-history sequence is a different path but not fully reconstructed.",
+        "2": "UNCERTAIN: a genuinely held withdrawal can lower the EMA; the full restore/wrapped-observation sequence remains unproved in this pass.",
+        "3": "ALLOWS conditionally: an ordinary LP owns the liquidity it removes and restores.",
+        "4": "DEMOTE: no independent current payoff or borrower-loss calculation beyond the disclosed FITX-1 source statement."
+      }
+    },
+    {
+      "raw_id": "p1-a05-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-math|withdraw-in|carry-crosses-empty-pool",
+      "reason": "100-15 bounded quantum-10 specific large-share empty-pool state=75. Concrete third-party transfer reaches17,999lamports; only the traced initial-deposit construction is claimed, not larger amplification or live prevalence.",
+      "gates": {
+        "1": "ALLOWS: Deposit/Withdraw signer and PDA/mint/token bindings validate genuine owners and accounts. create_market.rs658-661 initializes zero shares, swept bits and hold=-1; no list-only lending cap. deposit129-154 accrues, sees empty vest and satisfied bits. withdraw194-213 permits B=0, flushes vest via pool.rs1897-1904, burnsS, and claims0; zero shares clear only sweep bits1908-1911. A zero sweep restores the trader bit without altering carry. The next valid deposit/sweep/fullwithdraw pays the old carry through normal claim and rent-backed pay_sol. Failed min_sol would roll back; old owner uses its legitimate zero minimum.",
+        "2": "ALLOWS: A=10^18 or18e18 rawtokens fitsu64; S=1000A fitsu128. Initialized ordinary SPL mint without freeze authority is admitted. List-only market needs no open position or venue trade. Actual third-party SOL donation supplies backing; unmatched stays0. Source trace identifies each normal state write and uses no forged counters.",
+        "3": "ALLOWS: prior lender signs its normal full exit; the later lender signs only its own deposit/withdraw and uses public sweeps. An unrelated income payer supplies the old credit, so the transfer is not limited to attacker self-harm.",
+        "4": "ALLOWS bounded loss: 999 and17,999lamports of earlier income become spendable by a different owner after the prior account closes. The demonstrated amount exceeds one-lamport rounding, but is tiny and bounded by18446lamports in the initial-deposit construction; higher-ratio reachability/profit is not claimed. Treat as low-magnitude accounting transfer, not broad theft."
+      }
+    },
+    {
+      "raw_id": "p1-a05-b02",
+      "verdict": "LEAD",
+      "key": "shortwin|deposit|donation-extends-deposit-hold",
+      "reason": "Retain a partial liveness lead, not a confirmed deposit-lock finding: concrete vest arithmetic, but no complete settlement setup or safe minimal fix and explicit intended later-credit extension.",
+      "gates": {
+        "1": "UNCERTAIN: deposit130-135 requires zero vest for a held market; sol_settle324-328 arms it; public sweep and pool::vest_in965-986 permit weighted extensions before expiry. True source bits are assumed and achievable, but full settlement-to-hold trace remains partial.",
+        "2": "UNCERTAIN: a legitimate held vest is reachable; the specific1000000lamport starting settlement was not constructed. Arithmetic verifies47\u219248/450seconds and then1\u21922/10800seconds without an expiry race.",
+        "3": "ALLOWS: any payer can donate1lamport and call sweep_trader against genuine market accounts. No victim signature needed.",
+        "4": "DEMOTE: deposits can remain unavailable while attacker continues, but claims/withdrawals/exits stay available; final withdrawal/fullwipe flushes. Source and findings.md72-89 explicitly allow later credits to extend the hold. The cheap sustained extension needs liveness triage and a safe accounting design, not deletion of the historical-reward guard."
+      }
+    }
+  ],
+  "dedup_notes": [
+    "Merged exactly the two close_short hardening status reports; one shared missing check at the same account struct, with the same four exit sites. Other functions and distinct causes remain separate.",
+    "Raw severity/confidence adjectives are not carried into the report. Confidence uses judging.md deductions.",
+    "Carry transfer is deliberately bounded to the fully traced initial-deposit case; no large supply-ratio extrapolation is scored."
+  ]
+}

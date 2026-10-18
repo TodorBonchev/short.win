@@ -1,0 +1,92 @@
+Pass 1 specialist 8: asymmetry
+Frozen target: b815269224ba0f5d946f49de7e113220c4067041
+Auditor workflow: 6c41e1d46386de7fd9b1fa48c847e876ac8b2676
+Read-only static analysis; no cargo/Anchor builds, tests, runtime reproduction, or repository edits.
+Results: 0 FINDING blocks; 1 LEAD block (future position status hardening).
+
+FULL FILE READS (production complete; cfg(test) material was context only)
+./crates/shortwin-math/src/error.rs:1-173 [bundle 2006-2178]
+./crates/shortwin-math/src/lib.rs:1-45 [bundle 2975-3019]
+./crates/shortwin-math/src/params.rs:1-1572 [bundle 5920-7491]
+./programs/shortwin/src/state/config.rs:1-1176 [bundle 37538-38713]
+./programs/shortwin/src/state/epoch.rs:1-136 [bundle 38719-38854]
+./programs/shortwin/src/state/exposure.rs:1-22 [bundle 38860-38881]
+./programs/shortwin/src/state/layout_asserts.rs:1-251 [bundle 38887-39137]
+./programs/shortwin/src/state/lender.rs:1-171 [bundle 39143-39313]
+./programs/shortwin/src/state/market.rs:1-772 [bundle 39319-40090]
+./programs/shortwin/src/state/mod.rs:1-55 [bundle 40096-40150]
+./programs/shortwin/src/state/oracle.rs:1-29 [bundle 40156-40184]
+./programs/shortwin/src/state/pod.rs:1-160 [bundle 40190-40349]
+./programs/shortwin/src/state/position.rs:1-277 [bundle 40355-40631]
+./programs/shortwin/src/state/vault.rs:1-98 [bundle 40637-40734]
+./programs/shortwin/src/state/venue_extras.rs:1-143 [bundle 40740-40882]
+./programs/shortwin/src/state/venue_guard.rs:1-164 [bundle 40888-41051]
+./programs/shortwin/src/instructions/add_margin.rs:1-105 [bundle 29189-29293]
+./programs/shortwin/src/instructions/apply_config.rs:1-125 [bundle 29299-29423]
+./programs/shortwin/src/instructions/cancel_config.rs:1-59 [bundle 29429-29487]
+./programs/shortwin/src/instructions/claim_sol.rs:1-137 [bundle 29493-29629]
+./programs/shortwin/src/instructions/close_short.rs:1-356 [bundle 29635-29990]
+./programs/shortwin/src/instructions/cover_deficit.rs:1-115 [bundle 29996-30110]
+./programs/shortwin/src/instructions/crank_price.rs:1-267 [bundle 30116-30382]
+./programs/shortwin/src/instructions/deposit.rs:1-210 [bundle 31335-31544]
+./programs/shortwin/src/instructions/disable_venue.rs:1-79 [bundle 31550-31628]
+./programs/shortwin/src/instructions/expire.rs:1-195 [bundle 31915-32109]
+./programs/shortwin/src/instructions/flag_venue_upgraded.rs:1-159 [bundle 32188-32346]
+./programs/shortwin/src/instructions/initialize_config.rs:1-197 [bundle 32352-32548]
+./programs/shortwin/src/instructions/open_short.rs:1-721 [bundle 33384-34104]
+./programs/shortwin/src/instructions/propose_config.rs:1-52 [bundle 34110-34161]
+./programs/shortwin/src/instructions/revalidate_venue.rs:1-123 [bundle 34520-34642]
+./programs/shortwin/src/instructions/set_coverage_pause.rs:1-114 [bundle 34648-34761]
+./programs/shortwin/src/instructions/set_pause.rs:1-77 [bundle 34767-34843]
+./programs/shortwin/src/instructions/set_route_broken.rs:1-85 [bundle 34849-34933]
+./programs/shortwin/src/instructions/set_venue_extras.rs:1-203 [bundle 34939-35141]
+./programs/shortwin/src/instructions/sol_settle.rs:1-551 [bundle 35147-35697]
+./programs/shortwin/src/instructions/sync_lender.rs:1-163 [bundle 36222-36384]
+./programs/shortwin/src/instructions/withdraw.rs:1-316 [bundle 36390-36705]
+./programs/shortwin/src/engine/arming.rs:1-393 [bundle 23606-23998]
+./programs/shortwin/src/engine/waterfall.rs:1-140 [bundle 27931-28070]
+
+FULL PRODUCTION READS WITH ONLY A TEST PREFIX READ
+./programs/shortwin/src/engine/lender.rs: production through the #[cfg(test)] boundary; bundle 24633-24897. Remaining test module unread.
+./programs/shortwin/src/engine/prologue.rs: production through the #[cfg(test)] boundary; bundle 26693-26970. Remaining test module unread.
+
+OTHER BOUNDED SOURCE READS (not whole files)
+./crates/shortwin-math/src/bounds.rs:1-246 [bundle 402-650; may include test/context lines]
+./programs/shortwin/src/instructions/create_market.rs:604-798 [bundle 31135-31331; may include test/context lines]
+./programs/shortwin/src/engine/pool_select.rs:545-650 [bundle 25720-25825; may include test/context lines]
+./programs/shortwin/src/venues/pump_curve.rs:568-758 [bundle 45395-45585; may include test/context lines]
+./programs/shortwin/src/venues/pump_amm.rs:809-869 [bundle 44260-44320; may include test/context lines]
+./programs/shortwin/src/instructions/liquidate.rs:80-172 [bundle 32633-32725; may include test/context lines]
+./programs/shortwin/src/instructions/liquidate.rs:514-740 [bundle 33067-33295; may include test/context lines]
+./crates/shortwin-math/src/pool.rs:774-816 [bundle 8365-8407; may include test/context lines]
+./crates/shortwin-math/src/pool.rs:1427-1534 [bundle 9018-9125; may include test/context lines]
+./crates/shortwin-math/src/pool.rs:1579-1709 [bundle 9170-9300; may include test/context lines]
+./crates/shortwin-math/src/pool.rs:1709-1769 [bundle 9300-9360; may include test/context lines]
+./crates/shortwin-math/src/pool.rs:1879-2154 [bundle 9470-9745; may include test/context lines]
+./crates/shortwin-math/src/tier.rs:1-81 [bundle 16037-16120; may include test/context lines]
+./crates/shortwin-math/src/settle.rs:572-632 [bundle 15215-15275; may include test/context lines]
+
+SEARCH-ONLY COVERAGE BEYOND THE READ RANGES
+programs/shortwin/src/{engine,instructions,venues}: cross-file searches for VERSION, .version, status, POSITION_OPEN, POSITION_EXIT_IN_PROGRESS, .close(), init_if_new, mark_observation_restart, restart_ema_count, deposit_hold_until, and migration/reset fields.
+crates/shortwin-math/src/pool.rs: function/lock/calendar searches for touch, touch_pot, deposit, withdraw, claim, cover, closable, lock_until, cal_day. Only the bounded ranges above were read.
+crates/shortwin-math/src/settle.rs: restart_ema_count, s_count, evaluate; only the bounded evaluate section above was read.
+crates/shortwin-math/src and programs/shortwin/src: m_bps and status writer/reader searches; m_bps is explicitly informational in tier.rs.
+docs/ and services/ops/src: search for two-step authority acceptance. This search exposed historical audit snippets; only the independently identified authority-transfer trail was checked against the explicit accepted KI-70 policy, and it was not emitted. No unrelated historical report claim was used as a finding.
+
+FRAMEWORK CONTEXT READS
+~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-lang-1.2.0/src/common.rs: complete (close assigns System ownership, zeros lamports, and resizes to zero).
+~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anchor-lang-1.2.0/src/accounts/account.rs:250-269,310-405 (owner/discriminator checks, persistence, AccountsClose).
+
+PAIR/BRANCH REVIEW RECORD
+Config initialization / proposal / application / cancellation: every Params, TierParams, EmaParamsArgs, Kink and Authorities input field maps to the stored field. Params carries the whole struct on update; kink has its own variant. PendingChange.set zero-pads all payload bytes; clear resets the full payload. OracleFeed application resets all cached price fields while retaining the bump.
+State to/from math: Market pool/observation/basis/aggr, MarketVault vault, LenderPosition lender, ShareEpoch record, ShortPosition locked/arming projections preserve all operative fields in the reviewed pairs. Padding and explicitly informational m_bps are not economic omissions.
+Deposit / withdraw: both synchronize market parameters, accrue before share changes, roll observation buckets, persist record conversion remainders, use the stored token program, and bound user outputs. Entry versus exit mint filtering and Token-2022 memo handling are explicit asymmetric policies.
+Claim / withdraw close: both use pool::closable; closed lender state cannot survive Anchor close. deposit recreates from Lender::new after accrual. sync_lender owner versus outsider paths preserve the documented rebase ownership restriction.
+Open / close / expire / keeper_exit / sol_settle: locked position parameters are written at open; normal close, both keeper exits, and SOL settlement use remove_position and decrement exposure. The final position exit resets all three market low/high-water marks. Account status differs as recorded in the sole lead.
+Migration / restart: create, pool adoption, pump graduation, redetection, and first full prologue write restart_ema_count; arming passes it to the math evaluator, which requires a count at least that marker. Route chains and collection windows reset on reviewed adoptions.
+Version persistence: every reviewed account type that carries a layout version has matching checks in its reviewed instruction consumers or extras parser search. Borsh account types without a layout-version field retain discriminator/owner/PDA checks.
+
+UNREAD / LIMITATIONS
+All source not listed as full or bounded above remains unread for this specialist, even where a search produced a match. This includes most venue adapter implementation, most math modules, create_market before its bounded initialization tail, liquidate assessment/planning middle, pool selection before its reset tail, and all common/keeper service files.
+The complete 58,914-line source corpus was not read by this specialist. The bundle rules, build context, asymmetry SOP, selected exploit-pattern entries, account-map Review leads, and source index were read as review context. Some oversized early context reads were truncated and are not counted as full source coverage.
+This review did not run runtime or economic simulations. The hardening lead is explicitly contingent on a future writer of non-open position status.

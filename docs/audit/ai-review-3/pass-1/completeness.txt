@@ -1,0 +1,14 @@
+Completeness: 28 unique (Program, function) in raw, 28 covered in final.
+Map signer leads: 12 raised, 0 covered, 12 rejected.
+map lead rejected: shortwin::apply_config no-signer — Intentional public execution of the governance-signed stored proposal, constrained by its timelock and expiry.
+map lead rejected: shortwin::crank_price no-signer — Intentional public observation; market/mint bindings, parsed venue ReadSet, and owner-aware readers constrain the observation.
+map lead rejected: shortwin::crank_sol_usd no-signer — Intentional public refresh from the configured Pyth feed; receiver ownership, verification, freshness, and step checks validate the evidence.
+map lead rejected: shortwin::execute_pool_switch no-signer — Intentional public resolution after the existing collection window; stored candidate keys and fresh verification constrain the switch.
+map lead rejected: shortwin::flag_unsafe_mint no-signer — Intentional public safety flag; the bound market mint must actually fail its owner or safety-filter check.
+map lead rejected: shortwin::flag_venue_upgraded no-signer — Intentional public recording of deployment evidence; pinned ProgramData address, loader owner, deployment slot, and available fingerprint constrain the update.
+map lead rejected: shortwin::init_uva @ ./programs/shortwin/src/venues/pump_amm.rs:1139 no-signer — Internal helper reached through create_market::pump_listing; the outer creator Signer is the CPI payer, and an empty signer-seed list adds no PDA signature.
+map lead rejected: shortwin::init_uva @ ./programs/shortwin/src/venues/pump_curve.rs:1025 no-signer — Internal helper reached through create_market::pump_listing; the outer creator Signer is forwarded as CPI payer, and an empty signer-seed list adds no PDA signature.
+map lead rejected: shortwin::propose_pool no-signer — Intentional public candidate submission; bound accounts, mint-owner checks, candidate verification, and guarded selection constrain the mutation.
+map lead rejected: shortwin::pump_listing no-signer — Internal create_market helper; CreateMarket::creator is a Signer and supplies the canonical ATA and nested UVA initialization payments.
+map lead rejected: shortwin::sweep_protocol_fees no-signer — Intentional public sweep; canonical source accounts, the configured fixed fee recipient, tracked-fee debit, and vault floor prevent caller-directed payment.
+map lead rejected: shortwin::sweep_trader no-signer — Intentional public recovery into fixed market recipients; validated trader/token addresses, checked epoch records, and market PDA signatures constrain the sweep.

@@ -1,0 +1,38 @@
+Pass-two no-signer map reconciliation: 12/12 rows explicitly disposed of by both specialists 2 and 9; zero disagreements.
+These reject only the no-signer hypothesis. Separate issues are not evaluated or dismissed by this coverage reconciliation.
+
+REJECTED MAP LEAD | shortwin::apply_config | no-signer | Intentional public execution of a governance-authorized stored proposal; pending state, timelock, expiry, and change validation constrain the executor.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:9; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:164; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:21
+
+REJECTED MAP LEAD | shortwin::crank_price | no-signer | Intentional public observation; canonical market/mint/cache accounts and the ordered validated venue ReadSet constrain the update.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:10; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:165; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:22
+
+REJECTED MAP LEAD | shortwin::crank_sol_usd | no-signer | Intentional public refresh from the configured Pyth feed; fixed feed address and receiver ownership precede feed verification and freshness checks.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:11; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:166; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:23
+
+REJECTED MAP LEAD | shortwin::execute_pool_switch | no-signer | Intentional public resolution of an elapsed collection window; stored candidate keys, fresh verification, eligibility, and carried-position limits constrain the transition.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:12; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:167; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:24
+
+REJECTED MAP LEAD | shortwin::flag_unsafe_mint | no-signer | Intentional public safety tripwire; the market-bound mint must actually fail its owner or safety check before the persistent flag is set.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:13; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:168; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:25
+
+REJECTED MAP LEAD | shortwin::flag_venue_upgraded | no-signer | Intentional public upgrade-evidence flagging; the guard and authentic ProgramData are bound. The separately mentioned slot-mutation issue is not a missing caller signature.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:14; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:169; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:26
+
+REJECTED MAP LEAD | shortwin::init_uva @ ./programs/shortwin/src/venues/pump_amm.rs:1139 | no-signer | Internal Pump AMM helper reached through create_market/pump_listing; the outer creator is a Signer and the CPI payer meta is a signer. Empty seed groups add no PDA signature.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:15; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:170; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:27
+
+REJECTED MAP LEAD | shortwin::init_uva @ ./programs/shortwin/src/venues/pump_curve.rs:1025 | no-signer | Internal Pump curve helper reached through create_market/pump_listing; the outer creator is a Signer and the CPI payer meta is a signer. Empty seed groups add no PDA signature.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:16; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:171; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:28
+
+REJECTED MAP LEAD | shortwin::propose_pool | no-signer | Intentional public pool-candidate selection; canonical accounts, bound mint, candidate verification, and window/eligibility/position rules constrain writes.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:17; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:172; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:29
+
+REJECTED MAP LEAD | shortwin::pump_listing | no-signer | Internal create_market helper whose creator is already a Signer; that signed payer funds canonical ATA and fixed-program UVA initialization.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:18; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:173; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:30
+
+REJECTED MAP LEAD | shortwin::sweep_protocol_fees | no-signer | Intentional public payout to config.fee_recipient; canonical vault bindings, tracked-fee debit, and rent plus lender-SOL floor prevent caller-directed payment.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:19; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:174; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:31
+
+REJECTED MAP LEAD | shortwin::sweep_trader | no-signer | Intentional public recovery into canonical market recipients; bound trader/token accounts, checked epoch records, and market PDA signatures constrain the sweep.
+Evidence: /home/todor_dev/Projects/short.win/.rust-auditor/runs/20261018-110553/account-map.md:20; /tmp/shortwin-audit-results-20261018/p2-02-coverage.txt:175; /tmp/shortwin-audit-results-20261018/p2-09-coverage.txt:32

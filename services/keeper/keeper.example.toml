@@ -165,7 +165,7 @@ pinned_alert_s = 3600
 # A separate endpoint for the getProgramAccounts calls (empty: the keeper's --rpc).
 discovery_rpc = ""
 # M4-SEC-7: anyone can create pools for a mint, so the keeper ranks a discovery's pools by their
-# locked SOL (one read of each pool's WSOL vault and LP mint, at most rank_keys_per_tick accounts
+# locked SOL (one coherent read of each pool, WSOL vault and LP mint, at most rank_keys_per_tick accounts
 # a tick) and evaluates only the best max_candidates each tick.
 max_candidates = 8
 rank_keys_per_tick = 200

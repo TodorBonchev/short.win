@@ -19,8 +19,8 @@
 //! **Ranking** ([`rank`], M4-SEC-7). Anyone can create a CPMM pool for a mint (≈ 0.17 SOL), so
 //! the discovered set is unbounded. Every discovered pool is scored once per discovery on what
 //! its own account already says (a status and nonce `verify` would refuse, an unknown SOL side:
-//! out) and one batched read of its WSOL vault and LP mint: its locked SOL `λ·R`, the SOL side
-//! of its locked depth — unlocked liquidity scores nothing, so junk pools rank last however many
+//! out) and one coherent read of the pool, its WSOL vault and LP mint: its locked SOL `λ·R`,
+//! the SOL side of its locked depth — unlocked liquidity scores nothing, so junk pools rank last however many
 //! there are, and only burned LP could push a pool up. At most `rank_keys_per_tick` keys are read
 //! per tick (a large set is ranked over several ticks, the previous ranking in force meanwhile;
 //! no new discovery starts before it completes), and only the best `max_candidates` are
@@ -47,7 +47,7 @@
 //! | Situation | Action |
 //! |---|---|
 //! | a collection window has run (`now ≥ fp_t0 + pool_fast_window_s`; a Raydium market's fast path, or a list-only market with positions, M4-SEC-4) | `execute_pool_switch` on the window's candidate (`fp_keys`) |
-//! | otherwise | `propose_pool` of the deepest eligible candidate (not the incumbent, not the window's own) **iff `shortwin::engine::pool_select::decide` accepts it**: a list-only market adopts it (with positions open: opens or improves a window); a Raydium market with no open position adopts it at the 5 % margin inside the listing window, 25 % after; a fast path armed (`pool_fail` for `pool_fast_route_s`) opens a window with it; a running window takes it if it is deeper than `fp_d` and the chain that armed it holds (M4-SEC-2) — a window only with a candidate above the window floor (its locked SOL at `P_ema` alone, M4V-1; else nothing, `PoolTooThin`) and **whose opening caps every open position fits** (switch only if all fit: the deepest candidate that fits and that `decide` still takes for the window; none: nothing, `CarriedPositionsTooLarge` — the positions then exit on the failed pool through the S3 chain), and never a candidate whose own program the latch holds (the keeper ranks the others, M4V-4) |
+//! | otherwise | `propose_pool` of the deepest eligible candidate (not the incumbent, not the window's own) **iff `shortwin::engine::pool_select::decide` accepts it**: a list-only market adopts it (with positions open: opens or improves a window); a Raydium market with no open position adopts it at the 5 % margin inside the listing window, 25 % after; a fast path armed (`pool_fail` for `pool_fast_route_s`) opens a window with it; a running window takes it if it is deeper than `fp_d` and the chain that armed it holds (M4-SEC-2) — a window only with a candidate above the window floor (its locked SOL at `min(P_ema, P_candidate)`, M4V-1; otherwise try the next candidate) and **whose opening caps every open position fits** (switch only if all fit: the deepest candidate that fits and that `decide` still takes for the window; none: nothing, `CarriedPositionsTooLarge` — the positions then exit on the failed pool through the S3 chain), and never a candidate whose own program the latch holds (the keeper ranks the others, M4V-4) |
 //!
 //! The decision is the program's own function on the program's own numbers, so the keeper
 //! proposes at the first second the program accepts, and never otherwise (a market whose
@@ -75,7 +75,7 @@ use shortwin::engine::pool_select::{self, FitAt, FitContext, Proposal, SelectPar
 use shortwin::errors::ShortwinError;
 use shortwin::state::{Market, VenueKind, raydium_cache};
 use shortwin::venues::detect::{self, PumpClass};
-use shortwin_math::pool_select::{dominates, fast_path_qualifies, lambda_bps};
+use shortwin_math::pool_select::{dominates, fast_path_qualifies};
 use shortwin_services_common::{AccountData, Chain, Memcmp};
 use shortwin_venue_state::{mint, raydium_cpmm, raydium_v4};
 
@@ -225,22 +225,26 @@ impl CandidatePool {
         })
     }
 
-    /// The accounts [`rank`] reads for it: its WSOL vault and its LP mint.
-    pub fn rank_keys(&self) -> [Pubkey; 2] {
-        [self.sol_vault, self.lp_mint]
+    /// The accounts [`rank`] reads together: pool, WSOL vault and LP mint.
+    pub fn rank_keys(&self) -> [Pubkey; 3] {
+        [self.pool, self.sol_vault, self.lp_mint]
     }
 }
 
-/// The ranking score of `c` from its WSOL vault and LP mint accounts ([`CandidatePool::rank_keys`],
-/// in that order): its locked SOL `⌊λ_bps·R/10⁴⌋` (`R` the vault's balance; M4-SEC-7). 0 for an
+/// The ranking score of `c` from its pool, WSOL vault and LP mint accounts
+/// ([`CandidatePool::rank_keys`], in that order): its locked SOL `⌊locked_lp·R/total_lp⌋`
+/// (`R` the vault's balance; M4-SEC-7). 0 for an
 /// implausible pool or accounts that do not read. Unlocked liquidity adds nothing to it.
 pub fn score(c: &CandidatePool, accounts: &[Option<AccountData>]) -> u128 {
-    if !c.plausible {
-        return 0;
-    }
-    let (Some(Some(vault)), Some(Some(lp))) = (accounts.first(), accounts.get(1)) else {
+    let [Some(pool), Some(vault), Some(lp)] = accounts else {
         return 0;
     };
+    let Some(fresh) = CandidatePool::from_account(c.kind, c.pool, pool) else {
+        return 0;
+    };
+    if !fresh.plausible || fresh.rank_keys() != c.rank_keys() {
+        return 0;
+    }
     let r = vault
         .data
         .get(64..72)
@@ -249,7 +253,12 @@ pub fn score(c: &CandidatePool, accounts: &[Option<AccountData>]) -> u128 {
     let Ok(m) = mint::read_base(&lp.owner.to_bytes(), &lp.data) else {
         return 0;
     };
-    u128::from(lambda_bps(c.lp_counter, m.supply)) * u128::from(r) / 10_000
+    match fresh.lp_counter.checked_sub(m.supply) {
+        Some(locked) if fresh.lp_counter != 0 => {
+            u128::from(locked) * u128::from(r) / u128::from(fresh.lp_counter)
+        }
+        _ => 0,
+    }
 }
 
 /// The best `k` candidates by score (highest first; among equals the lowest key), each with a
@@ -291,7 +300,7 @@ pub async fn discover<C: Chain>(chain: &C, mint: &Pubkey) -> anyhow::Result<Vec<
 pub enum Verdict {
     /// Verified and eligible (ARCH §2.6): its locked depth `D`, real SOL reserve `R` and one-way
     /// fee φ (ppm), as the program computes them, whether it passes the window floor of a
-    /// collection window's candidate (its locked SOL at the market's `P_ema` alone reaches
+    /// collection window's candidate (its locked SOL at `min(P_ema, P_candidate)` reaches
     /// `pool_min_real_sol`; `pool_select::window_floor_ok`, M4V-1), and whether the market's open
     /// positions fit its opening caps (`pool_select::carried_fit`, switch only if all fit; `true`
     /// without an open position).
@@ -373,7 +382,11 @@ pub fn evaluate(
             d: a.state.locked_depth,
             real_sol: a.state.r,
             fee_ppm: a.state.fee_ppm,
-            window_floor: pool_select::window_floor_ok(&a, params, p_ref),
+            window_floor: pool_select::window_floor_ok(
+                &a,
+                params,
+                pool_select::window_price(p_ref, &a),
+            ),
             fits: pool_select::carried_fit(market, &a, fit, p_ref, FitAt::Proposal)
                 .is_ok_and(|f| f.fits()),
         },
@@ -531,18 +544,14 @@ pub fn plan(
         return out;
     };
     out.best = Some((c.pool, d));
-    // M4V-1: a window's candidate also needs the window floor, which is monotone in `D` at the
-    // market's one `P_ema`: if the deepest candidate misses it, every candidate does.
+    // Each candidate has its own proposal price and must pass its own floor.
     let window_floor = c.window_floor();
     match pool_select::decide(s, d, p) {
-        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !window_floor => {
-            out.blocked = Some(u32::from(ShortwinError::PoolTooThin));
-        }
         // Switch only if all fit: the window takes the deepest candidate whose opening caps every
         // open position fits (not monotone in `D`: the fee, the reserve and the tier count too)
         // and that `decide` still takes for the window; with none, the positions exit on the
         // failed pool through the S3 chain.
-        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !c.fits() => {
+        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) => {
             let fitting = ranked.iter().find_map(|&(d, c)| {
                 if !(c.fits() && c.window_floor()) {
                     return None;
@@ -564,7 +573,13 @@ pub fn plan(
                         expect,
                     });
                 }
-                None => out.blocked = Some(u32::from(ShortwinError::CarriedPositionsTooLarge)),
+                None => {
+                    out.blocked = Some(u32::from(if window_floor {
+                        ShortwinError::CarriedPositionsTooLarge
+                    } else {
+                        ShortwinError::PoolTooThin
+                    }));
+                }
             }
         }
         Ok(expect) => {
@@ -587,8 +602,10 @@ pub fn plan(
                 && s.open_positions == 0
                 && s.fp_t0 == 0
                 && !pool_select::fast_path_armed(s, p)
-                && fast_path_qualifies(d, s.pool_d, u64::from(p.fast_min_bps))
-                && window_floor;
+                && ranked.iter().any(|(depth, candidate)| {
+                    fast_path_qualifies(*depth, s.pool_d, u64::from(p.fast_min_bps))
+                        && candidate.window_floor()
+                });
         }
     }
     out
@@ -686,15 +703,20 @@ impl PoolTrack {
         self.rank_queue = plausible;
     }
 
-    /// The next pools to rank within `budget_keys` keys (at least one pool).
-    pub fn next_rank_batch(&mut self, budget_keys: usize) -> Vec<CandidatePool> {
-        let n = (budget_keys / 2).max(1).min(self.rank_queue.len());
-        self.rank_queue.drain(..n).collect()
+    /// The next pools to rank within `budget_keys` keys. Retain them until every read succeeds,
+    /// so a transport failure retries the whole batch without publishing partial scores.
+    pub fn next_rank_batch(&self, budget_keys: usize) -> Vec<CandidatePool> {
+        self.rank_queue
+            .iter()
+            .take(budget_keys / 3)
+            .cloned()
+            .collect()
     }
 
-    /// Records a ranked batch; once the queue is empty the best `k` become the candidates
+    /// Commits the scored queue prefix; once the queue is empty the best `k` become the candidates
     /// (returns `true` then).
     pub fn finish_rank_batch(&mut self, scored: Vec<(u128, CandidatePool)>, k: usize) -> bool {
+        self.rank_queue.drain(..scored.len());
         self.rank_scores.extend(scored);
         if !self.rank_queue.is_empty() {
             return false;
@@ -827,6 +849,101 @@ mod tests {
             Some(Action::Propose { pool, expect, .. }) => Some((*pool, *expect)),
             _ => None,
         }
+    }
+
+    fn account(owner: Pubkey, data: Vec<u8>) -> Option<AccountData> {
+        Some(AccountData {
+            lamports: 1,
+            owner,
+            executable: false,
+            data,
+        })
+    }
+
+    fn vault(amount: u64) -> Option<AccountData> {
+        let mut data = vec![0; 165];
+        data[64..72].copy_from_slice(&amount.to_le_bytes());
+        data[108] = 1;
+        account(shortwin::constants::TOKEN_PROGRAM_ID, data)
+    }
+
+    fn lp(supply: u64) -> Option<AccountData> {
+        let mut data = vec![0; 82];
+        data[36..44].copy_from_slice(&supply.to_le_bytes());
+        data[44] = 9;
+        data[45] = 1;
+        account(shortwin::constants::TOKEN_PROGRAM_ID, data)
+    }
+
+    fn rank_pool(plausible: bool, counter: u64) -> (CandidatePool, Option<AccountData>) {
+        let mut data = vec![0; raydium_cpmm::POOL_LEN];
+        data[..8].copy_from_slice(&raydium_cpmm::POOL_DISCRIMINATOR);
+        for off in [
+            raydium_cpmm::OFF_AMM_CONFIG,
+            raydium_cpmm::OFF_TOKEN_0_VAULT,
+            raydium_cpmm::OFF_TOKEN_1_VAULT,
+            raydium_cpmm::OFF_LP_MINT,
+            raydium_cpmm::OFF_TOKEN_1_MINT,
+        ] {
+            data[off..off + 32].copy_from_slice(Pubkey::new_unique().as_ref());
+        }
+        data[raydium_cpmm::OFF_TOKEN_0_MINT..raydium_cpmm::OFF_TOKEN_0_MINT + 32]
+            .copy_from_slice(WSOL_MINT.as_ref());
+        for off in [
+            raydium_cpmm::OFF_TOKEN_0_PROGRAM,
+            raydium_cpmm::OFF_TOKEN_1_PROGRAM,
+        ] {
+            data[off..off + 32].copy_from_slice(shortwin::constants::TOKEN_PROGRAM_ID.as_ref());
+        }
+        data[raydium_cpmm::OFF_STATUS] = if plausible {
+            0
+        } else {
+            raydium_cpmm::STATUS_BIT_SWAP
+        };
+        data[raydium_cpmm::OFF_LP_SUPPLY..raydium_cpmm::OFF_LP_SUPPLY + 8]
+            .copy_from_slice(&counter.to_le_bytes());
+        let acc = account(RAYDIUM_CPMM_PROGRAM_ID, data);
+        let cand = CandidatePool::from_account(
+            VenueKind::RaydiumCpmm,
+            Pubkey::new_unique(),
+            acc.as_ref().unwrap(),
+        )
+        .unwrap();
+        (cand, acc)
+    }
+
+    /// A complete CPMM ReadSet, including the genuine mint/program/authority bindings checked
+    /// by the program's verifier, with fully locked liquidity and no collected fee counters.
+    fn cpmm_candidate(x: u64, y: u64) -> (CandidatePool, Vec<Option<AccountData>>, Pubkey) {
+        let (cand, pool) = rank_pool(true, 1_000_000_000);
+        let pool_data = &pool.as_ref().unwrap().data;
+        let mint = Pubkey::new_from_array(
+            pool_data[raydium_cpmm::OFF_TOKEN_1_MINT..raydium_cpmm::OFF_TOKEN_1_MINT + 32]
+                .try_into()
+                .unwrap(),
+        );
+        let mut config = vec![0; raydium_cpmm::CONFIG_LEN];
+        config[..8].copy_from_slice(&raydium_cpmm::CONFIG_DISCRIMINATOR);
+        config
+            [raydium_cpmm::OFF_CONFIG_TRADE_FEE_RATE..raydium_cpmm::OFF_CONFIG_TRADE_FEE_RATE + 8]
+            .copy_from_slice(&2_500u64.to_le_bytes());
+        let token = |mint: Pubkey, amount| {
+            let mut a = vault(amount).unwrap();
+            a.data[..32].copy_from_slice(mint.as_ref());
+            a.data[32..64].copy_from_slice(shortwin::constants::RAYDIUM_CPMM_AUTHORITY.as_ref());
+            Some(a)
+        };
+        (
+            cand,
+            vec![
+                pool,
+                account(RAYDIUM_CPMM_PROGRAM_ID, config),
+                token(WSOL_MINT, y),
+                token(mint, x),
+                lp(0),
+            ],
+            mint,
+        )
     }
 
     #[test]
@@ -1024,44 +1141,17 @@ mod tests {
     /// already rules out, or whose vault and LP mint do not read, score nothing.
     #[test]
     fn the_ranking_keeps_the_best_pools_by_locked_sol() {
-        let pool = |plausible: bool| CandidatePool {
-            kind: VenueKind::RaydiumCpmm,
-            pool: Pubkey::new_unique(),
-            read_keys: vec![],
-            sol_vault: Pubkey::new_unique(),
-            lp_mint: Pubkey::new_unique(),
-            lp_counter: 1_000,
-            plausible,
-        };
-        let vault = |amount: u64| {
-            let mut data = vec![0u8; 165];
-            data[64..72].copy_from_slice(&amount.to_le_bytes());
-            Some(AccountData {
-                lamports: 1,
-                owner: shortwin::constants::TOKEN_PROGRAM_ID,
-                executable: false,
-                data,
-            })
-        };
-        let lp = |supply: u64| {
-            let mut data = vec![0u8; 82];
-            data[36..44].copy_from_slice(&supply.to_le_bytes());
-            data[44] = 9;
-            data[45] = 1;
-            Some(AccountData {
-                lamports: 1,
-                owner: shortwin::constants::TOKEN_PROGRAM_ID,
-                executable: false,
-                data,
-            })
-        };
-        let (a, b, c, d) = (pool(true), pool(true), pool(true), pool(false));
+        let pool = |plausible| rank_pool(plausible, 1_000).0;
+        let (a, aa) = rank_pool(true, 1_000);
+        let (b, ba) = rank_pool(true, 1_000);
+        let (c, ca) = rank_pool(true, 1_000);
+        let (d, da) = rank_pool(false, 1_000);
         // a: 100 SOL at λ 50 % (50 locked); b: 1,000 SOL at λ 1 % (10); c: unlocked (0).
-        assert_eq!(score(&a, &[vault(100), lp(500)]), 50);
-        assert_eq!(score(&b, &[vault(1_000), lp(990)]), 10);
-        assert_eq!(score(&c, &[vault(1_000_000), lp(1_000)]), 0);
-        assert_eq!(score(&d, &[vault(100), lp(0)]), 0, "implausible");
-        assert_eq!(score(&a, &[None, lp(500)]), 0);
+        assert_eq!(score(&a, &[aa.clone(), vault(100), lp(500)]), 50);
+        assert_eq!(score(&b, &[ba, vault(1_000), lp(990)]), 10);
+        assert_eq!(score(&c, &[ca, vault(1_000_000), lp(1_000)]), 0);
+        assert_eq!(score(&d, &[da, vault(100), lp(0)]), 0, "implausible");
+        assert_eq!(score(&a, &[aa, None, lp(500)]), 0);
         let ranked = rank(vec![(10, b.clone()), (0, c), (50, a.clone()), (0, d)], 8);
         assert_eq!(ranked, vec![a.clone(), b]);
         assert_eq!(rank(vec![(10, pool(true)), (50, a.clone())], 1), vec![a]);
@@ -1075,13 +1165,133 @@ mod tests {
         let mut ticks = 0;
         while !t.rank_queue.is_empty() {
             let batch = t.next_rank_batch(cfg.rank_keys_per_tick);
-            assert!(batch.len() * 2 <= cfg.rank_keys_per_tick);
+            assert!(batch.len() * 3 <= cfg.rank_keys_per_tick);
             let scored = batch.into_iter().map(|c| (1, c)).collect();
             t.finish_rank_batch(scored, cfg.max_candidates);
             ticks += 1;
         }
-        assert_eq!((ticks, t.candidates.len()), (2, cfg.max_candidates));
+        assert_eq!((ticks, t.candidates.len()), (4, cfg.max_candidates));
         assert!(t.discovery_due(0, false, &cfg));
+    }
+
+    #[test]
+    fn ranking_uses_the_fresh_counter_for_lp_changes() {
+        let (discovered, mut pool) = rank_pool(true, 1_000_000_000);
+        // A proportional deposit after discovery preserves 50 SOL of locked liquidity.
+        pool.as_mut().unwrap().data[raydium_cpmm::OFF_LP_SUPPLY..raydium_cpmm::OFF_LP_SUPPLY + 8]
+            .copy_from_slice(&2_000_000_000u64.to_le_bytes());
+        assert_eq!(
+            score(
+                &discovered,
+                &[pool.clone(), vault(200_000_000_000), lp(1_500_000_000)]
+            ),
+            50_000_000_000
+        );
+        // A proportional withdrawal must not overstate the same locked liquidity either.
+        pool.as_mut().unwrap().data[raydium_cpmm::OFF_LP_SUPPLY..raydium_cpmm::OFF_LP_SUPPLY + 8]
+            .copy_from_slice(&600_000_000u64.to_le_bytes());
+        assert_eq!(
+            score(
+                &discovered,
+                &[pool.clone(), vault(60_000_000_000), lp(100_000_000)]
+            ),
+            50_000_000_000
+        );
+        // Do not combine the refreshed counter with a vault from another pool layout.
+        pool.as_mut().unwrap().data
+            [raydium_cpmm::OFF_TOKEN_0_VAULT..raydium_cpmm::OFF_TOKEN_0_VAULT + 32]
+            .copy_from_slice(Pubkey::new_unique().as_ref());
+        assert_eq!(
+            score(&discovered, &[pool, vault(60_000_000_000), lp(100_000_000)]),
+            0
+        );
+    }
+
+    #[test]
+    fn ranking_preserves_sub_basis_point_locked_shares() {
+        // A coherent 0.5-bps lock still has 50 SOL of locked depth; integer bps lost it all.
+        let (cand, pool) = rank_pool(true, 1_000_000_000);
+        let scored = score(
+            &cand,
+            &[pool, vault(1_000_000_000_000_000), lp(999_950_000)],
+        );
+        assert_eq!(scored, 50_000_000_000);
+        assert_eq!(rank(vec![(scored, cand.clone())], 1), vec![cand]);
+    }
+
+    #[test]
+    fn ranking_keeps_the_queue_until_the_batch_commits() {
+        let mut track = PoolTrack::default();
+        let found = vec![rank_pool(true, 1_000).0, rank_pool(true, 1_000).0];
+        track.start_ranking(found.clone());
+        assert!(track.next_rank_batch(2).is_empty());
+        let first = track.next_rank_batch(3);
+        assert_eq!(first, found[..1]);
+        // A failed read has no commit: retry the same prefix, even if it was the entire queue.
+        assert_eq!(track.next_rank_batch(3), first);
+        assert_eq!(track.rank_queue, found);
+        assert!(!track.finish_rank_batch(vec![(10, first[0].clone())], 8));
+        let last = track.next_rank_batch(3);
+        assert_eq!(last, found[1..]);
+        assert_eq!(track.next_rank_batch(3), last);
+        assert!(track.finish_rank_batch(vec![(20, last[0].clone())], 8));
+        assert!(track.rank_queue.is_empty());
+        assert_eq!(track.candidates, vec![found[1].clone(), found[0].clone()]);
+    }
+
+    #[test]
+    fn evaluated_window_floors_use_each_candidate_price_and_search_shallower_pools() {
+        let (a, aa, mint) = cpmm_candidate(400_000_000_000, 16_000_000_000);
+        let (b, mut ba, _) = cpmm_candidate(40_000_000_000, 40_000_000_000);
+        // Both candidates belong to the same market mint.
+        ba[0].as_mut().unwrap().data
+            [raydium_cpmm::OFF_TOKEN_1_MINT..raydium_cpmm::OFF_TOKEN_1_MINT + 32]
+            .copy_from_slice(mint.as_ref());
+        ba[3].as_mut().unwrap().data[..32].copy_from_slice(mint.as_ref());
+        let (mut m, _) = market(Pubkey::new_unique());
+        m.mint = mint;
+        m.token_program = shortwin::constants::TOKEN_PROGRAM_ID;
+        m.ema_price.set(1_000_000_000_000_000_000);
+        m.ring_count = 1;
+        m.pool_d.set(100_000_000_000);
+        m.pool_fail_since = 9_000;
+        let params = shortwin::state::Params::defaults();
+        let tiers = shortwin::state::TierParams::defaults();
+        let fit = FitContext {
+            params: &params,
+            tiers: &tiers,
+            oracle: Default::default(),
+            now: 10_000,
+        };
+        let ea = evaluate(&m, &fit, 10_000, &a, &aa);
+        let eb = evaluate(&m, &fit, 10_000, &b, &ba);
+        assert_eq!(ea.d(), Some(80_000_000_000), "{ea:?}");
+        assert_eq!(eb.d(), Some(40_000_000_000), "{eb:?}");
+        assert!(
+            !ea.window_floor(),
+            "A has only 16 SOL at its proposal price"
+        );
+        assert!(eb.window_floor(), "B has 40 SOL at its proposal price");
+        assert!(ea.fits() && eb.fits());
+        let s = Situation::of(&m, VenueKind::RaydiumV4, 10_000, true);
+        let pl = plan(&s, &P, &m, &[ea.clone(), eb.clone()]);
+        assert_eq!(pl.best, Some((a.pool, 80_000_000_000)));
+        assert_eq!(proposed(&pl), Some((b.pool, Proposal::OpenWindow)));
+        // Before the chain is armed, B also justifies keeping it alive even though A does not.
+        let waiting = Situation {
+            pool_fail_since: 9_990,
+            ..s
+        };
+        assert!(plan(&waiting, &P, &m, &[ea.clone(), eb.clone()]).keep_chain);
+        // The same search applies when improving an unexpired collection window.
+        m.fp_t0 = 9_990;
+        m.fp_d.set(30_000_000_000);
+        m.fp_keys[0] = Pubkey::new_unique();
+        let s = Situation::of(&m, VenueKind::RaydiumV4, 10_000, true);
+        assert_eq!(
+            proposed(&plan(&s, &P, &m, &[ea, eb])),
+            Some((b.pool, Proposal::ImproveWindow))
+        );
     }
 
     #[test]

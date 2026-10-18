@@ -1,0 +1,161 @@
+Pass 2 specialist 6: periphery. Review finished.
+Frozen repository commit: b815269224ba0f5d946f49de7e113220c4067041.
+Primary source: .audit-mZFuf8/agent-6-bundle.md; mappings: source-index.tsv.
+I did not read the complete 58,914-line source bundle or the complete 61,531-line assigned bundle.
+I reviewed bounded relevant source for parsers, configuration, dependencies, and adapter checks.
+No source edits, builds, tests, runtime reproductions, protocol interaction, or subagents.
+All proposed diffs are scratch report text; they are unapplied and uncompiled.
+Artifacts: p2-06-periphery.md contains 1 FINDING and 3 LEAD blocks.
+
+FULL PRODUCTION READS (test modules were context only):
+./crates/shortwin-venue-state/src/bytes.rs: source lines 1-71; bundle 17262-17332.
+./crates/shortwin-venue-state/src/lib.rs: complete file through final production function; bundle 17372-17439.
+./crates/shortwin-venue-state/src/mint.rs: source lines 1-271; bundle 17443-17713.
+./crates/shortwin-venue-state/src/program_data.rs: source lines 1-154; bundle 17889-18042.
+./crates/shortwin-venue-state/src/pump_amm.rs: source lines 1-528; bundle 19783-20310.
+./crates/shortwin-venue-state/src/pyth.rs: source lines 1-397; bundle 20745-21141.
+./crates/shortwin-venue-state/src/raydium_cpmm.rs: source lines 1-444; bundle 21465-21908.
+./crates/shortwin-venue-state/src/raydium_v4.rs: source lines 1-280; bundle 22449-22728.
+./crates/shortwin-venue-state/src/token_account.rs: source lines 1-122; bundle 22954-23075.
+./programs/shortwin/src/instructions/apply_config.rs: complete file through final production function; bundle 29296-29425.
+./programs/shortwin/src/instructions/propose_config.rs: complete file through final production function; bundle 34107-34163.
+./programs/shortwin/src/instructions/set_venue_extras.rs: complete file through final production function; bundle 34936-35143.
+./programs/shortwin/src/mint_filter.rs: source lines 1-102; bundle 37139-37240.
+./programs/shortwin/src/state/config.rs: source lines 1-884; bundle 37538-38421.
+./programs/shortwin/src/state/venue_extras.rs: complete file through final production function; bundle 40737-40884.
+./services/keeper/src/view.rs: complete file through final production function; bundle 58520-58914.
+
+BOUNDED PARTIAL PRODUCTION READS:
+./programs/shortwin/src/venues/mod.rs: source lines 1-359; bundle 41509-41870.
+./programs/shortwin/src/venues/pump_amm.rs: source lines 399-461; bundle 43850-43912.
+./programs/shortwin/src/venues/raydium.rs: source lines 1-171; bundle 46062-46235.
+./programs/shortwin/src/venues/raydium_cpmm.rs: source lines 1-435; bundle 46461-46898.
+./programs/shortwin/src/venues/raydium_v4.rs: source lines 1-344; bundle 47284-47630.
+
+BUILD AND POLICY CONTEXT:
+Build context and all manifests in bundle lines 1-401, except closing fence line 251.
+Pass 2 notes, assigned prompt, specialty, shared output rules, report-language rules, known appendix 61400-61531.
+Account map review leads 59988-60120; no assumption that map flags prove defects.
+Exploit catalogue: targeted P1/B2/B3/B15/B25/L11; other catalogue parts received a partial skim.
+Two broad metadata/catalogue outputs truncated. These were not production reads and are not claimed as complete.
+
+CROSS-FILE SEARCHES AND FOLLOW-UP READS:
+rg for read_base callers across program, keeper, and venue-state Rust sources.
+rg for decode_zc and on-chain CONFIG_VERSION / MARKET_VERSION / VENUE_EXTRAS_VERSION checks.
+rg for governance assignments in instruction files; full GlobalConfig::apply reviewed separately.
+rg for unsafe, transmute, from_raw_parts, unwrap_unchecked, and unchecked borrows across program, venue-state, common, keeper.
+Numbered follow-up reads confirmed report locations in apply_config, config, mint, both Raydium parsers, and keeper view.
+Cargo.lock and services/Cargo.lock: search-only package/version context; no complete dependency audit.
+No claims of full instruction-flow or full keeper-service coverage follow from these searches.
+
+DEPENDENCY SOURCE READS:
+anchor-lang 1.2.0 src/accounts/account_loader.rs: lines 115-180 (owner, discriminator, and size checks).
+spl-token-2022-interface 2.1.0 src/extension/mod.rs: lines 262-340, 514-540, 953-980 (mint envelope and type checks).
+
+UNREAD OR SEARCH-ONLY IN-SCOPE PRODUCTION FILES:
+The files below received no bounded production read in this pass; some only appeared in the cross-file searches above.
+./crates/shortwin-math/src/bounds.rs
+./crates/shortwin-math/src/caps.rs
+./crates/shortwin-math/src/consts.rs
+./crates/shortwin-math/src/error.rs
+./crates/shortwin-math/src/fees.rs
+./crates/shortwin-math/src/lib.rs
+./crates/shortwin-math/src/num/mod.rs
+./crates/shortwin-math/src/num/u256.rs
+./crates/shortwin-math/src/observe.rs
+./crates/shortwin-math/src/params.rs
+./crates/shortwin-math/src/persist.rs
+./crates/shortwin-math/src/pool.rs
+./crates/shortwin-math/src/pool_select.rs
+./crates/shortwin-math/src/quote/cpmm.rs
+./crates/shortwin-math/src/quote/mod.rs
+./crates/shortwin-math/src/quote/pricing.rs
+./crates/shortwin-math/src/quote/ray_v4.rs
+./crates/shortwin-math/src/quote/reprice.rs
+./crates/shortwin-math/src/quote/sol_leg.rs
+./crates/shortwin-math/src/quote/straddle.rs
+./crates/shortwin-math/src/rent.rs
+./crates/shortwin-math/src/risk.rs
+./crates/shortwin-math/src/settle.rs
+./crates/shortwin-math/src/tier.rs
+./crates/shortwin-math/src/waterfall.rs
+./crates/shortwin-venue-state/src/pump.rs
+./programs/shortwin/src/constants.rs
+./programs/shortwin/src/engine/arming.rs
+./programs/shortwin/src/engine/bounds.rs
+./programs/shortwin/src/engine/caps.rs
+./programs/shortwin/src/engine/guard.rs
+./programs/shortwin/src/engine/lender.rs
+./programs/shortwin/src/engine/mod.rs
+./programs/shortwin/src/engine/observe.rs
+./programs/shortwin/src/engine/pool_select.rs
+./programs/shortwin/src/engine/prologue.rs
+./programs/shortwin/src/engine/route.rs
+./programs/shortwin/src/engine/tier.rs
+./programs/shortwin/src/engine/trader.rs
+./programs/shortwin/src/engine/waterfall.rs
+./programs/shortwin/src/errors.rs
+./programs/shortwin/src/events.rs
+./programs/shortwin/src/instructions/add_margin.rs
+./programs/shortwin/src/instructions/cancel_config.rs
+./programs/shortwin/src/instructions/claim_sol.rs
+./programs/shortwin/src/instructions/close_short.rs
+./programs/shortwin/src/instructions/cover_deficit.rs
+./programs/shortwin/src/instructions/crank_price.rs
+./programs/shortwin/src/instructions/crank_sol_usd.rs
+./programs/shortwin/src/instructions/create_market.rs
+./programs/shortwin/src/instructions/deposit.rs
+./programs/shortwin/src/instructions/disable_venue.rs
+./programs/shortwin/src/instructions/execute_pool_switch.rs
+./programs/shortwin/src/instructions/expire.rs
+./programs/shortwin/src/instructions/flag_unsafe_mint.rs
+./programs/shortwin/src/instructions/flag_venue_upgraded.rs
+./programs/shortwin/src/instructions/initialize_config.rs
+./programs/shortwin/src/instructions/liquidate.rs
+./programs/shortwin/src/instructions/mod.rs
+./programs/shortwin/src/instructions/open_short.rs
+./programs/shortwin/src/instructions/propose_pool.rs
+./programs/shortwin/src/instructions/revalidate_venue.rs
+./programs/shortwin/src/instructions/set_coverage_pause.rs
+./programs/shortwin/src/instructions/set_pause.rs
+./programs/shortwin/src/instructions/set_route_broken.rs
+./programs/shortwin/src/instructions/sol_settle.rs
+./programs/shortwin/src/instructions/sweep_protocol_fees.rs
+./programs/shortwin/src/instructions/sweep_trader.rs
+./programs/shortwin/src/instructions/sync_lender.rs
+./programs/shortwin/src/instructions/withdraw.rs
+./programs/shortwin/src/lamports.rs
+./programs/shortwin/src/lib.rs
+./programs/shortwin/src/state/epoch.rs
+./programs/shortwin/src/state/exposure.rs
+./programs/shortwin/src/state/layout_asserts.rs
+./programs/shortwin/src/state/lender.rs
+./programs/shortwin/src/state/market.rs
+./programs/shortwin/src/state/mod.rs
+./programs/shortwin/src/state/oracle.rs
+./programs/shortwin/src/state/pod.rs
+./programs/shortwin/src/state/position.rs
+./programs/shortwin/src/state/vault.rs
+./programs/shortwin/src/state/venue_guard.rs
+./programs/shortwin/src/venues/detect.rs
+./programs/shortwin/src/venues/pump_curve.rs
+./services/common/src/chain.rs
+./services/common/src/tx.rs
+./services/keeper/src/budget.rs
+./services/keeper/src/coverage.rs
+./services/keeper/src/decide.rs
+./services/keeper/src/fees.rs
+./services/keeper/src/graduation.rs
+./services/keeper/src/ixs.rs
+./services/keeper/src/monitor.rs
+./services/keeper/src/pda.rs
+./services/keeper/src/pool_monitor.rs
+./services/keeper/src/sweep.rs
+./services/keeper/src/venue.rs
+
+REVIEW LIMITS:
+No independent external venue source or deployed ELF review; comments about venue behavior were treated as context, not exploit proof.
+No new unprivileged exploit was proved in the reviewed parser/configuration lens.
+The known authority-transfer finding was independently reached through config serialization/application review.
+The three known hardening leads were independently reached through mint, live Raydium, and keeper decode paths.
+Findings omitted from this raw report were not independently reached in this bounded pass.

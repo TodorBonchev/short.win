@@ -1,0 +1,12 @@
+LEAD | program: shortwin | function: close_short | bug_class: hardening-position-status-unchecked | group_key: shortwin | close_short | hardening-position-status-unchecked
+title: Exit instructions omit the position status check.
+file: programs/shortwin/src/instructions/close_short.rs:84-91
+related_locations: programs/shortwin/src/instructions/liquidate.rs:122-129; programs/shortwin/src/instructions/expire.rs:83-90; programs/shortwin/src/instructions/sol_settle.rs:122-128; programs/shortwin/src/instructions/add_margin.rs:60-66; programs/shortwin/src/state/position.rs:18-21; programs/shortwin/src/instructions/open_short.rs:616
+pair_or_branch: add_margin versus close_short, liquidate, expire, and sol_settle; position initialization versus position consumers.
+asymmetry: AddMargin checks `position.status == POSITION_OPEN`; the four exit Accounts structs bind the PDA, borrower, and market but omit that check.
+code_smells: Only add_margin checks the status. All existing position writers set POSITION_OPEN. POSITION_EXIT_IN_PROGRESS is reserved for v1.1.
+proof: `POSITION_OPEN = 0` and `POSITION_EXIT_IN_PROGRESS = 1` are defined in state/position.rs:19-21. open_short.rs:616 writes `pos.status = POSITION_OPEN`. add_margin.rs:65 requires `position.status == POSITION_OPEN`. The position constraints in close_short.rs:84-91, liquidate.rs:122-129, expire.rs:83-90, and sol_settle.rs:122-128 contain no status check. A cross-file search of the production program finds no other writer of ShortPosition.status. Therefore no instruction-reachable non-open state exists today. A future split-exit or migration path that persists status 1, with its existing borrower/market/PDA fields intact, would satisfy these constraints and enter the old repayment or SOL-settlement handlers unless the upgrade changes every exit.
+guards: Anchor account ownership and discriminator checks, position.is_pda, has_one borrower, and has_one market prevent an outsider from substituting arbitrary zeroed bytes. No current path can persist status 1. Anchor 1.2.0 close also assigns System ownership and resizes the account to zero, so refunding a closed position does not supply this state.
+impact: Future-upgrade hardening only; no current exploit or monetary loss is proved.
+description: A future ExitInProgress writer exposes positions to existing exits; add_margin alone checks the status, and current instructions never write that state.
+fix: Require POSITION_OPEN on every existing exit before a future instruction introduces another persistent status.

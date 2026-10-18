@@ -1,0 +1,51 @@
+Pass 2 specialist 12: flow-gap. Review completed.
+Frozen source: b815269224ba0f5d946f49de7e113220c4067041.
+Primary source: .audit-mZFuf8/agent-12-bundle.md; source-index.tsv used for mapping.
+Output: 1 FINDING, 3 LEAD blocks. All four causes were independently reached and retain their exact Known findings labels.
+
+Scope and method:
+Bounded static review of lender deposit/withdraw/claim/cover/sync, final-share reset, sweep and cashback clearing, settlement booking and closing.
+No source edits, builds, tests, runtime reproduction, live calls, or subagents.
+No claim to a complete read of the 58,914-line source portion or 61,545-line bundle.
+The initial bulk metadata output and one catalogue/map read truncated. They do not count as complete coverage. Relevant rules, specialty, labels, and exploit entries were reread in bounded chunks.
+
+Full production files read from the frozen bundle:
+- programs/shortwin/src/instructions/deposit.rs
+- programs/shortwin/src/instructions/withdraw.rs
+- programs/shortwin/src/instructions/claim_sol.rs
+- programs/shortwin/src/instructions/cover_deficit.rs
+- programs/shortwin/src/instructions/sync_lender.rs
+- programs/shortwin/src/instructions/sol_settle.rs
+- programs/shortwin/src/instructions/sweep_trader.rs
+- programs/shortwin/src/engine/lender.rs (its test module was also displayed for context only)
+- programs/shortwin/src/engine/trader.rs
+
+Bounded production reads, expressed as frozen bundle lines:
+- crates/shortwin-math/src/pool.rs: 7589-8150; 8180-8210; 8481-8828; 8906-8917; 9027-9131; 9192-9298; 9300-10126.
+  Read state, entry/exit/claim math, vest and credit math, current-epoch touches, sweep and borrower settlement/repayment, last-share reset and epoch rollover.
+  Did not fully read calendar internals, conversion internals, or the forward-chain implementation. Did not read the pool test module.
+- programs/shortwin/src/engine/prologue.rs: 26693-26878.
+- programs/shortwin/src/instructions/create_market.rs: 31184-31196, initial pool and hold state only.
+- programs/shortwin/src/state/market.rs: 39773-39788, settlement hold and restart fields only.
+- programs/shortwin/src/venues/pump_amm.rs: 44230-44258, boost/cashback reader only.
+- crates/shortwin-math/src/params.rs: 6124-6136, defaults around lump_vest_s only.
+- crates/shortwin-math/src/bounds.rs: bundle 402-610 displayed with the build-context read; not a complete bounds review.
+
+Cross-file search only:
+- Function declarations and cfg(test) boundaries across pool.rs to plan bounded reads.
+- deposit_hold_until, lump_vest_s, cashback_claimable, closable occurrences across the bundle.
+- Exact line references across the named lender instructions, engine/lender.rs, engine/trader.rs, engine/prologue.rs, pump_amm.rs and math/pool.rs.
+Search hits outside the bounded reads are not full-source coverage.
+
+Metadata read:
+- Build context and manifests, including Anchor 1.2.0 and workspace-specific overflow settings.
+- Senior auditor mindset, Flow Gap specialty, shared output/report-language rules.
+- Known findings appendix.
+- Review leads account-map table, including lender/sweep/settlement flags; not the entire per-instruction map.
+- Relevant exploit entries P1, P9, P10, B5, B11, B15, B17, B18, B24, B26 and L1-L3; portions of adjacent entries were context only.
+
+Unreviewed production ground:
+Every source-index.tsv file not listed above remains unread for this pass, except incidental search hits. In particular, close_short/open_short/liquidate/expire, most arming/route and venue logic, all service implementations, most oracle/risk/quote math, mint-filter implementation, account layout modules, and framework/dependency source were not reviewed. This pass does not independently validate settlement eligibility/timers or external cashback programs. It validates the settlement booking/cleanup branches within its bounded source and states external liveness as a lead.
+
+Guard checks carried into reports:
+Actual owner signatures, stored-key/PDA bindings, LastSharesBorrowed, min_tokens/min_sol, record-owner/write constraints, owner-only rebase conversions, current-epoch no-op behavior, sweep bits, reward-source requirements, vest timing and floor rounding, mint entry guard calls, token reload postconditions, lamport rent floors, and lender close eligibility.

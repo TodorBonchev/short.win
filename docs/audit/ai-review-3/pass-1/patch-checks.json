@@ -1,0 +1,105 @@
+{
+  "method": "git apply --check only; no patch applied, no compile or test",
+  "checks": [
+    {
+      "program": "shortwin",
+      "function": "apply_config",
+      "bug_class": "unsafe-authority-transfer",
+      "option": 1,
+      "label": "source proposal",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-1-1.patch"
+    },
+    {
+      "program": "shortwin-math",
+      "function": "withdraw_in",
+      "bug_class": "carry-crosses-empty-pool",
+      "option": 1,
+      "label": "source proposal",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-2-1.patch"
+    },
+    {
+      "program": "shortwin",
+      "function": "flag_venue_upgraded",
+      "bug_class": "unhashed-slot-upgrade-latch",
+      "option": 1,
+      "label": "Require a hash before enabling growable venues",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-3-1.patch"
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "stale-lp-counter",
+      "option": 1,
+      "label": "refresh the counter; partial fix across split RPC snapshots",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-4-1.patch"
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "stale-lp-counter",
+      "option": 2,
+      "label": "read each pool in one RPC snapshot",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-4-2.patch"
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "rounded-lock-share-ranking",
+      "option": 1,
+      "label": "divide by a counter bounded to one",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-5-1.patch"
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "rounded-lock-share-ranking",
+      "option": 2,
+      "label": "reject zero before raw-ratio division",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-5-2.patch"
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "resolve_entry",
+      "bug_class": "unsupported-coin-creator-placeholder",
+      "option": 1,
+      "label": "Resolve the cached PumpSwap coin creator",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-6-1.patch"
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "evaluate",
+      "bug_class": "wrong-window-floor-reference",
+      "option": 1,
+      "label": "Use the proposal minimum price",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-7-1.patch"
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "plan",
+      "bug_class": "false-window-floor-monotonicity",
+      "option": 1,
+      "label": "Search when either the floor or carried caps fail",
+      "applies_to_frozen_source": true,
+      "output": "",
+      "patch": "/tmp/shortwin-audit-patch-checks/p1-8-1.patch"
+    }
+  ]
+}

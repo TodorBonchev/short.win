@@ -1531,7 +1531,18 @@ AIR2: every flushing settlement clears both sweep bits, even with S > 0; deposit
       a pending sweep with S > 0 credits immediately; ordinary later sweeps still vest
       every non-flushing settlement with S > 0 and vest_bal > 0 sets a deposit hold
 last lender leaving (withdraw of all remaining shares): the unreleased vest is released to it first (v0.4)
+    AI3-F06 (draft 1.0.3): add carry // WAD to its pending, carry_r // WAD to its realised SOL
+                          move realised surplus to unmatched; clear both carries
+                          add only carry % WAD + carry_r % WAD to diagnostic dust
 ```
+
+The final carry allocation closes the old cohort's undistributed accumulators: at large
+raw-token supplies a carry can hold whole lamports, even though the per-share increment
+rounds to zero. The two carries can differ after share changes, so allocate entitlement
+and realised backing separately and normalize surplus into the pot for existing claimants.
+This does not change historical pot entitlement, the last-share borrowed-token prohibition,
+partial withdrawals or rebase-record ownership. Regression and release status are in
+[`AI3-F06`](../audit/ai-review-3/triage.md#ai3-f06).
 
 - **`S = 0` without a wipe (R3A-10).** If every lender withdrew, a later trader sweep or venue cashback used to go to `unassigned`, which the next depositor took in full, even with a dust deposit (and `claim_venue_rewards` is permissionless). No lender exists to own such SOL, so v0.4 sends it to `protocol_fees` and drops `unassigned`:
 

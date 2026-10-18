@@ -1,0 +1,26 @@
+Coverage: 113/119 production files explicitly covered by completed specialists [1, 2, 4, 5, 6, 7, 8, 9, 10]; 6 pending.
+Prior snapshot: 109 covered files, 10 pending. Four engine files added by specialist 10. No file-level overclaim in the existing nonempty union.
+Conservative attribution correction: remove specialist 2 from lib.rs full-coverage attribution (record states all dispatch functions only); specialists 4 and 9 retain full coverage.
+Pending:
+programs/shortwin/src/engine/mod.rs
+programs/shortwin/src/engine/pool_select.rs
+programs/shortwin/src/engine/route.rs
+programs/shortwin/src/errors.rs
+programs/shortwin/src/events.rs
+programs/shortwin/src/instructions/mod.rs
+
+No-signer map: 12 rows = 9 Anchor instructions + 3 helper rows (two distinct init_uva locations and create_market::pump_listing). Both specialist 2 and specialist 9 reject all 12 signer-omission hypotheses. No authority-not-signer or key-compared-no-signer map rows.
+Map provenance totals: 75 review leads; 30 Anchor instructions; 51 automatically matched helper entries, which are not 51 additional public instructions.
+
+REJECTED MAP LEAD | shortwin::apply_config | no-signer | Intentional public execution of the governance-signed stored proposal, constrained by its timelock and expiry.
+REJECTED MAP LEAD | shortwin::crank_price | no-signer | Intentional public observation; market/mint bindings, parsed venue ReadSet, and owner-aware readers constrain the observation.
+REJECTED MAP LEAD | shortwin::crank_sol_usd | no-signer | Intentional public refresh from the configured Pyth feed; receiver ownership, verification, freshness, and step checks validate the evidence.
+REJECTED MAP LEAD | shortwin::execute_pool_switch | no-signer | Intentional public resolution after the existing collection window; stored candidate keys and fresh verification constrain the switch.
+REJECTED MAP LEAD | shortwin::flag_unsafe_mint | no-signer | Intentional public safety flag; the bound market mint must actually fail its owner or safety-filter check.
+REJECTED MAP LEAD | shortwin::flag_venue_upgraded | no-signer | Intentional public recording of deployment evidence; pinned ProgramData address, loader owner, deployment slot, and available fingerprint constrain the update.
+REJECTED MAP LEAD | shortwin::init_uva @ ./programs/shortwin/src/venues/pump_amm.rs:1139 | no-signer | Internal helper reached through create_market::pump_listing; the outer creator Signer is the CPI payer, and an empty signer-seed list adds no PDA signature.
+REJECTED MAP LEAD | shortwin::init_uva @ ./programs/shortwin/src/venues/pump_curve.rs:1025 | no-signer | Internal helper reached through create_market::pump_listing; the outer creator Signer is forwarded as CPI payer, and an empty signer-seed list adds no PDA signature.
+REJECTED MAP LEAD | shortwin::propose_pool | no-signer | Intentional public candidate submission; bound accounts, mint-owner checks, candidate verification, and guarded selection constrain the mutation.
+REJECTED MAP LEAD | shortwin::pump_listing | no-signer | Internal create_market helper; CreateMarket::creator is a Signer and supplies the canonical ATA and nested UVA initialization payments.
+REJECTED MAP LEAD | shortwin::sweep_protocol_fees | no-signer | Intentional public sweep; canonical source accounts, the configured fixed fee recipient, tracked-fee debit, and vault floor prevent caller-directed payment.
+REJECTED MAP LEAD | shortwin::sweep_trader | no-signer | Intentional public recovery into fixed market recipients; validated trader/token addresses, checked epoch records, and market PDA signatures constrain the sweep.

@@ -1,0 +1,892 @@
+{
+  "items": [
+    {
+      "program": "shortwin-keeper",
+      "function": "decode_zc",
+      "bug_class": "hardening-version-unchecked",
+      "kind": "LEAD",
+      "title": "The keeper reads layouts without their version checks",
+      "description": "The keeper accepts layouts without version checks; a future upgrade can make its decoded fields incompatible.",
+      "source_ids": [
+        "p2-a06-b04",
+        "p2-a07-b06",
+        "p2-a11-b02"
+      ],
+      "gate_evidence": {
+        "1": {
+          "status": "ALLOWS",
+          "evidence": "view.rs:48-54 requires shortwin ownership, matching concrete discriminator, and enough bytes for T, then returns pod_read_unaligned(body). load_with_positions:263-267,286-299,363-367 consumes GlobalConfig, Market and VenueExtras without comparing versions. MarketVault uses the same helper but has no version obligation established here. Current GlobalConfig, Market and VenueExtras have u16 version at the body start; compiled constants are 1,1,2. A same-discriminator, sufficiently sized body with another version reaches keeper interpretation."
+        },
+        "2": {
+          "status": "DEMOTE",
+          "evidence": "No current instruction or outsider write path creates the incompatible stored version. A program-owned account cannot be rewritten by an outsider; the claimed alternative layout requires a future privileged upgrade. ProposePool owner/discriminator/PDA and CONFIG_VERSION/MARKET_VERSION guards, and parse_extras VENUE_EXTRAS_VERSION, reject unsupported inputs on-chain. This hardening class stays a lead regardless of three-agent agreement."
+        },
+        "3": {
+          "status": "NOT_EVALUATED",
+          "evidence": "Stopped after Gate 2 demotion."
+        },
+        "4": {
+          "status": "NOT_EVALUATED",
+          "evidence": "Stopped after Gate 2 demotion."
+        }
+      },
+      "known_issue_comparison": "Pass 1 records this exact keeper helper as a lead. Earlier project triage hardens VenueGuard readers (L24/L50/L61), while this helper reads GlobalConfig, Market and VenueExtras; those changes do not close this separate future-layout gap. An empty starting ledger does not establish project novelty.",
+      "key": "shortwin-keeper|decode-zc|hardening-version-unchecked",
+      "code_smells": "The decoder checks the owner, discriminator and byte length, but it omits supported-version checks.",
+      "fixes": [
+        {
+          "label": "Raw hardening proposal — discriminate versioned types; unapplied and uncompiled",
+          "diff": "--- a/services/keeper/src/view.rs\n+++ b/services/keeper/src/view.rs\n@@ -51,6 +51,21 @@\n     }\n     let len = core::mem::size_of::<T>();\n     let body = acc.data.get(8..8usize.checked_add(len)?)?;\n+    let expected_version = if T::DISCRIMINATOR == GlobalConfig::DISCRIMINATOR {\n+        Some(shortwin::constants::CONFIG_VERSION)\n+    } else if T::DISCRIMINATOR == Market::DISCRIMINATOR {\n+        Some(shortwin::constants::MARKET_VERSION)\n+    } else if T::DISCRIMINATOR == VenueExtras::DISCRIMINATOR {\n+        Some(shortwin::constants::VENUE_EXTRAS_VERSION)\n+    } else {\n+        None\n+    };\n+    if let Some(expected) = expected_version {\n+        let version = u16::from_le_bytes(body.get(..2)?.try_into().ok()?);\n+        if version != expected {\n+            return None;\n+        }\n+    }\n     Some(bytemuck::pod_read_unaligned(body))\n }\n \n",
+          "source_ids": [
+            "p2-a06-b04"
+          ]
+        }
+      ],
+      "candidate_evidence": [
+        {
+          "raw_id": "p2-a06-b04",
+          "location": "services/keeper/src/view.rs:48",
+          "proof": "decode_zc takes the body at bytes 8..8+size_of::<T>() and returns pod_read_unaligned(body). load_with_positions uses it for GlobalConfig at line 266, Market at 289, and VenueExtras at 366 without version checks. A correctly sized GlobalConfig body with version 2 therefore decodes, although CONFIG_VERSION is 1. On-chain ApplyConfig and ProposeConfig require config.version == CONFIG_VERSION. Extras parsing likewise requires VENUE_EXTRAS_VERSION, currently 2.",
+          "guards": "The keeper requires shortwin ownership, the concrete discriminator, and enough bytes. On-chain handlers reject unsupported config and market versions, so a keeper interpretation cannot bypass those checks.",
+          "impact": "The keeper may plan from an unsupported layout and repeatedly submit rejected transactions after an incompatible upgrade.",
+          "limitations": "No current on-chain instruction was found that writes an invalid layout version. This is a future compatibility and hardening gap."
+        },
+        {
+          "raw_id": "p2-a07-b06",
+          "location": "services/keeper/src/view.rs:48-55, 274-311, 371-375; programs/shortwin/src/instructions/propose_pool.rs:111-132.",
+          "proof": "decode_zc copies the first size_of::<T>() bytes through pod_read_unaligned. load_with_positions uses it for GlobalConfig, Market, MarketVault and VenueExtras without a version test. In contrast, ProposePool explicitly requires CONFIG_VERSION and MARKET_VERSION. A future same-discriminator account of adequate length can be misread by the keeper before the program rejects its action.",
+          "guards": "Owners and discriminators are checked; today's program controls account creation, and simulation limits execution effects. No current path to create an incompatible version was established.",
+          "assumption": "Every program-owned account with the existing discriminator uses the compiled layout version."
+        },
+        {
+          "raw_id": "p2-a11-b02",
+          "location": "services/keeper/src/view.rs:48-55; load_with_positions :252-388.",
+          "proof": "decode_zc accepts any shortwin-owned account whose discriminator matches T and whose data contains size_of::<T>() bytes after offset 8. It returns pod_read_unaligned without inspecting a version field. load_with_positions accepts GlobalConfig through this helper, then Market and MarketVault, and finally VenueExtras. No typed version guard follows those loads. In contrast, programs/shortwin/src/instructions/set_coverage_pause.rs:69 and :84 checks CONFIG_VERSION and MARKET_VERSION; programs/shortwin/src/venues/mod.rs:189-192 checks VENUE_EXTRAS_VERSION before the on-chain consumer uses extras. A future account with the same discriminator and sufficient bytes, but another version, therefore enters keeper decision state even when the on-chain consumer rejects it.",
+          "impact": "The keeper can derive incorrect decisions or account lists during a future version transition. The current frozen state provides no outsider path to rewrite a shortwin-owned version.",
+          "limitations": "This is a hardening lead, not a demonstrated present exploit. Transaction simulation and on-chain checks still restrict execution. The generic decoder alone cannot know each type's expected version."
+        }
+      ],
+      "prior_pass_comparison": {
+        "source": ".rust-auditor/runs/20261018-110553/pass-1/decisions.json",
+        "source_ids": [
+          "p1-a04-b02",
+          "p1-a11-b07"
+        ],
+        "verdict": "LEAD",
+        "confidence": null,
+        "assessment": "Same defect re-read in frozen source; retain the exact known appendix bug-class label. Prior judgment is comparison context, not proof."
+      },
+      "prior_issue_evidence": [
+        {
+          "raw_id": "p1-a04-b02",
+          "relation": "related_distinct_extension",
+          "issue_ids": [],
+          "sources": [
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:43",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:48",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:50",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+            "services/keeper/src/view.rs:48",
+            "services/keeper/src/view.rs:263",
+            "services/keeper/src/view.rs:284"
+          ],
+          "reason": "Earlier version hardening added VenueGuard constraints to on-chain readers. The candidate concerns keeper decode_zc/load_with_positions using GlobalConfig and Market without comparing their versions: owner/discriminator/minimum length still pass. Thus the generic upgrade-compatibility pattern is known but the keeper account types and interpretation boundary are a distinct remaining extension; the on-chain VenueGuard fix does not cover it."
+        },
+        {
+          "raw_id": "p1-a11-b07",
+          "relation": "related_distinct_extension",
+          "issue_ids": [],
+          "sources": [
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:43",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:48",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:50",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+            "services/keeper/src/view.rs:48",
+            "services/keeper/src/view.rs:263",
+            "services/keeper/src/view.rs:284"
+          ],
+          "reason": "Earlier version hardening added VenueGuard constraints to on-chain readers. The candidate concerns keeper decode_zc/load_with_positions using GlobalConfig and Market without comparing their versions: owner/discriminator/minimum length still pass. Thus the generic upgrade-compatibility pattern is known but the keeper account types and interpretation boundary are a distinct remaining extension; the on-chain VenueGuard fix does not cover it."
+        }
+      ],
+      "notes": [
+        "All three raw blocks describe the same unchecked typed decode and require the same supported-version validation; merged without promotion.",
+        "p2-a06-b04 supplies the only unified diff for this group. It is preserved verbatim as a lead proposal; p2-a11-b02 instead recommends typed checks after loading, but supplies no raw diff to synthesize."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "stale-lp-counter",
+      "kind": "FINDING",
+      "title": "Correctness: Pool ranks combine LP values from different states",
+      "description": "An LP changes liquidity after discovery, so the keeper drops eligible pools or gives other pools excessive scores.",
+      "source_ids": [
+        "p2-a07-b01"
+      ],
+      "gate_evidence": {
+        "1": {
+          "status": "ALLOWS",
+          "evidence": "CandidatePool::from_account at pool_monitor.rs:166-225 parses supported venue ownership/layout and plausible SOL side/status/nonce, then stores lp_counter. rank_keys:229-230 requests only vault and LP mint; score:238-251 requires plausible metadata, both returned accounts, vault amount bytes and a readable mint, but never refreshes the counter. A genuine pool satisfies these checks. Discovery C=1e9,S=0.5e9,R=100e9, followed by an ordinary proportional deposit to C=2e9,S=1.5e9,R=200e9, preserves locked SOL at 50e9. score:252 uses old C=1e9 with new S=1.5e9; lambda_bps checked_sub returns zero and rank:258 discards the pool. A proportional withdrawal instead overstates the share. keeper.rs:3229-3250 confirms discovery and rank reads are separate. Later genuine-account verification and transaction simulation cannot restore a discarded pool."
+        },
+        "2": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        "3": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        "4": {
+          "status": "CORRECTNESS",
+          "evidence": "The documented locked-SOL score combines incompatible LP states and can exclude an eligible pool or displace another from the bounded candidate set. This is a source-proved formula/input mismatch. Fresh on-chain verification prevents invalid adoption; later rediscovery and direct proposals remain. No theft, profit, or stranded funds are established."
+        }
+      },
+      "known_issue_comparison": "Pass 1 records stale-lp-counter at this same score helper. AIR2-09 concerns whole-bps arithmetic with coherent inputs; prior services triage acknowledges multiple RPC reads but does not identify cached-counter subtraction or exclusion before verification. This is distinct from that documented arithmetic change.",
+      "key": "shortwin-keeper|score|stale-lp-counter",
+      "confidence": 75,
+      "confidence_basis": "Proven correctness defect without independently proved profit, loss or stranded funds; fixed 75. Normal confidence deductions do not apply.",
+      "fixes": [
+        {
+          "label": "Refresh each pool, vault and LP mint within one 99-key request; unapplied and uncompiled",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -225,9 +225,9 @@\n         })\n     }\n \n-    /// The accounts [`rank`] reads for it: its WSOL vault and its LP mint.\n-    pub fn rank_keys(&self) -> [Pubkey; 2] {\n-        [self.sol_vault, self.lp_mint]\n+    /// The accounts [`rank`] reads together: pool, WSOL vault and LP mint.\n+    pub fn rank_keys(&self) -> [Pubkey; 3] {\n+        [self.pool, self.sol_vault, self.lp_mint]\n     }\n }\n \n@@ -235,12 +235,16 @@\n /// in that order): its locked SOL `⌊λ_bps·R/10⁴⌋` (`R` the vault's balance; M4-SEC-7). 0 for an\n /// implausible pool or accounts that do not read. Unlocked liquidity adds nothing to it.\n pub fn score(c: &CandidatePool, accounts: &[Option<AccountData>]) -> u128 {\n-    if !c.plausible {\n-        return 0;\n-    }\n-    let (Some(Some(vault)), Some(Some(lp))) = (accounts.first(), accounts.get(1)) else {\n+    let [Some(pool), Some(vault), Some(lp)] = accounts else {\n         return 0;\n     };\n+    let Some(fresh) = CandidatePool::from_account(c.kind, c.pool, pool) else {\n+        return 0;\n+    };\n+    if !fresh.plausible || fresh.rank_keys() != c.rank_keys() {\n+        return 0;\n+    }\n+    let c = &fresh;\n     let r = vault\n         .data\n         .get(64..72)\n@@ -688,7 +692,7 @@\n \n     /// The next pools to rank within `budget_keys` keys (at least one pool).\n     pub fn next_rank_batch(&mut self, budget_keys: usize) -> Vec<CandidatePool> {\n-        let n = (budget_keys / 2).max(1).min(self.rank_queue.len());\n+        let n = (budget_keys / 3).max(1).min(self.rank_queue.len());\n         self.rank_queue.drain(..n).collect()\n     }\n \n--- a/services/keeper/src/keeper.rs\n+++ b/services/keeper/src/keeper.rs\n@@ -3239,13 +3239,17 @@\n             let t = self.pool_tracks.entry(key).or_default();\n             if round == 0 && !t.rank_queue.is_empty() {\n                 let batch = t.next_rank_batch(pcfg.rank_keys_per_tick);\n-                let keys: Vec<Pubkey> = batch.iter().flat_map(|c| c.rank_keys()).collect();\n-                let accs = self.chain.accounts(&keys).await?;\n-                let scored: Vec<(u128, pool_monitor::CandidatePool)> = batch\n-                    .into_iter()\n-                    .zip(accs.chunks(2))\n-                    .map(|(c, a)| (pool_monitor::score(&c, a), c))\n-                    .collect();\n+                let mut scored = Vec::with_capacity(batch.len());\n+                // Keep each three-account pool snapshot inside one 100-key RPC call.\n+                for group in batch.chunks(33) {\n+                    let keys: Vec<Pubkey> = group.iter().flat_map(|c| c.rank_keys()).collect();\n+                    let accs = self.chain.accounts(&keys).await?;\n+                    scored.extend(\n+                        group.iter().cloned()\n+                            .zip(accs.chunks(3))\n+                            .map(|(c, a)| (pool_monitor::score(&c, a), c)),\n+                    );\n+                }\n                 let t = self.pool_tracks.entry(key).or_default();\n                 if t.finish_rank_batch(scored, pcfg.max_candidates) {\n                     t.last_eval = None;\n--- a/services/keeper/src/config.rs\n+++ b/services/keeper/src/config.rs\n@@ -614,8 +614,8 @@\n         if p.fast_discovery_interval_s > p.discovery_interval_s {\n             bail!(\"pool_select.fast_discovery_interval_s exceeds discovery_interval_s\");\n         }\n-        if p.max_candidates == 0 || p.rank_keys_per_tick < 2 {\n-            bail!(\"pool_select.max_candidates must be positive and rank_keys_per_tick at least 2\");\n+        if p.max_candidates == 0 || p.rank_keys_per_tick < 3 {\n+            bail!(\"pool_select.max_candidates must be positive and rank_keys_per_tick at least 3\");\n         }\n         if p.discoveries_per_tick == 0 {\n             bail!(\"pool_select.discoveries_per_tick must be positive\");\n",
+          "source_ids": [
+            "p2-a07-b01"
+          ]
+        }
+      ],
+      "candidate_evidence": [
+        {
+          "raw_id": "p2-a07-b01",
+          "location": "services/keeper/src/pool_monitor.rs:237; CandidatePool::rank_keys at :229; next_rank_batch at :690; services/keeper/src/keeper.rs:3241-3250; services/common/src/rpc.rs:261-289.",
+          "proof": "Discovery records counter=1,000,000,000, circulating supply=500,000,000 and SOL reserve=100,000,000,000. A proportional deposit doubles total liquidity: counter=2,000,000,000, supply=1,500,000,000, reserve=200,000,000,000. Locked SOL remains (2,000,000,000−1,500,000,000)*200,000,000,000/2,000,000,000=50,000,000,000. score instead evaluates lambda_bps(1,000,000,000,1,500,000,000)=0. rank retains only positive scores at pool_monitor.rs:258. Thus a valid candidate disappears before its fresh on-chain verifier runs. A withdrawal causes the converse overstatement. This does not require a counterfeit account or malicious RPC.",
+          "guards": "from_account parses the venue owner/layout and plausible status; later evaluate uses verify_candidate and transactions are simulated. These prevent invalid adoption, but cannot recover a candidate discarded before evaluation.",
+          "impact": "An ordinary LP operation can remove an eligible alternate pool until the next discovery, or fill the bounded candidate set with exaggerated scores. No direct on-chain theft is established.",
+          "fix_notes": "The RPC backend chunks at 100 keys. Three-key groups must stay together: candidate 34 starts at index 99 and otherwise spans two snapshots. The diff keeps each request at 99 keys. It preserves the existing bps formula for this isolated fix; apply the separate rounded-lock-share-ranking fix too. Diffs are unapplied and uncompiled.",
+          "assumption": "A pool's internal LP counter stays constant between discovery and ranking.",
+          "path": "discover → CandidatePool::from_account saves lp_counter → unlocked LP deposits → rank reads only vault and LP mint → score uses old counter → rank drops the pool."
+        }
+      ],
+      "prior_pass_comparison": {
+        "source": ".rust-auditor/runs/20261018-110553/pass-1/decisions.json",
+        "source_ids": [
+          "p1-a07-b01",
+          "p1-a11-b04"
+        ],
+        "verdict": "FINDING",
+        "confidence": 75,
+        "assessment": "Same defect re-read in frozen source; retain the exact known appendix bug-class label. Prior judgment is comparison context, not proof."
+      },
+      "prior_issue_evidence": [
+        {
+          "raw_id": "p1-a07-b01",
+          "relation": "new_to_register",
+          "issue_ids": [],
+          "sources": [
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+            "services/keeper/src/pool_monitor.rs:174",
+            "services/keeper/src/pool_monitor.rs:232",
+            "services/keeper/src/pool_monitor.rs:252",
+            "services/keeper/src/pool_monitor.rs:259"
+          ],
+          "reason": "The keeper discovery object retains an earlier venue LP counter, then rank_keys fetches only the later reserve vault and LP mint; score subtracts that later supply from the old counter and rank drops zero scores before complete verification. The older services review acknowledges multi-RPC state reads but does not identify this cached-counter/updated-supply subtraction and pre-verification exclusion. AIR2-09 changes whole-bps arithmetic on coherent inputs, so it does not address this separate temporal-state mechanism."
+        },
+        {
+          "raw_id": "p1-a11-b04",
+          "relation": "new_to_register",
+          "issue_ids": [],
+          "sources": [
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:64",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+            "services/keeper/src/pool_monitor.rs:174",
+            "services/keeper/src/pool_monitor.rs:232",
+            "services/keeper/src/pool_monitor.rs:252",
+            "services/keeper/src/pool_monitor.rs:259"
+          ],
+          "reason": "The keeper discovery object retains an earlier venue LP counter, then rank_keys fetches only the later reserve vault and LP mint; score subtracts that later supply from the old counter and rank drops zero scores before complete verification. The older services review acknowledges multi-RPC state reads but does not identify this cached-counter/updated-supply subtraction and pre-verification exclusion. AIR2-09 changes whole-bps arithmetic on coherent inputs, so it does not address this separate temporal-state mechanism."
+        }
+      ],
+      "notes": [
+        "RPC triple coherence checked in actual caller/backend: RpcChain::accounts chunks at 100 keys (rpc.rs:49,261-289). Raw patch groups 33 pools (99 keys), so each pool/vault/mint triple stays within one getMultipleAccounts request. Candidate 34 cannot straddle the 100-key boundary. It does not claim all pools share one bank snapshot.",
+        "Raw patch changes key budget from 2 to 3 and its config minimum consistently. It reparses the fresh pool and checks matching triple keys before computing the score. The separate whole-bps-rounding defect remains and requires its own raw-ratio fix.",
+        "The patch still drains its rank batch before RPC completion. That independent error-recovery lead is not fixed by snapshot coherence."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "score",
+      "bug_class": "rounded-lock-share-ranking",
+      "kind": "FINDING",
+      "title": "Correctness: Pool ranks round positive locked SOL to zero",
+      "description": "An LP dilutes the locked share below one basis point, so the keeper excludes a pool whose locked SOL stays positive.",
+      "source_ids": [
+        "p2-a07-b02"
+      ],
+      "gate_evidence": {
+        "1": {
+          "status": "ALLOWS",
+          "evidence": "The genuine-pool owner/layout/plausibility, available-account and LP-mint guards committed for score all allow one coherent snapshot. score:252 computes floor((C-S)*10000/C)*R/10000; rank:258 removes zero before evaluate. With C=1e9,S=999950000,R=X=Y=1e15, lambda_bps is zero while (C-S)*R/C and raw locked_depth are 50e9. At P_ref=1e18 the proposal floor is 50 SOL, above 25 SOL; valid status, authorities and fee inputs pass shared eligibility. locked_depth at math/pool_select.rs:31-55 deliberately preserves raw-ratio depth, and :60-65 states that a minimum current LP-share ratio is not an eligibility requirement. This path needs no old counter or counterfeit account."
+        },
+        "2": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        "3": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        "4": {
+          "status": "CORRECTNESS",
+          "evidence": "Whole-bps flooring discards positive eligible locked depth and can misorder other pools; rediscovery of unchanged coherent inputs does not repair the formula. The example is capital intensive and establishes a deterministic formula defect, not an economical attack or financial loss. Direct proposals and program eligibility remain."
+        }
+      },
+      "known_issue_comparison": "Pass 1 records this exact keeper site. AIR2-09 is explicitly documented at findings.md:45 and triage-math-2026-10-18.md:22 as the raw-ratio repair to on-chain locked_depth; keeper score still calls lambda_bps. It is a remaining distinct service site, not evidence that AIR2-09 is unfixed on-chain.",
+      "key": "shortwin-keeper|score|rounded-lock-share-ranking",
+      "confidence": 75,
+      "confidence_basis": "Proven correctness defect without independently proved profit, loss or stranded funds; fixed 75. Normal confidence deductions do not apply.",
+      "fixes": [
+        {
+          "label": "Calculate raw locked LP times reserve before division; unapplied and uncompiled",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -75,7 +75,7 @@\n use shortwin::errors::ShortwinError;\n use shortwin::state::{Market, VenueKind, raydium_cache};\n use shortwin::venues::detect::{self, PumpClass};\n-use shortwin_math::pool_select::{dominates, fast_path_qualifies, lambda_bps};\n+use shortwin_math::pool_select::{dominates, fast_path_qualifies};\n use shortwin_services_common::{AccountData, Chain, Memcmp};\n use shortwin_venue_state::{mint, raydium_cpmm, raydium_v4};\n \n@@ -249,7 +249,12 @@\n     let Ok(m) = mint::read_base(&lp.owner.to_bytes(), &lp.data) else {\n         return 0;\n     };\n-    u128::from(lambda_bps(c.lp_counter, m.supply)) * u128::from(r) / 10_000\n+    match c.lp_counter.checked_sub(m.supply) {\n+        Some(locked) if c.lp_counter != 0 => {\n+            u128::from(locked) * u128::from(r) / u128::from(c.lp_counter)\n+        }\n+        _ => 0,\n+    }\n }\n \n /// The best `k` candidates by score (highest first; among equals the lowest key), each with a\n",
+          "source_ids": [
+            "p2-a07-b02"
+          ]
+        }
+      ],
+      "candidate_evidence": [
+        {
+          "raw_id": "p2-a07-b02",
+          "location": "services/keeper/src/pool_monitor.rs:253-260; crates/shortwin-math/src/pool_select.rs:19-58.",
+          "proof": "Use one coherent snapshot with counter=1,000,000,000, supply=999,950,000 and SOL reserve=1,000,000,000,000,000. The raw locked SOL equals 50,000*1,000,000,000,000,000/1,000,000,000=50,000,000,000 (50 SOL). lambda_bps floors 0.5 bps to zero, so score returns zero. With X=Y=1,000,000,000,000,000, locked_depth instead returns 50,000,000,000; at P_ref=10^18 the window floor is 50 SOL and exceeds the 25-SOL default. The example is capital intensive but demonstrates a deterministic correctness defect without inconsistent snapshots.",
+          "guards": "Genuine pool metadata and fresh LP/vault accounts do not prevent this discrepancy. The on-chain locked_depth helper deliberately uses the raw ratio and documents proportional-deposit invariance. rank removes zero scores before verification.",
+          "impact": "The keeper omits positive-depth, eligible pools and can misorder other pools. The program's eligibility checks remain intact.",
+          "fix_notes": "This independent diff targets the frozen source; after the stale-lp-counter fix, c must refer to the freshly parsed pool. The product fits u128 because both factors are u64.",
+          "assumption": "Multiplying a whole-bps locked share by the reserve preserves the exact locked SOL score.",
+          "path": "proportional unlocked liquidity dilutes the locked share → score floors lambda to whole bps → rank removes the candidate → evaluate never checks its positive locked depth."
+        }
+      ],
+      "prior_pass_comparison": {
+        "source": ".rust-auditor/runs/20261018-110553/pass-1/decisions.json",
+        "source_ids": [
+          "p1-a07-b02",
+          "p1-a11-b03"
+        ],
+        "verdict": "FINDING",
+        "confidence": 75,
+        "assessment": "Same defect re-read in frozen source; retain the exact known appendix bug-class label. Prior judgment is comparison context, not proof."
+      },
+      "prior_issue_evidence": [
+        {
+          "raw_id": "p1-a07-b02",
+          "relation": "related_distinct_extension",
+          "issue_ids": [
+            "AIR2-09"
+          ],
+          "sources": [
+            "docs/audit/findings.md:45",
+            "docs/audit/ai-review-2/triage-math-2026-10-18.md:22",
+            "crates/shortwin-math/src/pool_select.rs:31",
+            "services/keeper/src/pool_monitor.rs:232",
+            "services/keeper/src/pool_monitor.rs:252",
+            "services/keeper/src/pool_monitor.rs:259"
+          ],
+          "reason": "AIR2-09 replaced on-chain locked_depth with the raw locked-LP ratio, retaining lambda_bps as a display/threshold helper. Keeper score still multiplies the whole-bps lambda_bps by reserve SOL and rank removes zeros. Thus the same premature-rounding pattern remains in the separate preselection service and can omit a pool that the fixed on-chain verifier would accept; do not label it already fixed under AIR2-09. It is also separate from mixed-snapshot LP inputs."
+        },
+        {
+          "raw_id": "p1-a11-b03",
+          "relation": "related_distinct_extension",
+          "issue_ids": [
+            "AIR2-09"
+          ],
+          "sources": [
+            "docs/audit/findings.md:45",
+            "docs/audit/ai-review-2/triage-math-2026-10-18.md:22",
+            "crates/shortwin-math/src/pool_select.rs:31",
+            "services/keeper/src/pool_monitor.rs:232",
+            "services/keeper/src/pool_monitor.rs:252",
+            "services/keeper/src/pool_monitor.rs:259"
+          ],
+          "reason": "AIR2-09 replaced on-chain locked_depth with the raw locked-LP ratio, retaining lambda_bps as a display/threshold helper. Keeper score still multiplies the whole-bps lambda_bps by reserve SOL and rank removes zeros. Thus the same premature-rounding pattern remains in the separate preselection service and can omit a pool that the fixed on-chain verifier would accept; do not label it already fixed under AIR2-09. It is also separate from mixed-snapshot LP inputs."
+        }
+      ],
+      "notes": [
+        "The raw diff is independent of the stale-counter patch. When combined, c must refer to the freshly parsed pool. Multiplying two u64 factors in u128 is bounded; the zero-counter and supply-above-counter branches remain zero."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "evaluate",
+      "bug_class": "wrong-window-floor-reference",
+      "kind": "FINDING",
+      "title": "Correctness: The keeper checks the proposal floor at the wrong price",
+      "description": "The keeper evaluates the floor at the wrong price, so it selects a pool that the proposal instruction rejects.",
+      "source_ids": [
+        "p2-a07-b03"
+      ],
+      "gate_evidence": {
+        "1": {
+          "status": "ALLOWS",
+          "evidence": "ProposePool requires config/guard/market ownership/discriminators, PDAs and versions, market has_one mint and mint token-program owner; candidate kind must be supported, incumbent ReadSet keys valid, Pump precedence absent and the candidate venue latch clear. Use genuine distinct CPMM pools with valid config/vault/LP keys, token-program ownership, WSOL/token mint sides and vault authority, enabled swaps, elapsed open time, positive reserves and a permitted 2500-ppm fee. raydium_cpmm::verify:354-407 and raydium::check_eligible:251-283 accept these states. With no open positions, carried_fit:526-527 returns Fits. These guards are checked once for the evaluate/plan paths. evaluate:359-376 passes P_ema directly to window_floor_ok; propose_pool:314-320 passes window_price=min(P_ema,P_candidate). Take P_ema=1e18, fully locked A with X=400e9,Y=16e9,D=80e9 and floor=25e9. General eligibility at lambda_min=5000 gives 160 SOL; keeper proposal floor gives 80 SOL, actual proposal gives 16 SOL. On a Raydium incumbent of D=100e9, outside its listing window, with no positions/window and an armed failure chain, A misses the normal 25% dominance threshold 125e9 but exceeds fast_min_bps=2500 threshold 25e9. decide:299-321 returns OpenWindow. Genuine owner/layout and carried-fit checks therefore do not mask the mismatched comparison. Simulation/program rejection is the demonstrated off-chain error; rollback prevents unsafe adoption."
+        },
+        "2": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        "3": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        "4": {
+          "status": "CORRECTNESS",
+          "evidence": "Keeper proposal evaluation disagrees with the on-chain rule and repeatedly chooses an action that is refused. A valid lower-ranked pool can be delayed; the current plan does not select it on this refusal. S3 exits and direct proposals remain. No persistent financial loss or stranded funds are proved."
+        }
+      },
+      "known_issue_comparison": "Pass 1 records this exact wrong argument. KI-17 at known-issues.md:93 accepts the on-chain candidate-price policy, and M4R-2 is explicit in propose_pool. That policy does not accept keeper evaluation at a different price. Prior services triage describes shared verification without identifying this argument mismatch.",
+      "key": "shortwin-keeper|evaluate|wrong-window-floor-reference",
+      "confidence": 75,
+      "confidence_basis": "Proven correctness defect without independently proved profit, loss or stranded funds; fixed 75. Normal confidence deductions do not apply.",
+      "fixes": [
+        {
+          "label": "Use the proposal-specific window_price; unapplied and uncompiled",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -373,7 +373,11 @@\n             d: a.state.locked_depth,\n             real_sol: a.state.r,\n             fee_ppm: a.state.fee_ppm,\n-            window_floor: pool_select::window_floor_ok(&a, params, p_ref),\n+            window_floor: pool_select::window_floor_ok(\n+                &a,\n+                params,\n+                pool_select::window_price(p_ref, &a),\n+            ),\n             fits: pool_select::carried_fit(market, &a, fit, p_ref, FitAt::Proposal)\n                 .is_ok_and(|f| f.fits()),\n         },\n",
+          "source_ids": [
+            "p2-a07-b03"
+          ]
+        }
+      ],
+      "candidate_evidence": [
+        {
+          "raw_id": "p2-a07-b03",
+          "location": "services/keeper/src/pool_monitor.rs:361-381; programs/shortwin/src/instructions/propose_pool.rs:314-321; programs/shortwin/src/engine/pool_select.rs:363-380.",
+          "proof": "Let P_ema=10^18 and the candidate be fully locked with X=400,000,000,000 and Y=16,000,000,000. Then D=80,000,000,000 and P_candidate=4*10^16. With pool_min_real_sol=25,000,000,000, the keeper's window_floor_ok at P_ema gives 80 SOL and true; the on-chain call at window_price gives 16 SOL and false. General eligibility still passes: at lambda_min=5,000 the eligibility reserve is 160 SOL. Take pool_d=100,000,000,000, open_positions=0, a failed incumbent with an armed fast path and no current window. D=80 billion misses the normal 25% dominance requirement (125 billion) but meets fast_min_bps=2,500 (25 billion), so decide returns OpenWindow. carried_fit returns Fits immediately with zero positions. A genuine owner/layout-verified candidate reaches the discrepancy.",
+          "guards": "verify_candidate uses the correct general eligibility price; it does not apply the proposal-only floor. Simulation and the on-chain require prevent unsafe adoption, but they do not choose another candidate.",
+          "impact": "The keeper repeatedly attempts a refused proposal and can delay a usable alternate pool.",
+          "assumption": "A proposal checks its collection-window floor at the market EMA price alone.",
+          "path": "incumbent halts at a high EMA → lower-priced alternate pool passes the keeper's floor → plan proposes it → simulation rejects PoolTooThin repeatedly."
+        }
+      ],
+      "prior_pass_comparison": {
+        "source": ".rust-auditor/runs/20261018-110553/pass-1/decisions.json",
+        "source_ids": [
+          "p1-a11-b01"
+        ],
+        "verdict": "FINDING",
+        "confidence": 75,
+        "assessment": "Same defect re-read in frozen source; retain the exact known appendix bug-class label. Prior judgment is comparison context, not proof."
+      },
+      "prior_issue_evidence": [
+        {
+          "raw_id": "p1-a11-b01",
+          "relation": "related_distinct_extension",
+          "issue_ids": [
+            "KI-17"
+          ],
+          "sources": [
+            "docs/audit/known-issues.md:93",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+            "programs/shortwin/src/engine/pool_select.rs:363",
+            "programs/shortwin/src/engine/pool_select.rs:376",
+            "programs/shortwin/src/instructions/propose_pool.rs:315",
+            "services/keeper/src/pool_monitor.rs:376"
+          ],
+          "reason": "KI-17 and M4R-2 specify the proposal floor at min(P_ema,P_cand); the execution intentionally uses P_ema. Keeper evaluate instead supplies P_ema to its proposal window_floor verdict. The prior register discusses the deliberate on-chain policy and candidate manipulation, not the keeper selecting a candidate that the same proposal refuses. This cross-component mismatch is a distinct extension; earlier shared-verifier review prose does not cover the wrong argument."
+        }
+      ],
+      "notes": [
+        "The zero-position example removes carried-position uncertainty without asserting a deployed loss. Both candidates can coexist with a failed incumbent; this is a supported Raydium fast path, not the list-only zero-position branch that adopts directly."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "plan",
+      "bug_class": "false-window-floor-monotonicity",
+      "kind": "FINDING",
+      "title": "Correctness: The keeper skips pools after a floor failure",
+      "description": "The keeper skips viable alternatives when the deepest candidate fails the proposal floor. This path works after evaluate fixes wrong-window-floor-reference.",
+      "source_ids": [
+        "p2-a07-b04"
+      ],
+      "gate_evidence": {
+        "1": {
+          "status": "ALLOWS",
+          "evidence": "Apply the separate evaluate|wrong-window-floor-reference printed fix under the one-level bug-is-not-a-guard rule; use the committed genuine-account and no-position carried-fit guards above. On the same Raydium incumbent D=100e9, P_ema=1e18, armed failure chain, no positions/window, outside listing window: A has X=400e9,Y=16e9,D=80e9 and corrected floor=false (16 SOL); B has X=Y=D=40e9 and floor=true (40 SOL). Both pass eligibility and qualify for OpenWindow without normal dominance. plan:510-518 takes no expired-window branch; :520-528 retains both distinct non-incumbents and ranks A first. :538-539 sets PoolTooThin immediately; the alternative search :545-567 only runs for !fits, but A fits. B is skipped. Each candidate has its own min price, so the shared-price monotonicity comment is false after evaluate is repaired."
+        },
+        "2": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        "3": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        "4": {
+          "status": "CORRECTNESS",
+          "evidence": "Repairing evaluate alone exposes this separate candidate-search defect: the keeper fails to propose accepted B after A fails its floor. The independent fix searches candidates that pass both checks. S3 exits and direct proposals remain; no profit, financial loss or irreversible lock is asserted. Fixed confidence 75 overrides ordinary masking deductions in the correctness lane."
+        }
+      },
+      "known_issue_comparison": "Pass 1 records this exact masked plan defect. KI-17 describes the candidate-specific proposal floor, not the planner stopping after one failure. The earlier services review does not establish shared-price monotonicity. This remains distinct from evaluate because changing the price argument does not change the search.",
+      "key": "shortwin-keeper|plan|false-window-floor-monotonicity",
+      "confidence": 75,
+      "confidence_basis": "Proven correctness defect without independently proved profit, loss or stranded funds; fixed 75. Normal confidence deductions do not apply.",
+      "fixes": [
+        {
+          "label": "Search each window candidate for both floor and carried fit; unapplied and uncompiled",
+          "diff": "--- a/services/keeper/src/pool_monitor.rs\n+++ b/services/keeper/src/pool_monitor.rs\n@@ -531,18 +531,14 @@\n         return out;\n     };\n     out.best = Some((c.pool, d));\n-    // M4V-1: a window's candidate also needs the window floor, which is monotone in `D` at the\n-    // market's one `P_ema`: if the deepest candidate misses it, every candidate does.\n+    // Each candidate has its own proposal price and must pass its own floor.\n     let window_floor = c.window_floor();\n     match pool_select::decide(s, d, p) {\n-        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !window_floor => {\n-            out.blocked = Some(u32::from(ShortwinError::PoolTooThin));\n-        }\n         // Switch only if all fit: the window takes the deepest candidate whose opening caps every\n         // open position fits (not monotone in `D`: the fee, the reserve and the tier count too)\n         // and that `decide` still takes for the window; with none, the positions exit on the\n         // failed pool through the S3 chain.\n-        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) if !c.fits() => {\n+        Ok(Proposal::OpenWindow | Proposal::ImproveWindow) => {\n             let fitting = ranked.iter().find_map(|&(d, c)| {\n                 if !(c.fits() && c.window_floor()) {\n                     return None;\n@@ -564,7 +560,13 @@\n                         expect,\n                     });\n                 }\n-                None => out.blocked = Some(u32::from(ShortwinError::CarriedPositionsTooLarge)),\n+                None => {\n+                    out.blocked = Some(u32::from(if window_floor {\n+                        ShortwinError::CarriedPositionsTooLarge\n+                    } else {\n+                        ShortwinError::PoolTooThin\n+                    }));\n+                }\n             }\n         }\n         Ok(expect) => {\n",
+          "source_ids": [
+            "p2-a07-b04"
+          ]
+        }
+      ],
+      "candidate_evidence": [
+        {
+          "raw_id": "p2-a07-b04",
+          "location": "services/keeper/src/pool_monitor.rs:539-573; programs/shortwin/src/engine/pool_select.rs:375-380.",
+          "proof": "This path is masked by shortwin-keeper|evaluate|wrong-window-floor-reference and becomes reachable after that fix. Use the previous finding's armed situation: P_ema=10^18, incumbent depth=100 billion, no positions and no window. Candidate A has X=400 billion,Y=16 billion, D=80 billion and a false 16-SOL window floor. Candidate B has X=Y=40 billion, D=40 billion and a true 40-SOL floor. Both are fully locked, eligible, fit trivially and qualify for OpenWindow; neither satisfies normal dominance. A sorts first. The first match arm sets PoolTooThin and never checks B. The next arm searches other candidates only for !c.fits(), which A does not satisfy. No candidate ordering or tie is ambiguous.",
+          "guards": "The program's floor protects every proposal. Today evaluate's different defect makes this example try A instead of suppressing both; repairing evaluate alone exposes this separate search failure.",
+          "impact": "The keeper can leave a failed incumbent in place despite an alternate pool that the program accepts.",
+          "assumption": "Window-floor success is monotone in depth because every candidate uses one shared price.",
+          "path": "evaluate produces proposal-correct floors → deepest pool fails its own floor → plan stops at PoolTooThin → a shallower candidate with sufficient locked SOL never gets proposed."
+        }
+      ],
+      "prior_pass_comparison": {
+        "source": ".rust-auditor/runs/20261018-110553/pass-1/decisions.json",
+        "source_ids": [
+          "p1-a11-b02"
+        ],
+        "verdict": "FINDING",
+        "confidence": 75,
+        "assessment": "Same defect re-read in frozen source; retain the exact known appendix bug-class label. Prior judgment is comparison context, not proof."
+      },
+      "prior_issue_evidence": [
+        {
+          "raw_id": "p1-a11-b02",
+          "relation": "related_distinct_extension",
+          "issue_ids": [
+            "KI-17"
+          ],
+          "sources": [
+            "docs/audit/known-issues.md:93",
+            "docs/audit/ai-review-2/triage-services-2026-10-18.md:70",
+            "programs/shortwin/src/engine/pool_select.rs:376",
+            "services/keeper/src/pool_monitor.rs:538",
+            "services/keeper/src/pool_monitor.rs:548"
+          ],
+          "reason": "The proposal policy documented under KI-17 uses candidate-dependent min(EMA,spot), so candidate floor validity is not ordered by depth alone. Keeper plan expressly assumes one common EMA price and exits when the deepest pool fails the floor, instead of searching shallower passing pools as it does for carried-fit failures. This is a distinct remaining planner extension beyond p1-a11-b01: correcting evaluate alone exposes rather than removes this early return."
+        }
+      ],
+      "notes": [
+        "Masking dependency: shortwin-keeper|evaluate|wrong-window-floor-reference. The prerequisite sentence is exactly the pass-1 sentence and must remain in the printed description.",
+        "Only one masking level is used; no second retained defect is needed. Correctness confidence is fixed 75, as directed."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "resolve_entry",
+      "bug_class": "unsupported-coin-creator-placeholder",
+      "kind": "FINDING",
+      "title": "Correctness: The keeper omits supported coin creator extras",
+      "description": "The keeper drops every extras set with the supported coin creator placeholder, so it cannot construct those configured exit variants.",
+      "source_ids": [
+        "p2-a07-b05",
+        "p2-a11-b01"
+      ],
+      "gate_evidence": {
+        "1": {
+          "status": "ALLOWS",
+          "evidence": "SetVenueExtras:107-121 requires an honest authorized Signer, current config version/PDA and extras PDA; :130-175 accepts a supported venue/ix/count and current extras version. check_entry at venues/mod.rs:297-333 accepts one SEED_PLACEHOLDER with len=PLACEHOLDER_COIN_CREATOR=4, all-zero seed bytes, zero unused seeds and nondefault external program E. Choose PumpSwap cached creator C and a derived external nonsigner PDA outside both denylists. parse_extras:177-219 verifies extras owner/PDA/version, canonical template bump/address, count, nonsigner/external ownership, denylists and writable flags; all accept the configured entry. Placeholders::key:128-137 and parse:1264-1268 resolve C from CACHED_COIN_CREATOR. Keeper resolve_entry:670-677 instead matches IDs 0..3 and returns None for 4; choice_of:704 drops the whole set and extras_candidates:738-746 omits it from current, previous and stable. With previous/stable empty, only NONE remains. keeper::attempt_trading:2861-2880 loops only this list for liquidation/expiry, so no valid configured variant is constructed."
+        },
+        "2": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        "3": {
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        "4": {
+          "status": "CORRECTNESS",
+          "evidence": "Every otherwise valid PumpSwap template using the supported creator placeholder fails keeper resolution, although the on-chain feature supports it with cached data. This is a deterministic capability mismatch. A currently deployed venue requiring this extra is unproved; manual transactions, another usable set or software/configuration changes remain. No current liquidation loss or permanently stranded position is established."
+        }
+      },
+      "known_issue_comparison": "Pass 1 records this exact keeper/PumpSwap omission. Project L82 (findings.md:304; ai-review-2/triage-venues-2026-10-18.md:69) concerns the on-chain resolver omitting coin_creator for PumpCurve; here on-chain PumpSwap resolution succeeds and the keeper fails. That prior curve limitation does not close this different boundary.",
+      "key": "shortwin-keeper|resolve-entry|unsupported-coin-creator-placeholder",
+      "confidence": 75,
+      "confidence_basis": "Proven correctness defect without independently proved profit, loss or stranded funds; fixed 75. Normal confidence deductions do not apply.",
+      "fixes": [
+        {
+          "label": "Option A — resolve the cached PumpSwap creator with an expression arm; unapplied and uncompiled",
+          "diff": "--- a/services/keeper/src/venue.rs\n+++ b/services/keeper/src/venue.rs\n@@ -672,7 +672,11 @@\n                             PLACEHOLDER_POOL => pool_placeholder(kind, market),\n                             PLACEHOLDER_TRADER => Some(market.trader),\n                             PLACEHOLDER_BONDING_CURVE => Some(market.bonding_curve),\n-                            // The coin creator is not resolvable from the market cache.\n+                            shortwin::state::PLACEHOLDER_COIN_CREATOR\n+                                if kind == VenueKind::PumpSwap => Some(pump_amm::cached(\n+                                    market,\n+                                    pump_swap_cache::CACHED_COIN_CREATOR,\n+                                )),\n                             _ => None,\n                         }?;\n                         owned.push(key.to_bytes().to_vec());\n",
+          "source_ids": [
+            "p2-a07-b05"
+          ]
+        },
+        {
+          "label": "Option B — resolve the cached PumpSwap creator with a block arm; unapplied and uncompiled",
+          "diff": "--- a/services/keeper/src/venue.rs\n+++ b/services/keeper/src/venue.rs\n@@ -672,7 +672,14 @@\n                             PLACEHOLDER_POOL => pool_placeholder(kind, market),\n                             PLACEHOLDER_TRADER => Some(market.trader),\n                             PLACEHOLDER_BONDING_CURVE => Some(market.bonding_curve),\n-                            // The coin creator is not resolvable from the market cache.\n+                            shortwin::state::PLACEHOLDER_COIN_CREATOR\n+                                if kind == VenueKind::PumpSwap =>\n+                            {\n+                                Some(pump_amm::cached(\n+                                    market,\n+                                    pump_swap_cache::CACHED_COIN_CREATOR,\n+                                ))\n+                            }\n                             _ => None,\n                         }?;\n                         owned.push(key.to_bytes().to_vec());\n",
+          "source_ids": [
+            "p2-a11-b01"
+          ]
+        }
+      ],
+      "candidate_evidence": [
+        {
+          "raw_id": "p2-a07-b05",
+          "location": "services/keeper/src/venue.rs:657-687, 704, 737-746; programs/shortwin/src/venues/mod.rs:124-138,1260-1271; programs/shortwin/src/state/venue_extras.rs:60.",
+          "proof": "Take a PumpSwap market whose CACHED_COIN_CREATOR equals key C. Configure an otherwise valid template with one SEED_PLACEHOLDER whose len=PLACEHOLDER_COIN_CREATOR (4), zero seed bytes, and a permitted PDA program E. The program's Placeholders::key returns C and parse derives PDA(E,[C]). resolve_entry matches only IDs 0 through 3 and returns None at its wildcard. Therefore the keeper cannot produce any selection that contains that valid entry, for current, previous or stable sets. This is deterministic even when C never changes.",
+          "guards": "VenueExtras remains restricted to authorized setters; PDA canonical bumps, writable flags and denylists remain checked on-chain. A manual caller can provide the valid extras. An active venue requirement for this particular template is not proved; the supported configuration path itself is broken.",
+          "impact": "The keeper lacks a program-supported extras capability. If an exit needs that configured account, all keeper attempts without it fail until configuration or software changes.",
+          "assumption": "The market cache cannot resolve the coin_creator placeholder.",
+          "path": "authorized extras set contains a PumpSwap coin_creator PDA template → resolve_entry returns None → choice_of drops the complete set → extras_candidates offers only other sets or none."
+        },
+        {
+          "raw_id": "p2-a11-b01",
+          "location": "services/keeper/src/venue.rs:657, especially :670-677; choice_of :704; extras_candidates :738-746.",
+          "proof": "programs/shortwin/src/state/venue_extras.rs:60 defines PLACEHOLDER_COIN_CREATOR = 4. programs/shortwin/src/venues/mod.rs:297-333 accepts a SEED_PLACEHOLDER whose len is 4 and whose bytes are zero. programs/shortwin/src/instructions/set_venue_extras.rs:176-190 stores the checked set after the Signer/config authority checks at :101-117. programs/shortwin/src/venues/mod.rs:1266-1268 resolves this exact placeholder to pump_amm::cached(market, CACHED_COIN_CREATOR) for PumpSwap. Thus the stored creator is available without another RPC read. Take a PumpSwap market with cached creator C and one template entry: kind = ENTRY_TEMPLATE, key = an external program P, n_seeds = 1, seeds[0] = {kind: SEED_PLACEHOLDER, len: 4, bytes: [0; 32]}, writable = 0, with unused seeds zero. Choose P and C so the derived PDA is outside both denylists. The on-chain template resolver derives PDA(P, [C, canonical bump]). In the keeper, len = 4 reaches `_ => None` at services/keeper/src/venue.rs:676, and `?` at :677 discards the entry. `?` at :704 discards the whole set. If current has this entry and previous/stable are empty, extras_candidates returns exactly one choice, NONE, rather than current plus NONE. Out-of-scope caller context services/keeper/src/keeper.rs:2861-2862 and :2867-2880 confirms liquidate/expire iterate only this candidate list. Republishing the same template as previous or stable cannot help because all three use choice_of.",
+          "guards": "The setter requires an authorized signer and checks template shape. The on-chain parser verifies the extras PDA, version, venue, canonical bump, signer status, ownership, denylists, and writable flags. Those guards accept this supported template and do not repair the keeper omission.",
+          "impact": "The supported-template omission is unconditional for placeholder 4. If a venue needs that extra for buys, the keeper never tries the valid liquidation or expiry account list. A position with Q tokens owed and V lamports remains open after the failed automatic attempt; this report does not assert a specific loss amount.",
+          "limitations": "This is a proven integration correctness defect. No currently deployed venue requirement for this extra was established. A manually built transaction can select and pass the valid template. No build, test, or runtime reproduction was performed.",
+          "path": "Authorized set_venue_extras(PumpSwap, EXTRAS_IX_BUY, template) → current stores the valid template → extras_candidates → choice_of → resolve_entry returns None → keeper excludes current from its exit attempts."
+        }
+      ],
+      "prior_pass_comparison": {
+        "source": ".rust-auditor/runs/20261018-110553/pass-1/decisions.json",
+        "source_ids": [
+          "p1-a07-b03"
+        ],
+        "verdict": "FINDING",
+        "confidence": 75,
+        "assessment": "Same defect re-read in frozen source; retain the exact known appendix bug-class label. Prior judgment is comparison context, not proof."
+      },
+      "prior_issue_evidence": [
+        {
+          "raw_id": "p1-a07-b03",
+          "relation": "related_distinct_extension",
+          "issue_ids": [],
+          "sources": [
+            "docs/audit/ai-review-2/triage-venues-2026-10-18.md:69",
+            "docs/audit/ai-review-2/report.md:673",
+            "docs/audit/ai-review/report-3-venues.md:134",
+            "programs/shortwin/src/venues/mod.rs:1266",
+            "services/keeper/src/venue.rs:656"
+          ],
+          "reason": "L82 describes on-chain coin_creator resolution missing for PumpCurve. Here the on-chain parser supplies the PumpSwap creator from its cache, but keeper resolve_entry lacks that placeholder altogether and drops the configured set. The venue, resolver and failing boundary differ; prior curve-only template hardening cannot close this keeper/PumpSwap omission."
+        }
+      ],
+      "notes": [
+        "Both raw findings quote the same missing match branch and cached PumpSwap creator. Merge under the exact appendix label. Preserve both raw unified diffs as separate options because their added lines differ.",
+        "The two patches have the same semantic resolution and different match-arm formatting. Neither broadens creator support to PumpCurve. Every extra-set position and the actual exit caller from the second raw proof are retained in the gate."
+      ]
+    },
+    {
+      "program": "shortwin-keeper",
+      "function": "next_rank_batch",
+      "bug_class": "ranked-batch-lost-on-rpc-error",
+      "kind": "LEAD",
+      "title": "A failed RPC read removes pending rank candidates",
+      "description": "The keeper loses a pending batch after an RPC error until rediscovery. No outsider trigger or stranded funds are proved.",
+      "source_ids": [
+        "p2-a07-b07"
+      ],
+      "gate_evidence": {
+        "1": {
+          "status": "ALLOWS",
+          "evidence": "pool_monitor.rs:690-692 drains n=min(max(budget/2,1),queue.len) before the caller reads accounts. With [A,B] and a valid two-key budget, keeper.rs:3241 drains A; :3243 propagates accounts Err before finish_rank_batch:3250. RpcChain::accounts:261-289 propagates getMultipleAccounts/try_collect errors, with no returned partial batch. select_pools:3085-3098 catches and records the per-market error, then :3100-3107 retains the covered market PoolTrack. The tick continues other duties and main.rs:183-220 reuses the same keeper on later ticks. No enclosing transaction or rollback restores A. If B later scores, finish_rank_batch publishes scores without A; if the failed batch emptied the queue, the next tick skips ranking and retains old candidates (or none on first discovery)."
+        },
+        "2": {
+          "status": "ALLOWS",
+          "evidence": "The branch is reachable on an ordinary transport/RPC error; no malformed on-chain account or privileged configuration is needed. Default budget 200 permits all <=100 plausible pools to fit the failed batch; the two-pool example uses a valid configured budget of 2. discovery_due:668-677 requires the queue to be empty and the interval elapsed since last_discovery, which was stored before ranking at keeper.rs:3233. With a remaining queue, processing first continues its remaining batches; with an empty queue, rediscovery is eligible after the interval. Defaults are 10 seconds for failure/window activity and 300 seconds normally (config.rs:381-389), not a strict recovery deadline: selection allows at most two discoveries per tick, prioritizes urgency, and further RPC failures or delayed market reads can postpone it. A successful selected rediscovery calls start_ranking and restores the discovered pools. Restart creates fresh tracks and also rediscovers; no persistent source mutation is required."
+        },
+        "3": {
+          "status": "DEMOTE",
+          "evidence": "No source trace shows an unprivileged on-chain actor can force the transport failure or an independently material consequence. The proven lost in-memory work is a recoverable operational lead, not a covered formula/comparison/layout defect or an instruction that fails for every caller. Raw item is a lead and no count-based promotion applies. Stop here."
+        },
+        "4": {
+          "status": "NOT_EVALUATED",
+          "evidence": "Stopped after Gate 3 demotion; recovery and limitations are documented, not scored as financial harm."
+        }
+      },
+      "known_issue_comparison": "No matching next_rank_batch/rank_queue/RPC batch-loss issue appears in pass-1 decisions or in searches of docs/audit/ai-review*, docs/audit/known-issues.md and docs/audit/findings.md. The earlier services triage (lines 64-70) acknowledges per-market error isolation, multi-RPC reads and pool duties; it does not document discarding a drained ranking batch. KI-36 addresses crank fee-payer CU and KI-51 transaction-version/bundle deployment checks, not this queue mutation. This is new to the examined register, without a claim of global project novelty.",
+      "key": "shortwin-keeper|next-rank-batch|ranked-batch-lost-on-rpc-error",
+      "code_smells": "The helper drains the rank queue before the RPC read; the caller returns on error without restoring the removed candidates.",
+      "candidate_evidence": [
+        {
+          "raw_id": "p2-a07-b07",
+          "location": "services/keeper/src/pool_monitor.rs:690-706; services/keeper/src/keeper.rs:3241-3252 (caller outside the frozen in-scope source bundle).",
+          "proof": "For queue [A,B] with a one-pool budget, next_rank_batch drains A. If chain.accounts returns Err, the caller's question mark exits before finish_rank_batch. The next successful tick drains and scores B; finish_rank_batch sees an empty queue and publishes only B. A remains absent until a later discovery. If the failed batch empties the queue, the caller skips the ranking branch on the next tick and retains the previous candidates until rediscovery. The source trace establishes candidate loss, but its deployment impact and outer error recovery were not fully reviewed.",
+          "guards": "Discovery periodically rebuilds the queue; defaults are 300 seconds normally and 10 seconds during failure/window activity. Simulation still guards every on-chain action. No adversarial way to force the RPC failure was proved.",
+          "assumption": "Every batch removed from rank_queue reaches finish_rank_batch."
+        }
+      ],
+      "notes": [
+        "The actual recovery policy has now been reviewed, closing the raw proof's caller-context uncertainty. Candidate loss is confirmed statically; deployment incidence, adversarial control and material impact remain unproved.",
+        "No raw unified diff was supplied. The raw next-check recommendation is to keep candidates pending until scoring succeeds or restore a failed batch; no fix is invented.",
+        "Pool selection follows the tick's existing exits and cranks (keeper.rs:1468-1479). This failed ranking read does not retroactively skip those completed duties; old candidates can still be evaluated on later successful ticks."
+      ]
+    }
+  ],
+  "dispositions": [
+    {
+      "raw_id": "p2-a06-b04",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|decode-zc|hardening-version-unchecked",
+      "reason": "Retained as a lead; No current instruction or outsider write path creates the incompatible stored version. A program-owned account cannot be rewritten by an outsider; the claimed alternative layout requires a future privileged upgrade. ProposePool owner/discriminator/PDA and CONFIG_VERSION/MARKET_VERSION guards, and parse_extras VENUE_EXTRAS_VERSION, reject unsupported inputs on-chain. This hardening class stays a lead regardless of three-agent agreement.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "view.rs:48-54 requires shortwin ownership, matching concrete discriminator, and enough bytes for T, then returns pod_read_unaligned(body). load_with_positions:263-267,286-299,363-367 consumes GlobalConfig, Market and VenueExtras without comparing versions. MarketVault uses the same helper but has no version obligation established here. Current GlobalConfig, Market and VenueExtras have u16 version at the body start; compiled constants are 1,1,2. A same-discriminator, sufficiently sized body with another version reaches keeper interpretation."
+        },
+        {
+          "gate": 2,
+          "status": "DEMOTE",
+          "evidence": "No current instruction or outsider write path creates the incompatible stored version. A program-owned account cannot be rewritten by an outsider; the claimed alternative layout requires a future privileged upgrade. ProposePool owner/discriminator/PDA and CONFIG_VERSION/MARKET_VERSION guards, and parse_extras VENUE_EXTRAS_VERSION, reject unsupported inputs on-chain. This hardening class stays a lead regardless of three-agent agreement."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b06",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|decode-zc|hardening-version-unchecked",
+      "reason": "Retained as a lead; No current instruction or outsider write path creates the incompatible stored version. A program-owned account cannot be rewritten by an outsider; the claimed alternative layout requires a future privileged upgrade. ProposePool owner/discriminator/PDA and CONFIG_VERSION/MARKET_VERSION guards, and parse_extras VENUE_EXTRAS_VERSION, reject unsupported inputs on-chain. This hardening class stays a lead regardless of three-agent agreement.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "view.rs:48-54 requires shortwin ownership, matching concrete discriminator, and enough bytes for T, then returns pod_read_unaligned(body). load_with_positions:263-267,286-299,363-367 consumes GlobalConfig, Market and VenueExtras without comparing versions. MarketVault uses the same helper but has no version obligation established here. Current GlobalConfig, Market and VenueExtras have u16 version at the body start; compiled constants are 1,1,2. A same-discriminator, sufficiently sized body with another version reaches keeper interpretation."
+        },
+        {
+          "gate": 2,
+          "status": "DEMOTE",
+          "evidence": "No current instruction or outsider write path creates the incompatible stored version. A program-owned account cannot be rewritten by an outsider; the claimed alternative layout requires a future privileged upgrade. ProposePool owner/discriminator/PDA and CONFIG_VERSION/MARKET_VERSION guards, and parse_extras VENUE_EXTRAS_VERSION, reject unsupported inputs on-chain. This hardening class stays a lead regardless of three-agent agreement."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a11-b02",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|decode-zc|hardening-version-unchecked",
+      "reason": "Retained as a lead; No current instruction or outsider write path creates the incompatible stored version. A program-owned account cannot be rewritten by an outsider; the claimed alternative layout requires a future privileged upgrade. ProposePool owner/discriminator/PDA and CONFIG_VERSION/MARKET_VERSION guards, and parse_extras VENUE_EXTRAS_VERSION, reject unsupported inputs on-chain. This hardening class stays a lead regardless of three-agent agreement.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "view.rs:48-54 requires shortwin ownership, matching concrete discriminator, and enough bytes for T, then returns pod_read_unaligned(body). load_with_positions:263-267,286-299,363-367 consumes GlobalConfig, Market and VenueExtras without comparing versions. MarketVault uses the same helper but has no version obligation established here. Current GlobalConfig, Market and VenueExtras have u16 version at the body start; compiled constants are 1,1,2. A same-discriminator, sufficiently sized body with another version reaches keeper interpretation."
+        },
+        {
+          "gate": 2,
+          "status": "DEMOTE",
+          "evidence": "No current instruction or outsider write path creates the incompatible stored version. A program-owned account cannot be rewritten by an outsider; the claimed alternative layout requires a future privileged upgrade. ProposePool owner/discriminator/PDA and CONFIG_VERSION/MARKET_VERSION guards, and parse_extras VENUE_EXTRAS_VERSION, reject unsupported inputs on-chain. This hardening class stays a lead regardless of three-agent agreement."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|score|stale-lp-counter",
+      "reason": "Source-proved correctness defect; fixed confidence 75, with no independent financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "CandidatePool::from_account at pool_monitor.rs:166-225 parses supported venue ownership/layout and plausible SOL side/status/nonce, then stores lp_counter. rank_keys:229-230 requests only vault and LP mint; score:238-251 requires plausible metadata, both returned accounts, vault amount bytes and a readable mint, but never refreshes the counter. A genuine pool satisfies these checks. Discovery C=1e9,S=0.5e9,R=100e9, followed by an ordinary proportional deposit to C=2e9,S=1.5e9,R=200e9, preserves locked SOL at 50e9. score:252 uses old C=1e9 with new S=1.5e9; lambda_bps checked_sub returns zero and rank:258 discards the pool. A proportional withdrawal instead overstates the share. keeper.rs:3229-3250 confirms discovery and rank reads are separate. Later genuine-account verification and transaction simulation cannot restore a discarded pool."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "The documented locked-SOL score combines incompatible LP states and can exclude an eligible pool or displace another from the bounded candidate set. This is a source-proved formula/input mismatch. Fresh on-chain verification prevents invalid adoption; later rediscovery and direct proposals remain. No theft, profit, or stranded funds are established."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b02",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|score|rounded-lock-share-ranking",
+      "reason": "Source-proved correctness defect; fixed confidence 75, with no independent financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "The genuine-pool owner/layout/plausibility, available-account and LP-mint guards committed for score all allow one coherent snapshot. score:252 computes floor((C-S)*10000/C)*R/10000; rank:258 removes zero before evaluate. With C=1e9,S=999950000,R=X=Y=1e15, lambda_bps is zero while (C-S)*R/C and raw locked_depth are 50e9. At P_ref=1e18 the proposal floor is 50 SOL, above 25 SOL; valid status, authorities and fee inputs pass shared eligibility. locked_depth at math/pool_select.rs:31-55 deliberately preserves raw-ratio depth, and :60-65 states that a minimum current LP-share ratio is not an eligibility requirement. This path needs no old counter or counterfeit account."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "Whole-bps flooring discards positive eligible locked depth and can misorder other pools; rediscovery of unchanged coherent inputs does not repair the formula. The example is capital intensive and establishes a deterministic formula defect, not an economical attack or financial loss. Direct proposals and program eligibility remain."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b03",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|evaluate|wrong-window-floor-reference",
+      "reason": "Source-proved correctness defect; fixed confidence 75, with no independent financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "ProposePool requires config/guard/market ownership/discriminators, PDAs and versions, market has_one mint and mint token-program owner; candidate kind must be supported, incumbent ReadSet keys valid, Pump precedence absent and the candidate venue latch clear. Use genuine distinct CPMM pools with valid config/vault/LP keys, token-program ownership, WSOL/token mint sides and vault authority, enabled swaps, elapsed open time, positive reserves and a permitted 2500-ppm fee. raydium_cpmm::verify:354-407 and raydium::check_eligible:251-283 accept these states. With no open positions, carried_fit:526-527 returns Fits. These guards are checked once for the evaluate/plan paths. evaluate:359-376 passes P_ema directly to window_floor_ok; propose_pool:314-320 passes window_price=min(P_ema,P_candidate). Take P_ema=1e18, fully locked A with X=400e9,Y=16e9,D=80e9 and floor=25e9. General eligibility at lambda_min=5000 gives 160 SOL; keeper proposal floor gives 80 SOL, actual proposal gives 16 SOL. On a Raydium incumbent of D=100e9, outside its listing window, with no positions/window and an armed failure chain, A misses the normal 25% dominance threshold 125e9 but exceeds fast_min_bps=2500 threshold 25e9. decide:299-321 returns OpenWindow. Genuine owner/layout and carried-fit checks therefore do not mask the mismatched comparison. Simulation/program rejection is the demonstrated off-chain error; rollback prevents unsafe adoption."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "Keeper proposal evaluation disagrees with the on-chain rule and repeatedly chooses an action that is refused. A valid lower-ranked pool can be delayed; the current plan does not select it on this refusal. S3 exits and direct proposals remain. No persistent financial loss or stranded funds are proved."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b04",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|plan|false-window-floor-monotonicity",
+      "reason": "Source-proved correctness defect; fixed confidence 75, with no independent financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "Apply the separate evaluate|wrong-window-floor-reference printed fix under the one-level bug-is-not-a-guard rule; use the committed genuine-account and no-position carried-fit guards above. On the same Raydium incumbent D=100e9, P_ema=1e18, armed failure chain, no positions/window, outside listing window: A has X=400e9,Y=16e9,D=80e9 and corrected floor=false (16 SOL); B has X=Y=D=40e9 and floor=true (40 SOL). Both pass eligibility and qualify for OpenWindow without normal dominance. plan:510-518 takes no expired-window branch; :520-528 retains both distinct non-incumbents and ranks A first. :538-539 sets PoolTooThin immediately; the alternative search :545-567 only runs for !fits, but A fits. B is skipped. Each candidate has its own min price, so the shared-price monotonicity comment is false after evaluate is repaired."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "Repairing evaluate alone exposes this separate candidate-search defect: the keeper fails to propose accepted B after A fails its floor. The independent fix searches candidates that pass both checks. S3 exits and direct proposals remain; no profit, financial loss or irreversible lock is asserted. Fixed confidence 75 overrides ordinary masking deductions in the correctness lane."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b05",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|resolve-entry|unsupported-coin-creator-placeholder",
+      "reason": "Source-proved correctness defect; fixed confidence 75, with no independent financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "SetVenueExtras:107-121 requires an honest authorized Signer, current config version/PDA and extras PDA; :130-175 accepts a supported venue/ix/count and current extras version. check_entry at venues/mod.rs:297-333 accepts one SEED_PLACEHOLDER with len=PLACEHOLDER_COIN_CREATOR=4, all-zero seed bytes, zero unused seeds and nondefault external program E. Choose PumpSwap cached creator C and a derived external nonsigner PDA outside both denylists. parse_extras:177-219 verifies extras owner/PDA/version, canonical template bump/address, count, nonsigner/external ownership, denylists and writable flags; all accept the configured entry. Placeholders::key:128-137 and parse:1264-1268 resolve C from CACHED_COIN_CREATOR. Keeper resolve_entry:670-677 instead matches IDs 0..3 and returns None for 4; choice_of:704 drops the whole set and extras_candidates:738-746 omits it from current, previous and stable. With previous/stable empty, only NONE remains. keeper::attempt_trading:2861-2880 loops only this list for liquidation/expiry, so no valid configured variant is constructed."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "Every otherwise valid PumpSwap template using the supported creator placeholder fails keeper resolution, although the on-chain feature supports it with cached data. This is a deterministic capability mismatch. A currently deployed venue requiring this extra is unproved; manual transactions, another usable set or software/configuration changes remain. No current liquidation loss or permanently stranded position is established."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a11-b01",
+      "verdict": "FINDING",
+      "key": "shortwin-keeper|resolve-entry|unsupported-coin-creator-placeholder",
+      "reason": "Source-proved correctness defect; fixed confidence 75, with no independent financial-loss claim.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "SetVenueExtras:107-121 requires an honest authorized Signer, current config version/PDA and extras PDA; :130-175 accepts a supported venue/ix/count and current extras version. check_entry at venues/mod.rs:297-333 accepts one SEED_PLACEHOLDER with len=PLACEHOLDER_COIN_CREATOR=4, all-zero seed bytes, zero unused seeds and nondefault external program E. Choose PumpSwap cached creator C and a derived external nonsigner PDA outside both denylists. parse_extras:177-219 verifies extras owner/PDA/version, canonical template bump/address, count, nonsigner/external ownership, denylists and writable flags; all accept the configured entry. Placeholders::key:128-137 and parse:1264-1268 resolve C from CACHED_COIN_CREATOR. Keeper resolve_entry:670-677 instead matches IDs 0..3 and returns None for 4; choice_of:704 drops the whole set and extras_candidates:738-746 omits it from current, previous and stable. With previous/stable empty, only NONE remains. keeper::attempt_trading:2861-2880 loops only this list for liquidation/expiry, so no valid configured variant is constructed."
+        },
+        {
+          "gate": 2,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: source proves the wrong formula, comparison, or supported-feature behavior; no attack-state requirement is asserted."
+        },
+        {
+          "gate": 3,
+          "status": "NOT_APPLICABLE",
+          "evidence": "Correctness lane: no attacker, financial victim, or privileged-op harm is asserted."
+        },
+        {
+          "gate": 4,
+          "status": "CORRECTNESS",
+          "evidence": "Every otherwise valid PumpSwap template using the supported creator placeholder fails keeper resolution, although the on-chain feature supports it with cached data. This is a deterministic capability mismatch. A currently deployed venue requiring this extra is unproved; manual transactions, another usable set or software/configuration changes remain. No current liquidation loss or permanently stranded position is established."
+        }
+      ]
+    },
+    {
+      "raw_id": "p2-a07-b07",
+      "verdict": "LEAD",
+      "key": "shortwin-keeper|next-rank-batch|ranked-batch-lost-on-rpc-error",
+      "reason": "Retained as a lead; No source trace shows an unprivileged on-chain actor can force the transport failure or an independently material consequence. The proven lost in-memory work is a recoverable operational lead, not a covered formula/comparison/layout defect or an instruction that fails for every caller. Raw item is a lead and no count-based promotion applies. Stop here.",
+      "gates": [
+        {
+          "gate": 1,
+          "status": "ALLOWS",
+          "evidence": "pool_monitor.rs:690-692 drains n=min(max(budget/2,1),queue.len) before the caller reads accounts. With [A,B] and a valid two-key budget, keeper.rs:3241 drains A; :3243 propagates accounts Err before finish_rank_batch:3250. RpcChain::accounts:261-289 propagates getMultipleAccounts/try_collect errors, with no returned partial batch. select_pools:3085-3098 catches and records the per-market error, then :3100-3107 retains the covered market PoolTrack. The tick continues other duties and main.rs:183-220 reuses the same keeper on later ticks. No enclosing transaction or rollback restores A. If B later scores, finish_rank_batch publishes scores without A; if the failed batch emptied the queue, the next tick skips ranking and retains old candidates (or none on first discovery)."
+        },
+        {
+          "gate": 2,
+          "status": "ALLOWS",
+          "evidence": "The branch is reachable on an ordinary transport/RPC error; no malformed on-chain account or privileged configuration is needed. Default budget 200 permits all <=100 plausible pools to fit the failed batch; the two-pool example uses a valid configured budget of 2. discovery_due:668-677 requires the queue to be empty and the interval elapsed since last_discovery, which was stored before ranking at keeper.rs:3233. With a remaining queue, processing first continues its remaining batches; with an empty queue, rediscovery is eligible after the interval. Defaults are 10 seconds for failure/window activity and 300 seconds normally (config.rs:381-389), not a strict recovery deadline: selection allows at most two discoveries per tick, prioritizes urgency, and further RPC failures or delayed market reads can postpone it. A successful selected rediscovery calls start_ranking and restores the discovered pools. Restart creates fresh tracks and also rediscovers; no persistent source mutation is required."
+        },
+        {
+          "gate": 3,
+          "status": "DEMOTE",
+          "evidence": "No source trace shows an unprivileged on-chain actor can force the transport failure or an independently material consequence. The proven lost in-memory work is a recoverable operational lead, not a covered formula/comparison/layout defect or an instruction that fails for every caller. Raw item is a lead and no count-based promotion applies. Stop here."
+        }
+      ]
+    }
+  ],
+  "dedup_notes": [
+    "All 12 pass-2 specialists had returned before this final gate; this shard judges only the 10 assigned services raw IDs.",
+    "Ten raw candidates become seven items: five fixed-75 correctness findings, two leads, no rejected raw candidates. The three decode_zc blocks merge to one hardening lead; two resolve_entry blocks merge to one correctness finding.",
+    "Known labels are exactly the appendix labels for each same cause/function. score retains two different causes/fixes: refresh counter snapshots versus avoid whole-bps flooring. evaluate and plan remain separate because their fixes address price input and candidate search respectively.",
+    "Every supplied raw unified diff is preserved verbatim, including the hardening-lead proposal and both creator-placeholder variants. No diff is invented, rewritten, applied, compiled or run; root owns mechanical apply checking.",
+    "Actual keeper.rs, main.rs and common/rpc.rs callers are frozen out-of-bundle context. Project documents and pass-1 evidence are prior comparisons, not proof and not executed tests.",
+    "The gate reads genuine account guards and actual caller behavior once, in the requested constraints/setup/configuration/operation order. Later gates after demotion are not evaluated. Three agreeing hardening leads do not promote, and the new RPC queue-loss lead is not promoted by count.",
+    "Static source/document reads and JSON assembly only. No audited source edits, builds, tests, runtime reproduction, on-chain reads or live interactions."
+  ],
+  "completeness": {
+    "raw_blocks": 10,
+    "dispositions": 10,
+    "items": 7,
+    "findings": 5,
+    "leads": 2,
+    "rejected": 0
+  },
+  "source_revision": "b815269224ba0f5d946f49de7e113220c4067041"
+}

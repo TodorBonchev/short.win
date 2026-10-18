@@ -371,6 +371,133 @@ fn air_08_a_deposit_after_the_last_exit_waits_for_the_sweep() {
     assert_eq!(lab.vault().lender_sol, 0);
 }
 
+/// Actual System transfers and permissionless trader sweeps fund the carry. Both cohorts
+/// use the production withdrawal, including LastSharesBorrowed, claim, payout and close.
+#[test]
+fn last_exit_pays_swept_carry_before_the_next_cohort() {
+    use anchor_lang::solana_program::system_instruction;
+    use shortwin_litesvm_tests::{engine::sweep_trader_ix, pda, tokens};
+
+    for release_first in [false, true] {
+        let mut lab = Lab::new(TokenProgram::Spl);
+        // This scenario has no injected borrower state; retain all production invariants.
+        shortwin_litesvm_tests::invariants::positions::allow_injected_borrower_side(false);
+        shortwin_litesvm_tests::invariants::lender::allow_shareless_borrow(false);
+        let tokens = 2_000_000_000_000_000_000;
+        let ata = lab.user("old").ata;
+        let payer = lab.env.payer.insecure_clone();
+        tokens::mint_to(
+            &mut lab.env.svm,
+            &payer,
+            &lab.k.mint,
+            &ata,
+            &lab.mint_authority,
+            tokens - crate::common::USER_TOKENS,
+            TokenProgram::Spl,
+        );
+        let shares = lab.deposit("old", tokens).unwrap();
+        let market = lab.k.market;
+        let donate_and_sweep = |lab: &mut Lab, amount| {
+            ok(lab.env.send(
+                &[
+                    system_instruction::transfer(&payer.pubkey(), &pda::trader(&market).0, amount),
+                    sweep_trader_ix(&market, None),
+                ],
+                &[],
+            ));
+        };
+        // Each transfer is rent-exempt even when the harness checks the transaction's
+        // transfer-only prefix. At this share supply, 1,000 lamports remain in carry.
+        let old_income = 1_001_000;
+        let new_income = 1_000_001;
+        donate_and_sweep(&mut lab, old_income);
+        assert_eq!(lab.vault().lender_sol, old_income);
+        if release_first {
+            lab.env.warp(i64::from(lab.lump_vest_s));
+            ok(lab.env.send(&[sweep_trader_ix(&market, None)], &[]));
+            assert_eq!(lab.market().carry.get(), 1_000 * WAD as i128);
+            assert_eq!(lab.market().vest_bal, 0);
+        }
+        assert_eq!(lab.market().borrowed_q, 0);
+        let old_paid = lab.withdraw("old", shares).unwrap();
+        assert!(lab.position("old").is_none());
+        assert_eq!(lab.market().total_shares.get(), 0);
+        assert_eq!(
+            lab.deposit("new", 1),
+            Err(code(ShortwinError::WipeSweepPending))
+        );
+        // Income received with no shares still belongs to the protocol.
+        donate_and_sweep(&mut lab, 1_000_000);
+        assert_eq!(lab.vault().protocol_fees, 1_000_000);
+        let shares = lab.deposit("new", 1).unwrap();
+        donate_and_sweep(&mut lab, new_income);
+        let new_paid = lab.withdraw("new", shares).unwrap();
+        assert_eq!(
+            old_paid,
+            (tokens, old_income),
+            "old cohort owns its swept carry"
+        );
+        assert_eq!(
+            new_paid,
+            (1, new_income),
+            "new cohort receives only its own income"
+        );
+        let p = lab.market().pool();
+        assert_eq!((p.carry, p.carry_r, p.dust), (0, 0, 0));
+        assert_eq!((lab.vault().lender_sol, lab.vault().unmatched), (0, 0));
+        lab.env.assert_invariants();
+    }
+}
+
+/// Borrower accounting is injected through the math API in this lab case. All lender
+/// instructions are real; in particular the final claim event must report only its pot draw,
+/// and the earlier, shareless lender must retain its full rent claim.
+#[test]
+fn last_exit_carry_mismatch_preserves_claims_and_reports_the_pot_draw() {
+    use shortwin_litesvm_tests::tokens;
+
+    for (b_tokens, want_draw) in [
+        (1_000_000_000_000_000_000, 1_000),
+        (3_000_000_000_000_000_000, 0),
+    ] {
+        let mut lab = Lab::new(TokenProgram::Spl);
+        for (name, amount) in [("A", 2_000_000_000_000_000_000), ("B", b_tokens)] {
+            let ata = lab.user(name).ata;
+            let payer = lab.env.payer.insecure_clone();
+            tokens::mint_to(
+                &mut lab.env.svm,
+                &payer,
+                &lab.k.mint,
+                &ata,
+                &lab.mint_authority,
+                amount - crate::common::USER_TOKENS,
+                TokenProgram::Spl,
+            );
+        }
+        let a = lab.deposit("A", 2_000_000_000_000_000_000).unwrap();
+        lab.borrow_raw(1, lab.now() + 1).unwrap();
+        lab.accrue_raw(0, 3_000).unwrap();
+        let b = lab.deposit("B", b_tokens).unwrap();
+        lab.repay_raw(1, 3_000, 0, 3_000, 0).unwrap();
+        let (_, a_paid) = lab.withdraw("A", a).unwrap();
+        assert_eq!((lab.market().borrowed_q, lab.market().receivable), (0, 0));
+        let owner = lab.user("B").kp.insecure_clone();
+        let keys = ix::LenderKeys {
+            owner: owner.pubkey(),
+            mint: lab.k.mint,
+            token_program: lab.k.token_program,
+            owner_token_account: lab.user("B").ata,
+        };
+        let meta = ok(lab.env.send(&[ix::withdraw(&keys, b, 0)], &[&owner]));
+        let ev = events::one::<shortwin::events::Withdraw>(&meta);
+        assert_eq!((ev.sol_paid, ev.pot_draw), (1_000, want_draw));
+        assert!(lab.position("B").is_none());
+        assert_eq!(a_paid + lab.claim("A").unwrap(), 2_000);
+        assert_eq!((lab.vault().lender_sol, lab.vault().unmatched), (0, 0));
+        lab.env.assert_invariants();
+    }
+}
+
 /// AIR-07 (I-07), `pool_model.rebase_vest_demo()` attack row, on the program: every token is
 /// lent, an attacker deposits 1 raw unit before the last settlement, which therefore left
 /// 1 raw token (a rebase, not a full wipe). Before the fix its 5 SOL lump stayed vesting and a

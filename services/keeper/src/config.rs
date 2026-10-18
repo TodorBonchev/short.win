@@ -362,7 +362,7 @@ pub struct PoolSelectConfig {
     /// M4-SEC-7: the best candidates (by locked SOL) evaluated each tick; the rest of a mint's
     /// pools — anyone can create them — are never fetched per tick: 8.
     pub max_candidates: usize,
-    /// M4-SEC-7: the accounts (two per pool: its WSOL vault and LP mint) a discovery's ranking
+    /// M4-SEC-7: the accounts (three per pool: pool, WSOL vault and LP mint) a discovery's ranking
     /// reads per tick and market; a larger discovery is ranked over several ticks: 200.
     pub rank_keys_per_tick: usize,
     /// M7-SEC-8: the most markets whose pool discovery (four `getProgramAccounts` calls each) runs
@@ -614,8 +614,8 @@ impl KeeperConfig {
         if p.fast_discovery_interval_s > p.discovery_interval_s {
             bail!("pool_select.fast_discovery_interval_s exceeds discovery_interval_s");
         }
-        if p.max_candidates == 0 || p.rank_keys_per_tick < 2 {
-            bail!("pool_select.max_candidates must be positive and rank_keys_per_tick at least 2");
+        if p.max_candidates == 0 || p.rank_keys_per_tick < 3 {
+            bail!("pool_select.max_candidates must be positive and rank_keys_per_tick at least 3");
         }
         if p.discoveries_per_tick == 0 {
             bail!("pool_select.discoveries_per_tick must be positive");
@@ -756,6 +756,17 @@ mod tests {
         assert_eq!(cfg.sweep.cashback_min_lamports, 1);
         assert!(cfg.sweep.post_wipe && cfg.sweep.sweep);
         assert_eq!(d.sweep.cashback_interval_s, 7 * 86_400);
+    }
+
+    #[test]
+    fn ranking_budget_must_fit_a_coherent_pool_snapshot() {
+        for keys in [0, 1, 2] {
+            assert!(
+                KeeperConfig::from_toml(&format!("[pool_select]\nrank_keys_per_tick = {keys}"))
+                    .is_err()
+            );
+        }
+        assert!(KeeperConfig::from_toml("[pool_select]\nrank_keys_per_tick = 3").is_ok());
     }
 
     /// pump-final §7 (owner D2): every key of the retired straddle bundle is refused with the

@@ -96,6 +96,7 @@ EXCLUDED = [
     ("services/keeper-litesvm", "keeper test harness"),
     ("services/indexer", "the indexer and API: off-chain, read-only (AUDIT.md §2 out of scope)"),
     ("services/indexer-litesvm", "indexer test harness"),
+    ("services/vendor/postgresql_archive", "vendored ZIP compatibility patch used only by the indexer's optional embedded PostgreSQL test fixture; see PATCH.md"),
     ("tests/litesvm", "the LiteSVM test suites (root workspace member)"),
     ("tests/fuzz", "the invariant fuzz harness (root workspace member)"),
 ]

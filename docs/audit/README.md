@@ -11,5 +11,5 @@ The audit package for short.win's external security review (M10). The entry poin
 | [`findings.md`](findings.md) | The findings tracker and the resolution of each finding | during the engagement |
 | [`ai-review/`](ai-review/README.md) | An AI-assisted review of v1.0.0 (not a formal audit): its findings, the triage of its leads, and the proposed fixes on the `ai-review-fixes` branch | 2026-10-12 |
 | [`ai-review-2/`](ai-review-2/README.md) | AI review 2, of short.win 1.0.1 (not a formal audit; stopped after pass 1 of 3): the report, the proofs of concept, pass 2's unjudged agent reports, and what it did not cover | 2026-10-17 |
+| [`ai-review-3/`](ai-review-3/README.md) | AI review 3, a static two-pass review of draft 1.0.2 at `b815269`: 8 findings, 23 leads, all 83 raw candidate dispositions, coverage and patch-check evidence; draft 1.0.3 implementation tracked separately | 2026-10-18 |
 | `README.md` | This index | |
-

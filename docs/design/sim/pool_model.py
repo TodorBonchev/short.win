@@ -199,7 +199,7 @@ class Pool:
         self.carry = 0
         self.acc_r = 0           # realised allocation, WAD lamports per share
         self.carry_r = 0
-        self.dust = 0            # lamports*WAD dropped at epoch rolls
+        self.dust = 0            # lamports*WAD dropped at epoch rolls and last-exit sub-lamport residues
         self.sol_vault = 0       # MarketVault.lender_sol
         self.unmatched = 0       # MarketVault pot: realised SOL beyond its receivers' entitlement (R3A-2)
         self.protocol = 0        # lender credits that found no lender (S == 0, no live wipe record)
@@ -754,6 +754,14 @@ class Pool:
         L.shares -= shares
         L.withdrawn += amount
         self.S -= shares
+        if self.S == 0:
+            # Whole unallocated credits belong to the last holder, as does the flushed
+            # vest. Keep earlier lenders' backing in the pot when the two carries differ.
+            L.pending += self.carry // WAD
+            L.real += self.carry_r // WAD
+            self._to_pot(L)
+            self.dust += self.carry % WAD + self.carry_r % WAD
+            self.carry = self.carry_r = 0
         if self.S == 0 and self.empty_sweep_gate:
             self.wipe_swept = False            # AIR-08: no lender again; the next deposit waits for the sweep
         self.T -= amount

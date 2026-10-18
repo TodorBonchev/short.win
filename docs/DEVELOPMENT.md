@@ -605,7 +605,10 @@ candidate every open position fits (since #100 with the fee-scaled caps at `min(
 since #101 at most 25 bps)
 — on Raydium AMM v4,
 CPMM and list-only markets; M4-SEC-7: discovered pools ranked by locked SOL, at most
-`rank_keys_per_tick` (200) accounts read a tick and the best `max_candidates` (8) evaluated,
+`rank_keys_per_tick` (200) accounts read a tick and the best `max_candidates` (8) evaluated
+(draft 1.0.3: three accounts per pool — pool counter, WSOL vault and LP mint — in complete
+groups of at most 99 keys; the default ranks 66 pools per tick, and custom budgets must be
+at least 3; a failed RPC group retains the batch for retry),
 after the tick's exits and crank batch; config `[pool_select]` in `keeper.example.toml`; since M5
 duty 6 on the pump curve — `migrate_v2` as soon as a covered curve completes (since pump-final P4
 a position past `rT` exits in one instruction, and the straddle bundle with its `complete_curve`

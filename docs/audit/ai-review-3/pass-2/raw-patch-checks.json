@@ -1,0 +1,249 @@
+[
+  {
+    "sha256": "a1500428566c7a7e5707473832a7dc1c5f25374b7c76f6c4efeee129ca92e4f4",
+    "sources": [
+      {
+        "raw_id": "p2-a01-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "4d519ab4afbb1a04c0c313cd3b6f058e518a1eefc1fdf6f9b1fcaf717e910d56",
+    "sources": [
+      {
+        "raw_id": "p2-a02-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "3aa11f29a78856c3ba23fb17e388fd189a348e8f57ba87c1c661f59ba14bf86f",
+    "sources": [
+      {
+        "raw_id": "p2-a02-b02",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "39083b2af0fea8feeb8ea77f213e91052a1059af309df445244f135772c7e67a",
+    "sources": [
+      {
+        "raw_id": "p2-a04-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": false,
+    "stderr": "error: patch failed: programs/shortwin/src/instructions/close_short.rs:89\nerror: programs/shortwin/src/instructions/close_short.rs: patch does not apply\nerror: patch failed: programs/shortwin/src/instructions/liquidate.rs:127\nerror: programs/shortwin/src/instructions/liquidate.rs: patch does not apply\nerror: patch failed: programs/shortwin/src/instructions/expire.rs:88\nerror: programs/shortwin/src/instructions/expire.rs: patch does not apply\nerror: patch failed: programs/shortwin/src/instructions/sol_settle.rs:126\nerror: programs/shortwin/src/instructions/sol_settle.rs: patch does not apply",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "3c18a3be32020b70cca4105cff034d0a20705eb46eddd9b7fd1f033060f3fa69",
+    "sources": [
+      {
+        "raw_id": "p2-a05-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "007961919a5297b5a1ccde1b5fafe5a73f11c720035faaf049d0a9e5388a4b81",
+    "sources": [
+      {
+        "raw_id": "p2-a06-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "58bcea41e3c5d50cf248187badc48423c0796a6599c0f4a0c223829775189046",
+    "sources": [
+      {
+        "raw_id": "p2-a06-b02",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "ec6ccf7d00c7350afe6a5a39e5e89eb668237db08148d7f283a097efa8369f33",
+    "sources": [
+      {
+        "raw_id": "p2-a06-b03",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "da9b00ed261857f929c5394ceb236eb61649ad6fc359c974c1fb1d0bd15b7b09",
+    "sources": [
+      {
+        "raw_id": "p2-a06-b04",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "3915b3c783493b5f5baeb43687e9fba9400b2703411e443f49ae53d0c90e6df1",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "1d0387cf9fe5f791b113fdc6a81511cf58fcb5c8936fff9ae4caeafa46b2aae7",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b02",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "37006611473db25a3e529d8ce5f4565d36e22551170a8c08ec8087779390453c",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b03",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "949b5e4da4407507ed10e1688af32d2af77767c053d4555908341a84472cb797",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b04",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "38b96ea6b96bdab43a63bb82120bccf734080e55df8fc580a9f6ab4305594295",
+    "sources": [
+      {
+        "raw_id": "p2-a07-b05",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "b5ab5ce04e406ab6c0709bcec1276b2102fb1f98220355d3b7c68c299de1a054",
+    "sources": [
+      {
+        "raw_id": "p2-a08-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "61e396360cc1dd1db2062b0494b62188f37b84e8f61faa49865764cb9bd745b1",
+    "sources": [
+      {
+        "raw_id": "p2-a09-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "c952551d83e86d98be131a7902844e65de832819d0786a56e54c74c8f7dfc389",
+    "sources": [
+      {
+        "raw_id": "p2-a09-b02",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "19d3d04ffc02d14169de9cf4f11f6133deb8c71941e25ab566fdf02f4096d975",
+    "sources": [
+      {
+        "raw_id": "p2-a11-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  },
+  {
+    "sha256": "e6d8a254c4954b349d5378a53010f48d46e8fd91cf3893a2d4e70903da1ae8e7",
+    "sources": [
+      {
+        "raw_id": "p2-a12-b01",
+        "option": 1
+      }
+    ],
+    "passes_apply_check": true,
+    "stderr": "",
+    "applied": false,
+    "compiled": false
+  }
+]

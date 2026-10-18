@@ -1,0 +1,146 @@
+Pass 1 specialist 10: numerical-gap
+Frozen repository commit: b815269224ba0f5d946f49de7e113220c4067041
+rust-auditor commit: 6c41e1d46386de7fd9b1fa48c847e876ac8b2676
+Source: .audit-mZFuf8/agent-10-bundle.md; initial production reads came from this bundle.
+Method: static source review; no builds, tests, simulations, or runtime PoCs. Pure Python integer arithmetic checked the conditional fee example.
+Release context: on-chain/math overflow checks ON; services release overflow checks unset. Services production source was not reviewed.
+Coverage terms: FULL_PRODUCTION means every line before the trailing cfg(test) block was read, including comments. BOUNDED means only the listed original-file ranges. SEARCH_ONLY means symbol hits only. UNREAD means no substantive source review. Mechanical whole-bundle searches do not turn unread files into reviewed files.
+Two broad initial outputs were truncated; their assigned production sections were subsequently recovered with bounded reads. Coverage below does not rely on unseen truncated content.
+Instructions reviewed: build context, specialist/SOP/shared rules/report language, account-map review-lead table, assigned P4/P5/P8/B10/B11/B16/B17 and Part C patterns. The entire 61,414-line bundle was not read.
+Tests: occasional adjacent test comments appeared in bounded output, but tests do not count toward production coverage or findings.
+Rejected candidate: math pool permits zero-output share burns, but production withdraw lines 206-210 rejects S=0 with borrowed_q>0 (LastSharesBorrowed); no production underflow finding.
+Results: 0 FINDING; 1 LEAD, conditional fixed-supply curve fee basis. No finding diff is required because no FINDING was emitted.
+
+status	file	original source line ranges	bundle line ranges
+FULL_BUILD_CONTEXT	./crates/shortwin-math/Cargo.toml	all	7-29
+FULL_BUILD_CONTEXT	./crates/shortwin-venue-state/Cargo.toml	all	30-52
+FULL_BUILD_CONTEXT	./programs/shortwin/Cargo.toml	all	53-105
+FULL_BUILD_CONTEXT	./services/common/Cargo.toml	all	106-146
+FULL_BUILD_CONTEXT	./services/keeper/Cargo.toml	all	147-209
+FULL_BUILD_CONTEXT	./Cargo.toml	all	210-251
+FULL_BUILD_CONTEXT	./Anchor.toml	all	252-287
+FULL_BUILD_CONTEXT	./services/Cargo.toml	all	288-401
+FULL_PRODUCTION	./crates/shortwin-math/src/bounds.rs	1-355	405-759
+FULL_PRODUCTION	./crates/shortwin-math/src/caps.rs	1-406	1117-1522
+UNREAD	./crates/shortwin-math/src/consts.rs	none	none
+UNREAD	./crates/shortwin-math/src/error.rs	none	none
+FULL_PRODUCTION	./crates/shortwin-math/src/fees.rs	1-457	2184-2640
+UNREAD	./crates/shortwin-math/src/lib.rs	none	none
+UNREAD	./crates/shortwin-math/src/num/mod.rs	none	none
+UNREAD	./crates/shortwin-math/src/num/u256.rs	none	none
+FULL_PRODUCTION	./crates/shortwin-math/src/observe.rs	1-989	4131-5119
+UNREAD	./crates/shortwin-math/src/params.rs	none	none
+UNREAD	./crates/shortwin-math/src/persist.rs	none	none
+FULL_PRODUCTION	./crates/shortwin-math/src/pool.rs	1-2535	7592-10126
+UNREAD	./crates/shortwin-math/src/pool_select.rs	none	none
+UNREAD	./crates/shortwin-math/src/quote/cpmm.rs	none	none
+UNREAD	./crates/shortwin-math/src/quote/mod.rs	none	none
+FULL_PRODUCTION	./crates/shortwin-math/src/quote/pricing.rs	1-241	11777-12017
+UNREAD	./crates/shortwin-math/src/quote/ray_v4.rs	none	none
+FULL_PRODUCTION	./crates/shortwin-math/src/quote/reprice.rs	1-90	12393-12482
+FULL_PRODUCTION	./crates/shortwin-math/src/quote/sol_leg.rs	1-107	12545-12651
+BOUNDED	./crates/shortwin-math/src/quote/straddle.rs	1-296	12735-13030
+FULL_PRODUCTION	./crates/shortwin-math/src/rent.rs	1-442	13406-13847
+FULL_PRODUCTION	./crates/shortwin-math/src/risk.rs	1-422	14081-14502
+FULL_PRODUCTION	./crates/shortwin-math/src/settle.rs	1-754	14644-15397
+FULL_PRODUCTION	./crates/shortwin-math/src/tier.rs	1-388	16040-16427
+FULL_PRODUCTION	./crates/shortwin-math/src/waterfall.rs	1-388	16729-17116
+UNREAD	./crates/shortwin-venue-state/src/bytes.rs	none	none
+UNREAD	./crates/shortwin-venue-state/src/lib.rs	none	none
+UNREAD	./crates/shortwin-venue-state/src/mint.rs	none	none
+UNREAD	./crates/shortwin-venue-state/src/program_data.rs	none	none
+BOUNDED	./crates/shortwin-venue-state/src/pump.rs	626-733	18845-18952
+UNREAD	./crates/shortwin-venue-state/src/pump_amm.rs	none	none
+UNREAD	./crates/shortwin-venue-state/src/pyth.rs	none	none
+UNREAD	./crates/shortwin-venue-state/src/raydium_cpmm.rs	none	none
+UNREAD	./crates/shortwin-venue-state/src/raydium_v4.rs	none	none
+UNREAD	./crates/shortwin-venue-state/src/token_account.rs	none	none
+UNREAD	./programs/shortwin/src/constants.rs	none	none
+UNREAD	./programs/shortwin/src/engine/arming.rs	none	none
+FULL_PRODUCTION	./programs/shortwin/src/engine/bounds.rs	1-151	24004-24154
+FULL_PRODUCTION	./programs/shortwin/src/engine/caps.rs	1-143	24160-24302
+UNREAD	./programs/shortwin/src/engine/guard.rs	none	none
+UNREAD	./programs/shortwin/src/engine/lender.rs	none	none
+UNREAD	./programs/shortwin/src/engine/mod.rs	none	none
+FULL_PRODUCTION	./programs/shortwin/src/engine/observe.rs	1-98	25073-25170
+UNREAD	./programs/shortwin/src/engine/pool_select.rs	none	none
+BOUNDED	./programs/shortwin/src/engine/prologue.rs	1-120	26696-26815
+UNREAD	./programs/shortwin/src/engine/route.rs	none	none
+FULL_PRODUCTION	./programs/shortwin/src/engine/tier.rs	1-109	27306-27414
+UNREAD	./programs/shortwin/src/engine/trader.rs	none	none
+FULL_PRODUCTION	./programs/shortwin/src/engine/waterfall.rs	1-140	27931-28070
+UNREAD	./programs/shortwin/src/errors.rs	none	none
+UNREAD	./programs/shortwin/src/events.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/add_margin.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/apply_config.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/cancel_config.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/claim_sol.rs	none	none
+SEARCH_ONLY	./programs/shortwin/src/instructions/close_short.rs	symbol hits; no contiguous function coverage	whole-bundle rg hits
+UNREAD	./programs/shortwin/src/instructions/cover_deficit.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/crank_price.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/crank_sol_usd.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/create_market.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/deposit.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/disable_venue.rs	none	none
+SEARCH_ONLY	./programs/shortwin/src/instructions/execute_pool_switch.rs	symbol hits; no contiguous function coverage	whole-bundle rg hits
+SEARCH_ONLY	./programs/shortwin/src/instructions/expire.rs	symbol hits; no contiguous function coverage	whole-bundle rg hits
+UNREAD	./programs/shortwin/src/instructions/flag_unsafe_mint.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/flag_venue_upgraded.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/initialize_config.rs	none	none
+BOUNDED	./programs/shortwin/src/instructions/liquidate.rs	397-732	32950-33285
+UNREAD	./programs/shortwin/src/instructions/mod.rs	none	none
+BOUNDED	./programs/shortwin/src/instructions/open_short.rs	347-662	33730-34045
+UNREAD	./programs/shortwin/src/instructions/propose_config.rs	none	none
+SEARCH_ONLY	./programs/shortwin/src/instructions/propose_pool.rs	symbol hits; no contiguous function coverage	whole-bundle rg hits
+UNREAD	./programs/shortwin/src/instructions/revalidate_venue.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/set_coverage_pause.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/set_pause.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/set_route_broken.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/set_venue_extras.rs	none	none
+BOUNDED	./programs/shortwin/src/instructions/sol_settle.rs	134-344	35280-35490
+UNREAD	./programs/shortwin/src/instructions/sweep_protocol_fees.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/sweep_trader.rs	none	none
+UNREAD	./programs/shortwin/src/instructions/sync_lender.rs	none	none
+FULL_PRODUCTION	./programs/shortwin/src/instructions/withdraw.rs	1-316	36390-36705
+UNREAD	./programs/shortwin/src/lamports.rs	none	none
+UNREAD	./programs/shortwin/src/lib.rs	none	none
+UNREAD	./programs/shortwin/src/mint_filter.rs	none	none
+UNREAD	./programs/shortwin/src/state/config.rs	none	none
+UNREAD	./programs/shortwin/src/state/epoch.rs	none	none
+UNREAD	./programs/shortwin/src/state/exposure.rs	none	none
+UNREAD	./programs/shortwin/src/state/layout_asserts.rs	none	none
+UNREAD	./programs/shortwin/src/state/lender.rs	none	none
+UNREAD	./programs/shortwin/src/state/market.rs	none	none
+UNREAD	./programs/shortwin/src/state/mod.rs	none	none
+UNREAD	./programs/shortwin/src/state/oracle.rs	none	none
+UNREAD	./programs/shortwin/src/state/pod.rs	none	none
+UNREAD	./programs/shortwin/src/state/position.rs	none	none
+UNREAD	./programs/shortwin/src/state/vault.rs	none	none
+UNREAD	./programs/shortwin/src/state/venue_extras.rs	none	none
+UNREAD	./programs/shortwin/src/state/venue_guard.rs	none	none
+UNREAD	./programs/shortwin/src/venues/detect.rs	none	none
+SEARCH_ONLY	./programs/shortwin/src/venues/mod.rs	symbol hits; no contiguous function coverage	whole-bundle rg hits
+UNREAD	./programs/shortwin/src/venues/pump_amm.rs	none	none
+BOUNDED	./programs/shortwin/src/venues/pump_curve.rs	403-533	45230-45360
+UNREAD	./programs/shortwin/src/venues/raydium.rs	none	none
+UNREAD	./programs/shortwin/src/venues/raydium_cpmm.rs	none	none
+UNREAD	./programs/shortwin/src/venues/raydium_v4.rs	none	none
+UNREAD	./services/common/src/chain.rs	none	none
+UNREAD	./services/common/src/tx.rs	none	none
+UNREAD	./services/keeper/src/budget.rs	none	none
+UNREAD	./services/keeper/src/coverage.rs	none	none
+UNREAD	./services/keeper/src/decide.rs	none	none
+UNREAD	./services/keeper/src/fees.rs	none	none
+UNREAD	./services/keeper/src/graduation.rs	none	none
+UNREAD	./services/keeper/src/ixs.rs	none	none
+UNREAD	./services/keeper/src/monitor.rs	none	none
+UNREAD	./services/keeper/src/pda.rs	none	none
+UNREAD	./services/keeper/src/pool_monitor.rs	none	none
+UNREAD	./services/keeper/src/sweep.rs	none	none
+UNREAD	./services/keeper/src/venue.rs	none	none
+UNREAD	./services/keeper/src/view.rs	none	none
+
+Counts: {'FULL_BUILD_CONTEXT': 8, 'FULL_PRODUCTION': 19, 'UNREAD': 88, 'BOUNDED': 7, 'SEARCH_ONLY': 5}
+Full production lines read (comments included, trailing tests excluded): 8531
+Bounded lines read additionally: 1518
+No claim of coverage of all 58,914 source lines.
