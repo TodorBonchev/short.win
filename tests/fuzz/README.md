@@ -460,6 +460,7 @@ The M10 fuzz follow-ups add no finding (nor do their review fixes: every `credit
 | P7, `--profile pumpswap`, `--seed 77500000`, `--actions 400` (1 h) | the same | 3,678 s | 4 | 1,121 | 221,011 | 3,241,966 | 6,015,979 | 0 | 0 |
 | P7 review fixes, `--profile curve`, `--seed 77600000`, `--actions 400` (10 minutes) | `3e3b43b` as committed (the legacy `complete_curve` parsed with `a` odd; `crowd_v3_trades_land`) | 652 s | 4 | 327 | 58,948 | 779,003 | 1,414,529 | 0 | 0 |
 | run-101 (the 24 h run on 1.0.1, stopped for FUZZ-101-24H-A's fix), `--seed 101000000`, `--actions 400` | `eb84737` (release `72c82879…`, test-venue `fd46da2c…`; the fuzzer before FUZZ-101-24H-A's fix) | 3,903 s (stopped) | 4 | 1,496 | 286,746 | 3,707,965 | — (stopped before its summary) | 1 (FUZZ-101-24H-A: the JIT oracle's minted shares mixed share epochs, in its first minute) | 0 |
+| run-102 (the 24 h run on 1.0.1, the fixed fuzzer), `--seed 101000000`, `--actions 400` | `b13ee22` (the `tests/fuzz` of `9062dabc`; release `72c82879…`, test-venue `fd46da2c…`: the 1.0.1 bytes; re-runs run-101's seed stream, FUZZ-101-24H-A's seed included; the JIT oracle checked 5,510 bundles, 358 around a settlement, 33 with the lender behind the share epoch) | 86,420 s | 4 | 35,016 | 6,775,400 | 87,481,138 | 168,031,994 | 0 | 0 |
 
 In the M10 fuzz follow-ups' final runs: on `cpmm`, 180 liquidations and 337 expiries landed through
 the CPMM differential oracle (every lamport; 25 / 31 more through AMM v4's on adopted candidates),

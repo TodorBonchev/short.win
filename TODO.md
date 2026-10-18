@@ -216,8 +216,11 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
 - [ ] The Surfpool fork run of a synthetic close (pump-final §14 "Fork",
       `tests/litesvm/tests/graduation_surfpool.rs`, which still names the 2026-10-02 builds): not
       run (no Surfpool here).
-- [ ] A ≥ 24 h fuzz run on 1.0.1 (AUDIT.md §12's fix policy); P7 ran 10-minute smokes and ≈ 1 h
-      per profile.
+- [x] A ≥ 24 h fuzz run on 1.0.1 (AUDIT.md §12's fix policy): **clean.** Run-102 (2026-10-17/18,
+      the 1.0.1 bytes `72c82879…`, the fuzzer of `9062dabc`, `--seed 101000000`, 4 jobs, 86,420 s):
+      35,016 runs, 6,775,400 actions, 0 failures, 0 anomalies. Run-101 before it found
+      FUZZ-101-24H-A, the fuzzer's bug, not the program's (fixed in `9062dabc`;
+      `tests/fuzz/README.md`). It covers 1.0.1, not the draft 1.0.2, which needs its own run.
 
 ## Code and tooling
 
