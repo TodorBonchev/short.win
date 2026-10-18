@@ -696,3 +696,13 @@ already followed; the only crate change is `params`, below):
 - The vest-end precondition in `pool_model.py` `_vest`, E §9.4 and A §3.3 (M0B-A-2).
 - `docs/design/arch/cu_math` (V18's bench, v0.3 API) is marked superseded by
   `tests/bench/cu_math`.
+
+## Licence
+
+Business Source License 1.1 (`LICENSE` in this package; Change Date 2030-10-01, Change
+License Apache-2.0). Production use is permitted solely to interact with the Official
+Deployment, as set out in the Additional Use Grant and in
+[GRANTS.md](https://github.com/TodorBonchev/short.win/blob/main/GRANTS.md).
+
+This crate also contains code adapted from Raydium under Apache-2.0; see [NOTICE](NOTICE)
+and [LICENSE-APACHE](LICENSE-APACHE).

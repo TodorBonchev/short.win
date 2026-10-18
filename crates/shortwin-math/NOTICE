@@ -1,0 +1,23 @@
+shortwin-math
+Copyright 2026 Todor Bonchev
+
+This crate is licensed under the Business Source License 1.1 (the LICENSE file in this
+package; see also https://github.com/TodorBonchev/short.win/blob/main/GRANTS.md, part of its Additional Use Grant), except as
+noted below.
+
+Code adapted from Raydium (Apache License, Version 2.0)
+-------------------------------------------------------
+The following files reimplement Raydium's quote arithmetic so that short.win prices its
+legs exactly as the venues do. The adapted parts remain under the Apache License 2.0
+(full text in LICENSE-APACHE); the rest of each file is under BUSL-1.1.
+
+- src/quote/cpmm.rs: adapted from raydium-io/raydium-cp-swap @ 59fb845
+  (curve/calculator.rs, curve/fees.rs, instructions/swap_base_{input,output}.rs)
+  https://github.com/raydium-io/raydium-cp-swap
+- src/quote/ray_v4.rs: adapted from raydium-io/raydium-amm @ d26944b
+  (processor.rs process_swap_base_{in,out}_v2, math.rs swap_token_amount_base_{in,out})
+  https://github.com/raydium-io/raydium-amm
+
+Copyright (c) Raydium. Licensed under the Apache License, Version 2.0. The upstream
+repositories carry no NOTICE file. Changes: ported to no_std u128/U256 arithmetic with
+explicit rounding, as described in each file's header.
