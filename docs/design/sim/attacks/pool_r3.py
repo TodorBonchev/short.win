@@ -6,6 +6,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 import pool_model as pm   # noqa: E402
+pm.AUDIT2_MODEL = False  # Preserve this historical comparison's pre-AIR2 reference model.
 
 if __name__ == "__main__":
     print("R3A-2 stranded SOL after an honest wind-down (40 seeds x 3,000 ops):")

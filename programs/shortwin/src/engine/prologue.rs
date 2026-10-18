@@ -87,6 +87,21 @@ pub fn sync_market_params(config: &GlobalConfig, market: &mut Market, now: i64) 
 /// lamport a second of lender rent). On a list-only market (no price) and with no open position
 /// both are 0 and only the vest is released. Returns the lender credit.
 pub fn accrue(market: &mut Market, pool: &mut Pool, vault: &mut Vault, now: i64) -> Result<u64> {
+    if market.deposit_hold_until == 0 {
+        // Legacy dust flushes did not invalidate source bits. Re-check every source once;
+        // an empty vest alone does not prove that old cashback has already been collected.
+        pool.wipe_swept = 0;
+        market.deposit_hold_until = now.max(pool.vest_end).max(1);
+    }
+    if market.deposit_hold_until < 0
+        && pool.total_shares > 0
+        && super::lender::rewards_required(market)
+        && pool.wipe_swept & pool::WIPE_REWARDS_CLAIMED == 0
+    {
+        // A zero trader sweep can precede a later cashback claim. That later value enters
+        // through Trader again and may vest; hold deposits until it has actually released.
+        market.deposit_hold_until = now.max(pool.vest_end).max(1);
+    }
     let dt = u64::try_from(now.saturating_sub(market.last_accrual_ts)).unwrap_or(0);
     let util = rent::utilization_bps(pool.tokens_free, pool.borrowed_q).math()?;
     let mut basis = market.basis();
@@ -147,6 +162,11 @@ pub fn run(
     slot: u64,
 ) -> Result<Prologue> {
     let now = market_now(market, clock_now);
+    if market.restart_ema_count == 0 {
+        // Legacy accounts cannot identify an earlier restart. Invalidate existing arms once
+        // when first touched after upgrade; new arms use integrations after this marker.
+        market.mark_observation_restart(market.ema_count)?;
+    }
     sync_market_params(config, market, now);
     let mut pool = market.pool();
     let lender_credit = accrue(market, &mut pool, vault, now)?;
@@ -169,15 +189,22 @@ pub fn run(
             // curve's — is neither recorded nor a route observation of the new venue: the
             // chains the transition cleared start afresh at its first observation.
             pump_amm::restart_observation(&mut obs, pump_curve::graduation_anchor(st))?;
+            market.mark_observation_restart(obs.ema.count)?;
             changed = true;
         } else {
             // A PumpSwap market without a price starts it at its first executable observation,
             // marked for the warm-up (a PumpSwap listing or re-detection, M6), its liquidity
             // capped at the pool's locked depth `D` (M6R-1; over `λ_min` = 100 %, OWNER-M6D-1).
-            if market.venue_kind() == Some(VenueKind::PumpSwap) {
-                pump_amm::start_price(&mut obs, st, now)?;
+            let started = market.venue_kind() == Some(VenueKind::PumpSwap)
+                && pump_amm::start_price(&mut obs, st, now)?;
+            if started {
+                market.mark_observation_restart(obs.ema.count)?;
             }
-            recorded = observe::record(&mut obs, now, st)?;
+            // The start sample must not enter the warm-up bucket: its running minimum would
+            // otherwise pin the EMA to a briefly pushed-down spot through all eight steps.
+            if !started {
+                recorded = observe::record(&mut obs, now, st)?;
+            }
             let chains = route::observe_chains(config, market, st, now);
             (s3, pf, changed) = (chains.s3_no_route, chains.pool_fail, chains.changed);
             refresh_locked_depth(market, &mut obs, st);

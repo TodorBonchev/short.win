@@ -204,7 +204,7 @@ export async function loadSnapshot(
         fetchedAt: Date.now(),
         ...(opts.allowTestVenue === undefined ? {} : { allowTestVenue: opts.allowTestVenue }),
     });
-    return { snapshot, get };
+    return { snapshot: snapshot && { ...snapshot, clockVerified: clock !== null }, get };
 }
 
 /** The wallet's open quantity in a market (`WalletExposure.q_open`; 0 without a record). */

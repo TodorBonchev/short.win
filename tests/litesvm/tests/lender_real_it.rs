@@ -1435,7 +1435,8 @@ mod rent {
             "A26: the snapshot holds"
         );
 
-        // A position opened now snapshots 30 %.
+        // Integrate the current observation after the timelock, then snapshot 30 %.
+        sc.env.tick(&sc.mm, 1);
         let mut b3 = sc.env.borrower();
         let (_, n3, _) = open_ok(&mut sc.env, &sc.mm, &mut b3, Q);
         assert_eq!(

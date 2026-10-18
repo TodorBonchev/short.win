@@ -319,6 +319,14 @@ fn evaluate<'info>(
             let mut aggr = market.aggr();
             engine_waterfall::remove_position(&mut market, &mut aggr, pos)?;
             market.set_aggr(&aggr);
+            // AIR-09 vests a halted venue's token take. New shares did not own the tokens
+            // that were extinguished, so they cannot join until this vest has released.
+            if !inp.executable && !settled.flushed && pool.vest_bal != 0 {
+                market.deposit_hold_until = market.deposit_hold_until.max(pool.vest_end);
+            }
+            if settled.hold {
+                market.deposit_hold_until = market.deposit_hold_until.max(pool.vest_end);
+            }
             market.set_pool(&pool);
             Some(Booked {
                 settlement: s,

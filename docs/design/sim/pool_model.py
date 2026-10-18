@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-short.win -- lender-pool accounting reference model + property tests (v0.4.2).
+short.win -- lender-pool accounting reference model + property tests (v0.4.2 + AIR2).
 
 Companion to docs/design/ECONOMICS.md §9 (normative for the math crate's `pool`
 module, ARCH §3.3).  Standard library only; deterministic.
 
     python3 pool_model.py            # invariant fuzzing, liveness, attack / edge-case demos
     python3 pool_model.py --ops 200000 --seed 7
+    python3 -m unittest discover -s . -p 'test_*.py' -v
+
+Current AIR2 arithmetic is the default for Pool and the invariant fuzz. The dated
+comparison tables printed afterwards explicitly retain the pre-AIR2 model; use
+--historical to reproduce its fuzz too. See README.md for output provenance.
 
 Model (all integers; rounding in favour of the pool):
   * Token claims: shares are pro-rata claims on T + B (unborrowed + borrowed tokens,
@@ -100,6 +105,10 @@ VA = 1            # virtual token unit
 R_MAX = 1_000_000   # max shares per raw token unit before a rebase
 REBASE = 1_000
 VEST_FLUSH_RATIO = 1_000   # AIR-07: a settlement leaving <= 1/1,000 of the token claims it found flushes the vest
+WIPE_TRADER_SWEPT, WIPE_REWARDS_CLAIMED = 1, 2
+WIPE_BOTH = WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+# New model instances use current arithmetic; historical analysis drivers explicitly opt out.
+AUDIT2_MODEL = True
 U128 = 2**128 - 1
 LUMP_VEST_S = 6 * 3600       # PROPOSED lump_vest_s (ECON §15)
 LOCK_GRACE_S = 86_400        # PROPOSED lock_grace_s (ECON §15)
@@ -147,9 +156,15 @@ class Pool:
                  wipe_sweep_gate: bool = True, exit_flush_bps: int = 0, lock_floor: bool = True,
                  cum_convert: bool = True, fwd_chain: bool = True, vest_floor: bool = True,
                  dust_flush: bool = True, empty_sweep_gate: bool = True, pi_era_reset: bool = True,
-                 drain_gate: bool = True):
+                 drain_gate: bool = True, audit2: bool | None = None,
+                 settlement_deposit_gate: bool = True, rewards_required: bool = True):
         assert mode in ("continuous", "release")
         self.mode = mode
+        self.audit2 = AUDIT2_MODEL if audit2 is None else audit2
+        # This marker is program state, outside the math crate's Pool. Its vector recorder
+        # disables only this gate; whole-program simulations keep it enabled.
+        self.settlement_deposit_gate = settlement_deposit_gate
+        self.rewards_required = rewards_required
         self.util_cap = util_cap_bps
         self.prorata = prorata
         self.lump_vest_s = lump_vest_s
@@ -196,6 +211,10 @@ class Pool:
         self.vest_bal = 0        # R3B-2: unreleased lump SOL (already in sol_vault)
         self.vest_last = 0
         self.vest_end = 0
+        # Program deposit gate: -1 initialized, 0 legacy, positive settlement hold. The actual
+        # remaining vest controls release, even if later income extends its saved timestamp.
+        self.deposit_hold_until = -1
+        self.cal_day = 0        # first live calendar day; monotonic even if Clock goes backwards
         self.epoch = 0
         self.epochs = {}         # e -> [acc_end, num, den, acc_r_end, s_old, carry, carry_r, conv_rem]
         self.wipe_live = False
@@ -205,7 +224,7 @@ class Pool:
         self.lock_cal = {}       # bucket index (lock_until // LOCK_BUCKET_S) -> sum of lock terms expiring then
         self.b_min = 0
         self.max_release = 0     # latest (deadline + S3 tail) of any position opened so far (R3B-1, R4A-8)
-        self.wipe_swept = True   # v0.4.1 (R4A-7): trader / venue rewards swept into the live wipe record
+        self.wipe_swept = WIPE_BOTH  # AIR2 dust flush can clear these source bits even with S > 0
         self.lenders = {}
         self.positions = {}      # pid -> [q, index_open, p_rent, deadline]
         self.vault_token_balance = 0
@@ -216,6 +235,7 @@ class Pool:
     def advance(self, dt: int, d_index: int = 0):
         """accrue(): time passes (vest release), market rent index grows by d_index."""
         self.now += dt
+        self._prepare_program_accounting()
         self._release()
         if d_index:
             self.index += d_index
@@ -229,6 +249,22 @@ class Pool:
 
     def accrue(self, d_index: int):                  # backwards-compatible helper
         self.advance(0, d_index)
+
+    def _prepare_program_accounting(self):
+        """Program prologue before math accrual; absent from the pure Pool ABI/fixtures.
+
+        Legacy source bits cannot attest that pre-upgrade cashback was collected. A reward
+        claimed after an empty trader sweep can re-vest through that already-complete source;
+        the hold protects it until the actual common vest releases, even after both bits set.
+        """
+        if not (self.audit2 and self.settlement_deposit_gate):
+            return
+        if self.deposit_hold_until == 0:
+            self.wipe_swept = 0
+            self.deposit_hold_until = max(self.now, self.vest_end, 1)
+        if (self.deposit_hold_until < 0 and self.S and self.rewards_required
+                and not self.wipe_swept & WIPE_REWARDS_CLAIMED):
+            self.deposit_hold_until = max(self.now, self.vest_end, 1)
 
     def _release(self):
         if self.vest_bal == 0:
@@ -272,6 +308,8 @@ class Pool:
         O(buckets elapsed) <= LOCK_BUCKETS on-chain (a ring indexed by day)."""
         if not (self.lock_calendar and self.lock_expiry):
             return
+        if self.audit2:
+            self.cal_day = max(self.cal_day, self.now // LOCK_BUCKET_S + 1)
         for b in [b for b in self.lock_cal if b * LOCK_BUCKET_S <= self.now]:
             self.lock_norm -= min(self.lock_cal.pop(b), self.lock_norm)
 
@@ -404,7 +442,7 @@ class Pool:
                 L.shares, rec[7] = divmod(rec[7] + L.shares, den)
             else:
                 L.shares = L.shares * num // den   # a full wipe (conv_rem is not touched); v0.4.1 rebases
-            L.lock = L.lock * num // den
+            L.lock = (min(cdiv(L.lock, den), L.shares) if num else 0) if self.audit2 else L.lock * num // den
             L.lock_term = L.lock_term * num // den     # v0.4.1: keeps the term consistent with the scaled bucket
             L.epoch += 1
             if L.fwd and not settled:
@@ -588,6 +626,8 @@ class Pool:
             return 0
         if self.lock_expiry and self.now >= L.lock_until:
             return 0
+        if self.audit2 and self.lock_calendar and L.lock_until // LOCK_BUCKET_S < self.cal_day:
+            return 0
         return min(cdiv(L.lock * self.pi, L.lock_pi), L.shares)
 
     def locked_total(self) -> int:
@@ -600,13 +640,13 @@ class Pool:
         (every other lender left as it is): the state I-P4 must hold on (R4A-2 / R4B-3)."""
         if who not in self.lenders:
             return 0
-        saved = (self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, dict(self.lock_cal))
+        saved = (self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, dict(self.lock_cal), self.cal_day)
         rems = {e: self.epochs[e][7] for e in range(saved[0].epoch, self.epoch)}   # its touch may convert (KI-65)
         self.lenders[who] = copy.copy(saved[0])
         try:
             return self.free_allowance(who)
         finally:
-            self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, self.lock_cal = saved
+            self.lenders[who], self.unmatched, self.n_touch, self.lock_norm, self.lock_cal, self.cal_day = saved
             for e, r in rems.items():
                 self.epochs[e][7] = r
 
@@ -620,10 +660,12 @@ class Pool:
         su = max(self.S - self.locked_total(), u)
         if su == 0:
             return 0
-        return min(u * self.T // su, L.shares * (self.T + self.B + VA) // (self.S + VS), self.T)
+        by_value = (u if self.audit2 else L.shares) * (self.T + self.B + VA) // (self.S + VS)
+        return min(u * self.T // su, by_value, self.T)
 
     # ---- lender actions -------------------------------------------------------
     def deposit(self, who, amount: int) -> int:
+        self._prepare_program_accounting()
         self._release()
         L = self._touch(who)
         minted = amount * (self.S + VS) // (self.T + self.B + VA)
@@ -637,6 +679,11 @@ class Pool:
             # stop the flush and a later deposit at the collapsed price would take the vest (with S == 0 there is no vest
             # to keep, and a deposit is what brings S back: ARCH §9 M0b note 4)
             raise ValueError("PoolDrained: no deposit while T <= (T + B) / 1,000 with tokens lent out")
+        if self.audit2 and self.settlement_deposit_gate and self.deposit_hold_until >= 0 and self.vest_bal:
+            raise ValueError("PoolDrained: settlement income is still vesting")
+        need = WIPE_BOTH if self.rewards_required else WIPE_TRADER_SWEPT
+        if self.audit2 and self.wipe_swept & need != need:
+            raise ValueError("WipeSweepPending: sweep_trader / claim_venue_rewards first")
         if self.S == 0:
             # R4A-7 after a full wipe; AIR-08 also after the last lender's exit (wipe_swept is cleared then): SOL
             # that reaches the trader while S == 0 is the wiped lenders' or the protocol's (KI-10), so the sweep
@@ -650,6 +697,8 @@ class Pool:
         self.S += minted
         self.T += amount
         self.vault_token_balance += amount
+        if self.audit2:
+            self.deposit_hold_until = -1
         return minted
 
     def cover(self, who, lamports: int):
@@ -661,6 +710,7 @@ class Pool:
         L.real += lamports
 
     def withdraw(self, who, shares: int) -> int:
+        self._prepare_program_accounting()
         self._release()
         L = self._touch(who)
         if L.pending < 0:
@@ -728,21 +778,30 @@ class Pool:
         self.sol_vault -= pay
         return pay
 
-    def sweep_sol(self, lamports: int):
-        """Trader sweep / venue cashback: a lump (vests).  While S == 0 it marks the sweep done (R4A-7, AIR-08:
-        a deposit into a pool without shares waits for it) and tops up the live wipe record, or, with none (every
-        lender left), goes to the protocol (R3A-10)."""
+    def sweep_sol(self, lamports: int, source: int = WIPE_BOTH):
+        """Trader sweep / venue cashback, one source bit or a bundled sweep of both (the default).
+        Ordinary income vests. After a dust flush, each pending source credits the old shares
+        immediately; deposits wait for both sources. While S == 0 it tops up the live wipe record,
+        or goes to the protocol when no record is live (R3A-10, R4A-7, AIR-08)."""
+        self._prepare_program_accounting()
         self.sol_vault += lamports
         self.inflow += lamports
-        if self.S == 0:
-            self.wipe_swept = True
-        self._vest(lamports)
+        assert source in (WIPE_TRADER_SWEPT, WIPE_REWARDS_CLAIMED, WIPE_BOTH)
+        after_flush = self.audit2 and self.S != 0 and self.wipe_swept & source != source
+        if self.S == 0 or after_flush:
+            self.wipe_swept |= source
+        if after_flush:
+            self._release()
+            self._credit(lamports, realised=True)
+        else:
+            self._vest(lamports)
 
     def donate_tokens(self, amount: int):
         self.vault_token_balance += amount
 
     # ---- borrower side ----------------------------------------------------------
     def borrow(self, pid, q: int, duration: int = 30 * 86400, tail: int = S3_TAIL_S):
+        self._prepare_program_accounting()
         self._release()
         if q <= 0 or q > self.T or (self.B + q) * BPS > self.util_cap * (self.T + self.B):
             raise ValueError("utilization cap")
@@ -786,6 +845,7 @@ class Pool:
     def repay(self, pid, rent_paid: int, lender_lump: int):
         """Close / liquidation / expiry: Q returns; rent_paid (total, before the split with
         the position's own protocol share) and lender_lump (penalty share / expiry fee)."""
+        self._prepare_program_accounting()
         self._release()
         q, i_open, p, credited = self._close_pos(pid)
         self.T += q
@@ -806,6 +866,7 @@ class Pool:
         the rent top-up (M10-8C-1): the principal pays `rent` first (R_due, all of it the
         lenders' in a settlement; default the position's accrued rent ceil(q*dI/WAD), R_due
         past min_rent_s), and its part above `credited` vests with the lump."""
+        self._prepare_program_accounting()
         self._release()
         if rent is None:
             q, i_open, _p, _dl = self.positions[pid]
@@ -828,6 +889,10 @@ class Pool:
             # the next depositor taking them.  A just-in-time deposit before it shares the flush, but its tokens
             # stay as claims: at most 1/1,000 of the vest (R4B-6)
             self._flush_vest()
+            if self.audit2:
+                self.wipe_swept = 0
+        if self.audit2 and self.S and self.vest_bal:
+            self.deposit_hold_until = max(1, self.vest_end)
         self._maybe_roll()
 
     # ---- invariants -----------------------------------------------------------------
@@ -1789,7 +1854,7 @@ def rebase_vest_demo():
         p.borrow(1, p.T)
         dep(p, "ATT", 1)
         p.settle(1, 50 * sol, 5 * sol)
-        if p.S == 0:
+        if p.S == 0 or (p.audit2 and not p.wipe_swept):
             p.sweep_sol(0)                        # the post-wipe sweep the newcomer's deposit waits for
         p.deposit("NEW", 10**6)
         p.advance(p.lump_vest_s + 1)
@@ -1805,6 +1870,8 @@ def rebase_vest_demo():
         assert p.T == 1, p.T
         p.advance(60)
         p.settle(1, 50 * sol, 4 * sol, 0)
+        if p.audit2 and not p.wipe_swept:
+            p.sweep_sol(0)                        # AIR2: the dust flush also waits for the pending sweeps
         p.deposit("NEW", 10**6)
         p.advance(p.lump_vest_s + 1)
         rows.append(("organic: two lenders withdrew all they could at 90 % (1 raw token left), 10^6 deposited after",
@@ -1863,6 +1930,8 @@ def orphan_vest_demo(seeds: int = 200):
             p.borrow(2, p.T - 1)
             e0 = p.epoch
             p.settle(2, 10**9)                           # (mostly) a rebase ...
+            if p.audit2 and not p.wipe_swept:
+                p.sweep_sol(0)                          # finish the dust-flush sweep; the demo needs a later vest
             p.sweep_sol(3 * 10**9)                       # ... then a 3 SOL vest
             rolled = p.epoch > e0
             for w in list(p.lenders):                     # everyone leaves while the vest runs
@@ -1893,6 +1962,8 @@ def _rebased_pair(cum: bool, h_rem: int, w_rem: int, w_amount: int = 9_000):
     p.borrow(1, p.T - 1)
     p.settle(1, 10**9)
     assert p.epoch == 1 and p.epochs[0][2] == REBASE, (p.epoch, p.epochs)
+    if p.audit2 and not p.wipe_swept:
+        p.sweep_sol(0)                                  # finish the dust-flush sweep before the demo's later lump
     p.sweep_sol(3 * 10**9)
     return p
 
@@ -2532,16 +2603,23 @@ def latent_residual_table(tuned: int = 3_000, adversarial: int = 5_000):
 
 
 def main():
+    global AUDIT2_MODEL
     ap = argparse.ArgumentParser()
     ap.add_argument("--ops", type=int, default=60_000)
     ap.add_argument("--seed", type=int, default=20260927)
+    ap.add_argument("--historical", action="store_true", help="reproduce the pre-AIR2 reference output")
     a = ap.parse_args()
+    AUDIT2_MODEL = not a.historical
     for mode, cap in (("continuous", 9_000), ("continuous", 10_000), ("release", 9_000)):
         c, ep, mneg, strand = fuzz(a.ops, a.seed, mode, cap)
         print(f"fuzz[{mode}, util cap {cap/100:.0f}%]: {a.ops} ops, invariants held (liveness checked every "
               f"2,000 ops); share epochs rolled {ep}; largest sum of negative pendings {mneg:,} lamports; "
               f"worst stranded SOL after wind-down {strand:,} lamports (all within the rounding bound; no "
               f"rebase-orphan shares, KI-65); op counts {dict(sorted(c.items()))}")
+    if not a.historical:
+        print("\nThe following comparison tables retain the pre-AIR2 reference model and historical figures. "
+              "Current AIR2 formulas are covered by the fuzz above and test_audit2_models.py.")
+    AUDIT2_MODEL = False
     print("\nR3A-2 stranded lender SOL after an honest wind-down (40 seeds x 3,000 ops, reviewer's r3_stranded.py):")
     print("| model | realised inflow (SOL) | stranded (SOL) | worst seed (SOL) | seeds above 0.01 SOL |")
     print("|---|---|---|---|---|")

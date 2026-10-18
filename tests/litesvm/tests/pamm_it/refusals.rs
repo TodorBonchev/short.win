@@ -37,6 +37,10 @@ fn an_open_waits_for_the_post_change_warm_up() {
         refused(&mut env, &pm, q, E::EmaWarmingUp);
     }
     assert_eq!(market(&env, &pm).ema_warm, 8);
+    // The price-start sample was excluded, and refused opens roll back their observations.
+    env.warp(1);
+    crank(&mut env, &pm);
+    assert_eq!(market(&env, &pm).ema_warm, 8);
     for warm in (1..8).rev() {
         env.warp(1);
         crank(&mut env, &pm);

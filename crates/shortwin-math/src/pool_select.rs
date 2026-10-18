@@ -3,8 +3,8 @@
 //!
 //! Only the arithmetic lives here. Account verification (owners, discriminators, vault
 //! and mint keys, the SOL side) and `venue_executable` are the program's; their outcome
-//! enters [`eligible`] as plain inputs. Rounding is ECON §2.1's (the sims' `RaydiumPool`):
-//! `λ` is floored to whole bps first, then `D` is floored.
+//! enters [`eligible`] as plain inputs. `λ_bps` is a display/threshold quantity; locked
+//! depth uses the raw locked-LP ratio so an unlocked deposit cannot lower it by a bps step.
 
 use crate::error::MathError;
 use crate::fees::exceeds_cap;
@@ -28,10 +28,10 @@ pub fn lambda_bps(lp_counter: u64, lp_supply: u64) -> u32 {
     }
 }
 
-/// Locked constant-product depth `D = ⌊λ_bps·isqrt(X·Y)/10⁴⌋` (ECON §2.1; ARCH §2.6; the
-/// sims' `RaydiumPool.locked_depth`), with [`lambda_bps`] and `X`, `Y` the pricing reserves
-/// (ARCH §4.1). v0.3 floored once on the raw ratio, `⌊(counter − supply)·isqrt(X·Y)/
-/// counter⌋`, which can exceed this by up to `isqrt(X·Y)/10⁴`.
+/// Locked constant-product depth `D = ⌊(counter − supply)·isqrt(X·Y)/counter⌋`, with
+/// `X`, `Y` the pricing reserves (ARCH §4.1). AIR2-09: flooring the locked-LP fraction
+/// to whole bps first let proportional unlocked deposits lower `D`, even to zero.
+/// The raw ratio preserves proportional-deposit invariance, apart from venue LP rounding.
 ///
 /// Rounded down: `D` bounds how much a market may be sized on (ARCH §2.6 rule 5), so the
 /// pool is never credited with depth it does not have. `X·Y < 2¹²⁸` for `u64` reserves, so
@@ -39,13 +39,17 @@ pub fn lambda_bps(lp_counter: u64, lp_supply: u64) -> u32 {
 ///
 /// Errors: none in practice (`Overflow` is unreachable for `u64` reserves).
 pub fn locked_depth(lp_counter: u64, lp_supply: u64, x: u64, y: u64) -> Result<u128, MathError> {
+    let locked = match lp_counter.checked_sub(lp_supply) {
+        Some(locked) if lp_counter != 0 => locked,
+        _ => return Ok(0),
+    };
     let k = u128::from(x)
         .checked_mul(u128::from(y))
         .ok_or(MathError::Overflow)?;
     mul_div(
-        u128::from(lambda_bps(lp_counter, lp_supply)),
+        u128::from(locked),
         sqrt_u128(k, Rounding::Floor),
-        u128::from(BPS),
+        u128::from(lp_counter),
         Rounding::Floor,
     )
 }
@@ -217,11 +221,10 @@ mod tests {
         let (x, y) = (24_145_801_124_347u64, 38_155_515_042_581u64);
         let d = locked_depth(c, s, x, y).unwrap();
         let root = sqrt_u128(u128::from(x) * u128::from(y), Rounding::Floor);
-        // λ floored to whole bps first (ECON §2.1): 9,978 bps, then D floored.
+        // The display lambda remains whole bps; depth uses the raw ratio (AIR2-09).
         assert_eq!(lambda_bps(c, s), 9_978);
-        assert_eq!(d, 9_978 * root / 10_000);
-        // v0.3's single floor on the raw ratio is larger here.
-        assert!((u128::from(c - s) * root) / u128::from(c) > d);
+        assert_eq!(d, (u128::from(c - s) * root) / u128::from(c));
+        assert!(d > 9_978 * root / 10_000);
         assert!(lock_share_ok(c, s, 9_978) && !lock_share_ok(c, s, 9_979));
         assert_eq!(locked_depth(0, 0, x, y), Ok(0));
         assert_eq!(locked_depth(5, 7, x, y), Ok(0));

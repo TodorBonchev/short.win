@@ -40,6 +40,7 @@
 mod common;
 
 use anchor_lang::solana_program::instruction::Instruction;
+use shortwin::errors::ShortwinError as E;
 use shortwin::events::{CoverageGap, PriceCranked, RouteChainChanged};
 use shortwin::state::{ConfigChange, EmaParamsArgs, Market};
 use shortwin_litesvm_tests::drive::Actor;
@@ -214,6 +215,7 @@ fn coverage_gap_needs_open_positions_and_counts_them() {
     env.warp(100);
     let meta = crank_meta(&mut env, &mm);
     assert!(gaps(&meta).is_empty(), "no open position");
+    env.tick(&mm, 1);
     let mut b1 = env.borrower();
     let mut b2 = env.borrower();
     open_ok(&mut env, &mm, &mut b1, Q);
@@ -226,8 +228,8 @@ fn coverage_gap_needs_open_positions_and_counts_them() {
     assert_eq!((g[0].gap_s, g[0].open_positions), (45, 2));
 }
 
-/// Every prologue that rolls reports the gap: the lender instructions (A16 step 5), an open and
-/// a close — not only the crank.
+/// Successful rolling prologues report gaps: lender instructions (A16 step 5) and closes,
+/// not only cranks. An open after a gap now refuses the old EMA and rolls back its prologue.
 #[test]
 fn coverage_gap_from_every_rolling_prologue() {
     // deposit and withdraw
@@ -260,12 +262,25 @@ fn coverage_gap_from_every_rolling_prologue() {
     let meta = ok(env.send(&[ix::withdraw(&mm.lender_keys(), shares, 0)], &[&lender]));
     assert_eq!(gaps(&meta).len(), 1, "withdraw rolls (A16)");
 
-    // open and close
+    // An open refuses the stale price; after fresh observations, the close still reports gaps.
     let (mut env, mm, b, nonce) = with_position();
     env.warp(45);
     let mut b2 = env.borrower();
-    let (_o, _n2, meta) = open_ok(&mut env, &mm, &mut b2, Q / 2);
-    assert_eq!(gaps(&meta).len(), 1, "open_short's prologue reports");
+    let before = env.market(&mm.market());
+    assert_err(&env.open(&mm, &mut b2, Q / 2).0, E::EmaWarmingUp);
+    assert_eq!(env.market(&mm.market()).ema_ts, before.ema_ts);
+    assert_eq!(
+        env.market(&mm.market()).open_positions,
+        before.open_positions
+    );
+    let meta = crank_meta(&mut env, &mm);
+    assert_eq!(
+        gaps(&meta).len(),
+        1,
+        "the next successful roll reports the gap"
+    );
+    env.tick(&mm, 1);
+    open_ok(&mut env, &mm, &mut b2, Q / 2);
     env.warp(45);
     let (_c, meta) = close_ok(&mut env, &mm, &b, nonce);
     let g = gaps(&meta);

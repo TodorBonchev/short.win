@@ -7,11 +7,11 @@
  * expanded and repeated in the review when material; ECON §9.4), then the risks (`lender.risks`,
  * expanded on a wallet's first deposit, and the collapsed ones), the SPEC §5.3 disclosure with its
  * required checkbox — still before signing, and again in the review — and the sticky submit. A CPI-Guarded
- * source blocks the plain deposit and offers the opt-in bracket (FE-1); a pool without shares — a
- * live wipe record, or since AIR-08 a pool every lender left — prepends the sweep bundle while the
- * sweeps are pending (`wipeSweepPending`); a mint flagged unsafe blocks deposits.
+ * source blocks the plain deposit and offers the opt-in bracket (FE-1). A full wipe or last lender's
+ * exit prepends the pending sweep bundle. Surviving shares require a separately reviewed cleanup;
+ * an unsafe mint or unreleased settlement vest blocks deposits.
  */
-import { getLenderPositionSize } from '@shortwin/client';
+import { getLenderPositionSize, podU128ToBigInt } from '@shortwin/client';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { qk } from '../../../api/keys.ts';
@@ -25,8 +25,9 @@ import { lenderRiskVars } from '../../../config/disclosureVars.ts';
 import { T } from '../../../config/testids.ts';
 import { parseAmount } from '../../../lib/amount.ts';
 import { formatTokens } from '../../../lib/format.ts';
+import { formatUtc } from '../../../lib/time.ts';
 import { ConnectCta } from '../../../wallet/ConnectCta.tsx';
-import { depositPlanFrom } from '../build.ts';
+import { cleanupPlanFrom, depositPlanFrom } from '../build.ts';
 import {
     DEFAULT_TOLERANCE,
     disclosureVarsOf,
@@ -42,6 +43,7 @@ import {
     hasFlag,
     MARKET_FLAG,
     pendingLenderCredit,
+    previewDepositHold,
     previewDepositView,
     previewUnpaidRent,
     wipeLive,
@@ -62,6 +64,8 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
     const [tolText, setTolText] = useState(DEFAULT_TOLERANCE);
     const [building, setBuilding] = useState(false);
     const [buildError, setBuildError] = useState<string | null>(null);
+    const [cleanupBuilding, setCleanupBuilding] = useState(false);
+    const [cleanupError, setCleanupError] = useState<string | null>(null);
     const ackId = useId();
     const bracketId = useId();
 
@@ -88,12 +92,18 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
     const tolBps = parseTolerance(tolText);
     const overBalance = amount !== null && source !== null && amount > source.amount;
     const sweep = wipeSweepPending(market);
+    const cleanup = sweep && podU128ToBigInt(market.totalShares) > 0n;
     const unsafe = hasFlag(market, MARKET_FLAG.mintUnsafe);
     const guard = source?.cpiGuard ?? false;
     const bracket = guard && bracketFor === source?.address;
     const now = nowFor(ctx, 'market');
+    const hold = previewDepositHold(math, lendStateOf(chain), now);
+    const holdReason =
+        hold.ok && hold.value !== null
+            ? `Settlement income is vesting. Deposits resume at ${formatUtc(hold.value)} if the vest is not extended.`
+            : null;
     const preview =
-        amount !== null && tolBps !== null
+        !cleanup && amount !== null && tolBps !== null
             ? previewDepositView(math, lendStateOf(chain), now, amount, tolBps, sweep)
             : null;
     const vars = disclosureVarsOf(market, ctx.detail);
@@ -105,6 +115,9 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
     const blocker = ((): Reason | null => {
         if (!signer) return { text: 'Connect a wallet first' };
         if (unsafe) return { text: 'Deposits are blocked on this market' };
+        if (cleanup) return { text: 'Clean up pending lender income first (above)' };
+        if (holdReason) return { text: holdReason };
+        if (!hold.ok) return { text: 'The program would refuse this deposit (see above)' };
         if (!source) return { text: `You hold no ${symbol} in this wallet` };
         if (!chain.recordsComplete) return { text: 'Sync your position first (above)' };
         if (ctx.stale) return { text: 'Waiting for a fresh chain read' };
@@ -116,7 +129,21 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
         if (!ack) return { text: 'Tick the acknowledgement above to continue', target: ackId };
         return null;
     })();
-    const ready = blocker === null && !building;
+    const ready = blocker === null && !building && !cleanupBuilding;
+    const cleanupReason = !signer ? 'Connect a wallet first' : ctx.stale ? 'Waiting for a fresh chain read' : null;
+
+    const reviewCleanup = async () => {
+        if (!signer || cleanupReason || !cleanup) return;
+        setCleanupBuilding(true);
+        setCleanupError(null);
+        try {
+            flow.start(await cleanupPlanFrom(lendEnvOf(ctx, signer), chain));
+        } catch (e) {
+            setCleanupError(e instanceof Error ? e.message : String(e));
+        } finally {
+            setCleanupBuilding(false);
+        }
+    };
 
     const submit = async () => {
         if (!signer || !source || amount === null || !preview?.ok || tolBps === null) return;
@@ -146,6 +173,8 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     <Blocked code="MintUnsafeFlagged">Deposits are blocked on this market.</Blocked>
                 </>
             )}
+            {holdReason && <Blocked code="PoolDrained">{holdReason}</Blocked>}
+            {!hold.ok && <RefusalLine refusal={hold.refusal} />}
             {!signer && <div className="muted">Connect a wallet to lend this token.</div>}
             {signer &&
                 (accounts.length > 0 && source ? (
@@ -303,6 +332,31 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
                     >
                         This pool was wiped out. Your deposit first runs the permissionless post-wipe sweep (the venue
                         cashback claims and sweep_trader), so the old lenders receive what is left on the trader.
+                    </div>
+                ) : cleanup ? (
+                    <div
+                        className="banner"
+                        data-tone="info"
+                        role="status"
+                        data-testid={T.lendSweepNotice}
+                        data-kind="lenders"
+                    >
+                        <Disclosure id="lender.cleanup" />
+                        {cleanupReason && <div className="muted">{cleanupReason}</div>}
+                        {cleanupError && (
+                            <div className="field-error" role="alert">
+                                {cleanupError}
+                            </div>
+                        )}
+                        <Button
+                            block
+                            busy={cleanupBuilding}
+                            disabled={cleanupReason !== null || building}
+                            onClick={() => void reviewCleanup()}
+                            data-testid={T.lendCleanupSubmit}
+                        >
+                            Review pool cleanup
+                        </Button>
                     </div>
                 ) : (
                     // AIR-08: every lender left by withdrawals; what reached the trader since is the protocol's.

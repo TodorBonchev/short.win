@@ -146,6 +146,18 @@ function reserves(): bigint[] {
 }
 
 describe('pool selection: lambdaBps, lockedDepth, lockedSol, lockedFloorOk', () => {
+    // AIR2-09: the normative depth now applies the raw LP fraction, while legacy.ts remains
+    // the historical whole-bps implementation. Keep both the exact reference and error bound.
+    const checkDepth = (counter: bigint, supply: bigint, x: bigint, y: bigint, label = '') => {
+        const root = m.liquidity(x, y);
+        const expected = counter > supply ? ((counter - supply) * root) / counter : 0n;
+        const d = m.lockedDepth(counter, supply, x, y);
+        expect(d, label).toBe(expected);
+        const old = legacy.lockedDepth(m, counter, supply, x, y);
+        expect(d, label).toBeGreaterThanOrEqual(old);
+        expect(d - old, label).toBeLessThanOrEqual((root + 9_999n) / 10_000n);
+        return d;
+    };
     it('agree on every dumped Raydium / PumpSwap pool (the Fartcoin pool: λ = 9,978 bps)', () => {
         const pools = lpPools();
         expect(pools.length).toBeGreaterThanOrEqual(10);
@@ -159,8 +171,7 @@ describe('pool selection: lambdaBps, lockedDepth, lockedSol, lockedFloorOk', () 
             for (let i = 0; i < amounts.length; i++) {
                 const x = amounts[i] ?? 0n;
                 const y = amounts[(i * 7 + 3) % amounts.length] ?? 0n;
-                const d = m.lockedDepth(p.counter, p.supply, x, y);
-                expect(d, p.name).toBe(legacy.lockedDepth(m, p.counter, p.supply, x, y));
+                const d = checkDepth(p.counter, p.supply, x, y, p.name);
                 let price: bigint;
                 try {
                     price = m.priceWad(x, y);
@@ -191,8 +202,7 @@ describe('pool selection: lambdaBps, lockedDepth, lockedSol, lockedFloorOk', () 
             const supply = i % 2 === 0 ? counter - (r.below(64n) % (counter + 1n)) : r.below(64n);
             const [x, y] = [r.below(64n), r.below(64n)];
             expect(m.lambdaBps(counter, supply)).toBe(legacy.lambdaBps(counter, supply));
-            const d = m.lockedDepth(counter, supply, x, y);
-            expect(d).toBe(legacy.lockedDepth(m, counter, supply, x, y));
+            const d = checkDepth(counter, supply, x, y);
             const p = r.below(128n);
             // D < 2⁶⁴ and isqrt(P) < 2⁶⁴: the locked SOL never reaches the facade's u128 saturation.
             expect(m.lockedSol(d, p)).toBe(legacy.lockedSol(m, d, p));

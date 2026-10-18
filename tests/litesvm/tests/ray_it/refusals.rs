@@ -203,6 +203,10 @@ fn flags_and_disabled_venues() {
     let mut env = Env::ray_fork();
     let (fart, qf) = add_market(&mut env, FART);
     let (useless, qu) = add_market(&mut env, USELESS);
+    env.crank(&fart);
+    env.warp(1);
+    env.crank(&fart);
+    env.crank(&useless);
     let ea = env.pause_authority.insecure_clone();
     let flag = |env: &mut Env, bit: u8, on: bool| {
         ok(env.send(

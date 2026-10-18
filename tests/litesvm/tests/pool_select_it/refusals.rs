@@ -170,11 +170,12 @@ fn eligibility() {
         assert_err(&env.propose(Some(&inc), cand), want);
     }
 
-    // The locker-LP pool: list-only for good (λ = 0 as dumped, so D = 0).
+    // The locker-LP pool has less than one displayed basis point locked. The raw-ratio
+    // depth retains its 100 units (AIR2-09), still far below the listing floor.
     let mut env = Env::ray_fork();
     let locker = env.load_ray_pool(WSOL_T1);
     list_auto(&mut env, &locker);
-    assert_eq!((lambda_of(&env, &locker), d_of(&env, &locker)), (0, 0));
+    assert_eq!((lambda_of(&env, &locker), d_of(&env, &locker)), (0, 100));
     assert_err(&env.propose(None, &locker), E::PoolTooThin);
     assert_eq!(market_of(&env, &locker).venue_kind(), Some(VenueKind::None));
 }

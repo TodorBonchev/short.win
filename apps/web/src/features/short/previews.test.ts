@@ -6,7 +6,7 @@
  * the WASM facade must equal what `open_short` / `close_short` / `add_margin` booked, to the
  * lamport, and must predict each refusal's program error.
  */
-import { findExposurePda, podU128ToBigInt } from '@shortwin/client';
+import { bigIntToPodU128, findExposurePda, podU128ToBigInt } from '@shortwin/client';
 import type { Address } from '@solana/kit';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { programError } from '../../config/errors.ts';
@@ -113,6 +113,43 @@ describe('the open preview equals open_short', () => {
         const above = previewOpen(math, s, { q: caps.maxQ + 1n, slippageBps: 100, walletQ });
         expect(at?.refusal).toBeNull();
         expect(above?.refusalCap).toBe(caps.binding);
+    });
+});
+
+describe('new shorts need fresh price observations', () => {
+    for (const [name, emaAge, completedAge, bucketAge, blocked] of [
+        ['both observations at the 40-second boundary', 40n, 40n, null, false],
+        ['a stale pre-roll EMA despite a fresh pending bucket', 41n, 1n, 1n, true],
+        ['a fresh EMA timestamp with a stale completed bucket', 0n, 41n, null, true],
+        ['a roll of an old bucket despite a fresh stored EMA timestamp', 0n, 1n, 41n, true],
+        ['a fresh bucket replaces the stale completed observation', 1n, 100n, 1n, false],
+        ['a bucket in this same second has not completed yet', 0n, 41n, 0n, true],
+    ] as const) {
+        it(name, async () => {
+            const { s } = await snapshotOf(vectorCase('spl-open-0'));
+            const withAges = {
+                ...s,
+                market: {
+                    ...s.market,
+                    emaTs: s.now - emaAge,
+                    lbLo: bigIntToPodU128(1n),
+                    lbSec: s.now - completedAge,
+                    bLo: bigIntToPodU128(bucketAge === null ? 0n : 1n),
+                    bSec: bucketAge === null ? 0n : s.now - bucketAge,
+                },
+            };
+            expect(openBlocked(math, withAges)).toEqual(blocked ? { code: 'EmaWarmingUp' } : null);
+        });
+    }
+
+    it('allows a fresh initialized EMA without a completed bucket', async () => {
+        const { s } = await snapshotOf(vectorCase('spl-open-0'));
+        expect(
+            openBlocked(math, {
+                ...s,
+                market: { ...s.market, emaTs: s.now, bLo: bigIntToPodU128(0n), lbLo: bigIntToPodU128(0n) },
+            }),
+        ).toBeNull();
     });
 });
 

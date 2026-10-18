@@ -144,6 +144,7 @@ fn amm_v4_disable_matrix() {
         0,
         "open from pool_open_time"
     );
+    env.tick(&rm, 1);
     let (_, nonce, _) = open_ok(&mut env, &rm, &mut b, q);
     assert_eq!(
         rm.v4().info(&env.svm).status,
@@ -180,6 +181,7 @@ fn cpmm_disable_matrix() {
     warp_to(&mut env, open_at);
     env.crank(&rm);
     assert_eq!(env.market(&rm.market()).no_route_since, 0);
+    env.tick(&rm, 1);
     let mut b = env.borrower();
     open_ok(&mut env, &rm, &mut b, q);
 }

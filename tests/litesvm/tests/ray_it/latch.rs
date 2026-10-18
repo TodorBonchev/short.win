@@ -35,6 +35,10 @@ fn either_raydium_upgrade_blocks_opens_on_both() {
         let mut env = Env::ray_fork();
         let (fart, qf) = add_market(&mut env, FART);
         let (useless, qu) = add_market(&mut env, USELESS);
+        env.crank(&fart);
+        env.warp(1);
+        env.crank(&fart);
+        env.crank(&useless);
         let dumped = FIXTURE_GUARD_SLOTS[usize::from(venue)];
         assert_eq!(
             program.program_data().account.data[4..12],

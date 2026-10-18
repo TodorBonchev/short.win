@@ -117,7 +117,6 @@ pub fn handler<'info>(
         let mut market = ctx.accounts.market.load_mut()?;
         let mut vault_acc = ctx.accounts.market_vault.load_mut()?;
         let now = prologue::market_now(&market, clock.unix_timestamp);
-
         prologue::sync_market_params(&config, &mut market, now);
         mint_guard(
             &market,
@@ -128,6 +127,13 @@ pub fn handler<'info>(
         let mut pool = market.pool();
         let mut vault = vault_acc.vault();
         prologue::accrue(&mut market, &mut pool, &mut vault, now)?;
+        if market.deposit_hold_until >= 0 {
+            // A later sweep or exit can extend the shared vest past the end recorded by the
+            // settlement. Zero also protects pre-upgrade markets whose reserved bytes did
+            // not yet record holds. Release that existing vest before initializing the marker.
+            require!(pool.vest_bal == 0, ShortwinError::PoolDrained);
+            market.deposit_hold_until = -1;
+        }
         // A16 step 5: roll a completed bucket (no ReadSet, so no record and no chains).
         prologue::roll_only(&market_key, &mut market, now, clock.slot)?;
 

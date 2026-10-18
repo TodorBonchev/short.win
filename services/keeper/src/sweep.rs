@@ -3,9 +3,9 @@
 //! what the keeper sends so that lamports and tokens left on a market's trader side, and the
 //! cashback the venues accrue to the market's `trader` PDA, reach the lenders.
 //!
-//! **The post-wipe bundle** (duty 6, [`wipe_pending`], [`post_wipe_ixs`]). While the pool has no
-//! shares (`S = 0`: after a full wipe, with a live wipe record, or — since AIR-08 — after the last
-//! lender's exit, which clears both bits) a deposit waits for `wipe_trader_swept` and, on the pump
+//! **The post-wipe bundle** (duty 6, [`wipe_pending`], [`post_wipe_ixs`]). After a full wipe,
+//! the last lender's exit, or a dust flush with surviving shares (AIR2-05), a deposit waits
+//! for `wipe_trader_swept` and, on the pump
 //! venues (`PumpCurve`, `PumpMigrating`, `PumpSwap`) and on every market that has the trader's pump
 //! UVA (a curve market that left pump, AIR-05; `engine::lender::rewards_required`),
 //! `wipe_rewards_claimed` (R4A-7) — until then the market takes no deposit and hence no open. Off
@@ -13,8 +13,10 @@
 //! `sweep_trader` (the program's `claim_venue_rewards` is not built: M5-SEC-1 and M6's
 //! UVA-reading pattern, ARCH §3.9): the trader bit always, the rewards bit when the trader's venue
 //! cashback is not claimable — the pump UVA's lamports above its rent-exempt minimum, and on
-//! PumpSwap the WSOL of `ATA(pAMM UVA(trader), WSOL)`. With cashback outstanding the keeper
-//! prepends the venues' own permissionless claims, in one transaction:
+//! PumpSwap the WSOL of `ATA(pAMM UVA(trader), WSOL)`. A zero legacy migration marker also
+//! triggers this cleanup once; a held vest can continue to block deposits after the source
+//! bits are complete. With cashback outstanding the keeper prepends the venues' own
+//! permissionless claims, in one transaction:
 //!
 //! | venue | transaction |
 //! |---|---|
@@ -87,18 +89,18 @@ pub fn rent_minimum(data: &[u8], len: usize) -> Option<u64> {
     Some(min)
 }
 
-/// The pool has no shares and a deposit still waits for a sweep (R4A-7; AIR-08): the trader bit,
+/// A deposit still waits for a sweep (R4A-7; AIR-08; AIR2-05): the trader bit,
 /// or — on a pump venue, `PumpMigrating` included (M6-SEC-5), and on any market with the trader's
 /// pump UVA (AIR-05) — the rewards bit is clear (the program's `deposit` check,
 /// `engine::lender::rewards_required`, `WipeSweepPending`). Since AIR-08 this holds after the last
-/// lender's exit as well as after a full wipe: `withdraw` clears both bits when `S` reaches 0, so
-/// the gate is `S = 0`, not the wipe record (a new market starts with both bits set and is not
-/// pending).
+/// lender's exit as well as after a full wipe. A dust flush also clears them while shares
+/// survive. Legacy markets with the zero migration marker also need one cleanup, even if
+/// their old source bits are set. New markets start with marker -1 and both bits set.
 pub fn wipe_pending(market: &Market) -> bool {
     let rewards = shortwin::engine::lender::rewards_required(market);
-    market.total_shares.get() == 0
-        && (!market.has_flag(MARKET_FLAG_WIPE_TRADER_SWEPT)
-            || (rewards && !market.has_flag(MARKET_FLAG_WIPE_REWARDS_CLAIMED)))
+    market.deposit_hold_until == 0
+        || !market.has_flag(MARKET_FLAG_WIPE_TRADER_SWEPT)
+        || (rewards && !market.has_flag(MARKET_FLAG_WIPE_REWARDS_CLAIMED))
 }
 
 /// A full-wipe record is live (the sweep then names the latest `ShareEpoch` record).
@@ -351,8 +353,9 @@ pub fn post_wipe_ixs(
 /// One sweep or claim the keeper sent (duties 6 and 13).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SweepKind {
-    /// While `S = 0` and a deposit waits for the sweep — right after a full wipe (duty 6) or,
-    /// since AIR-08, after the last lender's exit: the claims needed and `sweep_trader`.
+    /// A deposit waits for source cleanup: after a full wipe, the last lender's exit, a
+    /// dust flush with surviving shares, or a legacy market's one-time initialization.
+    /// Send the needed claims and `sweep_trader`.
     PostWipe,
     /// The trader side held something (duty 13).
     Sweep,
@@ -395,6 +398,7 @@ mod tests {
     fn market(kind: VenueKind) -> Market {
         let mut m: Market = bytemuck::Zeroable::zeroed();
         m.venue = kind as u8;
+        m.deposit_hold_until = -1;
         m.trader = Pubkey::new_unique();
         m.trader_wsol = Pubkey::new_unique();
         m.market_vault = Pubkey::new_unique();
@@ -451,10 +455,7 @@ mod tests {
         assert!(ix.accounts.iter().all(|a| !a.is_signer));
     }
 
-    /// R4A-7, AIR-08: while `S = 0` — after a full wipe or after the last lender's exit (which
-    /// clears both bits) — pending until the trader bit and, on the pump venues and on any market
-    /// with the trader's pump UVA (AIR-05), the rewards bit are set; never while lenders hold
-    /// shares.
+    /// The bits gate deposits at zero shares and after a dust flush with surviving shares.
     #[test]
     fn wipe_pending_follows_the_deposit_check() {
         for (kind, uva, rewards) in [
@@ -471,18 +472,19 @@ mod tests {
             (VenueKind::RaydiumV4, false, false),
             (VenueKind::None, false, false),
         ] {
-            for wipe in [true, false] {
+            for (wipe, shares) in [(true, 0), (false, 0), (false, 1_000)] {
                 let mut m = market(kind);
                 if !uva {
                     m.pump_uva = Pubkey::default();
                 }
-                m.total_shares = shortwin::state::PodU128::new(1_000);
-                assert!(!wipe_pending(&m), "{kind:?}: lenders hold shares");
-                m.total_shares = shortwin::state::PodU128::new(0);
+                m.total_shares = shortwin::state::PodU128::new(shares);
                 if wipe {
                     m.flags |= MARKET_FLAG_WIPE_LIVE;
                 }
-                assert!(wipe_pending(&m), "{kind:?}, wipe {wipe}: S = 0, bits clear");
+                assert!(
+                    wipe_pending(&m),
+                    "{kind:?}, wipe {wipe}, shares {shares}: bits clear"
+                );
                 m.flags |= MARKET_FLAG_WIPE_TRADER_SWEPT;
                 assert_eq!(
                     wipe_pending(&m),
@@ -491,6 +493,16 @@ mod tests {
                 );
                 m.flags |= MARKET_FLAG_WIPE_REWARDS_CLAIMED;
                 assert!(!wipe_pending(&m), "{kind:?}, wipe {wipe}");
+                m.deposit_hold_until = 0;
+                assert!(
+                    wipe_pending(&m),
+                    "{kind:?}, wipe {wipe}, shares {shares}: legacy marker invalidates old bits"
+                );
+                m.deposit_hold_until = 1;
+                assert!(
+                    !wipe_pending(&m),
+                    "an initialized hold alone does not require another sweep"
+                );
             }
         }
     }

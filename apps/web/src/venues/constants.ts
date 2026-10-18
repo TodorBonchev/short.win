@@ -132,6 +132,8 @@ export const EXTRAS_MAX_SEEDS = 4;
 
 /** `COVERAGE_CLEAR_DELAY_S`: opens wait this long after a coverage pause is cleared (M7-SEC-3). */
 export const COVERAGE_CLEAR_DELAY_S = 5n;
+/** `shortwin_math::consts::COVERAGE_GAP_S`: the maximum observation age for a new short. */
+export const COVERAGE_GAP_S = 40n;
 /** `STANDARD_POOL_TOKENS`: `migrate_v2`'s token seed on a standard curve (the EMA leg's `X_p`). */
 export const STANDARD_POOL_TOKENS = 206_900_000_000_000n;
 /**

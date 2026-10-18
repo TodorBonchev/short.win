@@ -2,8 +2,12 @@
 """Vectors for shortwin_math::pool (ECONOMICS §9, §13; ARCHITECTURE §3.3, §8.1, §8.3 I8).
 
 Drives the normative lender-pool model `docs/design/sim/pool_model.py` v0.4.2 (default
-switches: option (a), owner decision O16) through a recording subclass of its `Pool` and
+arithmetic: v0.4.2 + AIR2; option (a), owner decision O16) through a recording subclass of its `Pool` and
 writes, next to itself:
+
+The program-side settlement hold is disabled here: its Market marker lives outside the math
+Pool API. The recorder uses current arithmetic even when a dated analysis driver imports it;
+its traces and counts are current fixtures, not replacements for the historical report tables.
 
   pool_fuzz_continuous_<cap>_<k>.json
                        `pool_model.fuzz` itself: seed 20260927, continuous rent at a 90 %
@@ -148,7 +152,7 @@ operation's "=VALUE", "!CODE" or "" with "," and <state> is the canonical state:
    real,claimed,fwd,fwd_epoch,fwd_shares,fwd_lag]         per lender, creation order
 
 `lock_epoch` is the model's -1 ("no lock") written as 4294967295 (u32::MAX); `wipe_swept`
-is the model's flag (the trader bit of Pool::wipe_swept). Rust types are the on-chain ones
+encodes only the model's trader bit (`rewards_required = false` in this harness). Rust types are the on-chain ones
 of ARCH §2.3.4/§2.3.6; an operation whose model result does not fit them is refused
 (expected "!overflow" / "!underflow") and the model state is rolled back, as a reverted
 transaction would. The generator also asserts that every calendar bucket lies within the
@@ -183,19 +187,18 @@ SEED = 20260927
 PM_OPS = 60_000          # the whole ECON §9.6 fuzz run (ARCH §8.1: 60,000 ops per rent mode)
 FUZZ_PARTS = 3           # files per run, each under 1 MB (tests/vectors/README.md)
 MAX_FILE_BYTES = 990_000
-# ECON §9.6: share epochs rolled and op counts of the two option-(a) runs. Since AIR-07's residual
-# fix a deposit into a drained pool is refused (PoolDrained): 26 of the 90 % run's 6,653 deposits
-# and 234 of the 100 % run's 6,607, which moves every later count (before: 1020 and 1930 epochs).
+# Current AIR2 math-only runs: the program's settlement-hold marker is outside this API.
+# Historical ECON tables deliberately retain their own pre-AIR2 counts.
 ECON_9_6 = {
-    9_000: (1021, {'accrue': 3395, 'adv': 3287, 'borrow': 2835, 'borrow!': 518, 'churn': 3168,
-                   'churn!': 252, 'claim': 3378, 'claimN': 3416, 'cover': 3384, 'dep': 6627,
-                   'dep!': 26, 'donate': 3329, 'gov': 3302, 'repay': 3246, 'settle': 3342,
-                   'sweep': 3304, 'wd': 6315, 'wd!': 239, 'wdall': 2896, 'wdall!': 367,
-                   'wipe': 3374}),
-    10_000: (1941, {'accrue': 3344, 'adv': 3344, 'borrow': 3358, 'churn': 3467, 'claim': 3377,
-                    'claimN': 3462, 'cover': 3396, 'dep': 5862, 'dep!': 745, 'donate': 3305,
-                    'gov': 3303, 'repay': 3302, 'settle': 3325, 'sweep': 3264, 'wd': 5574,
-                    'wd!': 966, 'wdall': 2848, 'wdall!': 458, 'wipe': 3300}),
+    9_000: (1007, {'accrue': 3423, 'adv': 3331, 'borrow': 2825, 'borrow!': 533, 'churn': 3145,
+                   'churn!': 247, 'claim': 3384, 'claimN': 3424, 'cover': 3375, 'dep': 6507,
+                   'dep!': 123, 'donate': 3327, 'gov': 3280, 'repay': 3243, 'settle': 3372,
+                   'sweep': 3304, 'wd': 6324, 'wd!': 207, 'wdall': 2935, 'wdall!': 348,
+                   'wipe': 3343}),
+    10_000: (1938, {'accrue': 3343, 'adv': 3344, 'borrow': 3359, 'churn': 3472, 'claim': 3378,
+                    'claimN': 3462, 'cover': 3396, 'dep': 5850, 'dep!': 755, 'donate': 3302,
+                    'gov': 3303, 'repay': 3302, 'settle': 3324, 'sweep': 3263, 'wd': 5576,
+                    'wd!': 963, 'wdall': 2849, 'wdall!': 457, 'wipe': 3302}),
 }
 # ECON §9.3: the lock-heavy mix, v0.4.1 row (sampled states, states above T + dust).
 ECON_LOCK_FUZZ = (954, 0)
@@ -268,7 +271,7 @@ def out_of_range(v: int, t: str):
 def state_str(p) -> str:
     f = [p.now, p.T, p.B, p.S, p.acc, p.carry, p.acc_r, p.carry_r, p.dust, p.receivable,
          p.max_release, p.vest_bal, p.vest_last, p.vest_end, p.epoch, int(p.wipe_live),
-         int(p.wipe_swept), p.pi, p.pi_epoch, p.lock_norm, p.b_min, p.sol_vault, p.unmatched,
+         int(bool(p.wipe_swept & pm.WIPE_TRADER_SWEPT)), p.pi, p.pi_epoch, p.lock_norm, p.b_min, p.sol_vault, p.unmatched,
          p.protocol, p.inflow]
     out = [",".join(map(str, f))]
     if p.lock_cal:
@@ -318,6 +321,12 @@ class RecPool(BasePool):
     """pool_model.Pool that logs its outermost calls in the pool-API vocabulary."""
 
     def __init__(self, *a, **kw):
+        # These are math-only vectors: the program's Market marker enforces the hold
+        # reported by Settled, outside pool::deposit. Historical analysis imports must
+        # not switch this recorder away from current arithmetic.
+        kw.setdefault("audit2", True)
+        kw["settlement_deposit_gate"] = False
+        kw["rewards_required"] = False  # Rust harness gates only the Trader source.
         super().__init__(*a, **kw)
         self.rec_init()
         REGISTRY.append(self)
@@ -806,9 +815,10 @@ class Ext:
 
     def op_dep(self):
         p = self.p
-        if p.S == 0 and not p.wipe_swept and self.rng.random() < 0.6:
-            # the depositor bundles the sweep a pool without shares waits for: after a full wipe
-            # (R4A-7) and, since AIR-08, after the last lender's exit (else wipe_sweep_pending)
+        if not p.wipe_swept and self.rng.random() < 0.6:
+            # Complete the pending sweep after a full wipe, last exit, or AIR2 dust flush;
+            # other attempts still exercise WipeSweepPending. Keep lazy-conversion coverage
+            # progressing after the new gate rather than mostly generating refused deposits.
             p.sweep_sol(self.amt("sweep"))
         p.deposit(self.who(), self.amt("dep"))
 
@@ -1267,7 +1277,7 @@ def ext_profiles() -> list:
             "stopping inside them"),
         Ext("ext_pot_fwd_dust_100", 66, 4_000, 10_000, 8, FWD, dust_amounts(),
             "KI-66 full: the forward chain with dust amounts (most chains floor to 0 shares)"),
-        Ext("ext_pot_fwd_open_100", 22, 4_000, 10_000, 6, FWD_OPEN, normal_amounts(),
+        Ext("ext_pot_fwd_open_100", 22, 5_000, 10_000, 6, FWD_OPEN, normal_amounts(),
             "KI-66 full: owners stopping inside forward chains (sync_lender(1) of a chained lender: "
             "FWD_OPEN), residues at 999 modulo 1,000 before rebases so conv_rem sits near den - 1 and "
             "the owner's shares run a unit above the chain (lag 1), chains walked to the current epoch "

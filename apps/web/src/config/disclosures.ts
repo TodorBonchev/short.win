@@ -13,6 +13,7 @@ export const LENDER_SOL_REPAYMENT =
 
 export type DisclosureId =
     | 'lender.solRepayment'
+    | 'lender.cleanup'
     | 'lender.risks'
     | 'lender.lossHistory'
     | 'lender.exitForfeitsVest'
@@ -36,6 +37,7 @@ export type DisclosureId =
     | 'market.venueTrust'
     | 'market.mintUnsafe'
     | 'market.create'
+    | 'market.priceRefresh'
     | 'token.cpiGuard'
     | 'token.memoRequired'
     | 'tx.simulation';
@@ -74,6 +76,28 @@ export interface Disclosure {
 const d = (x: Disclosure): Disclosure => x;
 
 export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
+    'lender.cleanup': d({
+        id: 'lender.cleanup',
+        title: 'Clean up pending lender income',
+        body: [
+            'This transaction collects pending income for the pool’s existing lenders. You pay its network fee and any account rent needed to claim venue cashback.',
+            'Your tokens stay in your wallet. Once cleanup confirms, deposits wait until any income still vesting has released. You review and sign your deposit separately.',
+        ],
+        ack: null,
+        severity: 'info',
+        source: 'AIR2-05; ARCH §3.3, §3.9; FRONTEND §3.6',
+    }),
+    'market.priceRefresh': d({
+        id: 'market.priceRefresh',
+        title: 'Refresh the market price',
+        body: [
+            'An idle market may need two transactions: record a price observation, then update the smoothed price after the chain clock advances. You review and sign each separately and pay its network fee.',
+            'Opening a short is a separate action. Refreshing the price does not guarantee that new shorts are available.',
+        ],
+        ack: null,
+        severity: 'info',
+        source: 'open_short stale-price guard; crank_price observation buckets',
+    }),
     'lender.solRepayment': d({
         id: 'lender.solRepayment',
         title: 'You may be repaid in SOL',

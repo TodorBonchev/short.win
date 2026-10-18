@@ -40,8 +40,8 @@ to build and test the code, what the code relies on, and what we already know ab
   rows), and the register's §7 maps every finding. Its follow-ups (branch `air-followups`,
   2026-10-12/13: `SolSettle.vest_flushed`, the keeper, the indexer, the web, the IDL and client,
   the fuzz corpus and the docs) change the program once more (§0's AI-review build). The fixes
-  and their follow-ups have passed local runs of the CI gate (the latest on 2026-10-13, §10)
-  but have not yet been through CI or an external fix review; the owner waived the ≥ 24 h fuzz
+  and their follow-ups passed local runs of the CI gate on 2026-10-13 (§10). Integrated-tree
+  CI is recorded below; an external fix review remains open. The owner waived the ≥ 24 h fuzz
   run for this batch on 2026-10-13, so none was run on its program (§12).
 - **After the AI review: short.win 1.0.1, pump v3** (branch `pump-v3`, 2026-10-13 … 16; the
   design `pump-final`, the owner's decisions D1 (a) … D4 of 2026-10-13; §13). pump redeployed
@@ -49,14 +49,19 @@ to build and test the code, what the code relies on, and what we already know ab
   the curve's `rT` exits in one instruction by pump's synthetic migration, a stuck synthetic
   migration is priced on the pool `migrate_v2` creates, and the straddle helper `complete_curve`
   is retired (D2: **an audit-scope change**, described in this addendum).
-  The build's hashes (§0) are a **local build, not verified**: no verifiable build (its tools are
-  not installed on the machine that built them, and that session's rules allowed no network
-  beyond read-only Solana RPC to fetch them: §0) and no CI run; a local run of every CI job that
-  runs on that machine passed on 2026-10-16 (§10 "The pump v3 gate").
+  The build's hashes (§0) were reproduced by CI's **verifiable build** on `35558c2`
+  (run [39073841046](https://github.com/TodorBonchev/short.win/actions/runs/39073841046),
+  2026-10-17 UTC). The run's services dependency check failed; the whole CI gate is not green.
+  A local run of every CI job available on the earlier machine passed on 2026-10-16
+  (§10 "The pump v3 gate"). The working-tree AI review 2 fixes have different program bytes
+  and are not covered by this reproducible-build result.
 - **AI review 2 of short.win 1.0.1** ([`audit/ai-review-2/`](audit/ai-review-2/README.md);
   2026-10-17; not a formal audit; stopped by the owner after pass 1 of 3): 13 findings and 85
-  leads, not triaged; 3 of the 4 findings at confidence 90 have a CONFIRMED proof of concept.
-  Pass 2's unjudged agent reports and the list of what the scan did not cover are in the folder.
+  leads. The 2026-10-18 follow-up triages all 85 leads and maps 330 pass-2 blocks to 74 keys,
+  with targeted reproductions and draft **1.0.2** fixes recorded in
+  [`audit/findings.md`](audit/findings.md). Unresolved findings and release gates remain open.
+  The original unjudged reports are preserved; the follow-up does not replace the missing
+  judge run, pass 3 or an independent audit.
 - Normative sources:
   - the design documents `docs/SPEC.md`, `docs/design/ARCHITECTURE.md` (ARCH) and
     `docs/design/ECONOMICS.md` (ECON);
@@ -82,7 +87,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | Item | Value |
 |---|---|
 | Audit commit / tag | **`e4895c2`, tagged `audit-1` / `v1.0.0`** (2026-10-11), the head of `m1-core` at the tag: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration), then the **FE-30 batch** (branch `m10/fe30`, 2026-10-08: the web and the indexer only, owner decisions of the ninth round; the program bytes unchanged), then the fuzzer fix `9861c5a` (run D's two oracle findings, FUZZ-24D-A and FUZZ-M10-24H-D-B: `tests/fuzz` and docs), then the **M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10: phone and tablet layouts, the desktop terminal's fixes; the owner's twelfth round; approved as built in the thirteenth round, 2026-10-10) and the **round-13 UX batch** (m1-core `7a64dcd`, 2026-10-11: O-1 lend order, O-2 coverage notice once, O-3 newcomer help, O-4 12 px floor, O-5 Claim wording; its 143 new strings and the `borrower.liquidation` ¶3 amendment approved by the owner on 2026-10-11) — the web only; then the evidence sync `04c5236` (docs), the lint fix `7b2121d` (the web's lint configuration, M10-CI-LINT) and the CI record `e4895c2` (docs). The program bytes are those of the KI-66 full / KI-67 batch. **Tagged on 2026-10-11** (the owner's decision of that day; owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x); its program hashes are the table below (CI run 38125079869's verifiable build on `7b2121d`; `e4895c2` changes only docs) |
-| Package version | At the tag `shortwin` and `complete_curve` were both 1.0.0 (`programs/*/Cargo.toml`; `security.txt`'s `source_release` `v1.0.0`). **Since 2026-10-16 `shortwin` is 1.0.1** (`source_release` `v1.0.1`; the owner's 1.0.x rule; §13) and `complete_curve` is retired |
+| Package version | At the tag `shortwin` and `complete_curve` were both 1.0.0. The released source since 2026-10-16 is `shortwin` 1.0.1 (§13); `complete_curve` is retired. The draft AI review 2 candidate is **1.0.2** (`source_release` `v1.0.2`), with no release tag or deployment |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
 | TEST-ONLY mock venue | `BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7` (`tests/mock_cpamm`; never deployed; out of scope, §2) |
@@ -162,15 +167,15 @@ proposed fixes' bytes, not release hashes:
 above, then pump-final P0 … P8; §13). `anchor build --tools-version v1.57 --arch v3
 --ignore-keys` and `scripts/build-test-venue.sh` with the pinned toolchain, on `dd24af1` (the
 version bump; no later commit changes program bytes: `venues/mod.rs`'s doc comment of
-2026-10-16 keeps every line number, and a rebuild gave the same bytes). **A local build, not
-verified:** no verifiable build ran and no CI run. The machine that built it has no Docker, and
-the `--local` mode (no Docker daemon) lacks its prerequisites there too: solana-verify 0.5.2,
-bubblewrap and the extracted image are not installed. The session's rules allowed no network
-beyond read-only Solana RPC, so none of them could be fetched, nor the image from Docker Hub or
-the crates and platform-tools v1.57 the build downloads.
-`scripts/verifiable-build.sh --local --compare target/deploy` (pump-final §15 P8; or Docker
-mode, or CI's `verifiable-build` job) is still to run. These are the bytes to verify, not yet
-release hashes:
+2026-10-16 keeps every line number, and a rebuild gave the same bytes). **Verified on
+2026-10-17 UTC:** CI run [39073841046](https://github.com/TodorBonchev/short.win/actions/runs/39073841046),
+commit `35558c211f88407d8489e21cd621dfe7ab80bb46`, rebuilt these bytes with solana-verify
+0.5.2 in image `solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f`,
+`--arch v3 --cargo-build-sbf-args="--tools-version v1.57"`. Its comparison with the
+`anchor-build` artifact and A49 checks passed. The artifact's
+[hash record](audit/ai-review-2/ci-1.0.1-hashes.txt) is preserved here. This verifies the
+committed 1.0.1 program, not the draft AI review 2 fixes or the full release gate
+(the services dependency check failed).
 
 | Program | sha256 of the `.so` file | executable hash (trailing zeros trimmed) | bytes |
 |---|---|---|---|
@@ -196,6 +201,24 @@ release hashes:
   included; `python3 scripts/audit_scope.py check`: ok.
 
 ---
+
+**Unreleased candidate: short.win 1.0.2 (2026-10-18).** The broader AI review 2
+batch changes the program, math, models and clients. It includes reserved-byte migrations for
+legacy deposit holds and settlement arms without changing Market's 3,104-byte size. The
+[findings tracker](audit/findings.md#ai-review-2-working-tree-batch-2026-10-18) records the fixes,
+validation and unresolved findings. Fresh canonical builds used
+`anchor build --tools-version v1.57 --arch v3 --ignore-keys` and `scripts/build-test-venue.sh`:
+
+| Local artifact | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
+|---|---|---|---|
+| `target/deploy/shortwin.so` | `a6ecd6f763f9549eee5913a08d57effbcd69dd312d59217a44cc386f03e62b5e` | `12fb0f2537524eed971d0234ba89033d8c1c327a4335f681e8d82d06c733c69c` | 1,641,144 |
+| `target/test-venue/deploy/shortwin.so` | `7449c9917d63652a7d36b9cded09a8c26137f38ce9c1513dfb7ed0d19f1505e7` | `80a733597c925ed650e8c61970ecf921698a39a043ce59f7f901bf36de6a8764` | 1,676,296 |
+
+These are local test artifacts, **not verifiable-build or deployment evidence**. CI run
+39073841046 completed with only `services` failing and `fuzz-nightly` skipped; its other jobs,
+including mutations, passed on committed 1.0.1. It does not cover this candidate. Release
+still requires resolution or acceptance of the open findings, the full
+gate on that revision, an exact-tree verifiable build, ≥24 h fuzz and auditor fix review.
 
 ## 1. The protocol on one page
 
@@ -682,7 +705,7 @@ design `pump-final`; its row below; §13): a program change, built as 1.0.1.
 | The seventh and eighth rounds' web wording | **Decided (2026-10-08, ninth round): approved as written** — `lender.potSyncs`, `lender.potSyncsDeferred`, `lender.claimCloses` and `lender.subUnitConversion` (FRONTEND §4.2) | As written in FRONTEND §4.2 | Web only |
 | The web on phones and the thirteenth round's UX items (M10-RESP; O-1 … O-6; FRONTEND §13) | **Decided (2026-10-10, thirteenth round): the M10-RESP redesign approved as built** (the twelfth round's request of 2026-10-09: phones, tablets and desktops in the dark terminal style), with **O-1** the lend deposit order, **O-2** the coverage notice once, **O-3** newcomer help (the intro strip, the glossary, How it works), **O-4** a 12 px text floor and **O-5** the Claim wording to build, and **O-6** the Mobile Wallet Adapter after the audit, off by default (the "Open in Backpack / Phantom / Solflare" links stay). **Decided (2026-10-11): the round's 143 new or changed strings approved word for word** (FRONTEND §4.3), with recommendations 6–10 (Tier C as How it works' example, the risk texts there without tick boxes, "short.win" in running text and "ShortWin" as the brand mark, the glossary cuts, "Lending page") approved; **`borrower.liquidation` ¶3 amended** (the expiry fee made conditional: "Expiry: after {maxDuration} the position can be closed by anyone. Unless it can be liquidated at that point, you pay a {expiryFee} expiry fee instead of the penalty."; SPEC §5.3, `expire.rs`'s `UseLiquidate`; FRONTEND §4.2); and the round's questions: a Claim shortfall under 10,000 lamports counts as none (`CLAIM_DUST_LAMPORTS`), the Lending page's Claim is the market panel's claim with its pot syncs, and a Claim is enabled with something claimable now or syncs that can pay, the short-phone breakpoint approved, the lone header ⓘ accepted until a design pass after the audit | Built (`acbe323`, `7a64dcd`); O-6 lifted 2026-10-13 (its own row) | Web only |
 | **O-6, the Mobile Wallet Adapter** (FRONTEND §5.4 (6), §9.3, §13 FE-32) | **Decided (2026-10-13): O-6 lifted.** Built now and switched on (default on; `VITE_ENABLE_MOBILE_WALLET_ADAPTER=false` keeps an off switch). `@solana-mobile/wallet-standard-mobile` 0.7.0, with the protocol pinned to 3.0.0 through pnpm overrides; Kit stays 8.3.0. The mobile UX fixes ship with their strings as drafted. No WalletConnect / Reown. The security review's safeguards taken as decided: the adapter signs only through `solana:signTransaction`, a repo-wide 14-day `minimumReleaseAge` (the two packages excluded until 2026-10-21), Disconnect local only, the `ws://localhost` CSP residual accepted. This replaces the decision of 2026-10-10 (after the audit, off by default). | Built, on by default | No. Web only: CSP `connect-src` + `ws://localhost:*`, `http://localhost` and two style hashes, in flag-on builds |
-| **pump v3** (the design `pump-final`; known-issues KI-77, PUMP-2026-10-13-1 … -6; §13) | **Decided (2026-10-13):** change the program — `PumpMigrating` priced on the post-completion fields, v3 for every curve leg; **D1 (a)** refuse live cashback curves (`CurveCashbackCoin` 6109); **D2** retire `complete_curve` and the 3-transaction straddle bundle (an audit-scope change, described in this addendum); **D3** `B̂_v3` is the risk and exit price above `rT`; **D4** the two strings (6109's and 6031's) as drafted; every residual of the design's §16 / §17 accepted; the release order keeper (both TradeExtras formats) → program upgrade → web; version **1.0.1**; the re-pin to pump's 2026-10-13 build (slot 456,494,698). **Decided after P1 (which introduced `φ_s` on 2026-10-14), confirmed by the owner on 2026-10-16:** the live-supply synthetic fee `φ_s` (a burn can raise it under a multi-tier curve `FeeConfig`) and the fee gates' 10¹⁵ `φ` disclosed beside KI-72 and accepted under KI-72's decision of 2026-10-12 (AI review decision 3; KI-77); no code change | Built (P0 … P8, `pump-v3`); hashes §0 (local, not verified) | **Program** (built: 1.0.1; the `complete_curve` program removed) |
+| **pump v3** (the design `pump-final`; known-issues KI-77, PUMP-2026-10-13-1 … -6; §13) | **Decided (2026-10-13):** change the program — `PumpMigrating` priced on the post-completion fields, v3 for every curve leg; **D1 (a)** refuse live cashback curves (`CurveCashbackCoin` 6109); **D2** retire `complete_curve` and the 3-transaction straddle bundle (an audit-scope change, described in this addendum); **D3** `B̂_v3` is the risk and exit price above `rT`; **D4** the two strings (6109's and 6031's) as drafted; every residual of the design's §16 / §17 accepted; the release order keeper (both TradeExtras formats) → program upgrade → web; version **1.0.1**; the re-pin to pump's 2026-10-13 build (slot 456,494,698). **Decided after P1 (which introduced `φ_s` on 2026-10-14), confirmed by the owner on 2026-10-16:** the live-supply synthetic fee `φ_s` (a burn can raise it under a multi-tier curve `FeeConfig`) and the fee gates' 10¹⁵ `φ` disclosed beside KI-72 and accepted under KI-72's decision of 2026-10-12 (AI review decision 3; KI-77); no code change | Built (P0 … P8, `pump-v3`); hashes §0 (reproduced by CI on `35558c2`) | **Program** (built: 1.0.1; the `complete_curve` program removed) |
 | Other M10 items | The G-H10 reading of a zero-lamport borrower ((A) reaped after the open, (B) emptied inside the exit's transaction; both tested); the fuzzer's PumpSwap weights (`fee_shock` 3, `open_near_cap` 6) | As built | No |
 | Scope note | `shortwin-gov` and `crates/squads-v4-ix` are out of scope under the owner's scope decision (programs plus keeper core). They prepare the transactions the members sign | Out of scope (§2) | No |
 

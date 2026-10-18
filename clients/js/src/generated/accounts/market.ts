@@ -261,6 +261,20 @@ export type Market = {
    */
   minOpenHardCapBps: number;
   pad6: ReadonlyUint8Array;
+  /**
+   * Initial vest end after a settlement leaves a vest. Deposits wait until the shared vest
+   * actually reaches 0, because later credits can move its end. -1 means initialized with
+   * no hold; 0 means legacy/uninitialized. First accrual invalidates legacy source bits and
+   * arms the hold; pending venue rewards also arm it before a split claim can re-vest income.
+   * The next successful deposit after release sets -1. Carved from `_reserved`.
+   */
+  depositHoldUntil: bigint;
+  /**
+   * First EMA count belonging to the latest observation restart (restart count + 1).
+   * Settlement arms from an earlier count must rearm, even if nobody touched them during
+   * warm-up. Zero on legacy markets until their first full prologue. Carved from `_reserved`.
+   */
+  restartEmaCount: bigint;
   reserved: ReadonlyUint8Array;
 };
 
@@ -455,6 +469,20 @@ export type MarketArgs = {
    */
   minOpenHardCapBps: number;
   pad6: ReadonlyUint8Array;
+  /**
+   * Initial vest end after a settlement leaves a vest. Deposits wait until the shared vest
+   * actually reaches 0, because later credits can move its end. -1 means initialized with
+   * no hold; 0 means legacy/uninitialized. First accrual invalidates legacy source bits and
+   * arms the hold; pending venue rewards also arm it before a split claim can re-vest income.
+   * The next successful deposit after release sets -1. Carved from `_reserved`.
+   */
+  depositHoldUntil: number | bigint;
+  /**
+   * First EMA count belonging to the latest observation restart (restart count + 1).
+   * Settlement arms from an earlier count must rearm, even if nobody touched them during
+   * warm-up. Zero on legacy markets until their first full prologue. Carved from `_reserved`.
+   */
+  restartEmaCount: number | bigint;
   reserved: ReadonlyUint8Array;
 };
 
@@ -567,7 +595,9 @@ export function getMarketEncoder(): FixedSizeEncoder<MarketArgs> {
       ["lenderCreditRem", getPodU128Encoder()],
       ["minOpenHardCapBps", getU16Encoder()],
       ["pad6", fixEncoderSize(getBytesEncoder(), 6)],
-      ["reserved", fixEncoderSize(getBytesEncoder(), 144)],
+      ["depositHoldUntil", getI64Encoder()],
+      ["restartEmaCount", getU64Encoder()],
+      ["reserved", fixEncoderSize(getBytesEncoder(), 128)],
     ]),
     (value) => ({ ...value, discriminator: MARKET_DISCRIMINATOR }),
   );
@@ -681,7 +711,9 @@ export function getMarketDecoder(): FixedSizeDecoder<Market> {
     ["lenderCreditRem", getPodU128Decoder()],
     ["minOpenHardCapBps", getU16Decoder()],
     ["pad6", fixDecoderSize(getBytesDecoder(), 6)],
-    ["reserved", fixDecoderSize(getBytesDecoder(), 144)],
+    ["depositHoldUntil", getI64Decoder()],
+    ["restartEmaCount", getU64Decoder()],
+    ["reserved", fixDecoderSize(getBytesDecoder(), 128)],
   ]);
 }
 

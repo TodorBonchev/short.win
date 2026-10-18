@@ -174,7 +174,7 @@ layout!(acct Market, 3_104, {
     // misc (M7-SEC-3: `coverage_cleared_at` from `_reserved`; AIR-03: `lender_credit_rem` from
     // `_reserved[0..16]`; AIR-19: `min_open_hard_cap_bps` from `_reserved[16..24]`)
     coverage_cleared_at @ 2_928, lender_credit_rem @ 2_936, min_open_hard_cap_bps @ 2_952,
-    _pad6 @ 2_954, _reserved @ 2_960,
+    _pad6 @ 2_954, deposit_hold_until @ 2_960, restart_ema_count @ 2_968, _reserved @ 2_976,
 });
 layout!(nested RingEntry, 136, {
     ts @ 0, p @ 8, l @ 24, x @ 40, y @ 56, lo @ 72, hi @ 88, llo @ 104, lhi @ 120,

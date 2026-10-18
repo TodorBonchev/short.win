@@ -92,12 +92,12 @@ use shortwin_math::rent;
 use shortwin_math::risk;
 use shortwin_math::tier::Tier;
 
-use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
+use crate::constants::{CONFIG_VERSION, MARKET_VERSION, VENUE_GUARD_VERSION};
 use crate::engine::caps::{self as engine_caps, CapInputs};
 use crate::engine::guard::{self, mint_guard, MintPath};
 use crate::engine::{lender, prologue, tier as engine_tier, waterfall};
 use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
-use crate::events::{Open, TraderSwept, SWEEP_TO_VEST};
+use crate::events::{Open, TraderSwept};
 use crate::state::{
     GlobalConfig, Market, MarketVault, OracleCache, ShortPosition, TierParams, VenueGuard,
     VenueKind, WalletExposure, EXTRAS_IX_SELL, POOL_VAULT_SEED, POSITION_OPEN,
@@ -118,7 +118,12 @@ pub struct OpenShort<'info> {
     )]
     pub config: AccountLoader<'info, GlobalConfig>,
     /// The venue-upgrade latch (A7): read only by opens.
-    #[account(seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump)]
+    #[account(
+        seeds = [VenueGuard::SEED],
+        bump = venue_guard.load()?.bump,
+        constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION
+            @ ShortwinError::ConfigVersion
+    )]
     pub venue_guard: AccountLoader<'info, VenueGuard>,
     /// The cached SOL/USD price for the tier (ARCH §4.7).
     #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)]
@@ -261,6 +266,10 @@ pub fn handler<'info>(
             clock.unix_timestamp,
             Some(ctx.accounts.mint.supply),
         );
+        // Keep the timestamp from before the prologue. Rolling an old, still-open bucket sets
+        // `ema_ts` to this instruction's time; that does not make its old sample fresh enough
+        // to price a new position.
+        let ema_ts_before = market.ema_ts;
         let mut vault = ctx.accounts.market_vault.load()?.vault();
         let pro = prologue::run(
             &config,
@@ -340,6 +349,20 @@ pub fn handler<'info>(
             .checked_add(i64::from(config.params.market_warmup_s))
             .or_math()?;
         require_gte!(now, warm, ShortwinError::MarketWarmingUp);
+        // An idle market can retain an old EMA even after its listing warm-up has elapsed.
+        // The margin and caps below must use a recently integrated price.
+        require!(
+            now.saturating_sub(ema_ts_before) <= shortwin_math::consts::COVERAGE_GAP_S,
+            ShortwinError::EmaWarmingUp
+        );
+        // A preceding crank can roll an old bucket and advance `ema_ts` in this transaction.
+        // The completed bucket retains the observation's second, so that roll alone cannot
+        // make an idle market's price fresh enough for an open.
+        require!(
+            market.lb_lo.get() == 0
+                || now.saturating_sub(market.lb_sec) <= shortwin_math::consts::COVERAGE_GAP_S,
+            ShortwinError::EmaWarmingUp
+        );
         let p_ema = market.ema_price.get();
         let p_spot = state.price().ok_or(ShortwinError::NoRoute)?;
         require!(
@@ -462,6 +485,7 @@ pub fn handler<'info>(
     };
     let swept = trader.normalise()?;
     if swept.any() {
+        let sweep_to = crate::events::sweep_to(&pool, SweepSource::Trader);
         if swept.lamports > 0 {
             pool::sweep(
                 &mut pool,
@@ -480,8 +504,8 @@ pub fn handler<'info>(
             ts: clock.unix_timestamp,
             lamports: swept.lamports,
             tokens: swept.tokens,
-            to: SWEEP_TO_VEST,
-            wipe_bits: 0,
+            to: sweep_to,
+            wipe_bits: crate::events::sweep_wipe_bits(&pool),
         });
     }
     let ert = venues::effective_ert(kind, config.params.exec_rent_tol);

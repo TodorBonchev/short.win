@@ -240,6 +240,7 @@ pub fn liquidate(
 ) -> Result<Payout, MathError> {
     split.validate()?;
     check_bps(x.rent_protocol_bps)?;
+    check_bps(penalty_bps)?;
     let (rent, w) = after_buyback_and_rent(x.v, x.b, x.r_due)?;
     let (rent_protocol, rent_lenders) = split_rent(rent, x.rent_protocol_bps)?;
     let penalty = bps_of(x.base(), penalty_bps, Rounding::Ceil)?.min(w);
@@ -296,6 +297,7 @@ pub fn expire(
     keeper: &ExpiryKeeperTerms,
 ) -> Result<Payout, MathError> {
     check_bps(x.rent_protocol_bps)?;
+    check_bps(expiry_fee_bps)?;
     let (rent, w) = after_buyback_and_rent(x.v, x.b, x.r_due)?;
     let (rent_protocol, rent_lenders) = split_rent(rent, x.rent_protocol_bps)?;
     let expiry_fee = bps_of(x.base(), expiry_fee_bps, Rounding::Ceil)?.min(w);

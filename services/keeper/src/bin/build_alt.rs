@@ -6,9 +6,11 @@
 //! shortwin-build-alt create --rpc <url> --keypair <payer> [--authority <keypair>] [--freeze]
 //!                           [--priority-price <µlamports/CU>] [--static-only]
 //! shortwin-build-alt extend --rpc <url> --keypair <payer> --table <alt> [--authority <keypair>]
+//!                           [--market <market> [--protocol-table <protocol alt>]]
 //!                           [--priority-price <µlamports/CU>] [--static-only]
 //! shortwin-build-alt check  --rpc <url> --table <alt> [--static-only]
-//! shortwin-build-alt market --rpc <url> --market <market> [--table <protocol alt>]
+//!                           [--market <market> [--protocol-table <protocol alt>]]
+//! shortwin-build-alt market --rpc <url> --market <market> [--protocol-table <protocol alt>]
 //!                           [--keypair <payer> [--authority <keypair>] [--priority-price <µlamports/CU>]]
 //! ```
 //!
@@ -20,12 +22,14 @@
 //!   deactivated, never extended again). Prints the table's address: put it in the keeper's
 //!   `lookup_tables`.
 //! - `extend`: adds whatever the list has and the table lacks (e.g. a new pump recipient).
+//!   With `--market`, refreshes that market's keys, including pool switches and new extras.
 //! - `check`: exit 0 if the table holds every address of the list and is active, 1 otherwise
 //!   (the missing ones are printed); also reports extra entries and the authority.
 //!
 //! - `market` (M7, OWNER-M7-1's fallback; ARCH §6.4): a market's own table
 //!   (`alt::market_entries`) — the per-market keys its trading transactions and cranks name that
-//!   the protocol table (`--table`, else the list `create` would build) leaves inline. Prints the
+//!   the protocol table (`--protocol-table`, with `--table` retained as an alias for this command;
+//!   else the list `create` would build) leaves inline. Prints the
 //!   list and its rent; with `--keypair` also creates it, extendable (never frozen: a new extras
 //!   set or a pool switch adds keys; closing it after deactivation returns the rent). Put its
 //!   address in the keeper's `lookup_tables` and publish it to clients (the PumpSwap open with the
@@ -43,7 +47,8 @@ use solana_pubkey::Pubkey;
 use solana_signer::Signer;
 
 const USAGE: &str = "usage: shortwin-build-alt <print|create|extend|check|market> [--rpc <url>] \
-     [--keypair <payer>] [--authority <keypair>] [--table <alt>] [--market <market>] [--freeze] \
+     [--keypair <payer>] [--authority <keypair>] [--table <alt>] [--market <market>] \
+     [--protocol-table <protocol alt>] [--freeze] \
      [--priority-price <µlamports/CU>] [--static-only]";
 
 #[derive(Default)]
@@ -54,14 +59,19 @@ struct Args {
     authority: Option<String>,
     table: Option<Pubkey>,
     market: Option<Pubkey>,
+    protocol_table: Option<Pubkey>,
     freeze: bool,
     price: u64,
     static_only: bool,
 }
 
 fn parse_args() -> anyhow::Result<Args> {
+    parse_args_from(std::env::args().skip(1))
+}
+
+fn parse_args_from(args: impl IntoIterator<Item = String>) -> anyhow::Result<Args> {
     let mut a = Args::default();
-    let mut it = std::env::args().skip(1);
+    let mut it = args.into_iter();
     a.cmd = it.next().context(USAGE)?;
     while let Some(flag) = it.next() {
         let mut val = || {
@@ -74,12 +84,30 @@ fn parse_args() -> anyhow::Result<Args> {
             "--authority" => a.authority = Some(val()?),
             "--table" => a.table = Some(Pubkey::from_str(&val()?).context("--table")?),
             "--market" => a.market = Some(Pubkey::from_str(&val()?).context("--market")?),
+            "--protocol-table" => {
+                a.protocol_table = Some(Pubkey::from_str(&val()?).context("--protocol-table")?)
+            }
             "--priority-price" => a.price = val()?.parse().context("--priority-price")?,
             "--freeze" => a.freeze = true,
             "--static-only" => a.static_only = true,
             "-h" | "--help" => bail!("{USAGE}"),
             other => bail!("unknown argument {other}\n{USAGE}"),
         }
+    }
+    if a.market.is_some() && !matches!(a.cmd.as_str(), "market" | "extend" | "check") {
+        bail!("--market is supported by market, extend and check");
+    }
+    if a.protocol_table.is_some() && a.market.is_none() {
+        bail!("--protocol-table requires --market");
+    }
+    if a.cmd == "market" && a.table.is_some() && a.protocol_table.is_some() {
+        bail!("use only --protocol-table (or its market-command alias --table)");
+    }
+    if a.cmd != "market" && a.table.is_some() && a.table == a.protocol_table {
+        bail!("the market table and protocol table must be different");
+    }
+    if a.freeze && a.cmd != "create" {
+        bail!("--freeze is supported only by create; market tables must remain extendable");
     }
     Ok(a)
 }
@@ -149,14 +177,14 @@ async fn main() -> anyhow::Result<()> {
             let c = need_rpc()?;
             let table = a.table.context("--table is required")?;
             let (payer, authority) = signers(&a)?;
-            let list = entries(Some(c), a.static_only).await?;
+            let list = alt::selected_entries(c, a.market, a.protocol_table, a.static_only).await?;
             let n = alt::extend(c, &payer, &authority, &table, &alt::keys(&list), a.price).await?;
             println!("{table}: {n} addresses added");
         }
         "check" => {
             let c = need_rpc()?;
             let table = a.table.context("--table is required")?;
-            let list = entries(Some(c), a.static_only).await?;
+            let list = alt::selected_entries(c, a.market, a.protocol_table, a.static_only).await?;
             let state = alt::read_table(c, &table).await?;
             let expected = alt::keys(&list);
             let missing = state.missing(&expected);
@@ -190,15 +218,9 @@ async fn main() -> anyhow::Result<()> {
         "market" => {
             let c = need_rpc()?;
             let market = a.market.context("--market is required")?;
-            let protocol = match a.table {
-                Some(t) => alt::read_table(c, &t).await?.addresses,
-                None => alt::keys(&entries(Some(c), a.static_only).await?),
-            };
-            let view = shortwin_keeper::view::load(c, &[market]).await?;
-            let mv = view
-                .market(&market)
-                .with_context(|| format!("{market}: not a readable short.win market"))?;
-            let list = alt::market_entries(mv, &protocol)?;
+            let list =
+                alt::selected_entries(c, Some(market), a.protocol_table.or(a.table), a.static_only)
+                    .await?;
             print(&list);
             println!(
                 "# rent {} lamports (recovered on close)",
@@ -226,4 +248,63 @@ async fn main() -> anyhow::Result<()> {
         other => bail!("unknown command {other}\n{USAGE}"),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(values: &[&str]) -> anyhow::Result<Args> {
+        parse_args_from(values.iter().map(|v| (*v).to_string()))
+    }
+
+    #[test]
+    fn market_refresh_keeps_destination_separate_from_protocol_table() {
+        let market = Pubkey::new_unique().to_string();
+        let table = Pubkey::new_unique().to_string();
+        let protocol = Pubkey::new_unique().to_string();
+        for command in ["extend", "check"] {
+            let parsed = args(&[
+                command,
+                "--table",
+                &table,
+                "--market",
+                &market,
+                "--protocol-table",
+                &protocol,
+            ])
+            .unwrap();
+            assert_eq!(parsed.table.unwrap().to_string(), table);
+            assert_eq!(parsed.protocol_table.unwrap().to_string(), protocol);
+            assert_eq!(parsed.market.unwrap().to_string(), market);
+            assert!(
+                args(&[
+                    command,
+                    "--table",
+                    &table,
+                    "--market",
+                    &market,
+                    "--protocol-table",
+                    &table
+                ])
+                .is_err()
+            );
+        }
+        assert!(args(&["create", "--market", &market]).is_err());
+        assert!(args(&["check", "--protocol-table", &protocol]).is_err());
+        assert!(args(&["market", "--market", &market, "--freeze"]).is_err());
+        assert!(args(&["market", "--market", &market, "--table", &protocol]).is_ok());
+        assert!(
+            args(&[
+                "market",
+                "--market",
+                &market,
+                "--table",
+                &protocol,
+                "--protocol-table",
+                &protocol
+            ])
+            .is_err()
+        );
+    }
 }

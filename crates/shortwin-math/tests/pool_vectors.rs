@@ -355,16 +355,15 @@ fn replay_fuzz_run(stem: &str, epochs: u32) {
     assert_eq!(t.epochs_rolled.0, epochs, "{stem}: ECON §9.6 epochs rolled");
 }
 
-// Since AIR-07's residual fix a deposit into a drained pool is refused (26 of the 90 % run's
-// deposits, 234 of the 100 % run's), which moves the epochs rolled from 1,020 and 1,930.
+// Current AIR2 math-only fuzz; program-side settlement-hold integration has separate tests.
 #[test]
 fn pool_model_fuzz_continuous_90() {
-    replay_fuzz_run("continuous_90", 1_021);
+    replay_fuzz_run("continuous_90", 1_007);
 }
 
 #[test]
 fn pool_model_fuzz_continuous_100() {
-    replay_fuzz_run("continuous_100", 1_941);
+    replay_fuzz_run("continuous_100", 1_938);
 }
 
 #[test]
@@ -379,18 +378,15 @@ fn lock_heavy_mix_untouched_ip4() {
 
 #[test]
 fn stranded_sol_after_an_honest_wind_down() {
-    // ECON §9.4 / R3A-2 (reviewer's r3_stranded.py), v0.4 row: 40 seeds × 3,000 operations;
-    // stranded 0.000015 SOL in total (15,044 lamports), worst seed 435 lamports, no seed above
-    // 0.01 SOL. AIR-03's carried rent-credit remainder took it from 19,887 / 582 lamports
-    // (0.000020 / 0.000001 SOL): an accrual's floored fraction no longer stays in `lender_sol`.
-    // AIR-07's drained-pool gate, which refuses some of the table's deposits, moved it from
-    // 15,058 / 440.
+    // The ECON §9.4 / R3A-2 driver on current AIR2 arithmetic: 40 seeds × 3,000 operations;
+    // 15,273 lamports of rounding dust, worst seed 444, no seed above 0.01 SOL. The dated
+    // pre-AIR2 table remains 15,044 / 435; current dust-sweep gating changes the traces.
     let runs = replay_group("pool_stranded", 120_000);
     assert_eq!(runs.len(), 40);
     let stranded: Vec<u64> = runs.iter().map(|(_, s)| s.final_lender_sol).collect();
     let total: u64 = stranded.iter().sum();
     let worst = *stranded.iter().max().expect("seeds");
-    assert_eq!((total, worst), (15_044, 435));
+    assert_eq!((total, worst), (15_273, 444));
     assert_eq!(format!("{:.6}", total as f64 / 1e9), "0.000015");
     assert_eq!(stranded.iter().filter(|&&s| s > 10_000_000).count(), 0);
 }

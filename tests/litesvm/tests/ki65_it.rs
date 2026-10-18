@@ -89,6 +89,9 @@ fn rebase(lab: &mut Lab, pid: &str, sol: u64, lump: u64) {
     assert_eq!(lab.market().share_epoch, e + 1, "{pid}: the epoch rolled");
     let r = *lab.state().records.last().unwrap();
     assert_eq!(r.num, 1, "{pid}: a rebase, not a wipe");
+    // AIR2-05: close the empty pre-flush source before introducing new income.
+    // The following lump is a fresh vest, not cashback owed to the old holders.
+    lab.sweep_sol(0);
     if lump > 0 {
         lab.sweep_sol(lump);
     }

@@ -26,7 +26,9 @@
 //! | `coverage_cleared_at` (M7-SEC-3, from `_reserved`) | 2,928 | 8 |
 //! | `lender_credit_rem` (AIR-03, from `_reserved`) | 2,936 | 16 |
 //! | `min_open_hard_cap_bps` @2,952 (AIR-19, from `_reserved`) | 2,952 | 8 |
-//! | `_reserved` | 2,960 | 144 |
+//! | `deposit_hold_until` | 2,960 | 8 |
+//! | `restart_ema_count` | 2,968 | 8 |
+//! | `_reserved` | 2,976 | 128 |
 //!
 //! The math crate's state types (`pool::Pool`, `rent::{Basis, Aggr}`, `observe::*`) hold native
 //! `u128`/`i128`; the conversions below ([`Market::pool`], [`Market::set_pool`], …) copy field by
@@ -456,7 +458,17 @@ pub struct Market {
     /// 0 (unset) on existing accounts: the global cap alone, as before.
     pub min_open_hard_cap_bps: u16,
     pub _pad6: [u8; 6],
-    pub _reserved: [u8; 144],
+    /// Initial vest end after a settlement leaves a vest. Deposits wait until the shared vest
+    /// actually reaches 0, because later credits can move its end. -1 means initialized with
+    /// no hold; 0 means legacy/uninitialized. First accrual invalidates legacy source bits and
+    /// arms the hold; pending venue rewards also arm it before a split claim can re-vest income.
+    /// The next successful deposit after release sets -1. Carved from `_reserved`.
+    pub deposit_hold_until: i64,
+    /// First EMA count belonging to the latest observation restart (restart count + 1).
+    /// Settlement arms from an earlier count must rearm, even if nobody touched them during
+    /// warm-up. Zero on legacy markets until their first full prologue. Carved from `_reserved`.
+    pub restart_ema_count: u64,
+    pub _reserved: [u8; 128],
 }
 
 impl Market {
@@ -642,6 +654,14 @@ impl Market {
         r.head = self.ring_head;
         r.len = self.ring_count;
         r
+    }
+
+    /// Invalidate settlement arms from before this restart, including untouched positions.
+    pub fn mark_observation_restart(&mut self, count: u64) -> Result<()> {
+        self.restart_ema_count = count
+            .checked_add(1)
+            .ok_or(crate::errors::ShortwinError::MathOverflow)?;
+        Ok(())
     }
 
     /// Stores the observation state back (the inverse of [`Market::observation`]).

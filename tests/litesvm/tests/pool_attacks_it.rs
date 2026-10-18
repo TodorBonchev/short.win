@@ -475,6 +475,7 @@ mod lambda_games {
         // under `pool_min_real_sol` (`PoolTooThin`) on this pool at the floor; three hours of the
         // keeper's 60-s observations bring `L_slow` to the pool's depth (τ_slow 1 h).
         crank_every(&mut env, &rm, 60, 180);
+        crank_every(&mut env, &rm, 1, 1);
         // A position of 0.43 % of the conservative `X₀` — which the locked depth bounds and the
         // deposit did not raise (rule 5) — ≈ 0.11 SOL of notional: over `min_notional`, under
         // the fee-scaled caps (3·φ = 0.75 % of `X₀`, and the wallet's share of 7.5·φ). The

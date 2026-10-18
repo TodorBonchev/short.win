@@ -11,7 +11,9 @@ import type { ErrorAction } from '../config/errors.ts';
 
 export type TxKind =
     | 'create_market'
+    | 'crank_price'
     | 'deposit'
+    | 'lender_cleanup'
     | 'withdraw'
     | 'claim_sol'
     | 'cover_deficit'

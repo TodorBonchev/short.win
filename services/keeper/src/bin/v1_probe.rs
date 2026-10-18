@@ -138,10 +138,10 @@ async fn run(a: &Args) -> anyhow::Result<bool> {
         "v1 {} by {} ({})",
         if v1_ok { "ACCEPTED" } else { "REFUSED" },
         a.rpc,
-        if a.send {
-            "landed: leaders take v1"
-        } else {
-            "simulation only: says nothing about the leaders; rerun with --send"
+        match (a.send, v1_ok) {
+            (true, true) => "landed: leaders take v1",
+            (true, false) => "send failed: no successful v1 landing confirmed",
+            (false, _) => "simulation only: says nothing about the leaders; rerun with --send",
         }
     );
     Ok(v1_ok)

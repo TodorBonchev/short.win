@@ -10,6 +10,7 @@
 //! |---|---|
 //! | T-OPS-1 | the example layout is refused for anything that sends (`status` and `verify` still run); `--dry-run` simulates and sends nothing; `verify` on an empty cluster fails on every missing piece |
 //! | T-OPS-2 | the whole sequence: both multisigs; `init-config` with the vault PDAs (a stale guard slot refused first); `stage-upgrade` refused while the deployer still holds the upgrade authority; the checked upgrade-authority transfer of short.win through Governance (its whole upgrade set since the straddle helper `complete_curve` was retired, pump-final D2; the deployer co-signs; `--checked` required; Squads refuses 1 s early); an `Authorities` change through both timelocks (Squads 172,800 s, then short.win's `TimelockNotElapsed` 1 s early); an upgrade through the vault (a buffer the vault does not own, and one whose ELF outgrows the ProgramData, refused by the tool — the first, staged anyway, by the loader after the time lock); a cancelled stale upgrade; `status` decoding a staged transaction; Emergency `set-pause` in two transactions (a rerun refused as a duplicate); the worst-case `set_venue_extras` through the transaction buffer, and three of them in one message through a buffer create and extends; a buffer an interrupted run left resumed with `--force-buffer`, a foreign one refused and closed with `close-buffer`; `verify` passes, and fails on a layout that drifted |
+//! | T-OPS-3 | a revalidation after an extension exceeds both default budgets; `--compute-unit-limit` permits execute and approve/execute, remains outside the stored vault message, and applies to dry-run too |
 
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
@@ -35,6 +36,76 @@ use squads_v4_ix::state::{Multisig, Proposal, ProposalStatus};
 
 const EXAMPLE: &str = include_str!("../governance.example.toml");
 const GOV_TL: i64 = 172_800;
+
+#[test]
+fn t_ops_4_oracle_feed_is_checked_before_staging_and_again_before_apply() {
+    use shortwin_venue_state::pyth;
+    let h = H::new("t_ops_4");
+    h.ok(
+        "create-multisigs --payer @payer --gov-create-key @gov_create --emg-create-key @emg_create",
+    );
+    h.ok("init-config --authority @deployer");
+    let key = Pubkey::new_unique();
+    let bytes = include_bytes!("../../../tests/fixtures/accounts/pyth_sol_usd_shard0.bin");
+    let update = pyth::read(&pyth::RECEIVER, bytes).unwrap();
+    let expected_feed = update.feed_id;
+    let feed: String = expected_feed.iter().map(|b| format!("{b:02x}")).collect();
+    let stage = format!("stage propose-oracle-feed {key} {feed} --key @gov0");
+    let sent = h.chain.sizes.borrow().len();
+    assert!(format!("{:#}", h.err(&stage)).contains("does not exist"));
+    let valid = solana_account::Account {
+        lamports: 10_000_000,
+        owner: Pubkey::new_from_array(pyth::RECEIVER),
+        data: bytes.to_vec(),
+        executable: false,
+        rent_epoch: 0,
+    };
+    let mut wrong = valid.clone();
+    wrong.owner = Pubkey::new_unique();
+    h.env().svm.set_account(key, wrong).unwrap();
+    assert!(format!("{:#}", h.err(&stage)).contains("WrongOwner"));
+    let mut wrong = valid.clone();
+    wrong.data.truncate(8);
+    h.env().svm.set_account(key, wrong).unwrap();
+    assert!(format!("{:#}", h.err(&stage)).contains("layout"));
+    h.env().svm.set_account(key, valid.clone()).unwrap();
+    let wrong_id = format!(
+        "stage propose-oracle-feed {key} {} --key @gov0",
+        "00".repeat(32)
+    );
+    assert!(format!("{:#}", h.err(&wrong_id)).contains("feed id differs"));
+    assert_eq!(
+        h.chain.sizes.borrow().len(),
+        sent,
+        "bad input sends nothing"
+    );
+
+    let index = staged_index(&h.ok(&stage));
+    h.ok(&format!(
+        "approve --ms governance --index {index} --key @gov1"
+    ));
+    h.ok(&format!(
+        "approve --ms governance --index {index} --key @gov2"
+    ));
+    h.warp(GOV_TL);
+    h.ok(&format!(
+        "execute --ms governance --index {index} --key @gov2"
+    ));
+    h.warp(i64::from(h.layout().timelock_s));
+    let mut changed = valid.clone();
+    let mut changed_update = update;
+    changed_update.feed_id = [0; 32];
+    changed.data = pyth::encode(&changed_update).to_vec();
+    h.env().svm.set_account(key, changed).unwrap();
+    let sent = h.chain.sizes.borrow().len();
+    assert!(format!("{:#}", h.err("apply --key @payer")).contains("feed id differs"));
+    assert_eq!(h.chain.sizes.borrow().len(), sent);
+    assert!(h.env().config().pending.is_some());
+    h.env().svm.set_account(key, valid).unwrap();
+    h.ok("apply --key @payer");
+    assert_eq!(h.env().config().pyth_sol_usd, key);
+    assert_eq!(h.env().config().pyth_feed_id, expected_feed);
+}
 
 // ---- the chain -----------------------------------------------------------------------------
 
@@ -791,7 +862,7 @@ fn t_ops_2_full_sequence_through_both_timelocks() {
     let file = h.dir.join("extras.toml");
     std::fs::write(&file, extras).unwrap();
     let r = h.ok(&format!(
-        "stage set-venue-extras pump_swap sell {} --key @emg0",
+        "stage set-venue-extras pump_swap sell {} --key @emg0 --compute-unit-limit 600000",
         file.display()
     ));
     assert!(r.contains("through transaction buffer 0"), "{r}");
@@ -833,7 +904,9 @@ fn t_ops_2_full_sequence_through_both_timelocks() {
     let (big, text) = {
         let member = h.keypair("emg1");
         let mut out = Vec::new();
-        let ops = shortwin_ops::send::Ops::new(&h.chain, false, &mut out);
+        let ops = shortwin_ops::send::Ops::new(&h.chain, false, &mut out)
+            .with_compute_unit_limit(600_000)
+            .unwrap();
         let opts = StageOpts {
             buffer_index: 1,
             ..StageOpts::default()
@@ -1030,4 +1103,86 @@ fn t_ops_2_full_sequence_through_both_timelocks() {
         text.contains("FAIL Emergency threshold: 2, expected 3"),
         "{text}"
     );
+}
+
+/// A revalidation reviewed before an extension hashes the ELF through Squads. Its budget
+/// belongs on the outer execute transaction, and the same holds when approval and execution
+/// share a transaction. A synthetic 900 KB ELF makes the hash exceed both default budgets.
+#[test]
+fn t_ops_3_compute_budget_revalidates_after_an_extension() {
+    let h = H::new("t_ops_3");
+    let l = h.layout();
+    let venue = 2;
+    let pd = shortwin::constants::VENUE_PROGRAM_DATA[venue];
+    let initial_slot = l.guard_slots.unwrap()[venue];
+    let mut data = shortwin_venue_state::program_data::encode_header(initial_slot, None).to_vec();
+    data.resize(data.len() + 900_000, 0xab);
+    h.env()
+        .svm
+        .set_account(
+            pd,
+            solana_account::Account {
+                lamports: 10_000_000_000,
+                data,
+                owner: loader::ID,
+                executable: false,
+                rent_epoch: 0,
+            },
+        )
+        .unwrap();
+    h.ok(
+        "create-multisigs --payer @payer --gov-create-key @gov_create --emg-create-key @emg_create",
+    );
+    h.ok("init-config --authority @deployer");
+
+    for (round, combined) in [false, true].into_iter().enumerate() {
+        let reviewed_slot = initial_slot + round as u64;
+        let r = h.ok(&format!(
+            "stage revalidate-venue {venue} {reviewed_slot} --key @emg0 --compute-unit-limit 600000"
+        ));
+        let index = staged_index(&r);
+        let (_, stored) =
+            h.rt.block_on(shortwin_ops::squads::transaction(&h.chain, &l.emg, index))
+                .unwrap();
+        let stored_ixs = shortwin_ops::squads::executed(&stored.unwrap()).unwrap();
+        assert_eq!(stored_ixs.len(), 1, "budget must stay outside the vault");
+        assert_eq!(stored_ixs[0].program_id, shortwin::ID);
+
+        // Model ExtendProgram's account change after the reviewed message was staged.
+        let extended_slot = reviewed_slot + 1;
+        let mut acc = h.account(&pd).unwrap();
+        acc.data[4..12].copy_from_slice(&extended_slot.to_le_bytes());
+        acc.data.resize(acc.data.len() + 10_240, 0);
+        h.env().svm.set_account(pd, acc).unwrap();
+        let command = if combined {
+            format!("approve --ms emergency --index {index} --key @emg1 --execute")
+        } else {
+            h.ok(&format!(
+                "approve --ms emergency --index {index} --key @emg1"
+            ));
+            format!("execute --ms emergency --index {index} --key @emg1")
+        };
+        let sent = h.chain.sizes.borrow().len();
+        let default_error = h.err(&command);
+        assert!(
+            matches!(
+                &tx_failure(&default_error).err,
+                TxError::Instruction { detail, .. }
+                    if detail == "ComputationalBudgetExceeded" || detail == "ProgramFailedToComplete"
+            ),
+            "{default_error:#}"
+        );
+        assert_eq!(h.chain.sizes.borrow().len(), sent, "failed simulation sent");
+        let dry_run = h.ok(&format!("{command} --compute-unit-limit 600000 --dry-run"));
+        assert!(dry_run.contains("NOT sent"), "{dry_run}");
+        assert_eq!(h.chain.sizes.borrow().len(), sent);
+        assert_eq!(h.env().venue_guard().guard_slot[venue], reviewed_slot);
+
+        h.ok(&format!("{command} --compute-unit-limit 600000"));
+        assert_eq!(h.env().venue_guard().guard_slot[venue], extended_slot);
+        assert!(matches!(
+            h.status(&l.emg.key, index),
+            ProposalStatus::Executed(_)
+        ));
+    }
 }

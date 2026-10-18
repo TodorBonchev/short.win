@@ -84,7 +84,7 @@ use crate::engine::bounds::{self, ExitBound};
 use crate::engine::guard::{mint_guard, MintPath};
 use crate::engine::{lender, prologue, waterfall as engine_waterfall};
 use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
-use crate::events::{Liquidate as LiquidateEvent, MintSafetyTripped, TraderSwept, SWEEP_TO_VEST};
+use crate::events::{Liquidate as LiquidateEvent, MintSafetyTripped, TraderSwept};
 use crate::lamports;
 use crate::state::{
     GlobalConfig, Market, MarketVault, ShortPosition, VenueKind, WalletExposure, EXTRAS_IX_BUY,
@@ -203,8 +203,8 @@ pub fn handler<'info>(ctx: Context<'info, Liquidate<'info>>, extras: ExtrasSel) 
             ts: clock.unix_timestamp,
             lamports: out.swept.lamports,
             tokens: out.swept.tokens,
-            to: SWEEP_TO_VEST,
-            wipe_bits: 0,
+            to: out.sweep_to,
+            wipe_bits: out.sweep_wipe_bits,
         });
     }
     if let Some(ev) = out.completed.take() {
@@ -481,6 +481,8 @@ pub(crate) struct ExitOutcome {
     /// What the trader normalisation swept (`TraderSwept`): lamports to lenders, tokens of a
     /// pump venue's `trader_base_ata` to the pool vault.
     pub swept: crate::engine::trader::Swept,
+    pub sweep_to: u8,
+    pub sweep_wipe_bits: u8,
     /// The buyback completed the curve: the market moved to `PumpMigrating` (`VenueStateChanged`).
     pub completed: Option<crate::events::VenueStateChanged>,
     pub assessment: Assessment,
@@ -610,6 +612,7 @@ pub(crate) fn keeper_exit<'info>(
         (t, venues::raydium::sol_first(&m))
     };
     let swept = trader.normalise()?;
+    let sweep_to = crate::events::sweep_to(&pool, SweepSource::Trader);
     if swept.lamports > 0 {
         pool::sweep(
             &mut pool,
@@ -622,6 +625,7 @@ pub(crate) fn keeper_exit<'info>(
         )
         .math()?;
     }
+    let sweep_wipe_bits = crate::events::sweep_wipe_bits(&pool);
     let leg = Leg {
         kind,
         market: accs.market.to_account_info(),
@@ -705,6 +709,8 @@ pub(crate) fn keeper_exit<'info>(
     Ok(Box::new(ExitOutcome {
         mint_ok,
         swept,
+        sweep_to,
+        sweep_wipe_bits,
         completed,
         assessment: plan.assessment,
         bound: plan.bound,

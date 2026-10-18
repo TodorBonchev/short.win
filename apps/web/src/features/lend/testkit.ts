@@ -5,7 +5,7 @@
  */
 import { bigIntToPodI128, bigIntToPodU128, type Market } from '@shortwin/client';
 import { type Address, address } from '@solana/kit';
-import type { LenderFields, LendState, RecordFields, VaultPoolFields } from './previews.ts';
+import { type LenderFields, type LendState, MARKET_FLAG, type RecordFields, type VaultPoolFields } from './previews.ts';
 
 const WAD = 10n ** 18n;
 export const NO_LOCK_EPOCH = 4_294_967_295;
@@ -100,6 +100,7 @@ export function marketOf(m: VectorCase['market'], venue = 0): LendState['market'
         vestBal: big(m.vestBal),
         vestLast: big(m.vestLast),
         vestEnd: big(m.vestEnd),
+        depositHoldUntil: big(m.depositHoldUntil ?? -1),
         shareEpoch: Number(m.shareEpoch),
         flags: Number(m.flags),
         venue,
@@ -189,6 +190,7 @@ export function simplePool(
         vestBal?: bigint;
         vestLast?: bigint;
         vestEnd?: bigint;
+        depositHoldUntil?: bigint;
         flags?: number;
         venue?: number;
         pumpUva?: Address;
@@ -215,8 +217,9 @@ export function simplePool(
             vestBal: o.vestBal ?? 0n,
             vestLast: o.vestLast ?? 0n,
             vestEnd: o.vestEnd ?? 0n,
+            depositHoldUntil: o.depositHoldUntil ?? -1n,
             shareEpoch: o.shareEpoch ?? 0,
-            flags: o.flags ?? 0,
+            flags: o.flags ?? MARKET_FLAG.wipeTraderSwept | MARKET_FLAG.wipeRewardsClaimed,
             venue,
             pumpUva: o.pumpUva ?? (venue >= 1 && venue <= 3 ? PUMP_UVA : NO_UVA),
         },

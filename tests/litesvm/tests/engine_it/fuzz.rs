@@ -160,7 +160,10 @@ impl Walk {
             }
             Err(_) if gates.paused => assert_eq!(got, Some(code(E::OpensPaused))),
             Err(_) if gates.flagged => assert_eq!(got, Some(code(E::RouteBroken))),
-            Err(_) => assert!(is_one_of(got, &REFUSALS), "open: {got:?}"),
+            Err(_) => assert!(
+                got == Some(code(E::EmaWarmingUp)) || is_one_of(got, &REFUSALS),
+                "open: {got:?}"
+            ),
         }
     }
 

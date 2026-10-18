@@ -8,7 +8,7 @@ Output only; the code is `services/keeper-litesvm/tests/scenarios/cascade.rs`.
 
 - **Baskets:** `min_notional` positions (≈ 0.1 SOL each, one borrower each) filling the 25-SOL
   launch cap — on the mock venue (a 10,000-SOL pool, so only the launch cap binds; 246 positions)
-  and on the PumpSwap `mature` fork (the heaviest measured `liquidate`, ≈ 212 k requested CU).
+  and on the PumpSwap `mature` fork (the heaviest measured `liquidate`, ≈ 215 k requested CU).
 - **Paths:** `cascade.py`'s, scaled to the positions' Tier C terms (open at a live CR ≈ 2.9 against
   `L` = 1.5): a ×3 gap held (S1 settlements), pumps ×3 over 60 s, ×3 and ×10 over 10 minutes. The
   keeper ticks every slot.

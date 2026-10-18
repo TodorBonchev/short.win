@@ -7,12 +7,14 @@
 import { getOpenShortInstructionDataDecoder } from '@shortwin/client';
 import { type Address, createNoopSigner } from '@solana/kit';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageBannersContext } from '../../components/PageBanners.tsx';
 import { ToastProvider } from '../../components/Toast.tsx';
 import { T } from '../../config/testids.ts';
 import type { MathModule } from '../../math/load.ts';
-import { MARKET_FLAG } from '../../venues/constants.ts';
+import { TxDoneContext } from '../../tx/TxReviewModal.tsx';
+import type { TxPlan, TxStage } from '../../tx/types.ts';
+import { COVERAGE_GAP_S, MARKET_FLAG } from '../../venues/constants.ts';
 import { NO_EXTRAS } from '../../venues/lists.ts';
 import type { ChainSnapshot } from './snapshot.ts';
 import { testMath, vectorCase, vectorSnapshot } from './testing.ts';
@@ -22,6 +24,9 @@ const state = vi.hoisted(() => ({
     math: null as unknown,
     walletQ: 0n,
     start: vi.fn(),
+    close: vi.fn(),
+    stage: 'idle' as TxStage,
+    plan: null as TxPlan | null,
 }));
 
 // The panel's Retry rebuilds trades through the app's RPC client (M9-UX-1); not exercised here.
@@ -54,8 +59,8 @@ vi.mock('./useTradeFlow.ts', () => ({
     useTradeFlow: () => ({
         flow: {
             state: {
-                stage: 'idle',
-                plan: null,
+                stage: state.stage,
+                plan: state.plan,
                 report: null,
                 acks: new Set(),
                 speed: 'normal',
@@ -68,7 +73,7 @@ vi.mock('./useTradeFlow.ts', () => ({
             setAck: vi.fn(),
             setSpeed: vi.fn(),
             sign: vi.fn(),
-            close: vi.fn(),
+            close: state.close,
         },
         start: state.start,
         building: false,
@@ -83,6 +88,12 @@ let math: MathModule;
 beforeAll(() => {
     math = testMath();
     state.math = math;
+});
+beforeEach(() => {
+    state.start.mockClear();
+    state.close.mockClear();
+    state.stage = 'idle';
+    state.plan = null;
 });
 
 async function show(name: string, patch?: (s: ChainSnapshot) => ChainSnapshot) {
@@ -102,6 +113,75 @@ async function show(name: string, patch?: (s: ChainSnapshot) => ChainSnapshot) {
 const value = (id: string) => screen.getByTestId(id).dataset.value;
 
 describe('ShortPanel', () => {
+    it.each(['crank_price', 'open_short'] as const)(
+        'Done after %s preserves the correct trade-sheet behavior',
+        async (kind) => {
+            const { s } = await vectorSnapshot(vectorCase('spl-open-0'));
+            state.snapshot = s;
+            state.stage = 'confirmed';
+            state.plan = { kind, title: 'Confirmed', instructions: [], watch: [], disclosures: [], invalidate: [] };
+            const done = vi.fn();
+            render(
+                <TxDoneContext.Provider value={done}>
+                    <ToastProvider>
+                        <ShortPanel mint={s.mint} />
+                    </ToastProvider>
+                </TxDoneContext.Provider>,
+            );
+            fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+            expect(state.close).toHaveBeenCalledTimes(1);
+            expect(done).toHaveBeenCalledTimes(kind === 'crank_price' ? 0 : 1);
+        },
+    );
+
+    it('offers an explicit price review on a stale market, with separate signatures and fees', async () => {
+        await show('spl-open-0', (s) => ({ ...s, now: s.now + COVERAGE_GAP_S + 1n }));
+        expect(screen.getByTestId(T.shortPriceRefreshStep).dataset.step).toBe('record');
+        expect(screen.getByTestId(T.disclosure('market.priceRefresh')).textContent).toContain('sign each separately');
+        expect(screen.getByTestId(T.disclosure('market.priceRefresh')).textContent).toContain('network fee');
+        expect(state.start).not.toHaveBeenCalled();
+        expect((screen.getByTestId(T.shortSubmit) as HTMLButtonElement).disabled).toBe(true);
+        fireEvent.click(screen.getByTestId(T.shortPriceRefresh));
+        expect(state.start).toHaveBeenCalledTimes(1);
+        expect(state.start.mock.calls[0]?.[1]).toEqual([NO_EXTRAS]);
+    });
+
+    it('holds the next review in the recording second and resumes from chain state after reload', async () => {
+        const s = await show('spl-open-0', (s) => {
+            const now = s.now + COVERAGE_GAP_S + 1n;
+            return { ...s, now, market: { ...s.market, emaTs: now, bSec: now, bLo: s.market.emaPrice } };
+        });
+        expect(screen.getByTestId(T.shortPriceRefreshStep).dataset.step).toBe('wait');
+        expect((screen.getByTestId(T.shortPriceRefresh) as HTMLButtonElement).disabled).toBe(true);
+        expect(state.start).not.toHaveBeenCalled();
+        const current = state.snapshot as ChainSnapshot;
+        state.snapshot = { ...current, now: current.now + 1n };
+        // A newly mounted panel has no local first-transaction state to rely on.
+        const { unmount } = render(
+            <ToastProvider>
+                <ShortPanel mint={s.mint} />
+            </ToastProvider>,
+        );
+        const steps = screen.getAllByTestId(T.shortPriceRefreshStep);
+        expect(steps[1]?.dataset.step).toBe('integrate');
+        expect((screen.getAllByTestId(T.shortPriceRefresh)[1] as HTMLButtonElement).disabled).toBe(false);
+        expect(state.start).not.toHaveBeenCalled();
+        unmount();
+    });
+
+    it('does not offer a price refresh during ordinary listing warmup or on fresh prices', async () => {
+        await show('warmup-open');
+        expect(screen.queryByTestId(T.shortPriceRefresh)).toBeNull();
+        const { s } = await vectorSnapshot(vectorCase('spl-open-0'));
+        state.snapshot = s;
+        render(
+            <ToastProvider>
+                <ShortPanel mint={s.mint} />
+            </ToastProvider>,
+        );
+        expect(screen.queryByTestId(T.shortPriceRefresh)).toBeNull();
+    });
+
     it('shows the program’s numbers for the size it would open, and gates the submit on the disclosure', async () => {
         const c = vectorCase('spl-open-1');
         await show('spl-open-1');

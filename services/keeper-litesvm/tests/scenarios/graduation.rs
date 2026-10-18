@@ -1156,6 +1156,7 @@ fn a_list_only_market_is_redetected_and_prepared_by_the_keeper() {
         env.warp(i64::from(env.config().params.market_warmup_s));
         env.crank(&pm);
         env.warp(1);
+        env.crank(&pm);
         let mut b = env.borrower();
         let (res, _) = env.open(&pm, &mut b, q);
         ok(res);

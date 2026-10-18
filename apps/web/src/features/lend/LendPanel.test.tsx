@@ -240,6 +240,23 @@ const pickOf = (gain: bigint): SyncPick =>
           };
 
 describe('Lend → Deposit', () => {
+    it('explains a settlement vest hold and enables review when the current vest has released', () => {
+        const pool = { vestBal: 600n, vestLast: 0n, vestEnd: 1_200n, depositHoldUntil: 600n };
+        setChain(chainOf({ pool }));
+        const view = renderPanel('deposit');
+        // The old marker has expired at now=1,000, but a sweep extended the shared vest to 1,200.
+        expect(screen.getByTestId(T.lendDepositReason).textContent).toContain(formatUtc(1_200n));
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
+        fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
+        expect(submit().disabled).toBe(true);
+        expect(started).toEqual([]);
+        // A fresh read after full release still carries the marker until the next deposit clears it.
+        setChain(chainOf({ pool: { ...pool, vestBal: 0n } }));
+        view.reread();
+        expect(submit().disabled).toBe(false);
+        expect(screen.queryByText(/Deposits resume at/)).toBeNull();
+    });
+
     it('shows the SPEC §5.3 sentence verbatim and keeps the review closed until it is ticked', async () => {
         const { panel } = renderPanel('deposit');
         expect(panel().dataset.action).toBe('deposit');
@@ -379,6 +396,7 @@ describe('Lend → Deposit', () => {
         setChain(chainOf({ pool: { tokensFree: 0n, totalShares: 0n, flags: MARKET_FLAG.wipeLive, shareEpoch: 2 } }));
         renderPanel('deposit');
         expect(screen.getByTestId(T.lendSweepNotice).dataset.kind).toBe('wipe');
+        expect(screen.queryByTestId(T.lendCleanupSubmit)).toBeNull();
         fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
         // The preview reads the pool with the sweep done: 10⁶ raw tokens × 1,000 virtual shares.
         expect(screen.getByTestId(T.lendPreview('shares')).dataset.value).toBe('1000000000');
@@ -400,6 +418,7 @@ describe('Lend → Deposit', () => {
         setChain(chainOf({ pool: { tokensFree: 0n, totalShares: 0n, flags: 0, shareEpoch: 2 } }));
         renderPanel('deposit');
         expect(screen.getByTestId(T.lendSweepNotice).dataset.kind).toBe('emptied');
+        expect(screen.queryByTestId(T.lendCleanupSubmit)).toBeNull();
         fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
         expect(screen.getByTestId(T.lendPreview('shares')).dataset.value).toBe('1000000000');
         fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
@@ -415,6 +434,85 @@ describe('Lend → Deposit', () => {
         // The review says which sweep it is: no wipe here.
         expect(plan.title).toContain('· sweep after the last exit');
         expect(plan.title).not.toContain('post-wipe');
+    });
+
+    it('reviews surviving-lender cleanup separately, preserves inputs and waits for its vest before deposit', async () => {
+        setChain(chainOf({ pool: { flags: 0 } }));
+        const view = renderPanel('deposit');
+        const notice = screen.getByTestId(T.lendSweepNotice);
+        expect(notice.dataset.kind).toBe('lenders');
+        expect(notice.textContent).toContain('existing lenders');
+        expect(notice.textContent).toContain('network fee');
+        expect(notice.textContent).toContain('account rent');
+        fireEvent.change(screen.getByTestId(T.lendTokenAccount), { target: { value: GUARDED } });
+        fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
+        fireEvent.click(screen.getByTestId(T.lendCpiGuardBracket));
+        fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
+        expect(submit().disabled).toBe(true);
+        expect(screen.getByTestId(T.lendDepositReason).textContent).toContain('Clean up pending lender income first');
+        fireEvent.click(screen.getByTestId(T.lendCleanupSubmit));
+        await waitFor(() => expect(started).toHaveLength(1));
+        const plan = started[0] as TxPlan;
+        expect(plan.kind).toBe('lender_cleanup');
+        expect(plan.instructions).toHaveLength(1);
+        expect(identifyShortwinInstruction(plan.instructions[0]?.data as Uint8Array)).toBe(
+            ShortwinInstruction.SweepTrader,
+        );
+        expect(plan.title).toBe('Clean up pending lender income');
+        expect(plan.disclosures).toEqual(['lender.cleanup']);
+        expect(plan.instructions.flatMap((i) => i.accounts?.map((a) => a.address))).not.toContain(GUARDED);
+
+        // Cleanup lands and a delayed claim has started a held vest. No deposit went with it.
+        const flow = flowStub();
+        h.flow.current = { ...flow, state: { ...flow.state, stage: 'confirmed', plan } };
+        const vest = { vestBal: 600n, vestLast: 1_000n, vestEnd: 1_200n, depositHoldUntil: 1_000n };
+        setChain(chainOf({ pool: vest }));
+        view.reread();
+        expect(screen.queryByTestId(T.lendCleanupSubmit)).toBeNull();
+        expect((screen.getByTestId(T.lendAmountInput) as HTMLInputElement).value).toBe('1');
+        expect((screen.getByTestId(T.lendTokenAccount) as HTMLSelectElement).value).toBe(GUARDED);
+        expect((screen.getByTestId(T.lendCpiGuardBracket) as HTMLInputElement).checked).toBe(true);
+        expect((screen.getByTestId(T.disclosureAck('lender.solRepayment')) as HTMLInputElement).checked).toBe(true);
+        expect(submit().disabled).toBe(true);
+        expect(screen.getByTestId(T.lendDepositReason).textContent).toContain('Settlement income is vesting');
+
+        // Actual release, even with the positive marker still stored, enables a separate deposit.
+        h.flow.current = flowStub();
+        setChain(chainOf({ pool: { ...vest, vestBal: 0n } }));
+        view.reread();
+        expect(submit().disabled).toBe(false);
+        fireEvent.click(submit());
+        await waitFor(() => expect(started).toHaveLength(2));
+        const deposit = started[1] as TxPlan;
+        expect(deposit.kind).toBe('deposit');
+        expect(deposit.instructions).toHaveLength(3); // CPI Guard off → Deposit → on, no cleanup.
+        expect(identifyShortwinInstruction(deposit.instructions[1]?.data as Uint8Array)).toBe(
+            ShortwinInstruction.Deposit,
+        );
+    });
+
+    it('offers legacy cleanup without tokens, an amount, a deposit acknowledgement or complete lender records', async () => {
+        setChain(chainOf({ pool: { depositHoldUntil: 0n }, accounts: [], recordsComplete: false }));
+        renderPanel('deposit');
+        expect(submit().disabled).toBe(true);
+        const cleanup = screen.getByTestId(T.lendCleanupSubmit) as HTMLButtonElement;
+        expect(cleanup.disabled).toBe(false);
+        fireEvent.click(cleanup);
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect(started[0]?.kind).toBe('lender_cleanup');
+        expect(started[0]?.instructions).toHaveLength(1);
+    });
+
+    it('requires a connected wallet and a fresh read for separate cleanup', () => {
+        setChain({ ...chainOf({ pool: { flags: 0 } }), readAt: 0 });
+        const view = renderPanel('deposit');
+        expect((screen.getByTestId(T.lendCleanupSubmit) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByTestId(T.lendSweepNotice).textContent).toContain('Waiting for a fresh chain read');
+        setChain(chainOf({ pool: { flags: 0 } }));
+        h.wallet.current = { ready: true, status: 'disconnected', connected: null };
+        view.reread();
+        expect((screen.getByTestId(T.lendCleanupSubmit) as HTMLButtonElement).disabled).toBe(true);
+        expect(screen.getByTestId(T.lendSweepNotice).textContent).toContain('Connect a wallet first');
     });
 
     it('shows no unpaid-rent rows on a pool whose rent is all paid in', () => {

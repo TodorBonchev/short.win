@@ -87,7 +87,7 @@ fn accounts(h: &Harness, keys: &[Pubkey]) -> Vec<Option<AccountData>> {
 }
 
 /// A PumpSwap listing observed by nobody but the keeper: the keeper starts its price and observes
-/// its warm-up every second (eight buckets; the eighth integrated by the next instruction), then
+/// its warm-up every second (nine observations; the last bucket integrates on the next call), then
 /// leaves it alone; after the listing warm-up an open lands; a ×3 pump is liquidated on the pool in
 /// the first second the program accepts it, with the keeper's PumpSwap lists.
 #[test]
@@ -118,12 +118,15 @@ fn a_pumpswap_listing_is_warmed_up_and_a_pump_is_liquidated_on_the_pool() {
     }
     assert_eq!(
         observed,
-        (0..8).collect::<Vec<_>>(),
-        "the start, then seven warm-up seconds"
+        (0..=8).collect::<Vec<_>>(),
+        "nine observations cover the price start and warm-up"
     );
     let m = h.with_env(|env| env.market(&market));
     assert!(m.ema_price.get() > 0, "priced");
-    assert_eq!(m.ema_warm, 1, "the eighth bucket pending");
+    assert_eq!(
+        m.ema_warm, 1,
+        "the final warm-up bucket is pending integration"
+    );
 
     // The keeper's lists are the adapter's, with the live recipients it picks.
     let mk = h.with_env(|env| env.market(&market));
@@ -158,6 +161,7 @@ fn a_pumpswap_listing_is_warmed_up_and_a_pump_is_liquidated_on_the_pool() {
     let (b, nonce) = h.with_env(|env| {
         env.crank(&pm);
         env.warp(1);
+        env.crank(&pm);
         let q = q_for(env, &pm.pool);
         let mut b = env.borrower();
         let (res, nonce) = env.open(&pm, &mut b, q);

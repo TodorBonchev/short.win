@@ -18,7 +18,7 @@ use anchor_lang::system_program::{self, Transfer};
 use shortwin_math::pool;
 
 use crate::constants::MARKET_VERSION;
-use crate::engine::lender;
+use crate::engine::{lender, prologue};
 use crate::errors::{MathResultExt, ShortwinError};
 use crate::events::DeficitCovered;
 use crate::state::{LenderPosition, Market, MarketVault};
@@ -58,7 +58,7 @@ pub struct CoverDeficit<'info> {
 pub fn handler<'info>(ctx: Context<'info, CoverDeficit<'info>>, lamports: u64) -> Result<()> {
     require!(lamports > 0, ShortwinError::ZeroAmount);
     let clock = Clock::get()?;
-    let now = clock.unix_timestamp;
+    let now = prologue::market_now(&*ctx.accounts.market.load()?, clock.unix_timestamp);
     let market_key = ctx.accounts.market.key();
 
     let (t_after, s_after, after, tracked) = {

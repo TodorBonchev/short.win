@@ -282,6 +282,44 @@ pub async fn live_entries<C: Chain>(chain: &C) -> anyhow::Result<Vec<AltEntry>> 
     protocol_entries(static_entries(), recipient_entries(g, c)?)
 }
 
+/// The expected entries for protocol or market `create`, `extend` and `check`.
+/// A market table omits keys already supplied by the active protocol table.
+pub async fn selected_entries<C: Chain>(
+    chain: &C,
+    market: Option<Pubkey>,
+    protocol_table: Option<Pubkey>,
+    static_only: bool,
+) -> anyhow::Result<Vec<AltEntry>> {
+    if market.is_none() && protocol_table.is_some() {
+        bail!("--protocol-table requires --market");
+    }
+    let protocol = match protocol_table {
+        Some(table) => {
+            let state = read_table(chain, &table).await?;
+            if state.deactivation_slot != u64::MAX {
+                bail!("protocol table {table} is deactivated");
+            }
+            state
+                .addresses
+                .into_iter()
+                .map(|key| e(key, "protocol table"))
+                .collect()
+        }
+        None if static_only => protocol_entries(static_entries(), Vec::new())?,
+        None => live_entries(chain).await?,
+    };
+    match market {
+        None => Ok(protocol),
+        Some(market) => {
+            let view = crate::view::load(chain, &[market]).await?;
+            let mv = view
+                .market(&market)
+                .with_context(|| format!("{market}: not a readable short.win market"))?;
+            market_entries(mv, &keys(&protocol))
+        }
+    }
+}
+
 /// A market's own lookup table (ARCH §6.4's per-market fallback; M7 OWNER-M7-1): the per-market
 /// keys that the market's trading transactions (`open_short`, `close_short`, `add_margin`,
 /// `liquidate`, `expire`) and its cranks (`crank_price`, `sol_settle`) name and the protocol table

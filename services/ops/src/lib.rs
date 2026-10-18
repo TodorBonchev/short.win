@@ -21,6 +21,7 @@ pub mod cli;
 pub mod config;
 pub mod ixs;
 pub mod keys;
+pub mod oracle;
 pub mod send;
 pub mod squads;
 pub mod verify;

@@ -13,7 +13,7 @@
 import { getShortPositionSize, getWalletExposureSize } from '@shortwin/client';
 import type { Address } from '@solana/kit';
 import { Link } from '@tanstack/react-router';
-import { type ReactNode, useEffect, useId, useMemo, useState } from 'react';
+import { type ReactNode, useContext, useEffect, useId, useMemo, useState } from 'react';
 import { Button } from '../../components/Button.tsx';
 import { Disclosure } from '../../components/Disclosure.tsx';
 import { AmountInput, Field } from '../../components/Field.tsx';
@@ -31,7 +31,8 @@ import { formatBps, formatDuration, formatTokens } from '../../lib/format.ts';
 import { formatUtc } from '../../lib/time.ts';
 import { useAppClient } from '../../rpc/context.tsx';
 import { ReadAgeView, useReadAge } from '../../shell/SlotAge.tsx';
-import { TxReviewModal } from '../../tx/TxReviewModal.tsx';
+import { TxDoneContext, TxReviewModal } from '../../tx/TxReviewModal.tsx';
+import { NO_EXTRAS } from '../../venues/lists.ts';
 import { ConnectCta } from '../../wallet/ConnectCta.tsx';
 import { useWallet } from '../../wallet/useWallet.ts';
 import { CoverageLink } from './CoverageLink.tsx';
@@ -48,6 +49,7 @@ import {
     openBlocked,
     previewOpen,
 } from './previews.ts';
+import { freshPriceRefreshPlan, priceRefreshStep } from './priceRefresh.ts';
 import { freshOpenTrade, openTrade } from './trades.ts';
 import { BlockedNotice, CAP_TEXT, CrValue, errorByName, plainAmount, TierTerms } from './ui.tsx';
 import { useTradeFlow } from './useTradeFlow.ts';
@@ -156,13 +158,17 @@ export function ShortPanel({ mint }: { mint: Address }) {
     const [ack, setAck] = useState(false);
     const [lastPosition, setLastPosition] = useState<Address | null>(null);
     const [submitError, setSubmitError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const onTradeDone = useContext(TxDoneContext);
     const client = useAppClient();
     // The age of the snapshot behind the preview (FRONTEND.md §6.6): shown; Submit waits when stale.
     const age = useReadAge(s?.slot ?? null, s?.fetchedAt ?? null);
     // The reason line's button focuses the acknowledgement box (FRONTEND.md §7.6).
     const ackId = useId();
     useConfirmedToast(trade.flow, () =>
-        lastPosition ? [{ href: `/positions/${lastPosition}`, text: 'View position' }] : [],
+        trade.flow.state.plan?.kind === 'open_short' && lastPosition
+            ? [{ href: `/positions/${lastPosition}`, text: 'View position' }]
+            : [],
     );
 
     // Acknowledgements are per transaction (§4.1 rule 3): a confirmed open clears the box.
@@ -220,11 +226,21 @@ export function ShortPanel({ mint }: { mint: Address }) {
     const totalCost = preview ? preview.margin + preview.openFee + rents : null;
     const refusalInfo = preview?.refusal ? errorByName(preview.refusal) : undefined;
     const stage = trade.flow.state.stage;
+    const refreshStep = priceRefreshStep(math, s);
+    const refreshReason = firstReason([
+        [!connected, REASON.connect],
+        [!connected?.signer, REASON.signer],
+        [refreshStep === 'wait', 'Waiting for the chain clock to advance'],
+        [age.state === 'stale', REASON.stale],
+        [trade.building, REASON.building],
+        [stage !== 'idle' && stage !== 'confirmed', REASON.inReview],
+    ]);
     // The submit's reason line and its enabled state are one predicate list (FRONTEND.md §7.6).
     const reason = firstReason([
         [!connected, REASON.connect],
         [!connected?.signer, REASON.signer],
         [!!blocked, 'New shorts are unavailable on this market now'],
+        [refreshStep !== null, 'Refresh the market price before opening a short'],
         [!parsedQ.ok, parsedQ.ok ? '' : SIZE_REASON[parsedQ.error]],
         [!slipOk, REASON.slippage],
         [!preview, 'No quote for this size on the venue now'],
@@ -246,6 +262,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
             onPosition: setLastPosition,
         };
         setSubmitError(null);
+        setRefreshing(false);
         try {
             const t = await openTrade(math, s, walletQ, inputs);
             // Retry after a moved quote rebuilds the same open from a fresh read (M9-UX-1).
@@ -266,6 +283,39 @@ export function ShortPanel({ mint }: { mint: Address }) {
                     vars={routeBrokenVars(s.config.params)}
                     instead={coverageLinked ? <CoverageLink /> : undefined}
                 />
+            )}
+            {refreshStep && (
+                <section
+                    aria-label="Refresh market price"
+                    data-testid={T.shortPriceRefreshStep}
+                    data-step={refreshStep}
+                >
+                    <Disclosure id="market.priceRefresh" />
+                    <FormFoot reason={refreshReason}>
+                        {refreshing && trade.buildError && (
+                            <div className="banner" data-tone="danger" role="alert">
+                                {trade.buildError}
+                            </div>
+                        )}
+                        {!connected && <ConnectCta surface="short" />}
+                        <Button
+                            disabled={refreshReason !== null}
+                            busy={refreshing && trade.building}
+                            data-testid={T.shortPriceRefresh}
+                            onClick={() => {
+                                if (!connected?.signer) return;
+                                setRefreshing(true);
+                                setSubmitError(null);
+                                trade.start(
+                                    () => freshPriceRefreshPlan(client.rpc, math, mint, connected.address, symbol),
+                                    [NO_EXTRAS],
+                                );
+                            }}
+                        >
+                            {refreshStep === 'record' ? 'Review price observation' : 'Review price update'}
+                        </Button>
+                    </FormFoot>
+                </section>
             )}
             {!replaceForm && (
                 <>
@@ -511,7 +561,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                         reasonTestId={T.shortSubmitReason}
                         reasonTarget={reason === ACK_REASON && tp ? ackId : undefined}
                     >
-                        {(trade.buildError ?? submitError) && (
+                        {!refreshing && (trade.buildError ?? submitError) && (
                             <div className="banner" data-tone="danger" role="alert">
                                 {trade.buildError ?? submitError}
                             </div>
@@ -533,7 +583,7 @@ export function ShortPanel({ mint }: { mint: Address }) {
                             The venue’s extra accounts changed; retried with the {trade.fallback} set.
                         </p>
                     )}
-                    {stage === 'confirmed' && lastPosition && (
+                    {stage === 'confirmed' && trade.flow.state.plan?.kind === 'open_short' && lastPosition && (
                         <p className="short-note" role="status">
                             Position opened.{' '}
                             <Link to="/positions/$position" params={{ position: lastPosition }}>
@@ -543,7 +593,9 @@ export function ShortPanel({ mint }: { mint: Address }) {
                     )}
                 </>
             )}
-            <TxReviewModal flow={trade.flow} />
+            <TxDoneContext.Provider value={trade.flow.state.plan?.kind === 'crank_price' ? null : onTradeDone}>
+                <TxReviewModal flow={trade.flow} />
+            </TxDoneContext.Provider>
         </div>
     );
 }

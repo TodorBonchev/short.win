@@ -59,7 +59,7 @@
 //! market's token leg adds that ATA (6 accounts; key-checked against the market's PumpSwap cache),
 //! and the bit is set when it is missing or holds 0 WSOL **and** the trader's pump UVA holds
 //! nothing claimable either (curve-era cashback of a graduated market; a market listed on PumpSwap
-//! never had a pump UVA). With cashback outstanding anyone bundles `[create_idempotent
+//! has a cached pump UVA address but no curve-era cashback). With cashback outstanding anyone bundles `[create_idempotent
 //! ATA(trader, WSOL), pAMM claim_cashback(user = trader, user_wsol = ATA(trader, WSOL)),
 //! sweep_trader]`: pAMM's `claim_cashback` needs no signature of the trader (T-CASHBACK, pAMM
 //! part, verified on the dumped ELF), the claim moves the ATA's whole balance into
@@ -107,7 +107,7 @@ use crate::engine::trader::{
 };
 use crate::engine::{lender, prologue};
 use crate::errors::{MathResultExt, ShortwinError};
-use crate::events::{TraderSwept, SWEEP_TO_PROTOCOL, SWEEP_TO_VEST, SWEEP_TO_WIPE_RECORD};
+use crate::events::TraderSwept;
 use crate::state::{pump_swap_cache, GlobalConfig, Market, MarketVault, ShareEpoch, VenueKind};
 use crate::venues::{pump_amm, pump_curve};
 
@@ -135,7 +135,7 @@ fn pump_cashback_claimable(uva: &AccountInfo) -> Result<u64> {
 }
 
 /// `TraderSwept.wipe_bits` flag: a full-wipe record is live after the sweep.
-pub const WIPE_BITS_LIVE: u8 = 0x80;
+pub use crate::events::WIPE_BITS_LIVE;
 
 #[event_cpi]
 #[derive(Accounts)]
@@ -311,13 +311,7 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
         prologue::roll_only(&market_key, &mut market, now, clock.slot)?;
 
         let wipe_live = pool.total_shares == 0 && pool.is_wipe_live();
-        let to = if pool.total_shares > 0 {
-            SWEEP_TO_VEST
-        } else if wipe_live {
-            SWEEP_TO_WIPE_RECORD
-        } else {
-            SWEEP_TO_PROTOCOL
-        };
+        let to = crate::events::sweep_to(&pool, SweepSource::Trader);
         if wipe_live {
             // The live full-wipe record: the latest one (the epoch the wipe closed).
             require!(rem.len() == 1, ShortwinError::BadRemainingAccounts);
@@ -374,10 +368,10 @@ pub fn handler<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
                 SweepSource::Trader,
             )
             .math()?;
-            if rewards_clear && pool.total_shares == 0 {
+            if rewards_clear && pool.wipe_swept & pool::WIPE_REWARDS_CLAIMED == 0 {
                 // AIR-08: after the last lender's exit a deposit waits for the sweeps too, the
-                // venue-reward bit on a pump venue included: set it as after a full wipe
-                // (M5-SEC-1), once the trader holds no claimable cashback.
+                // venue-reward bit on a pump venue included. AIR2-05 also clears this bit at
+                // a dust flush with surviving shares. Set it once no cashback remains.
                 pool::sweep(
                     &mut pool,
                     &mut vault,

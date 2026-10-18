@@ -369,6 +369,7 @@ fn part_3b_a_held_deposit_lifts_no_open_the_burned_lp_sizes_it() {
             env.warp(60);
             crank(&mut env, &pm);
         }
+        crank_secs(&mut env, &pm, 1);
         let (with_d, without_d) = x0_now(&env, &pm, PUMPSWAP_LOCK_MIN_BPS);
         let (row56, _) = x0_now(&env, &pm, lambda_min(&env));
         let held = max_open(&env, &pm, &b, None);
@@ -551,6 +552,7 @@ fn sized_on_a_held_deposit(env: &mut Env, pm: &PammMarket) -> (f64, Pubkey, u64,
         env.warp(60);
         crank(env, pm);
     }
+    crank_secs(env, pm, 1);
     let held = max_open(env, pm, &b, None);
     let (_, nonce, _) = open_ok(env, pm, &mut b, held / 100 * 95);
     (held as f64 / honest as f64, b.key(), nonce, lp)
@@ -1190,6 +1192,7 @@ fn near_threshold(env: &mut Env, pm: &PammMarket) -> (PammLp, Borrower, PammUser
         env.warp(60);
         crank(env, pm);
     }
+    crank_secs(env, pm, 1);
     assert_eq!(pm.pool.locked_depth(&env.svm).0, 5_000, "λ 50 %");
     let mut b = env.borrower();
     let cap = max_open(env, pm, &b, None);

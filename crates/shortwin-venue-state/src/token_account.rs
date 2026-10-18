@@ -22,7 +22,7 @@
 //! | 129 | 36 | `close_authority`: `COption<Pubkey>` |
 
 use crate::bytes::{key_at, u8_at, u32_at, u64_at};
-use crate::mint::{ACCOUNT_LEN, TOKEN_2022_PROGRAM, TOKEN_PROGRAM};
+use crate::mint::{ACCOUNT_LEN, MULTISIG_LEN, TOKEN_2022_PROGRAM, TOKEN_PROGRAM};
 use crate::{Key, ReadError};
 
 /// Offset of `mint`.
@@ -91,6 +91,11 @@ pub fn read(program_owner: &Key, data: &[u8]) -> Result<TokenAccount, ReadError>
     }
     if data.len() < ACCOUNT_LEN {
         return Err(ReadError::TooShort);
+    }
+    // Token-2022 reserves this exact length for Multisig, even when signer-key bytes imitate
+    // AccountType::Account. Its extension allocator pads token accounts away from this size.
+    if data.len() == MULTISIG_LEN {
+        return Err(ReadError::WrongTag);
     }
     if data.len() > ACCOUNT_LEN
         && (*program_owner != TOKEN_2022_PROGRAM
@@ -170,5 +175,19 @@ mod tests {
         assert!(read(&TOKEN_2022_PROGRAM, &ext).is_ok());
         ext[165] = 1; // a mint
         assert_eq!(read(&TOKEN_2022_PROGRAM, &ext), Err(ReadError::WrongTag));
+    }
+
+    #[test]
+    fn refuses_a_multisig_with_signer_bytes_that_look_like_a_token_account() {
+        // Token-2022 InitializeMultisig accepts eleven arbitrary signer pubkeys. Their bytes
+        // overlap every token-account field and can imitate the extended AccountType byte.
+        let mut multisig = [0u8; crate::mint::MULTISIG_LEN];
+        multisig[..ACCOUNT_LEN].copy_from_slice(&account(42, None));
+        multisig[..3].copy_from_slice(&[1, 11, 1]); // m, n, is_initialized
+        multisig[ACCOUNT_LEN] = ACCOUNT_TYPE_ACCOUNT;
+        assert_eq!(
+            read(&TOKEN_2022_PROGRAM, &multisig),
+            Err(ReadError::WrongTag)
+        );
     }
 }

@@ -546,6 +546,12 @@ fn the_2026_10_pumpswap_redeploy_latches_until_revalidated() {
 
     let (spm, sq) = list_market(&mut env, &short);
     let (mpm, mq) = list_market(&mut env, &mature);
+    // The second listing's warm-up ages the first market; observe both before opening.
+    env.crank(&spm);
+    env.crank(&mpm);
+    env.warp(1);
+    env.crank(&spm);
+    env.crank(&mpm);
     let rent = |env: &Env, len: usize| env.svm.minimum_balance_for_rent_exemption(len);
     let pool = |env: &Env| {
         let a = read::account(&env.svm, &short.pool).unwrap();

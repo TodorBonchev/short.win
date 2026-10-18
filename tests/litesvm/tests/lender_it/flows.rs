@@ -295,6 +295,8 @@ fn sync_lender_goes_step_by_step_and_only_the_owner_converts_through_a_rebase() 
         let t = lab.market().tokens_free;
         lab.borrow30(&pid, t - 1).unwrap();
         lab.settle(&pid, 1_000_000, 0);
+        // AIR2-05: finish the empty old-source sweep before the next deposit.
+        lab.sweep_sol(0);
         assert_eq!(lab.market().share_epoch, i + 1, "a rebase each round");
     }
     let e = lab.market().share_epoch;
@@ -777,6 +779,8 @@ fn claim_sol_closes_only_when_nothing_is_owed_either_way() {
     lab.borrow30("p", t - 1).unwrap();
     lab.settle("p", 1_000_000_000, 0);
     assert_eq!(lab.market().share_epoch, 1);
+    // AIR2-05: the later claim/deposit bundle follows a completed empty source sweep.
+    lab.sweep_sol(0);
     lab.claim("H").unwrap();
     let h = lab.position("H").expect("pending > 0: kept");
     assert_eq!((h.shares, h.epoch), (0, 1), "dust converted to 0 shares");

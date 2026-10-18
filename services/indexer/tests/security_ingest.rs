@@ -124,6 +124,83 @@ fn market_created(
     }
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_dust_flush_sweep_credits_lenders_instead_of_protocol_fees() {
+    use shortwin::events::{SWEEP_TO_LENDERS, SWEEP_TO_PROTOCOL, TraderSwept};
+    let pg = pg().await;
+    let pool = pg.fresh_db().await.expect("db");
+    let mut writer = Writer::open(&pool, ProgramIds::default(), "rpc_backfill")
+        .await
+        .unwrap();
+    let market = k(90);
+    let created = market_created(market, k(91), 10, 3);
+    writer
+        .write(&tx(
+            10,
+            10,
+            vec![sw_top(
+                shortwin::instruction::CreateMarket {
+                    venue_hint: 0,
+                    max_creation_fee: u64::MAX,
+                }
+                .data(),
+                vec![sw_event(&ev(&created))],
+            )],
+            vec![],
+        ))
+        .await
+        .unwrap();
+    for (sig, to, lamports) in [
+        (11, SWEEP_TO_LENDERS, 123_456),
+        (12, SWEEP_TO_PROTOCOL, 654_321),
+    ] {
+        let event = TraderSwept {
+            market,
+            slot: u64::from(sig),
+            ts: 1,
+            lamports,
+            tokens: 0,
+            to,
+            wipe_bits: 3,
+        };
+        writer
+            .write(&tx(
+                sig,
+                u64::from(sig),
+                vec![sw_top(
+                    shortwin::instruction::SweepTrader {}.data(),
+                    vec![sw_event(&ev(&event))],
+                )],
+                vec![],
+            ))
+            .await
+            .unwrap();
+    }
+    writer.close().await.unwrap();
+    let (lenders, protocol): (String, String) = sqlx::query_as(
+        "SELECT lender_sol::text, protocol_fees::text FROM markets WHERE market = $1",
+    )
+    .bind(market.to_string())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(lenders, "123456");
+    assert_eq!(protocol, (created.creation_fee + 654_321).to_string());
+    let fees: Vec<(String, String)> = sqlx::query_as(
+        "SELECT fee_type, amount::text FROM fees WHERE fee_type LIKE 'trader_sweep_%' ORDER BY fee_type",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        fees,
+        vec![
+            ("trader_sweep_lenders".into(), "123456".into()),
+            ("trader_sweep_protocol".into(), "654321".into())
+        ]
+    );
+}
+
 // ---- M8-SEC-7: the Emergency's disable_venue survives later configuration changes ---------------
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

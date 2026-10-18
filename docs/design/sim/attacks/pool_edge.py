@@ -16,6 +16,8 @@ for cand in (os.path.join(HERE, ".."),):
         sys.path.insert(0, cand)
         break
 from pool_model import *   # noqa: E402
+import pool_model as _reference
+_reference.AUDIT2_MODEL = False  # Preserve this historical comparison's pre-AIR2 reference model.
 
 print("--- (a) share/asset ratio after full SOL settlement (pump token: 1e15 raw supply) ---")
 p = Pool()

@@ -5,6 +5,19 @@ gives each file's licence, and the licence texts are in [`LICENSES/`](LICENSES/)
 that Cargo and pnpm download are not part of the repository; they come under their own licences
 (all permissive; `deny.toml` enforces the Rust allow-list).
 
+## Vendored PostgreSQL archive helper
+
+`services/vendor/postgresql_archive/` contains `postgresql_archive` 0.21.0 from
+crates.io, from [theseus-rs/postgresql-embedded](https://github.com/theseus-rs/postgresql-embedded)
+at `a995b73d5b0b220f96b03634ec8cdfe117996c26`, by Brian Heineman. Its declared licence is
+`(Apache-2.0 OR MIT) AND PostgreSQL`; upstream Apache and MIT notices are preserved in
+the directory, and the [PostgreSQL licence](LICENSES/PostgreSQL.txt) is included here.
+The test-only helper has a ZIP 9 dependency update and two filename API adaptations,
+documented in [PATCH.md](services/vendor/postgresql_archive/PATCH.md), to address
+RUSTSEC-2026-0367, RUSTSEC-2026-0368, and RUSTSEC-2026-0369. Local changes retain the
+upstream licence expression; the repository's default code and documentation licences
+do not apply to this vendored directory.
+
 ## Program binaries (`tests/fixtures/programs/`)
 
 Unmodified copies of programs deployed on Solana mainnet, each stored with its loader header

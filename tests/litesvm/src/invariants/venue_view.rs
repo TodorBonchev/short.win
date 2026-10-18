@@ -219,14 +219,13 @@ fn pump_swap(svm: &LiteSVM, m: &Market) -> Option<VenueView> {
     let buckets = u128::from(p.protocol_fees) + u128::from(p.creator_fees);
     let payable = u64::try_from(u128::from(quote.amount).checked_sub(buckets)?).ok()?;
     let boost = p.virtual_quote_reserves + i128::try_from(buckets).ok()?;
-    // M6R-1: λ_bps and D on the pricing reserves, recomputed (not the program's function).
-    let lam = if p.lp_supply == 0 || lp_supply > p.lp_supply {
+    let root = (u128::from(r.base) * u128::from(effective)).isqrt();
+    // AIR2-09: use the raw LP ratio, independently of the program's depth function.
+    let locked_depth = if p.lp_supply == 0 || lp_supply > p.lp_supply {
         0
     } else {
-        u128::from(p.lp_supply - lp_supply) * 10_000 / u128::from(p.lp_supply)
+        root * u128::from(p.lp_supply - lp_supply) / u128::from(p.lp_supply)
     };
-    let root = (u128::from(r.base) * u128::from(effective)).isqrt();
-    let locked_depth = lam * root / 10_000;
     let mint_acc = svm.get_account(&m.mint)?;
     let supply = mint::read_base(&mint_acc.owner.to_bytes(), &mint_acc.data)
         .ok()?

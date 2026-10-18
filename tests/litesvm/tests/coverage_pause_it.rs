@@ -431,6 +431,8 @@ mod role {
         cov::set(&mut env, &k3, &mm.market(), false);
         cov::wait_clear_delay(&mut env);
         env.crank(&mm);
+        env.warp(1);
+        env.crank(&mm);
         ok(try_open(&mut env, &mm));
     }
 
@@ -869,6 +871,10 @@ mod emergency {
         env.warp(applies_at - env.now());
         ok(env.send(&[ix::apply_config_for(&change)], &[]));
         assert_eq!(env.config().coverage_authority, fresh.pubkey());
+        for m in &markets {
+            env.crank(m);
+        }
+        env.warp(1);
         for m in &markets {
             env.crank(m);
             for paused in [true, false] {

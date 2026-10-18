@@ -173,6 +173,8 @@ fn i18_f_the_warm_up_keeps_l_slow_at_or_below_d() {
     let (mut env, pm) = unpriced_mature();
     let key = pm.market();
     crank_step(&mut env, &pm, 1);
+    // The price-start sample is excluded; the next crank records the first warm-up bucket.
+    crank_step(&mut env, &pm, 1);
     // A warm-up integration (8 → 7).
     let (pre, ev) = crank_step(&mut env, &pm, 1);
     assert_eq!(i18(&env, &pre, &ev).map_err(|v| v.to_string()), Ok(()));

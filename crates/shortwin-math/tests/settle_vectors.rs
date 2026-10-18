@@ -355,6 +355,7 @@ struct Replay {
     /// A full replay (the trace began with `init`), or decision-only lines.
     full: bool,
     obs: Observation,
+    restart_ema_count: u64,
     ema_prm: EmaParams,
     exit: ExitParams,
     liq_n: u8,
@@ -379,6 +380,7 @@ impl Replay {
             box_cap: None,
             full: false,
             obs: Observation::default(),
+            restart_ema_count: 0,
             ema_prm: EmaParams::DEFAULT,
             exit: ExitParams::DEFAULT,
             liq_n: 3,
@@ -473,6 +475,7 @@ impl Replay {
                 self.obs.rewrite_liquidity(l_new, k).unwrap();
                 if kind == "R" {
                     self.obs.mark_restart();
+                    self.restart_ema_count = self.obs.ema.count + 1;
                 }
                 *cov.rewrites.entry(name).or_default() += 1;
                 "rewrite"
@@ -719,6 +722,7 @@ impl Replay {
             now,
             deadline,
             ema_count,
+            restart_ema_count: self.restart_ema_count,
             p_ema,
             l_ema,
             bx,

@@ -5,6 +5,37 @@
 use crate::common::*;
 
 #[test]
+fn an_idle_market_requires_client_refresh_before_its_first_new_open() {
+    use shortwin::errors::ShortwinError as E;
+    use shortwin_litesvm_tests::errors::assert_err;
+    use shortwin_math::consts::COVERAGE_GAP_S;
+
+    let (mut h, markets) = setup(1, KeeperConfig::default());
+    let mm = &markets[0];
+    for _ in 0..COVERAGE_GAP_S + 2 {
+        let report = h.second();
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+        assert!(
+            !report.observed(&mm.market()),
+            "idle inventory has no keeper observation budget"
+        );
+    }
+    h.with_env(|env| {
+        let mut borrower = env.borrower();
+        assert_err(&env.open(mm, &mut borrower, Q).0, E::EmaWarmingUp);
+        env.crank(mm);
+        assert_err(&env.open(mm, &mut borrower, Q).0, E::EmaWarmingUp);
+        env.warp(1);
+        env.crank(mm);
+        ok(env.open(mm, &mut borrower, Q).0);
+    });
+    assert!(
+        h.second().observed(&mm.market()),
+        "the new position starts keeper coverage"
+    );
+}
+
+#[test]
 fn a_healthy_position_is_observed_every_30_seconds_and_an_empty_market_never() {
     let (mut h, mms) = setup(2, KeeperConfig::default());
     let (with, without) = (mms[0].market(), mms[1].market());

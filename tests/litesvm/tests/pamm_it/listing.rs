@@ -113,6 +113,13 @@ fn the_first_pumpswap_observation_starts_the_price_marked_for_the_warm_up() {
         (d, d, d)
     );
     assert_eq!((m.ema_warm, m.ema_guard, m.ring_count), (8, 1, 1));
+    assert_eq!(m.b_lo.get(), 0, "the price-start sample is not recorded");
+    crank_secs(&mut env, &pm, 1);
+    assert_eq!(
+        market(&env, &pm).ema_warm,
+        8,
+        "the first later sample only records"
+    );
     // The first warm-up integration re-seeds L_ema from the pool's own bucket (its √k).
     crank_secs(&mut env, &pm, 1);
     let m = market(&env, &pm);

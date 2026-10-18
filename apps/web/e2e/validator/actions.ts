@@ -63,7 +63,7 @@ import {
     getEnableCpiGuardInstruction,
     getEnableMemoTransfersInstruction,
 } from '@solana-program/token-2022';
-import { ata, eventAuthority, getAccount, PROGRAMS, pda, rpc, send, sleep, WSOL_MINT } from './chain.ts';
+import { ata, eventAuthority, getAccount, PROGRAMS, pda, rpc, send, sleep, WSOL_MINT, waitForClock } from './chain.ts';
 import { signerFor, type WalletName } from './keys.ts';
 import { derivePool, reserves, swapExactInIx } from './mock-cpamm.ts';
 import { mockTradeAccounts, openShortFromNode } from './seed.ts';
@@ -248,6 +248,11 @@ export async function lendFromNode(
 export async function payRentIn(m: MarketInfo, qRaw: bigint, holdMs = 30_000): Promise<void> {
     const payer = await signerFor('payer');
     const nonce = BigInt(Date.now());
+    // Other specs can leave the market idle. Record an honest current price bucket, then
+    // complete it in a later chain second before opening the position that pays the rent.
+    await crankPrice(m);
+    await waitForClock((await marketAccount(m)).bSec + 1n);
+    await crankPrice(m);
     const p = await openShortFromNode(payer, m, qRaw, nonce);
     await new Promise((resolve) => setTimeout(resolve, holdMs));
     await closeShortFromNode(payer, m, p);

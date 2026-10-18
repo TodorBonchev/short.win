@@ -393,6 +393,32 @@ pub const SWEEP_TO_VEST: u8 = 0;
 pub const SWEEP_TO_WIPE_RECORD: u8 = 1;
 /// Credited to `protocol_fees` (no lender and no live wipe).
 pub const SWEEP_TO_PROTOCOL: u8 = 2;
+/// Credited immediately to the surviving lenders after a dust flush (no new vest).
+pub const SWEEP_TO_LENDERS: u8 = 3;
+
+/// Event encoding of the math's pre-sweep accounting destination.
+pub fn sweep_to(pool: &shortwin_math::pool::Pool, source: shortwin_math::pool::SweepSource) -> u8 {
+    use shortwin_math::pool::{sweep_destination, SweepDestination};
+    match sweep_destination(pool, source) {
+        SweepDestination::Vest => SWEEP_TO_VEST,
+        SweepDestination::WipeRecord => SWEEP_TO_WIPE_RECORD,
+        SweepDestination::Protocol => SWEEP_TO_PROTOCOL,
+        SweepDestination::Lenders => SWEEP_TO_LENDERS,
+    }
+}
+
+/// Live full-wipe record marker in the compact event wipe bits.
+pub const WIPE_BITS_LIVE: u8 = 0x80;
+
+/// Event wipe bits immediately after a sweep, before later instruction effects.
+pub fn sweep_wipe_bits(pool: &shortwin_math::pool::Pool) -> u8 {
+    pool.wipe_swept
+        | if pool.is_wipe_live() {
+            WIPE_BITS_LIVE
+        } else {
+            0
+        }
+}
 
 /// Trader normalisation or `sweep_trader`.
 #[event]

@@ -1075,7 +1075,10 @@ fn m7_keeper_cost_inputs() {
     assert_eq!(rates.quiet_cranks * 30, rates.quiet_s, "quiet: every 30 s");
     assert_eq!(rates.near_cranks, rates.near_s, "near: every second");
     assert!((1..=10).contains(&rates.liq_trigger_extra), "{rates:?}");
-    assert_eq!(rates.pamm_warmup_cranks, 8, "the PumpSwap warm-up");
+    assert_eq!(
+        rates.pamm_warmup_cranks, 9,
+        "the PumpSwap price start and warm-up observations"
+    );
     for l in &loads {
         assert!(l.observed_every_due, "{l:?}");
     }

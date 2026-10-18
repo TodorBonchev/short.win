@@ -196,7 +196,7 @@ proptest! {
             count += dc;
             let bx = SettleBox { p_lo: pe.min(a), p_hi: pe.max(a), l_lo: 1_000u128.min(b), l_hi: 1_000u128.max(b) };
             let inp = SettleInputs {
-                now, deadline: now + 1_000 - i64::from(w / 6) * 1_500, ema_count: count, p_ema: pe, l_ema: 1_000, bx,
+                now, deadline: now + 1_000 - i64::from(w / 6) * 1_500, ema_count: count, restart_ema_count: 0, p_ema: pe, l_ema: 1_000, bx,
                 budget, r_due: 0, cr_liquidatable: liq, ema_leg: liq || w == 1, executable: exec, warmed: true, p_rs,
                 l_live: 1_000, b_live: None, sigma_live: u64::MAX,
                 s3: S3Chain { no_route_now: halted || !exec, no_route_since: Some(now - 700), ..S3_OFF },
@@ -327,6 +327,7 @@ fn fee_above_the_hard_cap_is_s3_evidence_and_refutes() {
         now,
         deadline: now + 86_400,
         ema_count: 500,
+        restart_ema_count: 0,
         p_ema: p,
         l_ema: l,
         bx: SettleBox::point(p, l),

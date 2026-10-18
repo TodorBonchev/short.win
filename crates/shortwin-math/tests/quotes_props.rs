@@ -8,7 +8,7 @@
 //! value), monotonicity in `q`, a buy costs at least what a sale of the same size pays,
 //! capped (risk) fees never quote above live ones (one combined fee at the cap on pump
 //! venues, ECON §3.1), fee gates compare ppm exactly (ECON §2.1), `reprice` rounds so
-//! that `Y/X ≥ P` (R3B-7 c), and the locked depth floors `λ` to bps first (ECON §2.1).
+//! that `Y/X ≥ P` (R3B-7 c), and locked depth floors the raw locked-LP ratio (ECON §2.1).
 //! At least 2,000 cases each.
 
 mod common;
@@ -1125,7 +1125,8 @@ proptest! {
 
     // -------------------------------------------------------------- pool selection
 
-    /// ECON §2.1: `λ_bps = ⌊(counter − supply)·10⁴/counter⌋`, `D = ⌊λ_bps·isqrt(X·Y)/10⁴⌋`.
+    /// ECON §2.1: `λ_bps = ⌊(counter − supply)·10⁴/counter⌋` is display-only;
+    /// `D = ⌊(counter − supply)·isqrt(X·Y)/counter⌋`.
     #[test]
     fn locked_depth_properties(counter: u64, supply: u64, x: u64, y: u64, d1: u128, d2: u128,
                                margin in 0u64..20_000) {
@@ -1135,9 +1136,9 @@ proptest! {
         prop_assert!(d <= root && lam <= 10_000);
         if counter > supply {
             prop_assert_eq!(b(lam), b(counter - supply) * 10_000u32 / counter);
-            prop_assert_eq!(b(d), b(lam) * root / 10_000u32);
-            // Never above v0.3's single floor on the raw ratio.
-            prop_assert!(b(d) <= b(counter - supply) * root / counter);
+            prop_assert_eq!(b(d), b(counter - supply) * root / counter);
+            // The former whole-bps floor could only undercount this locked depth.
+            prop_assert!(b(d) >= b(lam) * root / 10_000u32);
         } else {
             prop_assert_eq!((d, lam), (0, 0));
         }
@@ -1179,7 +1180,7 @@ proptest! {
     /// M4-SEC-1 / M4-SEC-3: at the pool's own spot price the floor admits every pool the
     /// v0.4.1 pair `R ≥ pool_min_real_sol ∧ λ ≥ λ_min` admitted (the floor is `≈ λ·R/λ_min ≥ R`),
     /// up to the floors of `D`, `isqrt` and `P` (a few lamports); an unlocked deposit of any size
-    /// moves `D` only by `λ`'s floor to whole bps; a window's adoption liquidity is
+    /// moves `D` by at most one unit from the integer square root; a window's adoption liquidity is
     /// the smaller of its record and the executing instruction's sample, capped at `D/λ_min`
     /// (M4V-2), and an honest record of a pool with `λ ≥ λ_min` is its live depth (to one unit of
     /// rounding); the floor of an adoption carrying positions is the locked SOL itself (M4V-1).
@@ -1197,7 +1198,8 @@ proptest! {
         // The pair at its floor: R = y, λ = lam ≥ λ_min.
         let s0 = 2 * l_live / 1_000_000_000 + 2 * (p.isqrt() / 1_000_000_000) + 4;
         let slack = 5 * s0 + 1;
-        let boundary = u128::from(y) * u128::from(lam) / u128::from(lock_min);
+        let boundary = u128::from(y) * u128::from(counter - supply) * 10_000
+            / (u128::from(counter) * u128::from(lock_min));
         if lam >= lock_min && boundary > slack {
             // The pair admits the pool for every floor up to R = y; the locked-depth floor
             // admits it up to λ·y/λ_min ≥ y.
@@ -1206,14 +1208,14 @@ proptest! {
             let floor = u64::try_from(boundary - slack).unwrap_or(u64::MAX);
             prop_assert!(pool_select::locked_floor_ok(d, p, lock_min, floor), "below its boundary");
             prop_assert!(!pool_select::locked_floor_ok(d, p, lock_min,
-                u64::try_from(u128::from(y) * u128::from(lam) / u128::from(lock_min) + 1).unwrap_or(u64::MAX)));
+                u64::try_from(boundary + 1).unwrap_or(u64::MAX)));
         }
-        // An unlocked deposit of k times the pool, pro rata: λ divided by k + 1, D kept but for
-        // λ's floor to whole bps.
+        // An unlocked deposit of k times the pool, pro rata: λ divided by k + 1, D kept
+        // to one unit despite the first integer square root.
         if let (Some(c2), Some(s2), Some(x2), Some(y2)) = (counter.checked_mul(k + 1),
             supply.checked_add(counter * k), x.checked_mul(k + 1), y.checked_mul(k + 1)) {
             let d2 = pool_select::locked_depth(c2, s2, x2, y2).unwrap();
-            prop_assert!(d2.abs_diff(d) <= u128::from(k + 1) * (l_live / 10_000 + 2) + 2, "D {} -> {}", d, d2);
+            prop_assert!(d2 >= d && d2 - d <= 1, "D {} -> {}", d, d2);
         }
         // M4R: the adoption anchor ⌊D·10⁴/λ_min⌋ is at least the pool's live depth whenever
         // λ ≥ λ_min (up to D's floor), so the warm-up's seed — not the anchor — is what binds.

@@ -46,6 +46,123 @@ fn dump(owner: Pubkey, data: &[u8]) -> AccountData {
 }
 
 #[test]
+fn market_alt_refresh_adds_published_extras_without_adding_protocol_keys() {
+    use shortwin::state::EXTRAS_IX_BUY;
+    use shortwin_litesvm_tests::engine::{VENUE_HINT_MOCK, set_venue_extras_ix};
+
+    let (h, markets) = setup(1, KeeperConfig::default());
+    let market = markets[0].market();
+    let payer = h.with_env(|env| env.funded_keypair());
+    let protocol_authority = h.with_env(|env| env.funded_keypair());
+    let slot = recent_slot(&h);
+    let statics = alt::keys(&alt::static_entries());
+    let protocol = block_on(alt::create(
+        h.chain(),
+        &payer,
+        &protocol_authority,
+        slot,
+        &statics,
+        false,
+        0,
+    ))
+    .unwrap();
+    let expected = || {
+        block_on(alt::selected_entries(
+            h.chain(),
+            Some(market),
+            Some(protocol),
+            false,
+        ))
+        .unwrap()
+    };
+    let initial = alt::keys(&expected());
+    assert!(initial.contains(&market));
+    assert!(initial.iter().all(|k| !statics.contains(k)));
+    // Separate authority permits creation in the same slot, just as independent operators do.
+    let table = block_on(alt::create(
+        h.chain(),
+        &payer,
+        &payer,
+        slot,
+        &initial,
+        false,
+        0,
+    ))
+    .unwrap();
+    let extra = Pubkey::new_unique();
+    h.with_env(|env| {
+        let authority = env.pause_authority.insecure_clone();
+        let ix = set_venue_extras_ix(
+            &authority.pubkey(),
+            VENUE_HINT_MOCK,
+            EXTRAS_IX_BUY as u8,
+            vec![shortwin::ExtraEntryArg {
+                kind: 1,
+                writable: false,
+                key: extra,
+                seeds: vec![],
+            }],
+        );
+        ok(env.send(&[ix], &[&authority]));
+    });
+    let refreshed = alt::keys(&expected());
+    let before = block_on(alt::read_table(h.chain(), &table)).unwrap();
+    let missing = before.missing(&refreshed);
+    assert!(
+        missing.contains(&extra),
+        "market check detects a new extras key"
+    );
+    // The test-only mock's extras PDA is outside the production protocol list. Publishing
+    // its first set adds that PDA too, whereas production venue PDAs are already excluded.
+    assert_eq!(missing.len(), 2);
+    assert_eq!(
+        block_on(alt::extend(
+            h.chain(),
+            &payer,
+            &payer,
+            &table,
+            &refreshed,
+            0
+        ))
+        .unwrap(),
+        missing.len()
+    );
+    let after = block_on(alt::read_table(h.chain(), &table)).unwrap();
+    assert!(after.missing(&refreshed).is_empty());
+    assert!(after.addresses.iter().all(|k| !statics.contains(k)));
+    assert_eq!(
+        block_on(alt::extend(
+            h.chain(),
+            &payer,
+            &payer,
+            &table,
+            &refreshed,
+            0
+        ))
+        .unwrap(),
+        0
+    );
+    assert!(
+        block_on(alt::selected_entries(
+            h.chain(),
+            None,
+            Some(protocol),
+            false
+        ))
+        .is_err()
+    );
+    assert!(
+        block_on(alt::selected_entries(
+            h.chain(),
+            Some(Pubkey::new_unique()),
+            Some(protocol),
+            false
+        ))
+        .is_err()
+    );
+}
+
+#[test]
 fn the_protocol_alt_is_built_on_chain_and_carries_the_keepers_v0_transactions() {
     let (mut h, ms) = ray_setup(&[FART, USELESS, T22], KeeperConfig::default());
     let payer = h.with_env(|env| env.funded_keypair());

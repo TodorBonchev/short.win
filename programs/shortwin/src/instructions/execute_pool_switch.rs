@@ -66,7 +66,7 @@
 use anchor_lang::prelude::*;
 use shortwin_math::pool::Vault;
 
-use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
+use crate::constants::{CONFIG_VERSION, MARKET_VERSION, VENUE_GUARD_VERSION};
 use crate::engine::guard;
 use crate::engine::pool_select::{self, FitAt, SelectParams, Situation};
 use crate::engine::prologue;
@@ -89,7 +89,12 @@ pub struct ExecutePoolSwitch<'info> {
     pub config: AccountLoader<'info, GlobalConfig>,
     /// The venue-upgrade latch: a window whose candidate's program bit is set is cancelled, not
     /// adopted (module docs step 5; M4-SEC-8, M4V-4). Read only.
-    #[account(seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump)]
+    #[account(
+        seeds = [VenueGuard::SEED],
+        bump = venue_guard.load()?.bump,
+        constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION
+            @ ShortwinError::ConfigVersion
+    )]
     pub venue_guard: AccountLoader<'info, VenueGuard>,
     #[account(
         mut,
@@ -107,6 +112,41 @@ pub struct ExecutePoolSwitch<'info> {
     /// Read only.
     #[account(seeds = [OracleCache::SEED], bump = oracle_cache.bump)]
     pub oracle_cache: Box<Account<'info, OracleCache>>,
+}
+
+// Keep the candidate reader's large return value and fit temporaries out of the handler's
+// stack frame. This boundary also fits the 4 KiB SBF limit without whole-program LTO.
+#[inline(never)]
+fn fitting_candidate(
+    market: &Market,
+    config: &GlobalConfig,
+    oracle: &OracleCache,
+    kind: VenueKind,
+    candidate: &[AccountInfo],
+    clock_now: i64,
+    now: i64,
+) -> Option<Box<venues::raydium::Adoption>> {
+    let p_ref = pool_select::reference_price(market);
+    let a = Box::new(
+        pool_select::verify_candidate(
+            kind,
+            candidate,
+            &market.mint,
+            &market.token_program,
+            &config.params,
+            clock_now,
+            p_ref,
+        )
+        .ok()?,
+    );
+    if a.window_keys() != market.fp_keys || !pool_select::window_floor_ok(&a, &config.params, p_ref)
+    {
+        return None;
+    }
+    let fit = pool_select::FitContext::of(config, oracle, now);
+    pool_select::carried_fit(market, &a, &fit, p_ref, FitAt::Execution)
+        .is_ok_and(|f| f.fits())
+        .then_some(a)
 }
 
 pub fn handler<'info>(ctx: Context<'info, ExecutePoolSwitch<'info>>) -> Result<()> {
@@ -163,30 +203,23 @@ pub fn handler<'info>(ctx: Context<'info, ExecutePoolSwitch<'info>>) -> Result<(
 
     // Step 4: still eligible, still the recorded pool, still above the window floor (M4V-1), and
     // every open position still fits its opening caps (switch only if all fit).
-    let p_ref = pool_select::reference_price(&market);
-    let fit = pool_select::FitContext::of(&config, &ctx.accounts.oracle_cache, pro.now);
     let situation = Situation::of(&market, kind, pro.now, pro.pool_fail);
     // M4V-4: a latched candidate program is "not adoptable now" — a cancellation, not a revert.
     let latched = guard::candidate_latched(&*ctx.accounts.venue_guard.load()?, cand_kind);
     let adoptable = !inc.pump_venue && !latched && pool_select::window_adoptable(&situation, &p);
-    let adoption = pool_select::verify_candidate(
-        cand_kind,
-        candidate,
-        &market.mint,
-        &market.token_program,
-        &config.params,
-        clock.unix_timestamp,
-        p_ref,
-    )
-    .ok()
-    .filter(|a| a.window_keys() == market.fp_keys)
-    .filter(|a| pool_select::window_floor_ok(a, &config.params, p_ref))
-    // The fit last, and only for a window that may still be adopted (its CU).
-    .filter(|a| {
-        adoptable
-            && pool_select::carried_fit(&market, a, &fit, p_ref, FitAt::Execution)
-                .is_ok_and(|f| f.fits())
-    });
+    let adoption = if adoptable {
+        fitting_candidate(
+            &market,
+            &config,
+            &ctx.accounts.oracle_cache,
+            cand_kind,
+            candidate,
+            clock.unix_timestamp,
+            pro.now,
+        )
+    } else {
+        None
+    };
     let d_inc = market.pool_d.get();
     let best = market.fp_keys.first().copied().unwrap_or_default();
     let d_best = market.fp_d.get();

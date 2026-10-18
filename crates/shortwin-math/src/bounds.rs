@@ -88,9 +88,10 @@ impl Default for ExitParams {
 /// for tens of minutes: M6E-1 on PumpSwap, AIR-14 on Raydium), and a push of `L_ema` or `L_slow`
 /// by deposit-wrapped cranks reaches no reference. What the cap gives up is V2-14's layer above
 /// `D`: a buyback wrapped in an unlocked LP's own withdrawal is priced on the drained pool, at
-/// worst at `D`. `D` is deposit- and withdraw-invariant up to the whole-bps floor of `λ` (at most
-/// 1 bp of the pool's `√(X·Y)` in that instruction), so no capital-only bundle moves the cap
-/// materially. `None` on the pump curve and the mock, which have no locked depth and no pool
+/// worst at `D`. `D` uses the raw locked-LP ratio: proportional unlocked deposits and withdrawals
+/// preserve it up to integer reserve and square-root rounding (AIR2-09). Recognition of pending
+/// protocol fees can still change the economic reserves (AI2 L74); it is not a proportional
+/// LP flow. `None` on the pump curve and the mock, which have no locked depth and no pool
 /// selection (no switch, no guard), as before.
 ///
 /// Errors: `InvalidInput` for a corrupted ring while the guard is set.

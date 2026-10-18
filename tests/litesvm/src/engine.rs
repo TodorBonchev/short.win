@@ -95,7 +95,8 @@ pub struct MarketSpec {
     pub quote: u64,
     /// Tokens the lender deposits.
     pub lend: u64,
-    /// Seconds to warp after listing (≥ `market_warmup_s` = 50 by default).
+    /// Seconds of listing warm-up (≥ `market_warmup_s` = 50 by default). `mock_market` records
+    /// and integrates a fresh sample during its last second; `mock_market_unobserved` only warps.
     pub warmup: i64,
 }
 
@@ -270,8 +271,30 @@ pub fn create_mock_market_ix(creator: &Pubkey, pool: &MockPool) -> Instruction {
 
 impl Env {
     /// A mock market per `spec` (module docs), through real instructions: the pool, its
-    /// liquidity, `create_market(Mock)`, the lender's deposit, the warm-up.
+    /// liquidity, `create_market(Mock)`, the lender's deposit, and observed warm-up. The final
+    /// two cranks leave a recently integrated EMA, as ordinary opens now require.
     pub fn mock_market(&mut self, spec: MarketSpec) -> MockMarket {
+        let mm = self.create_mock_market(spec);
+        if spec.warmup > 0 {
+            self.warp(spec.warmup - 1);
+            self.crank(&mm);
+            self.warp(1);
+            self.crank(&mm);
+        } else {
+            self.warp(spec.warmup);
+        }
+        mm
+    }
+
+    /// A mock market whose listing warm-up elapses without observations. Use this explicitly
+    /// when exercising an idle market with an old EMA, rather than ordinary ready-to-open setup.
+    pub fn mock_market_unobserved(&mut self, spec: MarketSpec) -> MockMarket {
+        let mm = self.create_mock_market(spec);
+        self.warp(spec.warmup);
+        mm
+    }
+
+    fn create_mock_market(&mut self, spec: MarketSpec) -> MockMarket {
         let pool = mock::new_pool(self, spec.program, spec.decimals, spec.fee_ppm);
         mock::seed(self, &pool, spec.base, spec.quote);
         let creator = self.funded_keypair();
@@ -318,7 +341,6 @@ impl Env {
             let lender = mm.lender.insecure_clone();
             errors::ok(self.send(&[ix::deposit(&mm.lender_keys(), spec.lend, 0)], &[&lender]));
         }
-        self.warp(spec.warmup);
         mm
     }
 

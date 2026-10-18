@@ -20,14 +20,15 @@
  *    lend-post-wipe drives its full wipe) and `pot` (wallet `potClaimer`; lend-claim-sync), with the
  *    tokens their other lenders deposit later (`rejoin`, `potLate`); and for KI66-R4 `chain`, lent
  *    by `chainAbsent` alone (lend-claim-pot-chain rebases it), with `chainClaimer`'s tokens.
- * 7. After the 50 s market warm-up: six open positions (`margin` on main, `closer` and `holder`
- *    on move, `wipeBorrower` on wipe, `potBorrower` on pot, `chainBorrower` on chain) with
- *    generous bounds.
+ * 7. After the 50 s market warm-up and two fresh price observations: six open positions (`margin`
+ *    on main, `closer` and `holder` on move, `wipeBorrower` on wipe, `potBorrower` on pot,
+ *    `chainBorrower` on chain) with generous bounds.
  *
  * Run standalone: `node e2e/validator/seed.ts` (against a running E2E validator).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import {
+    getCrankPriceInstructionAsync,
     getCreateMarketInstructionAsync,
     getDepositInstructionAsync,
     getInitializeConfigInstructionAsync,
@@ -677,6 +678,26 @@ export async function seed(): Promise<E2EState> {
     if (ENV.program === 'test-venue') {
         log(`waiting for the ${MARKET_WARMUP_S}s market warm-up…`);
         await waitForClock(createdAt + MARKET_WARMUP_S + 2n);
+        // Listing warm-up is longer than the open freshness window. Record and then complete
+        // an honest fresh price bucket for each seeded market; a roll of its old sample is not enough.
+        const observe = async () => {
+            for (const m of [main, move, wipe, pot, chain]) {
+                if (!m.pool) throw new Error(`${m.symbol} is not a mock market`);
+                const ix = await getCrankPriceInstructionAsync({
+                    mint: m.mint,
+                    eventAuthority: c.eventAuthority,
+                    program: SHORTWIN_PROGRAM_ADDRESS,
+                });
+                const read = [m.pool.pool, m.pool.baseVault, m.pool.quoteVault].map((address) => ({
+                    address,
+                    role: AccountRole.READONLY,
+                }));
+                await send(c.payer, [{ ...ix, accounts: [...ix.accounts, ...read] }]);
+            }
+        };
+        await observe();
+        await waitForClock((await clock()).unixTimestamp + 1n);
+        await observe();
         positions = {
             margin: await openShortFromNode(await w('margin'), main, 2_000_000n * TOKEN, 1n),
             closer: await openShortFromNode(await w('closer'), move, 300_000n * TOKEN, 1n),

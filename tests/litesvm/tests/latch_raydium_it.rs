@@ -324,6 +324,10 @@ fn three_markets() -> (Env, [(RayMarket, u64); 3]) {
         add_market(&mut env, USELESS),
         add_market(&mut env, T22),
     ];
+    // Listing the later markets advances the clock; renew the earlier markets' samples.
+    crank_all(&mut env, &m);
+    env.warp(1);
+    crank_all(&mut env, &m);
     (env, m)
 }
 
@@ -553,6 +557,8 @@ fn a_real_upgrade_latches_opens_on_every_raydium_market() {
         assert!(!g.is_flagged(venue));
         assert_eq!(g.guard_slot[i], s);
         assert_err(&flag(&mut env, venue), E::VenueNotUpgraded);
+        env.warp(1);
+        crank_all(&mut env, &markets);
         for (rm, q) in &markets {
             ok(try_open(&mut env, rm, *q / 2));
         }
@@ -960,6 +966,9 @@ fn the_2026_10_cpmm_redeploy_latches_until_revalidated() {
     assert_err(&flag(&mut env, venue), E::VenueNotUpgraded);
 
     let markets = [add_market(&mut env, FART), add_market(&mut env, USELESS)];
+    crank_all(&mut env, &markets);
+    env.warp(1);
+    crank_all(&mut env, &markets);
     let [(fart, qf), (useless, qu)] = &markets;
     let (bu, nu) = open_ok(&mut env, useless, *qu);
     let (bf, nf) = open_ok(&mut env, fart, *qf);

@@ -23,6 +23,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 from shortwin_sim import *            # noqa: E402,F401
+import shortwin_sim as _reference
+
+# These dated analysis tables predate AIR2-09 and keep their original bps-rounded D.
+_reference.RAW_LOCKED_DEPTH = False
 import importlib.util as _ilu          # noqa: E402
 
 

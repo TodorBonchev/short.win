@@ -45,6 +45,7 @@ use shortwin::constants::{
     WSOL_MINT,
 };
 use shortwin::instructions::create_market::VENUE_HINT_AUTO;
+use shortwin::state::VenueKind;
 use shortwin_venue_state::{pump, pump_amm};
 use solana_keypair::Keypair;
 use solana_signer::Signer;
@@ -263,7 +264,8 @@ pub struct PumpSpec {
     pub coin: PumpCoin,
     /// Tokens the lender deposits (planted in its account first).
     pub lend: u64,
-    /// Seconds to warp after listing (≥ `market_warmup_s` = 50 by default).
+    /// Seconds of listing warm-up (≥ `market_warmup_s` = 50 by default), with observations
+    /// during the last second so normal opens have a recently integrated EMA.
     pub warmup: i64,
 }
 
@@ -295,7 +297,8 @@ impl Env {
         (env, pm)
     }
 
-    /// The [`PumpMarket`] of an already listed curve: seeds the lender and warps (`spec`).
+    /// The [`PumpMarket`] of an already listed curve: seeds the lender and observes through
+    /// the last second of the listing warm-up (`spec`).
     pub fn pump_market_listed(&mut self, spec: PumpSpec, c: PumpCurve) -> PumpMarket {
         let market = pda::market(&c.mint).0;
         let program = c.token_program;
@@ -323,7 +326,14 @@ impl Env {
             let lender = pm.lender.insecure_clone();
             errors::ok(self.send(&[ix::deposit(&pm.lender_keys(), spec.lend, 0)], &[&lender]));
         }
-        self.warp(spec.warmup);
+        if spec.warmup > 0 && self.market(&market).venue_kind() == Some(VenueKind::PumpCurve) {
+            self.warp(spec.warmup - 1);
+            self.crank(&pm);
+            self.warp(1);
+            self.crank(&pm);
+        } else {
+            self.warp(spec.warmup);
+        }
         pm
     }
 }

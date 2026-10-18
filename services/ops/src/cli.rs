@@ -62,6 +62,9 @@ with the start of the same message is resumed), --allow-duplicate (stage althoug
 transaction holds the same message and is still open).
 Keys are keypair FILES given on the command line (never hardware paths, never printed).
 --dry-run simulates and sends nothing (a command of several transactions stops after the first).
+--compute-unit-limit <units>: set the outer transaction's compute budget (1..1400000); omitted:
+runtime default. Use at least 600000 on execute or approve --execute for a revalidation after
+an extension, or size it by simulation. Staging does not save this option in the vault message.
 --confirm-timeout <s>: how long a sent transaction is awaited (default 90 s, past its blockhash's
 lifetime, so one reported as not confirmed has expired); check `status` before rerunning one.";
 
@@ -91,6 +94,8 @@ pub struct Args {
     pub execute: bool,
     /// `--confirm-timeout <s>` (the binary's RPC client; `None`: its default).
     pub confirm_timeout: Option<u64>,
+    /// `--compute-unit-limit <units>` (all outer transactions; `None`: runtime default).
+    pub compute_unit_limit: Option<u32>,
 }
 
 /// Parses `argv` (without the program name).
@@ -123,6 +128,11 @@ pub fn parse(argv: &[String]) -> anyhow::Result<Args> {
             "--buffer-index" => a.buffer_index = val()?.parse().context("--buffer-index")?,
             "--allow-duplicate" => a.allow_duplicate = true,
             "--execute" => a.execute = true,
+            "--compute-unit-limit" => {
+                let limit = val()?.parse().context("--compute-unit-limit <units>")?;
+                crate::send::validate_compute_unit_limit(limit)?;
+                a.compute_unit_limit = Some(limit);
+            }
             "--confirm-timeout" => {
                 a.confirm_timeout = Some(val()?.parse().context("--confirm-timeout <seconds>")?)
             }
@@ -155,6 +165,10 @@ pub async fn run<C: Chain>(
     let a = parse(argv)?;
     let layout = Layout::load(a.config.as_deref().context("--config <file> is required")?)?;
     let ops = Ops::new(chain, a.dry_run, out);
+    let ops = match a.compute_unit_limit {
+        Some(limit) => ops.with_compute_unit_limit(limit)?,
+        None => ops,
+    };
     dispatch(&ops, &layout, &a).await
 }
 
@@ -835,13 +849,12 @@ async fn stage_admin<C: Chain>(ops: &Ops<'_, C>, l: &Layout, a: &Args) -> anyhow
                 util_kink_bps: arg(0)?.parse().context("bps")?,
             },
         ),
-        "propose-oracle-feed" => ixs::propose_config(
-            &vault,
-            ConfigChange::OracleFeed {
-                account: config::pubkey(arg(0)?, "account")?,
-                feed_id: config::hex32(arg(1)?, "feed id")?,
-            },
-        ),
+        "propose-oracle-feed" => {
+            let account = config::pubkey(arg(0)?, "account")?;
+            let feed_id = config::hex32(arg(1)?, "feed id")?;
+            crate::oracle::preflight(ops.chain, account, &feed_id).await?;
+            ixs::propose_config(&vault, ConfigChange::OracleFeed { account, feed_id })
+        }
         other => bail!("stage: unknown admin instruction {other:?}\n{USAGE}"),
     };
     let index = squads::stage(ops, ms, &key, 0, &[ix], stage_opts(a)).await?;
@@ -857,6 +870,9 @@ async fn apply<C: Chain>(ops: &Ops<'_, C>, a: &Args) -> anyhow::Result<()> {
         .pending
         .change()
         .map_err(|e| anyhow::anyhow!("decoding the pending change: {e:?}"))?;
+    if let ConfigChange::OracleFeed { account, feed_id } = &change {
+        crate::oracle::preflight(ops.chain, *account, feed_id).await?;
+    }
     let now = ops.chain.clock().await?.unix_timestamp;
     ops.say(format!(
         "pending: {} (applicable from {}, now {now}; the window closes {} s after it)",
@@ -942,6 +958,25 @@ mod tests {
         );
         assert!("verify --bogus".parse::<Args>().is_err());
         assert!("approve --index x".parse::<Args>().is_err());
+    }
+
+    #[test]
+    fn compute_unit_limit_is_optional_and_bounded() {
+        assert_eq!("execute".parse::<Args>().unwrap().compute_unit_limit, None);
+        for units in [1, 600_000, crate::send::COMPUTE_UNIT_LIMIT_MAX] {
+            let a: Args = format!("execute --compute-unit-limit {units}")
+                .parse()
+                .unwrap();
+            assert_eq!(a.compute_unit_limit, Some(units));
+        }
+        for value in ["", "0", "1400001", "-1", "4294967296", "abc"] {
+            assert!(
+                format!("execute --compute-unit-limit {value}")
+                    .parse::<Args>()
+                    .is_err(),
+                "accepted {value:?}"
+            );
+        }
     }
 
     #[test]

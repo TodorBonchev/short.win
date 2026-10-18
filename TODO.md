@@ -4,9 +4,105 @@ The AI-review fixes (AIR-01 … AIR-24) are merged. Details, commits and tests f
 [`docs/audit/ai-review/README.md`](docs/audit/ai-review/README.md); design-doc wording is in
 [`docs/audit/ai-review/DOC-FOLLOWUPS.md`](docs/audit/ai-review/DOC-FOLLOWUPS.md).
 
-The follow-ups are done on the branch `air-followups` (2026-10-12/13; the owner asked for it to
-be pushed with `[skip ci]`, so it has not been through CI). Each ticked item names its commits;
-what is still open is under [What remains](#what-remains).
+The follow-ups were completed on `air-followups` (2026-10-12/13) and integrated into `main`.
+They were initially pushed with `[skip ci]`; current CI and local verification are recorded
+below. Historical ticked items name their commits; the 2026-10-18 follow-up is committed as
+the draft 1.0.2 audit-fix batch.
+
+## Working-tree follow-up (2026-10-18)
+
+This section supersedes the older “CI has not run” notes below. The changes are committed;
+program changes remain a draft fix batch, not a released or externally reviewed patch.
+
+- [x] GitHub CI was dispatched on `main` at `35558c2`: [run 39073841046](https://github.com/TodorBonchev/short.win/actions/runs/39073841046).
+      The 1.0.1 verifiable build passed and reproduced `72c82879…1429`; its exact hash record
+      and provenance are now in AUDIT §0. The services dependency job failed; this is not a
+      green full gate, and this run does not cover the working-tree fixes.
+- [x] Services dependency audit failure repaired: `rustls` 0.23.46 and `zip` 9.0.5.
+      A small temporary `postgresql_archive` patch is required because upstream 0.21.0 still
+      requires ZIP 8 (including for Linux Zonky JARs). No advisory exceptions added;
+      cargo-deny, cargo-audit and fresh PostgreSQL download/extraction tests pass.
+- [x] Android MWA timeouts diagnosed and fixed in the test harness: Chromium 152 leaves touch
+      input blocked after the external wallet-protocol navigation. The fake-wallet hook cancels
+      only that navigation; the real protocol and wallet exchange remain tested. All 14 formerly
+      failing cases pass (19 passed, 2 flag-off skips); design-pass `STATUS.md` records evidence.
+- [x] `shortwin-gov --compute-unit-limit` implemented (1–1,400,000), including outer Squads
+      execution and budget-aware buffer sizing. 16 unit and 3 end-to-end tests pass, including
+      hashed revalidation failing at the default budget and succeeding with 600,000 CU.
+- [x] Public repository URL added to program `security.txt`; pump-UVA comments corrected;
+      keeper RPC limitations and compiled constants documented. The v1 probe no longer claims
+      a refused send landed.
+- [x] AI review 2: initial comparison of all 13 findings and inventory of all 85 leads recorded
+      in [`docs/audit/findings.md`](docs/audit/findings.md). Only finding 6 is closed as a
+      duplicate; open leads still need adjudication, not blanket acceptance.
+- [x] Existing draft fixes for findings 2–4 reviewed and regression-tested, including old-bucket
+      cranks, freshness boundary/recovery, and a vest extended beyond the original hold end.
+      IDL/client regenerated; web previews now follow the open and deposit gates.
+- [x] Idle-market price refresh added to the short UI: separately reviewed observation and
+      integration transactions, real chain-clock checks, reload recovery and an expiry guard.
+      A local-chain end-to-end test confirms both transactions without opening a position.
+      Earlier draft's web unit suite: 1,050 passed, 1 skipped; typecheck and lint passed.
+- [x] Earlier draft-program compatibility checks: math/WASM 387 passed; LiteSVM 1,142 passed,
+      5 ignored; fuzz smoke 20 passed after refreshing stale fixture observations. Economic
+      assertions retained; strict Clippy passed for both Rust workspaces. Local draft hashes are in the
+      findings tracker and are distinct from the verified 1.0.1 build.
+- [ ] Release the program fix batch only after resolving the remaining findings and completing
+      its full gate, exact-tree verifiable build, ≥24 h fuzz and review. The broader batch below
+      implements the version bump and legacy vest/arm migration; it remains unreleased
+      ([findings tracker](docs/audit/findings.md#ai-review-2-working-tree-batch-2026-10-18)).
+
+## Broader audit triage (2026-10-18; draft 1.0.2)
+
+- [x] Review all 85 pass-1 leads and inventory all 330 pass-2 blocks (74 distinct keys), with
+      evidence and limits in the [triage register](docs/audit/ai-review-2/triage-pass2-2026-10-18.md)
+      and the linked math, venue and services reports. This is targeted follow-up, not the
+      missing original judge run, pass 3 or an independent audit.
+- [x] Implement draft fixes for conversion-lock rounding, split-settlement vest capture,
+      dust-flush source accounting, restart-stale settlement arms, raw-ratio locked depth,
+      and the unlocked-share withdrawal cap. Preserve Market's 3,104-byte layout; initialize
+      legacy vest/arm markers on first use and recheck legacy source bits. Split cashback
+      claims hold deposits through any new vest; both edge-case transaction regressions fail
+      on the preceding draft and pass on the corrected binary. Update the IDL/client, web,
+      keeper and indexer. Update the indexer before the program to recognize sweep destination
+      `3`; deploy the new keeper/UI with or after 1.0.2, since cleanup requires its migration marker.
+- [x] Add a separately reviewed pool cleanup action when existing lenders still have shares.
+      It preserves the entered deposit and lets cleanup complete before any resulting vest
+      releases; deposit retries cannot roll that cleanup back by appending a deposit.
+- [x] Add strict LP-mint/account parsing, guard-version checks, governance oracle preflight,
+      and ALT verification fixes. Reproduce alternate-account cashback stranding against the
+      pinned venue ELF; keep its recovery and completeness migration open.
+- [x] Synchronize the normative Python models and replay vectors. Preserve historical attack
+      rules explicitly rather than silently changing old measurements.
+- [x] Bump the program package and workspace lock entries to **1.0.2**, a draft candidate.
+      No tag, deployment or release has been made. Current local hashes are in AUDIT §0.
+- [x] Validate the current candidate: **1,343 program/core/LiteSVM tests** pass (5 ignored),
+      **376 math tests**, **21 fuzz smoke tests** and **1,065 web tests** (1 skipped), with
+      typecheck, lint and strict root/program Clippy. The models pass 16 focused tests,
+      180,000 pool operations, 4,800 Monte Carlo paths and the 1,655-case configuration
+      battery. Regenerated pool fixtures reproduce byte-for-byte.
+- [x] Integrate upstream through `9062dab` before commit/push, retaining the wallet/link UI
+      and FUZZ-101-24H-A oracle fix. Its regression now adds the real observation/cleanup
+      prerequisites required by 1.0.2, preserving the original corpus and economic assertions.
+      The integrated web and 21-test fuzz suites, formatting and strict fuzz Clippy pass.
+- [x] Refresh M1/M2/M3/M5/M6 compute and trace baselines without increasing budgets;
+      all 12 transaction-size probes pass. The alternate SBF stack-frame fix passes all
+      40 pool-selection tests on both the canonical and no-LTO/16-codegen-unit builds.
+- [x] Refresh M7 keeper cost, cascade and PumpSwap size measurements, their simulator inputs
+      and ECON §5.8 tables. All three gates pass; the largest measured market-day cost increase
+      is 0.00104 SOL under the benchmark's assumptions.
+- [x] Run the complete services workspace: **409 tests pass**, including PostgreSQL security,
+      ingestion/replay, keeper scenarios and governance execution. Six are ignored in that run;
+      the two M7 benchmarks pass separately, while four live-RPC cases remain outside it.
+      Services/keeper Clippy, formatting and both offline ZIP extraction regressions pass.
+- [x] Pass 12 selected validator/browser cases on the final program, including phone lending,
+      post-wipe deposits, claim sync and idle-price refresh. After the cleanup UI follow-up,
+      rerun the two-case claim chain on a fresh ledger: the separately reviewed sweep preserves
+      shares/epoch, and the later claim pays in full. The full browser release gate remains open.
+- [ ] Resolve the remaining findings: full-digest VenueGuard migration (AIR2-07), creator/risk
+      fee treatment and exit-budget gap (AIR2-10/11), alternate cashback recovery (AIR2-12),
+      keeper payout after rent exhaustion (AIR2-13), and historical pot entitlement
+      (AIR2-P2-02). Other open lead dispositions remain in the findings tracker; unverified
+      claims have not been accepted or declared fixed.
 
 ## AI review 2 of short.win 1.0.1 (2026-10-17; stopped after pass 1)
 
@@ -23,11 +119,12 @@ asked for what it had found, for the auditors. Everything is in
       (`convert_steps`: a safety classifier stopped its PoC agent before it wrote a test)
 
 **Still open**
-- [ ] Triage: each finding and lead against `known-issues.md` and `ai-review/`, results into
-      `findings.md` (finding 6 is KI-70 / AIR-04, accepted)
-- [ ] Fixes for the confirmed findings, in a 1.0.x program batch (the audit freeze)
-- [ ] Pass 2's 330 unjudged agent blocks (`pass-2-unjudged.md`; 34 of 84 agents ran), pass 3, the
-      PoC of finding 1, and the keeper core, which the scan left out
+- [x] Broader targeted triage of all 85 leads and 330 pass-2 blocks, including keeper paths;
+      finding 1's lock-rounding mismatch reproduced and fixed in the draft. Its original
+      all-free-inventory magnitude remains unverified. Finding 6 is KI-70 / AIR-04, accepted.
+- [ ] Complete the draft 1.0.2 program batch and its release gates (above).
+- [ ] Original pass-2 judge run, pass 3 and independent keeper-core review; the targeted
+      follow-up does not claim to complete those missing audit passes.
 
 ## Design polish: the logo and the web app's look (2026-10-16; on `main`)
 
@@ -47,15 +144,14 @@ branch. The full record is in [`docs/design/design-pass-2026-10/`](docs/design/d
       gate (96 passed) and the web E2E on desktop and phone green
 
 **Still open**
-- [ ] **CI on GitHub** for the design pass (nothing in it has run in CI)
-- [ ] 14 Android tests of `mobile-mwa.spec.ts` time out on the local machine, with or without the design pass
-      (untouched `d805c19` fails the same 14); find out why (another gate had them green)
+- [x] **CI on GitHub** for the design pass: `web` and `web-e2e` passed in run 39073841046; the whole repository gate still has the services failure.
+- [x] The 14 Android `mobile-mwa.spec.ts` timeouts: fixed and verified (working-tree follow-up above).
 
 ## pump v3 and the Mobile Wallet Adapter (2026-10-13 … 16; branch `pump-v3`)
 
-The branch `pump-v3` holds `main` (`c0e0900`), the pump catch-up of the design `pump-final`
-(phases P0 … P8) and the Mobile Wallet Adapter (O-6, cherry-picked on 2026-10-15). Not pushed, not
-through CI. The owner's decisions of 2026-10-13 are recorded in SPEC §14 (fifteenth round) and
+The former branch `pump-v3` combined `main` (`c0e0900`), the pump catch-up of the design
+`pump-final` (phases P0 … P8) and the Mobile Wallet Adapter (O-6, cherry-picked on 2026-10-15).
+It is now integrated into `main`; the CI follow-up is recorded above. The owner's decisions of 2026-10-13 are recorded in SPEC §14 (fifteenth round) and
 AUDIT.md §7; the addendum is AUDIT.md §13.
 
 **Done**
@@ -109,12 +205,10 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
 **Still open**
 - [ ] **Remove the two `@solana-mobile` release-age exclusions** in `pnpm-workspace.yaml` after
       2026-10-21, then `pnpm install --frozen-lockfile` again.
-- [ ] **CI on GitHub** for `pump-v3` (nothing here has run in CI).
-- [ ] **The verifiable build** of 1.0.1 (`scripts/verifiable-build.sh --local --compare
-      target/deploy`: it needs solana-verify 0.5.2 and bubblewrap, not installed on the P8
-      machine, and network for them, the image, the crates and platform-tools, which that
-      session's rules did not allow (read-only Solana RPC only); or Docker mode, or CI's
-      `verifiable-build` job), then the 1.0.1 hashes in AUDIT.md §0 as verified ones.
+- [ ] **Green full CI on GitHub** for the integrated pump v3 code: run 39073841046 started on `35558c2`; services dependency audit failed.
+- [x] **The verifiable build of 1.0.1:** CI run 39073841046 on `35558c2` reproduced both
+      the file and executable hashes; AUDIT §0 now records the verified build. A new build
+      is required for the draft program fixes.
 - [ ] **R-PFEE on a new pump-fees build:** re-read `withdraw`'s accounts and authority on any
       pump-fees build after the 10-12 one (done for the 10-12 build; the stop rule did not
       trigger; PUMP-2026-10-13-5).
@@ -185,33 +279,32 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
         CI only) ran CI's web job, the facade's tests and its smoke test (their commit messages).
   - [x] The build's hashes in AUDIT.md §0, marked as not verified (local `anchor build`; no
         verifiable build, no CI). `11d359b`
-  - [ ] CI on GitHub: the owner asked for the branch to be pushed with `[skip ci]`
-        (2026-10-13), so CI has not run.
+  - [ ] Green full CI on GitHub: run 39073841046 covers the integrated committed code;
+        services dependency audit failed. The current working-tree changes need a new run.
 
 ## What remains
 
 Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-13.
 
 **Release evidence (needs CI or tools not on the local machine)**
-- [ ] CI on GitHub: the owner asked for the branch to be pushed with `[skip ci]` (2026-10-13),
-      so CI has not run. The jobs not run locally: `deny` (`cargo deny`, `cargo audit`; since
+- [ ] Green full CI on GitHub: run 39073841046 now supplies committed-tree evidence,
+      including `deny`, verifiable-build, indexer and web E2E passes; services audit failed.
+      Historical jobs not run locally: `deny` (`cargo deny`, `cargo audit`; since
       v1.0.0 the Cargo lockfiles change only workspace packages, `complete-curve` removed and
       `shortwin` 1.0.1, and `pnpm-lock.yaml` gained the Mobile Wallet Adapter's npm packages,
       which deny and audit do not cover) and `verifiable-build` (Docker). `web-e2e` and the
       indexer's PostgreSQL and validator tests ran locally on `pump-v3` (2026-10-16, AUDIT.md
       §10).
-- [ ] `rpc_local` (no CI job runs it): `SHORTWIN_RPC_URL=http://127.0.0.1:8899 cargo test
-      --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored`
-      against `solana-test-validator`; last run by the keeper track at `8945087` (1 passed),
-      `services/common` unchanged since.
-- [ ] Release as 1.0.x (owner decision of 2026-10-02; SPEC §14): bump the version in
-      `programs/*/Cargo.toml`, which `security.txt`'s `source_release` carries; then CI and the
-      verifiable build on that tree, and its hashes in AUDIT.md §0 (the 1.0.0-versioned hashes
-      there are a local build's, not verified). *The version is 1.0.1 since `dd24af1` (pump v3,
-      above) and its local hashes are in AUDIT.md §0; CI and the verifiable build remain.*
-- [ ] `scripts/mutants.sh` (CI's opt-in `mutants` job, nightly or `workflow_dispatch`): run on
-      every earlier batch, not on the AI review's fixes nor on 1.0.1 (it builds into target
-      directories of its own, which this machine's disk budget does not allow).
+- [x] `rpc_local`: passed on 2026-10-18 against the local E2E validator at
+      `http://127.0.0.1:18899` with the updated services lockfile (1 passed). Command:
+      `SHORTWIN_RPC_URL=http://127.0.0.1:18899 cargo test --manifest-path services/Cargo.toml -p shortwin-services-common --test rpc_local -- --ignored`.
+- [ ] Release as 1.0.x (owner decision of 2026-10-02; SPEC §14): the working-tree package and
+      `security.txt` version are now 1.0.2; finish CI, the exact-tree verifiable build and the
+      remaining release gates before tagging it. *1.0.1's hashes are reproduced by CI in
+      AUDIT §0; the 1.0.2 hashes there are local test evidence only.*
+- [ ] `scripts/mutants.sh`: the opt-in CI job **passed** on committed 1.0.1 in run
+      39073841046. The working-tree program batch still
+      needs its own mutation-test evidence.
 - [x] The PostgreSQL indexer tests on the migrated and re-recorded inputs: `ingest_sessions`,
       `api_replayed`, `security_ingest`, and the replay harness's
       `every_session_replays_into_the_chain_state`,
@@ -248,18 +341,17 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
       extensions. Its bit is in no v1.0 latch mask, so this blocks nothing before v1.1.
 
 **Code and tooling (optional)**
-- [ ] At the next program batch: `security.txt`'s `source_code` can name this repository (a program
-      change).
-- [ ] `shortwin-gov`: a `--compute-unit-limit` option (`services/ops/src/send.rs`). It sets none,
-      so a hashed revalidation after an extension (pump-fees 438,358 CU) cannot be executed with
-      it today.
-- [ ] Program comments "never had a pump UVA" (`engine/lender.rs`, `instructions/sweep_trader.rs`):
-      `Market.pump_uva` is set on every PumpSwap market (`pump_amm::write_cache`); the clause
-      means that the UVA holds no curve-era cashback.
-- [ ] The attack scripts' historical and analysis rules still inherit the fixed sim; pin them.
-- [ ] Keeper constants that are not config: `DEPLOY_SLOT_SLACK` (2), `NOT_DEPLOYED_ALERT_S` (30),
-      `NOT_DEPLOYED_RUN_GAP_S` (5).
-- [ ] Keeper limits after `a1edf78` / `bf037ef`, to document or improve: an RPC backend that
+- [x] `security.txt`'s `source_code` names this public repository in the draft program batch.
+- [x] `shortwin-gov --compute-unit-limit`: implemented and tested; specify it on `execute`
+      or `approve --execute`, since staging does not store the outer transaction's budget.
+- [x] Program comments distinguish the cached pump UVA address from curve-era cashback.
+- [x] Pin the attack scripts' historical and analysis rules separately from the current
+      normative model (`docs/design/sim/README.md`); replay generators explicitly use the
+      current model. The historical pool-edge report is reproduced unchanged.
+- [ ] Optional: make keeper thresholds configurable. Their compiled values
+      `DEPLOY_SLOT_SLACK` (2), `NOT_DEPLOYED_ALERT_S` (30), `NOT_DEPLOYED_RUN_GAP_S` (5)
+      are now documented in `services/README.md`.
+- [x] Keeper limits after `a1edf78` / `bf037ef` documented in `services/README.md`: an RPC backend that
       reports no context slot makes every `VenueNotUpgraded` stale (a whole read per deploy slot,
       `VenueFlagFailed` on upgrades); a pool that always simulates on a lagging node pages an
       upgrade but never flags it (three round trips a tick); a flag or revalidation between the
@@ -271,7 +363,8 @@ Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-1
 - [ ] Fuzz coverage since the drained-pool gate: late deposits after a drain are refused
       (83 of 1,689 deposits in a 10-minute run), so FUZZ-M7-24H-3-sized deficits are reachable
       only at ≤ 99.9 % utilisation; no pre-AIR baseline was compared.
-- [ ] An SBF build of `shortwin` with the fuzz jobs' profile (`CARGO_PROFILE_RELEASE_LTO=false`,
-      16 codegen units) reported `execute_pool_switch::handler`'s frame at 4,224 B, 128 B over
-      the 4,096 limit (2026-10-12, a local log). The canonical builds (LTO fat, 1 codegen unit)
-      report nothing; CI builds the program with those. Check whether the frame can shrink.
+- [x] Reproduce and fix the alternate SBF profile's 4,224-byte `execute_pool_switch::handler`
+      frame. Candidate verification and carried-position fit now run in a separate frame;
+      canonical and no-LTO/16-codegen-unit builds are clean, and all 40 pool-selection
+      integration tests pass on both final draft artifacts. The alternate artifact is diagnostic,
+      not release provenance.

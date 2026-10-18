@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { readRepo } from '../test/repo.ts';
 import {
     COVERAGE_CLEAR_DELAY_S,
+    COVERAGE_GAP_S,
     CURVE_MIN_LEN,
     ENTRY,
     EXTRAS_IX,
@@ -89,6 +90,7 @@ describe('venue constants = the program', () => {
         expect(GUARD_MASK.raydium_v4).toBe(g('GUARD_RAYDIUM_V4') | g('GUARD_RAYDIUM_CPMM'));
         expect(GUARD_MASK.mock).toBe(GUARD_MASK.raydium_v4);
         expect(COVERAGE_CLEAR_DELAY_S).toBe(BigInt(num(constants, 'COVERAGE_CLEAR_DELAY_S')));
+        expect(COVERAGE_GAP_S).toBe(BigInt(num(readRepo('crates/shortwin-math/src/consts.rs'), 'COVERAGE_GAP_S')));
     });
 
     it('market flags and pool-cache slots', () => {

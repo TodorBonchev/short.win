@@ -19,6 +19,7 @@ use std::io::Write;
 use anchor_lang::solana_program::instruction::Instruction;
 use anyhow::bail;
 use shortwin_services_common::{Chain, TxError, TxOutcome, tx};
+use solana_compute_budget_interface::ComputeBudgetInstruction;
 use solana_keypair::Keypair;
 use solana_message::{Message, VersionedMessage};
 use solana_pubkey::Pubkey;
@@ -27,6 +28,17 @@ use solana_transaction::versioned::VersionedTransaction;
 
 /// Solana's packet limit (`PACKET_DATA_SIZE`): every transaction must fit.
 pub const TX_MAX: usize = 1_232;
+
+/// Solana's maximum compute-unit limit per transaction.
+pub const COMPUTE_UNIT_LIMIT_MAX: u32 = tx::MAX_COMPUTE_UNITS;
+
+pub(crate) fn validate_compute_unit_limit(limit: u32) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        (1..=COMPUTE_UNIT_LIMIT_MAX).contains(&limit),
+        "--compute-unit-limit must be between 1 and {COMPUTE_UNIT_LIMIT_MAX}"
+    );
+    Ok(())
+}
 
 /// A transaction the chain refused (or that failed its simulation): returned as the error of
 /// [`Ops::send`] so callers and tests can match the program and code.
@@ -114,10 +126,11 @@ pub fn wire_size(payer: &Pubkey, ixs: &[Instruction]) -> usize {
     })
 }
 
-/// The tool's context: the chain, `--dry-run`, and where the report goes.
+/// The tool's context: the chain, optional compute budget, `--dry-run`, and report destination.
 pub struct Ops<'a, C: Chain> {
     pub chain: &'a C,
     pub dry_run: bool,
+    compute_unit_limit: Option<u32>,
     out: RefCell<&'a mut dyn Write>,
     /// Transactions sent (or simulated, in a dry run) so far: `(label, size)`.
     pub sent: RefCell<Vec<(String, usize)>>,
@@ -128,9 +141,33 @@ impl<'a, C: Chain> Ops<'a, C> {
         Self {
             chain,
             dry_run,
+            compute_unit_limit: None,
             out: RefCell::new(out),
             sent: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Override the runtime's default for every outer transaction, including Squads vault
+    /// execution. This instruction must not be stored inside a Squads vault message: a CPI
+    /// cannot set the transaction's compute budget.
+    pub fn with_compute_unit_limit(mut self, limit: u32) -> anyhow::Result<Self> {
+        validate_compute_unit_limit(limit)?;
+        self.compute_unit_limit = Some(limit);
+        Ok(self)
+    }
+
+    fn transaction_instructions(&self, ixs: &[Instruction]) -> Vec<Instruction> {
+        self.compute_unit_limit
+            .map(ComputeBudgetInstruction::set_compute_unit_limit)
+            .into_iter()
+            .chain(ixs.iter().cloned())
+            .collect()
+    }
+
+    /// The wire size including the optional compute budget. Staging and buffer chunking use
+    /// the same instructions as [`Self::send`], so their packet-limit decisions stay exact.
+    pub fn wire_size(&self, payer: &Pubkey, ixs: &[Instruction]) -> usize {
+        wire_size(payer, &self.transaction_instructions(ixs))
     }
 
     /// Writes one line of the report.
@@ -149,12 +186,13 @@ impl<'a, C: Chain> Ops<'a, C> {
         ixs: &[Instruction],
         signers: &[&Keypair],
     ) -> anyhow::Result<TxOutcome> {
-        let size = wire_size(&payer.pubkey(), ixs);
+        let ixs = self.transaction_instructions(ixs);
+        let size = wire_size(&payer.pubkey(), &ixs);
         if size > TX_MAX {
             bail!("{label}: a {size}-byte transaction (the limit is {TX_MAX})");
         }
         let blockhash = self.chain.latest_blockhash().await?;
-        let msg = Message::new_with_blockhash(ixs, Some(&payer.pubkey()), &blockhash);
+        let msg = Message::new_with_blockhash(&ixs, Some(&payer.pubkey()), &blockhash);
         let n = usize::from(msg.header.num_required_signatures);
         let required: Vec<Pubkey> = msg.account_keys[..n].to_vec();
         let mut keys: Vec<&Keypair> = vec![payer];

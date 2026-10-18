@@ -1963,7 +1963,9 @@ impl Model {
             }
             Ev::TraderSwept(x) => {
                 let (leg, to_lenders) = match x.to {
-                    e::SWEEP_TO_VEST => (("trader_sweep_lenders", "lenders"), true),
+                    e::SWEEP_TO_VEST | e::SWEEP_TO_LENDERS => {
+                        (("trader_sweep_lenders", "lenders"), true)
+                    }
                     e::SWEEP_TO_WIPE_RECORD => (("trader_sweep_wipe", "lenders"), true),
                     _ => (("trader_sweep_protocol", "protocol"), false),
                 };
@@ -1978,7 +1980,9 @@ impl Model {
             }
             Ev::VenueRewardsClaimed(x) => {
                 let (leg, to_lenders) = match x.to {
-                    e::SWEEP_TO_VEST => (("venue_rewards_lenders", "lenders"), true),
+                    e::SWEEP_TO_VEST | e::SWEEP_TO_LENDERS => {
+                        (("venue_rewards_lenders", "lenders"), true)
+                    }
                     e::SWEEP_TO_WIPE_RECORD => (("venue_rewards_wipe", "lenders"), true),
                     _ => (("venue_rewards_protocol", "protocol"), false),
                 };

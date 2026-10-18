@@ -2,7 +2,7 @@
   "address": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
   "metadata": {
     "name": "shortwin",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "spec": "0.1.0",
     "description": "short.win: permissionless P2P token lending for shorting memecoins (Anchor program)"
   },
@@ -7417,11 +7417,31 @@
             }
           },
           {
+            "name": "deposit_hold_until",
+            "docs": [
+              "Initial vest end after a settlement leaves a vest. Deposits wait until the shared vest",
+              "actually reaches 0, because later credits can move its end. -1 means initialized with",
+              "no hold; 0 means legacy/uninitialized. First accrual invalidates legacy source bits and",
+              "arms the hold; pending venue rewards also arm it before a split claim can re-vest income.",
+              "The next successful deposit after release sets -1. Carved from `_reserved`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "restart_ema_count",
+            "docs": [
+              "First EMA count belonging to the latest observation restart (restart count + 1).",
+              "Settlement arms from an earlier count must rearm, even if nobody touched them during",
+              "warm-up. Zero on legacy markets until their first full prologue. Carved from `_reserved`."
+            ],
+            "type": "u64"
+          },
+          {
             "name": "_reserved",
             "type": {
               "array": [
                 "u8",
-                144
+                128
               ]
             }
           }

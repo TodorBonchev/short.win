@@ -218,8 +218,11 @@ fn redetect(
     if priced {
         observe::rewrite_liquidity(&mut obs, l, shortwin_math::observe::VenueChange::Graduation)?;
     } else {
+        let count = obs.ema.count;
         *obs = shortwin_math::observe::Observation::new(now, p, l).math()?;
+        obs.ema.count = count;
     }
+    market.mark_observation_restart(obs.ema.count)?;
     market.set_observation(&obs);
     market.venue = to as u8;
     if to == VenueKind::PumpMigrating {
@@ -254,6 +257,7 @@ fn redetect_pool(market: &mut Market, cp: &AccountInfo, now: i64) -> Result<Opti
     venues::pump_amm::graduate(market, &pool, now)?;
     let mut obs = market.observation();
     venues::pump_amm::restart_observation(&mut obs, venues::pump_amm::graduation_anchor(&pool))?;
+    market.mark_observation_restart(obs.ema.count)?;
     market.set_observation(&obs);
     Ok(Some(Transition {
         from: VenueKind::None,

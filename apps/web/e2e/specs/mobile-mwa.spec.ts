@@ -248,9 +248,8 @@ test.describe('Mobile Wallet Adapter (flag on)', { tag: '@scaffold' }, () => {
         const launches = await app.mwaLaunches();
         expect(launches).toHaveLength(1);
         expect(launches[0]?.active).toBe(true);
-        // `location.assign('solana-wallet:…')` left the page where it was: headless Chromium has no
-        // app for the scheme (were it to navigate, CDP's Page.frameRequestedNavigation would have to
-        // stand in for the hooks).
+        // The harness cancels the native external-protocol handoff after recording the intent:
+        // Chromium 152 otherwise blocks later touch input even though the fake wallet connects.
         expect(page.url(), 'the page stays after the intent').toBe(url);
         expect([...fake.methods()].sort()).toEqual(['authorize', 'get_capabilities']);
         expect(fake.sessions).toEqual([expect.objectContaining({ established: true, closedByWallet: false })]);
@@ -271,6 +270,8 @@ test.describe('Mobile Wallet Adapter (flag on)', { tag: '@scaffold' }, () => {
             ),
         ).toBe(false);
         await app.a11y('android connected through the Mobile Wallet Adapter');
+        await app.id(T.walletButton).tap();
+        await expect(app.id(T.walletDisconnect)).toBeVisible();
     });
 
     test('M3 a reload reconnects without an association; after Disconnect it does not', async ({

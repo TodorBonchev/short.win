@@ -56,8 +56,8 @@ declare_id!("5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK");
 // 2026-10-02; `SECURITY.md`, the web app's `/security` page and `/.well-known/security.txt` carry
 // the same). Not in
 // `no-entrypoint` builds (the keeper links both programs as libraries: two `#[no_mangle]
-// SECURITY_TXT` symbols would clash) nor in the TEST-ONLY `test-venue` build (A49). No `expiry`,
-// `source_code` or `source_revision` while the repository is private, and no `auditors` before
+// SECURITY_TXT` symbols would clash) nor in the TEST-ONLY `test-venue` build (A49). No `expiry`
+// or commit-dependent `source_revision`, and no `auditors` before
 // the first published audit; `source_release` is the package version (`v1.0.0` at the audit
 // freeze), never a commit (the hash must not depend on it).
 #[cfg(not(any(feature = "no-entrypoint", feature = "test-venue")))]
@@ -67,6 +67,7 @@ solana_security_txt::security_txt! {
     contacts: "email:security@short.win,link:https://short.win/security",
     policy: "https://short.win/security",
     preferred_languages: "en",
+    source_code: "https://github.com/TodorBonchev/short.win",
     source_release: concat!("v", env!("CARGO_PKG_VERSION"))
 }
 

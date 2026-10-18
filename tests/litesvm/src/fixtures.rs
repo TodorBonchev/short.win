@@ -193,6 +193,8 @@ pub fn install_market(
     m.trader_wsol_ata = pda::ata(&trader, &WSOL_MINT, &TOKEN_PROGRAM_ID);
     m.pump_pool_authority = pda::pump_pool_authority(mint);
     m.last_accrual_ts = now;
+    m.deposit_hold_until = -1;
+    m.restart_ema_count = 1;
     m.ema_params_version = config.ema_params.version;
     m.ema_dtmax_s = config.ema_params.ema_dtmax_s;
     m.ema_clamp_bps = config.ema_params.ema_clamp_bps;

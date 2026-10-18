@@ -29,6 +29,7 @@ import type { MathModule } from '../../math/load.ts';
 import {
     CONFIG_FLAG_PAUSED_OPENS,
     COVERAGE_CLEAR_DELAY_S,
+    COVERAGE_GAP_S,
     GUARD_MASK,
     type KindName,
     MARKET_FLAG,
@@ -67,6 +68,8 @@ export const TIER_NAMES = ['A', 'B', 'C', 'D'] as const;
 export interface MarketSnapshot {
     /** The cluster's `Clock::unix_timestamp` at the read. */
     readonly now: bigint;
+    /** RPC reads set false if `now` is a display fallback because Clock did not decode. */
+    readonly clockVerified?: boolean;
     readonly slot: bigint;
     readonly config: GlobalConfig;
     readonly guard: VenueGuard | null;
@@ -219,7 +222,7 @@ export interface Blocked {
  * The open guards of `open_short` steps 1, 3 and 4 (`engine::guard::open_static`, the latch, the
  * venue guards, the open guards), in the program's order: the first that refuses, else `null`.
  */
-export function openBlocked(math: MathModule, s: MarketSnapshot): Blocked | null {
+export function openPrerequisiteBlocked(math: MathModule, s: MarketSnapshot): Blocked | null {
     const { config, market: m, now, kind, venue } = s;
     const p = config.params;
     const flag = (bit: number) => (m.flags & bit) !== 0;
@@ -266,6 +269,23 @@ export function openBlocked(math: MathModule, s: MarketSnapshot): Blocked | null
     }
     const warm = m.createdAt + BigInt(p.marketWarmupS);
     if (now < warm) return { code: 'MarketWarmingUp', waitS: warm - now };
+    return null;
+}
+
+/** Includes the price guards after the listing, venue and warmup prerequisites. */
+export function openBlocked(math: MathModule, s: MarketSnapshot): Blocked | null {
+    const prerequisite = openPrerequisiteBlocked(math, s);
+    if (prerequisite) return prerequisite;
+    const { market: m, now, venue } = s;
+    const p = s.config.params;
+    // Match open_short's pre-prologue EMA timestamp and the completed sample after its roll.
+    // Rolling an old bucket advances emaTs, but cannot turn that old observation into a fresh one.
+    const observationNow = now > m.lastAccrualTs ? now : m.lastAccrualTs;
+    if (observationNow - m.emaTs > COVERAGE_GAP_S) return { code: 'EmaWarmingUp' };
+    const rolls = p128(m.bLo) !== 0n && m.bSec < observationNow;
+    const completedLo = rolls ? m.bLo : m.lbLo;
+    const completedAt = rolls ? m.bSec : m.lbSec;
+    if (p128(completedLo) !== 0n && observationNow - completedAt > COVERAGE_GAP_S) return { code: 'EmaWarmingUp' };
     const pEma = marketPrice(s).pEma;
     const pSpot = spotPrice(math, venue);
     if (pSpot === null) return { code: 'NoRoute' };

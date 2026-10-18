@@ -16,10 +16,10 @@ widths, inside the existing dark-terminal design system. On `main`, with freshly
 - Lint, typecheck and all unit tests pass.
 - The responsive gate passes in full.
 - The Playwright suite passes on desktop and phone.
-- 14 Android wallet-adapter tests fail. Untouched `main` without the design pass fails the same 14 on this
-  machine, so they are not caused by this work.
+- The 14 Android wallet-adapter failures were traced to Chromium's native external-protocol handoff and
+  fixed in the test harness on 2026-10-18; the Android MWA spec now passes (19 passed, 2 flag-off skips).
 
-What is left is a CI run on GitHub and a look at those Android tests.
+What is left is the GitHub CI evidence.
 
 ## Done
 
@@ -115,6 +115,25 @@ this machine. They are therefore not caused by the design pass. The owner's own 
 web E2E as green ("122 passed", TODO.md), so the difference is this machine's environment. One untested guess:
 this machine runs the system Chromium, because Playwright's bundled browser is not installed.
 
+**Android follow-up, 2026-10-18:** reproduced M3's timeout with system Chromium 152.0.7977.82, then reduced
+it to a two-button HTML page: the first button calls `location.assign('solana-wallet:…')`; the next real
+touch hangs at Playwright's "performing tap action". The same failure occurs using the browser executable
+directly, without the system launcher's user flags. The fake wallet had already authorized successfully;
+the native external-protocol handoff was blocking later input, including after a reload.
+
+`e2e/wallet/mwa-hooks.js` now cancels only `solana-wallet:` navigations with the Navigation API. The harness
+already supplies Android's app switch and wallet; cancelling the desktop handoff leaves the real adapter,
+association handshake, signing and CSP checks in place. M2 now also taps the connected wallet button to
+check that touch input still works. M3 passed in 3.5 s after previously timing out at 33.7 s. The complete
+spec, `SHORTWIN_E2E_KEEP=1 SHORTWIN_E2E_REUSE=1 pnpm --filter web e2e mobile-mwa.spec.ts
+--project=chain-android`, passed **19 tests**, with the **2 flag-off tests skipped** (1.5 min). No timeout
+was increased.
+
+The same spec was then rerun with a fresh ledger and the draft audit-fix test-venue build
+`c3689cc688690ffdaa247a25e16d652a73d504e887a2d97df95d65ef4f791897`: **19 passed, 2 skipped** (3.2 min,
+including seeding). The seed now records and completes fresh price buckets with real cranks after its
+50-second listing warm-up, before opening the seeded positions, to satisfy the new open-price age guard.
+
 **Resolved since the first report:**
 
 - The three lend chain-scenario specs (`lend-claim-sync`, `lend-post-wipe`, `lend-claim-pot-chain`) pass.
@@ -126,8 +145,6 @@ The cause was the stale local program build, as suspected; `target/` now holds f
 
 1. **CI on GitHub.** Nothing in this pass has run in CI, like the pump v3 work before it (TODO.md lists that too).
    Run the `ci` workflow.
-2. **The 14 Android wallet-adapter tests** fail on this machine with or without the design pass. Find out what
-   differs from the owner's green run.
 
 ### Known minor issues, reviewed and not fixed
 

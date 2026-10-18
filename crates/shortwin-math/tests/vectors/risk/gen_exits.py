@@ -63,7 +63,7 @@ M = sim.Market
 ECON_13_EXIT_FUZZ = {
     "runs": 1000, "exits": 697, "sandwich_attempts": 8948, "bundles": 253491, "attacker_only_seconds": 772,
     "blocker_runs": 192, "noisy_runs": 490, "freezer_runs": 267, "frozen_seconds": 2905,
-    "penalty_truncated_by_sandwich": 22, "max_loss_over_bref_bps": 102, "max_settle_box_bps": 94,
+    "penalty_truncated_by_sandwich": 21, "max_loss_over_bref_bps": 102, "max_settle_box_bps": 94,
     "reserve_waits_liq": 0, "reserve_waits_exp": 0,
     "kinds": {"liquidation": 224, "expiry": 281, "S1": 147, "S2": 10, "S3": 35}}
 CAP = defaultdict(list)
@@ -243,6 +243,7 @@ import fvcap as FC  # noqa: E402
 import ptf_sandwich as PTF  # noqa: E402
 import sandwich as SW  # noqa: E402
 import cascade as CS  # noqa: E402
+sim.RAW_LOCKED_DEPTH = True  # Current arithmetic vectors, not common's dated comparison tables.
 
 
 # ------------------------------------------------------------------------------------

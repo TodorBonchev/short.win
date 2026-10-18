@@ -47,7 +47,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use super::liquidate::{close_exposure, keeper_exit, ExitAccounts, ExitKind};
 use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
 use crate::errors::ShortwinError;
-use crate::events::{Expire as ExpireEvent, MintSafetyTripped, TraderSwept, SWEEP_TO_VEST};
+use crate::events::{Expire as ExpireEvent, MintSafetyTripped, TraderSwept};
 use crate::state::{
     GlobalConfig, Market, MarketVault, ShortPosition, WalletExposure, POOL_VAULT_SEED,
 };
@@ -164,8 +164,8 @@ pub fn handler<'info>(ctx: Context<'info, Expire<'info>>, extras: ExtrasSel) -> 
             ts: clock.unix_timestamp,
             lamports: out.swept.lamports,
             tokens: out.swept.tokens,
-            to: SWEEP_TO_VEST,
-            wipe_bits: 0,
+            to: out.sweep_to,
+            wipe_bits: out.sweep_wipe_bits,
         });
     }
     if let Some(ev) = out.completed.take() {

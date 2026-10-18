@@ -43,6 +43,7 @@ export type MarketPoolFields = Pick<
     | 'vestBal'
     | 'vestLast'
     | 'vestEnd'
+    | 'depositHoldUntil'
     | 'shareEpoch'
     | 'flags'
 >;
@@ -119,7 +120,7 @@ export function hasFlag(market: Pick<Market, 'flags'>, flag: number): boolean {
 }
 
 /**
- * Whether a deposit into a pool without shares also waits for the venue-reward sweep
+ * Whether a deposit after a wipe or dust flush also waits for the venue-reward sweep
  * (`engine::lender::rewards_required`; R4A-7): every pump-curve, migrating and PumpSwap market and,
  * since AIR-05, every market that has the trader's pump UVA (`Market.pump_uva` set) — a curve market
  * that left pump (→ `None`, then possibly a Raydium pool) keeps its curve-era cashback there.
@@ -134,16 +135,13 @@ export function wipeLive(market: MarketPoolFields): boolean {
 }
 
 /**
- * A deposit would be refused `WipeSweepPending` until the permissionless sweeps run: the pool has
- * no shares (`S = 0`) and the trader bit, or where {@link rewardsRequired} (a pump venue, or since
- * AIR-05 any market with the trader's pump UVA) the venue-reward bit, is clear — the program's
- * `deposit` check (`pool::deposit`; the keeper's `sweep::wipe_pending`). Since AIR-08
- * that holds after the last lender's exit as well as after a full wipe (R4A-7): `withdraw` clears
- * both bits when `S` reaches 0, so the gate is `S = 0`, not the wipe record. A new market starts
- * with both bits set and is not pending.
+ * A deposit waits for permissionless sweeps when its trader bit, or a required venue-reward
+ * bit, is clear. A full wipe, the last lender's exit and a dust flush clear these bits; a dust
+ * flush can retain shares. A new market starts with both bits set and is not pending.
  */
 export function wipeSweepPending(market: MarketPoolFields & Pick<Market, 'venue' | 'pumpUva'>): boolean {
-    if (podU128ToBigInt(market.totalShares) !== 0n) return false;
+    // First-use migration rechecks sources even if legacy dust-flush bits still say complete.
+    if (market.depositHoldUntil === 0n) return true;
     if (!hasFlag(market, MARKET_FLAG.wipeTraderSwept)) return true;
     return rewardsRequired(market) && !hasFlag(market, MARKET_FLAG.wipeRewardsClaimed);
 }
@@ -520,6 +518,18 @@ export function previewPosition(m: MathModule, s: LendState, now: bigint): Resul
 
 // ---- deposit ----------------------------------------------------------------------------
 
+/**
+ * A settlement reserves its remaining vest for the incumbent lenders. A nonnegative marker
+ * holds deposits until the whole current vest releases, including legacy markets whose new
+ * field is zero. Later credits may extend the schedule. -1 means initialized with no hold.
+ */
+export function previewDepositHold(m: MathModule, s: LendState, now: bigint): Result<bigint | null> {
+    if (s.market.depositHoldUntil < 0n) return { ok: true, value: null };
+    return attempt(() =>
+        session(m, s, (pool) => (pool.vestBal > m.previewVestRelease(pool, now) ? s.market.vestEnd : null)),
+    );
+}
+
 export interface DepositView {
     /** Shares `deposit(amount)` mints (`previewDeposit`). */
     readonly shares: bigint;
@@ -534,8 +544,8 @@ export interface DepositView {
 }
 
 /**
- * `deposit(amount)` on the stored state. `sweepBundled`: the sweeps a pool without shares waits for
- * (after a full wipe, or since AIR-08 after the last lender's exit; `wipeSweepPending`) run first in
+ * `deposit(amount)` on the stored state. `sweepBundled`: pending sweeps after a wipe, dust flush
+ * or last lender's exit (`wipeSweepPending`) run first in
  * the same transaction (FRONTEND.md §3.6), so the preview reads the pool with both sweep bits set.
  */
 export function previewDepositView(
@@ -546,7 +556,21 @@ export function previewDepositView(
     toleranceBps: number,
     sweepBundled = false,
 ): Result<DepositView> {
-    const o: PoolOverrides = sweepBundled ? { wipeSwept: WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED } : {};
+    const hold = previewDepositHold(m, s, now);
+    if (!hold.ok) return hold;
+    if (hold.value !== null)
+        return {
+            ok: false,
+            refusal: {
+                ...refusalNamed('PoolDrained'),
+                message: 'Settlement income is still vesting. Deposits resume when it has fully vested.',
+            },
+        };
+    const o: PoolOverrides = sweepBundled
+        ? { wipeSwept: WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED }
+        : s.market.depositHoldUntil === 0n
+          ? { wipeSwept: 0 }
+          : {};
     const minted = attempt(() =>
         session(
             m,

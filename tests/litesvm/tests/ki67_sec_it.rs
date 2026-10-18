@@ -114,6 +114,8 @@ fn rebase_k1(lab: &mut Lab, pid: &str, sol: u64) {
     assert_eq!(lab.market().share_epoch, e + 1, "{pid}: the epoch rolled");
     let r = *lab.state().records.last().unwrap();
     assert_eq!((r.num, r.den_log1000), (1, 1), "{pid}: a 1/1,000 rebase");
+    // AIR2-05: no old trader SOL remains before the next epoch's deposits.
+    lab.sweep_sol(0);
 }
 
 /// Rent in the current epoch with an early leaver (`ki66_sec_it::rent_with_leaver`).
@@ -539,6 +541,8 @@ fn rebase(lab: &mut Lab, pid: &str, sol: u64, lump: u64) {
         1,
         "{pid}: a rebase"
     );
+    // AIR2-05: clear the empty pre-flush source; the following lump is new income.
+    lab.sweep_sol(0);
     if lump > 0 {
         lab.sweep_sol(lump);
     }

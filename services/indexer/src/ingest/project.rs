@@ -1288,7 +1288,7 @@ async fn apply_to_market(
                 "venue_rewards"
             };
             let (suffix, to_lenders) = match u8_field(d, "to") {
-                0 => ("lenders", true),
+                0 | 3 => ("lenders", true),
                 1 => ("wipe", true),
                 _ => ("protocol", false),
             };

@@ -649,7 +649,7 @@ describe('the exit risk cap (AIR-10)', () => {
 });
 
 describe('Raydium', () => {
-    it('AMM v4 Fartcoin: SOL is the coin, fee 25 bps, D = ⌊9,978·√(X·Y)/10⁴⌋', () => {
+    it('AMM v4 Fartcoin: SOL is the coin, fee 25 bps, depth uses the raw locked LP ratio', () => {
         const pc = cache();
         pc[RAY_CACHE.pool] = fixtureAddress('ray_v4_fartcoin_pool');
         pc[RAY_CACHE.vaultSol] = fixtureAddress('ray_v4_fartcoin_coin_vault');
@@ -673,7 +673,9 @@ describe('Raydium', () => {
         expect(s.x).toBe(big(dec('ray_v4_fartcoin_pc_vault').amount));
         expect(s.y).toBe(big(dec('ray_v4_fartcoin_coin_vault').amount));
         expect(s.feePpm).toBe(2_500);
-        expect(s.lockedDepth).toBe((9_978n * m.liquidity(s.x, s.y)) / 10_000n);
+        const counter = big(dec('ray_v4_fartcoin_pool').lp_amount);
+        const supply = big(dec('ray_v4_fartcoin_lp_mint').supply);
+        expect(s.lockedDepth).toBe(((counter - supply) * m.liquidity(s.x, s.y)) / counter);
         expect(liquidityOf(m, s)).toBe(m.liquidity(s.x, s.y));
         // The market's recorded SOL side must match the pool's: the other side is not executable.
         const wrong = readVenueState(m, 'raydium_v4', { ...mk, flags: 0 }, read, { now, supply: null, pEma: 0n });

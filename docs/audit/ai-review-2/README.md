@@ -16,7 +16,7 @@ continue from there.
 | **Passes** | **1 of 3.** Pass 1 ran all 84 agents and was judged. Pass 2 stopped after 34 of 84 agents, and it was **not judged**. Pass 3 did not run. |
 | **Result of pass 1** | 13 findings: 4 at confidence 90 or more, 8 at 75 to 89, 1 below 75. 85 leads. |
 | **Proofs of concept** | For the 4 findings at confidence 90 or more: 3 CONFIRMED, 1 UNVERIFIED. |
-| **Triage** | None. Nobody has checked the findings against [`known-issues.md`](../known-issues.md) or [`ai-review/`](../ai-review/README.md), and none has an owner decision. |
+| **Triage** | Broader targeted triage of all 85 leads and a 330-block/74-key pass-2 register are in [`../findings.md`](../findings.md) and the evidence files below (2026-10-18). Draft 1.0.2 fixes and new reproductions are recorded separately; open claims and release gates remain. Comparison sources: [`known-issues.md`](../known-issues.md) and [`ai-review/`](../ai-review/README.md). Finding 6 is the existing accepted KI-70. |
 
 ## Files
 
@@ -25,11 +25,15 @@ continue from there.
 | [`report.md`](report.md) | The skill's report, byte for byte as its assembler wrote it: the scope, the 13 findings with their fixes, and the 85 leads |
 | [`poc/`](poc/) | The proof-of-concept tests and the record of each run |
 | [`pass-2-unjudged.md`](pass-2-unjudged.md) | The raw reports of pass 2's 34 agents. Nothing in it was deduplicated or judged. |
+| [`triage-math-2026-10-18.md`](triage-math-2026-10-18.md) | Accounting and arithmetic reproductions, draft fixes, rejected patches and unresolved economics |
+| [`triage-venues-2026-10-18.md`](triage-venues-2026-10-18.md) | Venue/program source review, real cashback reproduction, migration handling and remaining questions |
+| [`triage-services-2026-10-18.md`](triage-services-2026-10-18.md) | Keeper, ALT, governance preflight and event/indexer integration |
+| [`triage-pass2-2026-10-18.md`](triage-pass2-2026-10-18.md) | Every pass-2 block mapped to an exact key and current disposition |
 | [`account-map.md`](account-map.md) | The skill's account map of the program: each instruction's accounts and constraints, and its review leads |
 
 ## Findings
 
-The list is from [`report.md`](report.md), which has the description and the fix of each.
+The following list preserves the original scan result; current dispositions and regressions are in the triage files above. The list is from [`report.md`](report.md), which has the description and the fix of each.
 Confidence is the judge's confidence that the attack path works. It is not a severity. The
 report marks every item "NEW", because this was the first scan with the skill's memory on. "NEW"
 does not mean that nobody reported the item before.
@@ -51,7 +55,8 @@ does not mean that nobody reported the item before.
 | 13 | 55 | Liquidation pays the keeper nothing when rent takes the whole remainder. | `shortwin-math::liquidate` | |
 
 One overlap is known: finding 6 restates KI-70 (AIR-04), which the owner accepted on
-2026-10-12. The other findings have not been compared with the register.
+2026-10-12. The other findings have an initial comparison with the register in
+[`../findings.md`](../findings.md); their open claims still need adjudication.
 
 ## Proofs of concept
 
@@ -79,7 +84,8 @@ To run a test:
 3. Copy the test into `tests/litesvm/tests/`, and run it from the repository root, for example:
    `cargo test -p shortwin-litesvm-tests --test poc_04_sol_settle -- --nocapture`.
 
-The tests are not in the test suite, because they fail on 1.0.1.
+The immutable PoC copies fail on audited 1.0.1. Working-tree regressions now live in
+`tests/litesvm/tests/ai2_*_it.rs` and pass with the draft fixes; release gates remain open.
 
 ## How the scan worked
 
@@ -120,12 +126,14 @@ All agents only read the code that they reviewed. All builds and tests ran in se
   1 judged as leads. Pass 2 covered the lending and positions slices, and 9 of 12 specialists on
   settlement. It did not reach the pump venues, the Raydium venues, governance or markets.
 - **Pass 3 did not run.**
-- **Finding 1 has no PoC.**
-- **No triage.** Compare each finding and lead with [`known-issues.md`](../known-issues.md) and
-  [`ai-review/`](../ai-review/README.md), and record the result in
-  [`findings.md`](../findings.md).
-- **Fixes.** The fixes in [`report.md`](report.md) are the tool's proposals. Nobody has applied
-  or tested them. Under the audit freeze, a program fix goes out in a 1.0.x fix batch
+- **Finding 1 lacked an original PoC.** The follow-up reproduces and fixes the lock-rounding
+  mismatch; the original all-free-inventory magnitude remains unverified.
+- **Broader triage is recorded.** All 85 leads and 330 pass-2 blocks have dispositions and
+  evidence in [`../findings.md`](../findings.md). Open claims still need the specified
+  reproduction or design decision; targeted follow-up is not an independent full audit.
+- **Fixes.** The changes in [`report.md`](report.md) are proposals. The broader draft 1.0.2
+  batch contains verified targeted fixes and explicit unresolved findings; it does not blindly
+  apply the report's patches. Under the audit freeze, a program fix goes out in a 1.0.x fix batch
   ([AUDIT.md](../../AUDIT.md) §12).
 
 ## The earlier AI review

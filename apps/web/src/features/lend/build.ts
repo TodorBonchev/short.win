@@ -7,7 +7,7 @@
  * Retry re-reads the chain, re-quotes and re-derives the steps; inputs that no longer fit (a
  * balance gone, a source now behind CPI Guard) end in a `PlanError` the review shows.
  */
-import { findShareEpochPda, getLenderPositionSize } from '@shortwin/client';
+import { findShareEpochPda, getLenderPositionSize, podU128ToBigInt } from '@shortwin/client';
 import type { Address, Instruction, TransactionSigner } from '@solana/kit';
 import type { MathModule } from '../../math/load.ts';
 import type { AppRpc } from '../../rpc/client.ts';
@@ -18,6 +18,7 @@ import { chainNowSeconds, liveWipeRecordEpoch, marketNow, readLendChain } from '
 import { type LoadedChain, lendStateOf, lockGraceOf, planContextFor, subUnitVarsOf, unpaidRentVarsOf } from './ctx.ts';
 import {
     buildClaimPlan,
+    buildCleanupPlan,
     buildCoverPlan,
     buildDepositPlan,
     buildSyncPlan,
@@ -108,13 +109,16 @@ export async function depositPlanFrom(
     nowS: number,
     inp: DepositInputs,
 ): Promise<TxPlan> {
-    needRecords(chain);
     const market = chain.market;
+    const sweep = wipeSweepPending(market);
+    if (sweep && podU128ToBigInt(market.totalShares) > 0n) {
+        throw new PlanError('Clean up pending lender income first: close this review and use Review pool cleanup.');
+    }
+    needRecords(chain);
     if (hasFlag(market, MARKET_FLAG.mintUnsafe)) throw new PlanError('Deposits are blocked on this market.');
     const source = chain.tokenAccounts.find((a) => a.address === inp.source);
     if (!source) throw new PlanError('The source token account no longer holds this token.');
     if (inp.amount > source.amount) throw new PlanError('The amount is above the balance of the source account.');
-    const sweep = wipeSweepPending(market);
     const preview = previewDepositView(
         env.math,
         lendStateOf(chain),
@@ -140,8 +144,7 @@ export async function depositPlanFrom(
         minShares: preview.value.minShares,
         bracket: inp.bracket,
         sweep: sweepIxs,
-        // AIR-08: no wipe record, so every lender left (the sweep books to the protocol).
-        sweepAfterExit: sweep && !wipeLive(market),
+        sweepAfterExit: sweep && !wipeLive(market) && podU128ToBigInt(market.totalShares) === 0n,
         ...(unpaid.level === 'warn' ? { unpaidRent: unpaidRentVarsOf(unpaid) } : {}),
     });
     return {
@@ -150,6 +153,20 @@ export async function depositPlanFrom(
             const f = await freshChain(env);
             return depositPlanFrom(env, f.chain, f.nowS, inp);
         },
+    };
+}
+
+/** Permissionless cleanup only; every retry re-reads the sources and never appends a deposit. */
+export async function cleanupPlanFrom(env: LendEnv, chain: LoadedChain): Promise<TxPlan> {
+    const market = chain.market;
+    if (!wipeSweepPending(market) || podU128ToBigInt(market.totalShares) === 0n) {
+        throw new PlanError('No separate pool cleanup is needed now. Close this review and check the deposit form.');
+    }
+    const facts = await readSweepFacts(env.rpc, market);
+    const sweep = await postWipeSweepIxs(env.signer, chain.marketAddress, market, facts, null);
+    return {
+        ...buildCleanupPlan(planContextFor(chain, env.signer, display(env, chain)), sweep),
+        rebuild: async () => cleanupPlanFrom(env, (await freshChain(env)).chain),
     };
 }
 

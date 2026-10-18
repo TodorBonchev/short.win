@@ -75,6 +75,17 @@ pub fn check_ix(
             post.venue_kind() == Some(VenueKind::PumpSwap) && !priced(&mp.state) && priced(&post);
         if switched || graduated || started {
             ensure(
+                post.ema_count >= mp.state.ema_count
+                    && post.restart_ema_count == post.ema_count.saturating_add(1),
+                "I18",
+                || {
+                    format!(
+                        "market {}: restart must preserve the count and invalidate earlier settlement arms",
+                        mp.market
+                    )
+                },
+            )?;
+            ensure(
                 (post.ema_warm, post.ema_guard) == (EMA_WARMUP_BUCKETS, 1),
                 "I18",
                 || {

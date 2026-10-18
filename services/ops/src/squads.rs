@@ -41,7 +41,7 @@ use squads_v4_ix::{self as sq, pda as squads_pda};
 
 use crate::config::MsLayout;
 use crate::ixs;
-use crate::send::{Ops, TX_MAX, wire_size};
+use crate::send::{Ops, TX_MAX};
 
 /// Reads and decodes a multisig.
 pub async fn multisig<C: Chain>(chain: &C, ms: &MsLayout) -> anyhow::Result<Multisig> {
@@ -265,7 +265,7 @@ pub async fn stage<C: Chain>(
         None,
     )];
     direct.extend(proposal.iter().cloned());
-    let direct_size = wire_size(&c, &direct);
+    let direct_size = ops.wire_size(&c, &direct);
     if !force_buffer && direct_size <= TX_MAX {
         ops.send(&format!("stage {} #{index}", ms.name), member, &direct, &[])
             .await?;
@@ -331,7 +331,7 @@ pub async fn stage<C: Chain>(
     let mut at = match resume_at {
         Some(at) => at,
         None => {
-            let at = fit(&c, &create, bytes);
+            let at = fit(ops, &c, &create, bytes);
             ops.send(
                 &format!("buffer {} #{index} create ({at} B)", ms.name),
                 member,
@@ -346,7 +346,7 @@ pub async fn stage<C: Chain>(
         }
     };
     while at < bytes.len() {
-        let n = fit(&c, &extend, &bytes[at..]);
+        let n = fit(ops, &c, &extend, &bytes[at..]);
         ensure!(n > 0, "a buffer extend carries no byte");
         ops.send(
             &format!("buffer {} #{index} extend ({n} B)", ms.name),
@@ -430,8 +430,13 @@ pub async fn close_buffer<C: Chain>(
 }
 
 /// How many bytes of `rest` fit in one transaction of `build(chunk)` paid by `payer`.
-fn fit(payer: &Pubkey, build: &dyn Fn(&[u8]) -> Instruction, rest: &[u8]) -> usize {
-    let size = |n: usize| wire_size(payer, &[build(&rest[..n])]);
+fn fit<C: Chain>(
+    ops: &Ops<'_, C>,
+    payer: &Pubkey,
+    build: &dyn Fn(&[u8]) -> Instruction,
+    rest: &[u8],
+) -> usize {
+    let size = |n: usize| ops.wire_size(payer, &[build(&rest[..n])]);
     let mut n = rest.len();
     // One byte of chunk is one byte of transaction (bar a length prefix's growth).
     n = n.saturating_sub(size(n).saturating_sub(TX_MAX));

@@ -1,6 +1,6 @@
 [package]
 name = "shortwin"
-version = "1.0.1"
+version = "1.0.2"
 description = "short.win: permissionless P2P token lending for shorting memecoins (Anchor program)"
 edition = "2021"
 # Built by the platform-tools rustc (v1.57 = 1.95) through `anchor build` (ARCHITECTURE §1.1).

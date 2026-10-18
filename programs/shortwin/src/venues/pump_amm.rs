@@ -885,7 +885,9 @@ pub fn start_price(obs: &mut Observation, state: &VenueState, now: i64) -> Resul
         return Ok(false);
     }
     // `cap = D` here, so the `L_slow ≤ D` cap (AIR-13's, for a Raydium start) never binds.
+    let count = obs.ema.count;
     *obs = Observation::new_raydium(now, p, l, cap, state.locked_depth).math()?;
+    obs.ema.count = count;
     Ok(true)
 }
 

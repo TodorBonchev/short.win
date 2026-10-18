@@ -1698,6 +1698,7 @@ fn m4f1_an_oversized_carried_position_is_not_adopted_and_settles_in_s3() {
     // pool's √(X·Y) — so the size cap waits for it: four hours of the keeper's 60-s observations
     // bring `L_slow` within 2 % of the pool (τ_slow 1 h) before the open at the cap.
     crank_every(&mut env, &rm, 60, 240);
+    crank_every(&mut env, &rm, 1, 1);
     env.fresh_oracle();
     let (x_inc, _) = inc
         .io_reserves(&env.svm, shortwin_math::fees::Direction::Sell)

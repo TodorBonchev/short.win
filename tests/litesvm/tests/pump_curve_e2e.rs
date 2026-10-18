@@ -285,6 +285,8 @@ fn lifecycle_on_a_live_curve() {
     assert_err(&s.env.open(&s.pm, &mut early, q).0, E::MarketWarmingUp);
     s.env.warp(i64::from(s.env.config().params.market_warmup_s));
     s.crank();
+    s.env.warp(1);
+    s.crank();
 
     // ---- two opens at the listing price ----
     let a = open_checked(&mut s, q);

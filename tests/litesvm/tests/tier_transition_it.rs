@@ -614,6 +614,8 @@ mod mock {
         let stale_s = i64::from(env.config().params.oracle_stale_s);
         env.warp(usd.publish + stale_s + 1 - env.now());
         assert_eq!(crank_tier(&mut env, &mm), Tier::C);
+        // Keep the venue price fresh while the separate SOL/USD oracle remains stale.
+        env.tick(&mm, 1);
         let (oc, bc, nc) = open(&mut env, &mm, Q);
         assert_eq!(oc.tier, Tier::C as u8);
         let pos_c = env.position(&mm, &bc.key(), nc);

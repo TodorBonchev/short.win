@@ -334,8 +334,8 @@ impl PammPool {
     }
 
     /// The pool's burned-LP share and locked depth (M6R-1, ECON #105), recomputed here: `λ_bps =
-    /// ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋` and `D = ⌊λ_bps·isqrt(X·(Y +
-    /// VQR))/10⁴⌋` on the pricing reserves.
+    /// ⌊(Pool.lp_supply − lp_mint.supply)·10⁴/lp_supply⌋` and, since AIR2-09,
+    /// `D = ⌊(lp_supply − mint_supply)·isqrt(X·(Y + VQR))/lp_supply⌋` on the pricing reserves.
     pub fn locked_depth(&self, svm: &LiteSVM) -> (u128, u128) {
         let counter = u128::from(self.state(svm).lp_supply);
         let supply = u128::from(self.lp_mint_supply(svm));
@@ -346,7 +346,12 @@ impl PammPool {
         };
         let r = self.reserves(svm).expect("reserves");
         let root = (u128::from(r.base) * r.effective_quote).isqrt();
-        (lam, lam * root / 10_000)
+        let depth = if counter == 0 || supply > counter {
+            0
+        } else {
+            (counter - supply) * root / counter
+        };
+        (lam, depth)
     }
 
     /// Spot `⌊(quote + VQR)·WAD/base⌋`.

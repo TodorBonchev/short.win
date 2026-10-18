@@ -21,7 +21,7 @@ Inputs:
   * cadence: the keeper's own, measured (quiet: one crank per 30 s = 2,880 a day; near a threshold:
     one a second; an armed position 43 sol_settle calls; a foreign price deviation 116 cranks at the
     harness's 2 ticks a second, ~150 at 2.5 slots a second; an isolated LP-wrapped trigger 8 cranks
-    above the control; a PumpSwap warm-up 8 cranks).
+    above the control; a PumpSwap warm-up 9 cranks, with its last bucket pending integration).
   * revenue: SPEC §6.1 rent at 80 % utilisation on the beta cap of 25 SOL open notional per market
     (ADOPTED Q21); protocol share 15 %.
   * O17 budget as built at M7 (superseded by the owner's decision A of 2026-10-01; kept for the
@@ -58,17 +58,16 @@ PRICES = (0, 1_000, 10_000, 100_000)
 VENUES = ("pumpswap", "pump_curve", "raydium_cpmm", "raydium_amm_v4")
 NAMES = {"pumpswap": "PumpSwap", "pump_curve": "curve", "raydium_cpmm": "CPMM", "raydium_amm_v4": "AMM v4"}
 # Requested CU (ceil(consumed x 1.1)), the costliest measured per kind (tests/bench/m7_keeper/results.json).
-# Re-baselined on short.win 1.0.1 (`72c82879…`, pump's v3 curve adapter; pump-final P8): the curve's
-# exits trade one `buy_v3` with 10 TradeExtras (147,131 / 144,314, were 191,837 / 189,015).
+# Re-baselined on short.win 1.0.2 (`a6ecd6f7…`, AI-review-2 candidate, 2026-10-18).
 CU = {
-    "pumpswap": {"crank": 41_149, "sol_settle_keep": 66_136, "sol_settle_settle": 77_008,
-                 "liquidate": 214_447, "expire": 211_324},
-    "pump_curve": {"crank": 38_137, "sol_settle_keep": 63_941, "sol_settle_settle": 74_717,
-                   "liquidate": 147_131, "expire": 144_314},
-    "raydium_cpmm": {"crank": 32_560, "sol_settle_keep": 65_940, "sol_settle_settle": 78_494,
-                     "liquidate": 124_787, "expire": 117_594},
-    "raydium_amm_v4": {"crank": 32_497, "sol_settle_keep": 57_932, "sol_settle_settle": 68_833,
-                       "liquidate": 104_764, "expire": 101_111},
+    "pumpswap": {"crank": 41_257, "sol_settle_keep": 66_248, "sol_settle_settle": 77_152,
+                 "liquidate": 214_617, "expire": 211_508},
+    "pump_curve": {"crank": 38_159, "sol_settle_keep": 63_968, "sol_settle_settle": 74_775,
+                   "liquidate": 147_212, "expire": 144_410},
+    "raydium_cpmm": {"crank": 32_676, "sol_settle_keep": 66_070, "sol_settle_settle": 78_646,
+                     "liquidate": 124_955, "expire": 117_776},
+    "raydium_amm_v4": {"crank": 32_610, "sol_settle_keep": 58_052, "sol_settle_settle": 68_985,
+                       "liquidate": 104_933, "expire": 101_292},
 }
 LP_WRAP_CU = 150_000             # the attacker's [deposit, crank_price, withdraw] (estimate, M4G-2)
 V1_K = 6                         # the keeper's `batch_v1`
@@ -82,6 +81,7 @@ BURST_EXTRA = BURST_CRANKS - BURST_EC   # the rest of a burst: discretionary (56
 ROUND_TRIPS_PER_DAY = DAY // 60  # one round trip a minute keeps a market bursting all day (burst_s 60 s)
 SELF_LP_LOST_BPS = 5             # PumpSwap's protocol fee: what a round trip on a self-LP pool loses
 LIQ_TRIGGER_CRANKS = 8
+PAMM_WARMUP_CRANKS = 9
 LIQ_COVER_S = 10
 BUDGET = 30_000_000              # per_market_daily_lamports as built at M7 (retired by decision A)
 # The global budget (owner decision A of 2026-10-01; `[budget]`, PROPOSED defaults; ARCH §7.1 duty 8).
@@ -96,7 +96,7 @@ JUNK_PHI_BPS = 100               # its venue fee, one way
 TIER_D = {"cr_open": 40_000, "cr_liq": 17_500, "dur_days": 3, "rate_u0_bps": 10_000, "rate_u50_bps": 28_750}
 OPEN_FEE_BPS = 25
 PROTOCOL_RENT_BPS = 1_500
-SET_COVERAGE_PAUSE_CU = 8_921
+SET_COVERAGE_PAUSE_CU = 8_915
 CRANK_SOL_USD_CU = 7_212
 CRANK_SOL_USD_PER_DAY = 1_560    # a feed publishing every 55 s
 RATE80 = {"A": 5_000, "B": 10_000, "C": 20_000, "D": 40_000}   # APR bps at 80 % utilisation
@@ -227,7 +227,7 @@ def cross_check():
     cad = d["cadence"]
     assert (cad["quiet_cranks_per_day"], cad["armed_sol_settle_calls_per_episode"], cad["price_burst_cranks_per_trigger"],
             cad["liquidity_trigger_extra_cranks"], cad["pumpswap_warmup_cranks"]) == \
-        (QUIET_PER_DAY, ARMED_SETTLES, BURST_CRANKS, LIQ_TRIGGER_CRANKS, 8)
+        (QUIET_PER_DAY, ARMED_SETTLES, BURST_CRANKS, LIQ_TRIGGER_CRANKS, PAMM_WARMUP_CRANKS)
     g = d["global_lines"]
     assert g["set_coverage_pause"]["requested_cu"][1] == SET_COVERAGE_PAUSE_CU
     assert g["crank_sol_usd"]["requested_cu"][1] == CRANK_SOL_USD_CU
@@ -405,12 +405,12 @@ def main():
         armed = ARMED_SETTLES * tx_cost(CU[v]["sol_settle_keep"], price)
         burst = BURST_CRANKS * tx_cost(CU[v]["crank"], price)
         liq = tx_cost(CU[v]["liquidate"], price) + 1_000_000        # + a Jito tip of 0.001 SOL (assumption)
-        warm = 8 * tx_cost(CU[v]["crank"], price)
+        warm = PAMM_WARMUP_CRANKS * tx_cost(CU[v]["crank"], price)
         rows.append([f"{price:,}", f"{armed / LAMPORTS:.5f}", f"{burst / LAMPORTS:.5f}", f"{liq / LAMPORTS:.5f}",
                      f"{warm / LAMPORTS:.5f}"])
     print(table(["priority price (uL/CU)", f"one armed position ({ARMED_SETTLES} x sol_settle)",
                  f"one price deviation ({BURST_CRANKS} x crank)", "one liquidation (+0.001 SOL tip)",
-                 "a PumpSwap warm-up (8 cranks)"], rows))
+                 f"a PumpSwap warm-up ({PAMM_WARMUP_CRANKS} cranks)"], rows))
 
     print("\n### Global lines (the protocol, not a market's budget; SOL)\n")
     rows = []

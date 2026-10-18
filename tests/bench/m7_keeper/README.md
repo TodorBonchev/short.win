@@ -39,7 +39,8 @@ day's figure is the same). The same env overrides as the scenario suite apply (`
   §7.1 item 7), a v1 batch of 6 fits every venue and the mix, a table per market never holds
   fewer, within 1,232 B and 64 accounts;
 - the cadence: a quiet market every 30 s, a market near a threshold every second, the PumpSwap
-  warm-up 8 cranks, an isolated liquidity trigger 1–10 extra cranks, duty 11 one crank per feed
+  warm-up 9 cranks (the final bucket integrates on the next call), an isolated liquidity trigger
+  1–10 extra cranks, duty 11 one crank per feed
   update; every due market observed in its second at 50 and 200 markets;
 - T-SIZE (OWNER-M7-1): the first-time borrower's open with a separate fee payer and the largest
   extras set is over 1,232 B (by ≤ 24 B) only through A28 as enumerated, and fits through (b) and

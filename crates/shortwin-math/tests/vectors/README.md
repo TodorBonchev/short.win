@@ -8,6 +8,14 @@ analysis switches only feed comparison rows; generators assert the defaults). Th
 must match them exactly: no tolerance, no exception. Mainnet-trade fixtures (curve,
 PumpSwap and Raydium signatures of ARCH §8.1) follow the same layout.
 
+The AIR2 candidate uses the current default arithmetic described in
+[`sim/README.md`](../../../../../docs/design/sim/README.md). Historical attack outputs retain
+their old formulas, but generators that reuse those drivers explicitly pin current locked
+depth or pool arithmetic. The pool recorder disables only the program-side settlement-hold
+gate: that marker is outside the math `Pool`, and its integration has separate tests. Its
+current fuzz counts and traces therefore differ from both historical tables and the
+whole-program pool simulation. Pending dust sweeps remain enforced in the math fixtures.
+
 ## Layout
 
 ```

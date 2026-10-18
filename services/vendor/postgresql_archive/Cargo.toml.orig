@@ -1,0 +1,110 @@
+[package]
+authors.workspace = true
+categories.workspace = true
+description = "A library for downloading and extracting PostgreSQL archives"
+edition.workspace = true
+keywords.workspace = true
+license.workspace = true
+name = "postgresql_archive"
+repository = "https://github.com/theseus-rs/postgresql-embedded"
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+flate2 = { workspace = true, optional = true }
+futures-util = { workspace = true }
+hex = { workspace = true }
+liblzma = { workspace = true, optional = true }
+md-5 = { workspace = true, optional = true }
+quick-xml = { workspace = true, features = ["serialize"], optional = true }
+regex-lite = { workspace = true }
+reqwest = { workspace = true, default-features = false, features = ["http2", "json", "query", "stream"] }
+reqwest-middleware = { workspace = true, features = ["query"] }
+reqwest-retry = { workspace = true }
+reqwest-tracing = { workspace = true }
+rustls = { workspace = true, features = ["ring"], optional = true }
+semver = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, optional = true }
+sha1 = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+tar = { workspace = true, optional = true }
+target-triple = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full"], optional = true }
+tracing = { workspace = true, features = ["log"] }
+tracing-indicatif = { workspace = true, optional = true }
+url = { workspace = true }
+zip = { workspace = true, optional = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+criterion = { workspace = true }
+hex = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = [
+    "tls-native-tls",
+    "theseus",
+]
+blocking = ["dep:tokio"]
+github = [
+    "dep:serde_json",
+]
+indicatif = [
+    "dep:tracing-indicatif"
+]
+maven = [
+    "dep:quick-xml",
+    "md5",
+    "sha1",
+    "sha2",
+]
+md5 = ["dep:md-5"]
+tls-native-tls = ["reqwest/native-tls"]
+tls-rustls-aws-lc-rs = ["reqwest/rustls"]
+tls-rustls-ring = [
+    "dep:rustls",
+    "reqwest/rustls-no-provider",
+]
+sha1 = ["dep:sha1"]
+sha2 = ["dep:sha2"]
+tar-gz = [
+    "dep:flate2",
+    "dep:tar",
+]
+tar-xz = [
+    "dep:liblzma",
+    "dep:tar",
+]
+theseus = [
+    "github",
+    "sha2",
+    "tar-gz",
+]
+zip = [
+    "dep:zip",
+]
+zonky = [
+    "maven",
+    "tar-xz",
+    "zip",
+]
+
+[package.metadata.docs.rs]
+features = ["blocking"]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[[bench]]
+harness = false
+name = "archive"
+required-features = ["blocking", "theseus"]
+
+[package.metadata.cargo-machete]
+ignored = [
+    "md-5",
+    "serde_json",
+]

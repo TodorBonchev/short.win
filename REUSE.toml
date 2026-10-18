@@ -88,3 +88,11 @@ path = "tests/fixtures/programs/pump*.so"
 precedence = "override"
 SPDX-FileCopyrightText = "pump.fun"
 SPDX-License-Identifier = "LicenseRef-pump-fun-no-license"
+
+# Vendored embedded-Postgres archive helper, including its documentation and local security
+# patch: upstream licensing takes precedence over the repository-wide code/docs defaults.
+[[annotations]]
+path = "services/vendor/postgresql_archive/**"
+precedence = "override"
+SPDX-FileCopyrightText = ["2023 Theseus contributors", "2026 Todor Bonchev", "The PostgreSQL Global Development Group", "The Regents of the University of California"]
+SPDX-License-Identifier = "(Apache-2.0 OR MIT) AND PostgreSQL"

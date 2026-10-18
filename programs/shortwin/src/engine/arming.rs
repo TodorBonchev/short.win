@@ -241,6 +241,7 @@ pub fn inputs(
         now,
         deadline: pos.deadline,
         ema_count: obs.ema.count,
+        restart_ema_count: market.restart_ema_count,
         p_ema: obs.ema.price,
         l_ema: obs.ema.liq,
         bx,

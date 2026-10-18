@@ -11,7 +11,8 @@
  * 1. From Node: C withdraws the free tokens down to 12,000 (fewer than a thousandth of the claims);
  *    a 1,000× gap settles the borrowed tokens S1, which rolls the epoch with a rebase record
  *    (`num = 1`, `1/1,000`): C now holds old-epoch shares behind it and never converts them.
- * 2. A lends as many tokens in the new epoch (worth C's at the new price); the borrower borrows
+ * 2. A confirms the app's separate pool cleanup (only `sweep_trader`), then lends as many tokens
+ *    in the new epoch (worth C's at the new price); the borrower borrows
  *    again (once the EMA admits an open); rent is credited to A's shares and C's for 300 s; A takes
  *    part of its tokens out; the borrower closes and pays the rent in, realised on the shares still
  *    there: C's unconverted shares get more than C's credit (a surplus after the record), A less
@@ -33,6 +34,7 @@ import {
     LENDER_SYNCED_EVENT_DISCRIMINATOR,
     type LenderPosition,
     podU128ToBigInt,
+    SWEEP_TRADER_DISCRIMINATOR,
     SYNC_LENDER_DISCRIMINATOR,
 } from '@shortwin/client';
 import { dataValue, expect, need, requireTrading, T, test } from '../fixtures.ts';
@@ -75,6 +77,8 @@ const RENT_S = 300n;
 const WITHDRAW_TOKENS = 1_000n;
 /** `FWD_HOLD` (`shortwin_math::pool`): held at the record, the forward chain walked. */
 const FWD_HOLD = 1;
+/** `Market.flags`: the trader source is complete after the post-settlement cleanup. */
+const WIPE_TRADER_SWEPT = 1 << 7;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -99,9 +103,10 @@ test.describe('lend: a claim syncs an absent lender behind a rebase record first
     });
 
     test.describe('the rebase and the absent lender’s surplus', () => {
-        test.use({ wallet: null });
+        test.use({ wallet: 'chainClaimer' });
 
         test('a gap rebases the shares behind C; rent realised after the record leaves C a surplus and A a shortfall', async ({
+            app,
             state,
         }) => {
             requireTrading(state);
@@ -124,6 +129,38 @@ test.describe('lend: a claim syncs an absent lender behind a rebase record first
             const c0 = need(await lenderPosition(m.market, c), 'C lender position');
             expect(c0.epoch).toBe(epoch0);
             expect(c0.fwd).toBe(0);
+
+            // The dust flush requires its pending trader source to be swept before a new lender
+            // joins, even though C still has shares. The app reviews that cleanup separately:
+            // a later reward claim may vest, so a deposit must not roll the cleanup back.
+            await app.goto(`/m/${m.mint}?panel=lend&action=deposit`, 'market');
+            await app.connectWallet();
+            const panel = app.id(T.lendPanel);
+            await expect(panel.getByTestId(T.lendSweepNotice)).toBeVisible();
+            const cleanup = panel.getByTestId(T.lendCleanupSubmit);
+            await expect(cleanup).toBeEnabled();
+            await cleanup.click();
+            expect(await app.simulated()).toBe('review');
+            await expect(app.modal).toContainText('Clean up pending lender income');
+            await expect(app.inModal(T.txSimStatus)).toHaveAttribute('data-ok', 'true');
+            await expect(app.inModal(T.txInstruction('0'))).toHaveAttribute('data-name', 'SweepTrader');
+            await expect(app.inModal(T.txInstruction('1'))).toHaveCount(0);
+            await app.a11y('surviving-share pool cleanup review');
+            const cleanupSignature = await app.signAndConfirm();
+            await app.closeModal();
+
+            const cleanupLanded = need(await landedTransaction(cleanupSignature), 'landed pool cleanup');
+            expect(cleanupLanded.err).toBeNull();
+            expect(intentOf(cleanupLanded).map((ix) => Array.from(ix.data.subarray(0, 8)))).toEqual([
+                Array.from(SWEEP_TRADER_DISCRIMINATOR),
+            ]);
+            const cleaned = await marketAccount(m);
+            expect(cleaned.flags & WIPE_TRADER_SWEPT).toBe(WIPE_TRADER_SWEPT);
+            expect([cleaned.shareEpoch, podU128ToBigInt(cleaned.totalShares)]).toEqual([
+                mk.shareEpoch,
+                podU128ToBigInt(mk.totalShares),
+            ]);
+            await expect(cleanup).toHaveCount(0);
 
             // 2. A lends in the new epoch; the position borrows again; rent for RENT_S; A takes part out.
             await lendFromNode('chainClaimer', m, state.tokenAccounts.chain.claimer, CLAIMER_TOKENS * unit);

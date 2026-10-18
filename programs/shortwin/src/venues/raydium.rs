@@ -96,9 +96,38 @@ pub fn lp_supply(info: &AccountInfo) -> Option<u64> {
         return None;
     }
     let data = info.try_borrow_data().ok()?;
+    if data.len() != mint::MINT_LEN {
+        return None;
+    }
     mint::read_base(&info.owner.to_bytes(), &data)
         .ok()
         .map(|m| m.supply)
+}
+
+#[cfg(test)]
+mod lp_tests {
+    use super::*;
+
+    #[test]
+    fn lp_supply_requires_an_exact_spl_mint_layout() {
+        let key = Pubkey::new_unique();
+        for (len, expected) in [(mint::MINT_LEN, Some(42)), (mint::ACCOUNT_LEN, None)] {
+            let mut data = vec![0; len];
+            data[36..44].copy_from_slice(&42u64.to_le_bytes());
+            data[45] = 1;
+            let mut lamports = 1;
+            let info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut data,
+                &TOKEN_PROGRAM_ID,
+                false,
+            );
+            assert_eq!(lp_supply(&info), expected);
+        }
+    }
 }
 
 /// A verified candidate pool (ARCH §2.6), ready to be adopted by `create_market`.

@@ -482,6 +482,9 @@ fn a_list_only_market_is_redetected_as_a_curve() {
     ];
     ok(env.send(&ixs, &[]));
     env.warp(i64::from(env.config().params.market_warmup_s));
+    env.crank(&pm);
+    env.warp(1);
+    env.crank(&pm);
     let q = q_for(&env, &pm);
     crate::flows::round_trip(&mut env, &pm, q);
 }

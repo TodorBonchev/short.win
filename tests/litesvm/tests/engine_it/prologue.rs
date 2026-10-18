@@ -72,6 +72,10 @@ fn coverage_gap_is_reported_with_open_positions_only() {
     let meta2 = ok(env.send(&[crank_price_ix(&mm)], &[]));
     assert!(events::logged::<CoverageGap>(&meta).is_empty());
     assert!(events::logged::<CoverageGap>(&meta2).is_empty());
+    // The idle gaps left an old completed sample. Integrate the fresh observation before
+    // opening, then test coverage gaps with a live position.
+    env.warp(1);
+    env.crank(&mm);
     let mut b = env.borrower();
     open_ok(&mut env, &mm, &mut b, Q);
     let gap = shortwin_math::consts::COVERAGE_GAP_S + 1;

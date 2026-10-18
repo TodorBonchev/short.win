@@ -467,6 +467,7 @@ fn the_mark_is_conservative_and_resets_at_zero() {
     let m = env.market(&rm.market());
     assert_eq!((m.open_positions, m.max_q_hwm), (0, 0), "reset at 0");
     crank_every(&mut env, &rm2, 60, 61);
+    crank_every(&mut env, &rm2, 1, 1);
     let small = q_of(&env, &cand) / 2;
     open_new(&mut env, &rm2, small);
     assert_eq!(env.market(&rm.market()).max_q_hwm, small);

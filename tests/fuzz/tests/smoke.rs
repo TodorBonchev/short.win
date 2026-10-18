@@ -375,8 +375,10 @@ fn deficit_tripwire_on_fuzz_m7_24h_3() {
 /// lender, its shares all withdrawn, stays owed more than `CLAIM_DUST` of the accumulators'
 /// carry while none of its realised SOL is left and the pot is empty (`wind-down-owed-rounding`:
 /// 2,149 lamports; since AIR-07's vest flush the recorded list left 943, so its action 45 now
-/// sells). The rebase-orphan credit the oracle used to accept above the hooks' dust cap
-/// (`wind-down-orphan-credit`) is gone with KI-65's cumulative conversion (ECON
+/// sells; since AI2's stale-EMA guard a fresh observation precedes its first late
+/// `stale_receivable` open; AI2's dust-source gate now requires an explicit trader sweep before
+/// the original action 60 deposit). The rebase-orphan credit the oracle used to accept above the hooks'
+/// dust cap (`wind-down-orphan-credit`) is gone with KI-65's cumulative conversion (ECON
 /// §9.5): on the curve corpus file, and on run B's three largest cases — 19,131,900,419 lamports
 /// left on the mock, 890,963,742 on CPMM, 552,350,825 on PumpSwap, each with `S = 1` orphan
 /// share that the vest the leavers forfeited released to — every share has a holder, the last
@@ -447,6 +449,8 @@ fn wind_down_residue_on_fuzz_m10_24h_a() {
 /// what the absent lenders' own touches would still move to the pot after their chains (no
 /// `wind-down-absent-owed-above-residual`), and once the absent owners return the wind-down's
 /// I-P6 oracle passes.
+/// AI2's stale-EMA guard requires explicit observations before the historical idle opens:
+/// the original seeds and amounts stay fixed, with two cranks a second apart at those points.
 #[test]
 fn absent_owners_at_the_wind_down() {
     let check = |what: &str, o: &runner::Outcome| -> (u64, u64) {
@@ -475,14 +479,35 @@ fn absent_owners_at_the_wind_down() {
         (ev("wind-down-absent-owner"), ev("sync-lender-held-to-pot"))
     };
     ABSENT_OWNERS.with(|c| c.set(Some(true)));
-    let seeds: &[(u64, usize)] = if FULL {
-        &[(66_300_007, 265), (66_300_136, 249), (66_300_236, 92)]
+    let seeds: &[(u64, usize, &[usize])] = if FULL {
+        &[
+            (66_300_007, 265, &[206, 209]),
+            (66_300_136, 249, &[]),
+            (66_300_236, 92, &[5]),
+        ]
     } else {
-        &[(66_300_236, 92)]
+        &[(66_300_236, 92, &[5])]
     };
-    for &(seed, length) in seeds {
-        let o = runner::run(Profile::Mock, seed, None, length, Opts::default());
-        let (absent, to_pot) = check(&format!("one --profile mock --seed {seed}"), &o);
+    for &(seed, length, observe_before) in seeds {
+        let mut actions = stream(Profile::Mock, seed, length);
+        // Reverse order preserves the original action indices. One crank records the live
+        // price; after one second the next integrates it, satisfying the freshness guard.
+        for &at in observe_before.iter().rev() {
+            assert!(matches!(
+                actions[at].kind,
+                Kind::OpenNearCap | Kind::WrappedOpen | Kind::DepositWrappedOpen
+            ));
+            actions.splice(
+                at..at,
+                ["crank 0 0 0", "warp 0 0 0", "crank 0 0 0"]
+                    .map(|a| a.parse::<Action>().expect("fresh observation action")),
+            );
+        }
+        let o = runner::run(Profile::Mock, seed, Some(&actions), 0, Opts::default());
+        let (absent, to_pot) = check(
+            &format!("mock seed {seed}, observations before {observe_before:?}"),
+            &o,
+        );
         assert!(
             absent > 0 && to_pot > 0,
             "seed {seed}: no held lender's surplus moved"
@@ -526,6 +551,8 @@ fn absent_owners_at_the_wind_down() {
 /// owners return they cover, and the second claim pass pays every lender. The bound stays tight
 /// (3,111 lamports above the owed total here): a leak of 10,000 lamports beyond what the absent
 /// owners' return brings (`ABSENT_OWED_LEAK`) fires it.
+/// AI2's dust-source gate requires a trader sweep before the original action 57 deposit;
+/// the updated replay owes the present lenders 322,230,848 lamports and retains the same bound.
 #[test]
 fn absent_deficit_backs_the_present_lenders() {
     use shortwin_fuzz::world::{ABSENT_OWED_LEAK, CLAIM_DUST};
@@ -650,13 +677,31 @@ fn pswap_expire_cache_fuzz24d_a() {
 /// FUZZ-101-24H-A (run-101): the JIT capture oracle counts the shares the deposit minted from its
 /// `Deposit` event. The reproducer's JIT lender sits behind a rebase record (its stored count is
 /// its old epoch's) and the deposit's own touch converts it; the oracle must run on the
-/// settlement and pass.
+/// settlement and pass. AI2's stale-price and dust-source gates require fresh observations
+/// before the idle wrapped open and a trader sweep after the first settlement flushes dust.
+/// Keep the original corpus and every original action/amount; add only those prerequisites.
 #[test]
 fn jit_behind_rebase_fuzz101_24h_a() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("corpus/fuzz-101-24h-a-mixed-jit-behind-rebase.json");
     let c = runner::read_crash(&path).expect("corpus file");
-    let o = runner::run(c.profile, c.seed, Some(&c.actions), 0, c.opts);
+    let mut actions = c.actions.clone();
+    assert_eq!(actions[5].kind, Kind::DepositWrappedOpen);
+    assert_eq!(actions[9].kind, Kind::Deposit);
+    // Reverse insertion order preserves the historical action indices.
+    actions.insert(
+        9,
+        "sweep_trader 0 0 0"
+            .parse::<Action>()
+            .expect("post-flush cleanup"),
+    );
+    actions.splice(
+        5..5,
+        ["crank 0 0 0", "warp 0 0 0", "crank 0 0 0"]
+            .map(|a| a.parse::<Action>().expect("observation")),
+    );
+    let o = runner::run(c.profile, c.seed, Some(&actions), 0, c.opts);
+    println!("FUZZ-101-24H-A: events {:?}", o.stats.events);
     if let Some(f) = &o.failure {
         panic!("{}\n{}", f.signature, f.message);
     }

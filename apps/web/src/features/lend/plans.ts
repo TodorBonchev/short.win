@@ -18,6 +18,7 @@ import {
     getCoverDeficitInstructionAsync,
     getDepositInstructionAsync,
     getLenderPositionDecoder,
+    getMarketDecoder,
     getShareEpochAccountMetas,
     getSyncLenderInstructionAsync,
     getWithdrawInstructionAsync,
@@ -255,6 +256,39 @@ export async function buildDepositPlan(i: DepositPlanInput): Promise<TxPlan> {
         ],
         ...disclosuresOf(i, disclosures, i.unpaidRent ? { 'lender.unpaidRent': i.unpaidRent } : undefined),
         invalidate: lendInvalidations(i.mint, i.signer.address),
+    };
+}
+
+/**
+ * Pending income with surviving shares is collected separately: a split cashback claim can
+ * start a held vest. Appending a deposit would roll that cleanup back with PoolDrained.
+ * This plan has no lender conversion, token deposit, or CPI Guard bracket.
+ */
+export function buildCleanupPlan(c: LendContext, sweep: readonly Instruction[]): TxPlan {
+    if (sweep.length === 0) throw new PlanError('No pool cleanup is needed now.');
+    return {
+        kind: 'lender_cleanup',
+        title: 'Clean up pending lender income',
+        instructions: sweep,
+        watch: [
+            walletWatch(c),
+            vaultWatch(c),
+            {
+                kind: 'program',
+                address: c.marketAddress,
+                label: 'Pool income',
+                decode: (data) => {
+                    const market = getMarketDecoder().decode(data);
+                    return { vestBal: market.vestBal, vestEnd: market.vestEnd };
+                },
+                fields: {
+                    vestBal: { label: 'Income still vesting', unit: 'SOL', scale: 9 },
+                    vestEnd: { label: 'Vest ends', unit: '', scale: 0, kind: 'timestamp' },
+                },
+            },
+        ],
+        disclosures: ['lender.cleanup'],
+        invalidate: lendInvalidations(c.mint, c.signer.address),
     };
 }
 

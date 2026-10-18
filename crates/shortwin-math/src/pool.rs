@@ -105,11 +105,11 @@ pub const FWD_OPEN: u8 = 2;
 /// The lock calendar's bucket length and ring size (ECON §9.3, §15; ARCH §2.3.6, A75),
 /// defined with the other compile-time constants.
 pub use crate::consts::{LOCK_BUCKET_S, LOCK_BUCKETS};
-/// `Pool::wipe_swept` bit: `sweep_trader` ran since `S` last reached 0 — a full wipe, or since
-/// AIR-08 the last lender's exit (`Market.flags` bit 7 `wipe_trader_swept`; R4A-7).
+/// `Pool::wipe_swept` bit: `sweep_trader` ran since the latest full wipe, last-lender exit,
+/// or dust flush (`Market.flags` bit 7 `wipe_trader_swept`; R4A-7, AIR2-05).
 pub const WIPE_TRADER_SWEPT: u8 = 1;
-/// `Pool::wipe_swept` bit: `claim_venue_rewards` ran since `S` last reached 0 — a full wipe,
-/// or since AIR-08 the last lender's exit (`Market.flags` bit 8 `wipe_rewards_claimed`; R4A-7).
+/// `Pool::wipe_swept` bit: `claim_venue_rewards` ran since the latest full wipe, last-lender
+/// exit, or dust flush (`Market.flags` bit 8 `wipe_rewards_claimed`; R4A-7, AIR2-05).
 pub const WIPE_REWARDS_CLAIMED: u8 = 2;
 
 const LOCK_BUCKETS_I64: i64 = LOCK_BUCKETS as i64;
@@ -152,9 +152,9 @@ pub struct Pool {
     pub share_epoch: u32,
     /// Non-zero while the latest record is a full wipe still open for top-ups (V2-12).
     pub wipe_live: u8,
-    /// Sweeps done since `S` last reached 0 (a full wipe, or since AIR-08 the last lender's
-    /// exit): [`WIPE_TRADER_SWEPT`] | [`WIPE_REWARDS_CLAIMED`] (R4A-7). Read only while `S = 0`
-    /// (a deposit into a pool without shares waits for them).
+    /// Sweeps done since the latest full wipe, last-lender exit or dust flush:
+    /// [`WIPE_TRADER_SWEPT`] | [`WIPE_REWARDS_CLAIMED`] (R4A-7, AIR2-05). Deposits wait
+    /// for all required sources, including after a dust flush that leaves `S > 0`.
     pub wipe_swept: u8,
     /// Explicit padding (zero).
     pub _pad: [u8; 2],
@@ -360,6 +360,31 @@ impl SweepSource {
             Self::Trader => WIPE_TRADER_SWEPT,
             Self::VenueRewards => WIPE_REWARDS_CLAIMED,
         }
+    }
+}
+
+/// The accounting destination of a sweep, determined before its source bit is set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SweepDestination {
+    Vest,
+    WipeRecord,
+    Protocol,
+    /// Pre-flush value credited immediately to the shares that survived a dust flush.
+    Lenders,
+}
+
+/// Shared by the booking path and event producers; call before [`sweep`].
+pub fn sweep_destination(pool: &Pool, source: SweepSource) -> SweepDestination {
+    if pool.total_shares == 0 {
+        if pool.is_wipe_live() {
+            SweepDestination::WipeRecord
+        } else {
+            SweepDestination::Protocol
+        }
+    } else if pool.wipe_swept & source.bit() == 0 {
+        SweepDestination::Lenders
+    } else {
+        SweepDestination::Vest
     }
 }
 
@@ -1245,7 +1270,15 @@ fn convert_steps<R: Recs>(
             records.set_rem(idx, rem)?;
         }
         l.shares = shares;
-        l.lock = scale(l.lock)?;
+        // AIR2-01: a lender's own lock rounds up, as lock_of does. Cumulative share
+        // conversion may award a rounding unit; flooring this lock would make that unit
+        // immediately withdrawable even when every old share was locked. A zero lock
+        // stays zero; the aggregate calendar and its terms still round down.
+        l.lock = if num == 0 {
+            0
+        } else {
+            l.lock.div_ceil(den).min(shares)
+        };
         // v0.4.1: the term scales with the bucket it sits in (the roll scaled the buckets).
         l.lock_term = scale(l.lock_term)?;
         l.epoch = ovf(l.epoch.checked_add(1))?;
@@ -1708,12 +1741,19 @@ pub fn token_value(pool: &Pool, lender: &Lender) -> Result<u128, MathError> {
 // ---- pro-rata withdrawal (ECON §9.3; C0-9, V2-3, R3B-1, R4A-2) ------------------------------
 
 /// `pool_model.Pool._lock_of`: `lock_i(now) = min(⌈lock·Π/lock_Π⌉, shares)` if the lock
-/// is from this `Π` epoch and `now < lock_until`, else 0 (ECON §9.3).
+/// is from this `Π` epoch, `now < lock_until`, and its calendar day has not already expired,
+/// else 0 (ECON §9.3). Calendar expiry survives a backwards raw clock.
 ///
 /// # Errors
 /// `DivByZero` if `lock_pi` is 0; `Overflow` if the product exceeds `u128`.
 pub fn lock_of(vault: &Vault, lender: &Lender, now: i64) -> Result<u128, MathError> {
-    if lender.lock_epoch != vault.pi_epoch || lender.lock == 0 || now >= lender.lock_until {
+    if lender.lock_epoch != vault.pi_epoch
+        || lender.lock == 0
+        || now >= lender.lock_until
+        // A read-only-market lender touch may have advanced the calendar beyond the
+        // market's accrual clock. A clock regression must not resurrect its dropped term.
+        || day_of(lender.lock_until)? < vault.cal_day
+    {
         return Ok(0);
     }
     Ok(mul_div(lender.lock, vault.pi, lender.lock_pi, Rounding::Ceil)?.min(lender.shares))
@@ -1731,7 +1771,7 @@ pub fn locked_total(pool: &Pool, vault: &Vault, now: i64) -> Result<u128, MathEr
 
 /// Tokens the lender may withdraw now (`pool_model.Pool.free_allowance` after its
 /// touch; ECON §9.3, SPEC §2.4): with `u = shares − lock_i(now)` and
-/// `su = max(S − locked, u)`, `min(⌊u·T/su⌋, ⌊shares·(T + ΣB_Q + VA)/(S + VS)⌋, T)`;
+/// `su = max(S − locked, u)`, `min(⌊u·T/su⌋, ⌊u·(T + ΣB_Q + VA)/(S + VS)⌋, T)`;
 /// 0 if `su = 0` or the lender is parked on a live wipe record. Call [`touch`] first;
 /// the vault is only read (the calendar as it stands at `now`).
 ///
@@ -1753,7 +1793,9 @@ pub fn allowance(pool: &Pool, vault: &Vault, lender: &Lender, now: i64) -> Resul
     }
     let t = u128::from(pool.tokens_free);
     let by_free = mul_div(u, t, su, Rounding::Floor)?;
-    let by_value = tokens_for_shares(pool, lender.shares)?;
+    // L39: a small deposit must not make the value of an existing locked position
+    // withdrawable when the aggregate lock leaves very few unlocked shares.
+    let by_value = tokens_for_shares(pool, u)?;
     to_u64(by_free.min(by_value).min(t))
 }
 
@@ -1980,24 +2022,20 @@ fn deposit_in(
         // deposit is what brings `S` back (ARCH §9 M0b note 4), so `S = 0` is not drained.
         return Err(MathError::PoolDrained);
     }
-    if p.total_shares == 0 {
-        // R4A-7, and since AIR-08 also after the last lender's exit: SOL that reaches the
-        // trader while `S = 0` is the wiped lenders' (the live wipe record) or the protocol's
-        // (KI-10, R3A-10). A first deposit would make the sweep vest it to the new shares (and
-        // the last-lender flush pay it back at once), so the sweeps that book it come first.
-        let need = if rewards_required {
-            WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
-        } else {
-            WIPE_TRADER_SWEPT
-        };
-        if p.wipe_swept & need != need {
-            return Err(MathError::WipeSweepPending);
-        }
-        if p.is_wipe_live() {
-            // V2-12: the full-wipe record is final from now on; a parked depositor converts.
-            p.wipe_live = 0;
-            touch_in(p, v, l, records, now)?;
-        }
+    // R4A-7 / AIR-08 / AIR2-05: outstanding SOL belongs to the holders before a wipe,
+    // a last-lender exit, or a dust flush. The latter can leave S > 0, so gate that case too.
+    let need = if rewards_required {
+        WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED
+    } else {
+        WIPE_TRADER_SWEPT
+    };
+    if p.wipe_swept & need != need {
+        return Err(MathError::WipeSweepPending);
+    }
+    if p.total_shares == 0 && p.is_wipe_live() {
+        // V2-12: the full-wipe record is final from now on; a parked depositor converts.
+        p.wipe_live = 0;
+        touch_in(p, v, l, records, now)?;
     }
     l.shares = add_u128(l.shares, minted)?;
     p.total_shares = total;
@@ -2007,10 +2045,10 @@ fn deposit_in(
 
 /// `pool_model.Pool.deposit` (ECON §9.2; ARCH §3.3 `deposit`): releases the vest, touches
 /// the lender, mints `⌊amount·(S + VS)/(T + ΣB_Q + VA)⌋` shares (returned) and adds
-/// `amount` to `T`. A deposit into a pool without shares — after a full wipe (R4A-7) or,
-/// since AIR-08, after the last lender's exit — needs the sweeps since `S` reached 0: the
-/// trader sweep and, if `rewards_required` (a pump venue that can execute), the venue-reward
-/// claim (a new market starts with both bits set: nothing can have reached its trader). After
+/// `amount` to `T`. A deposit after a full wipe (R4A-7), last-lender exit (AIR-08), or
+/// dust flush with surviving shares (AIR2-05) needs the subsequent trader sweep and, if
+/// `rewards_required` (a pump venue that can execute), the venue-reward claim. A new market
+/// starts with both bits set: nothing can have reached its trader. After
 /// a full wipe it then finalises the wipe record (clears `wipe_live`) and touches again, so a
 /// parked depositor converts through it. No deposit is taken while the pool is drained —
 /// shares held, tokens lent out and at most `1/`[`VEST_FLUSH_RATIO`] of the token claims
@@ -2020,7 +2058,7 @@ fn deposit_in(
 /// # Errors
 /// `DepositTooSmall` if nothing would be minted; `Overflow` if `S` or `T` would leave
 /// `u128` / `u64`; `PoolDrained` if `S > 0`, `ΣB_Q > 0` and `VEST_FLUSH_RATIO·T ≤ T + ΣB_Q`;
-/// `WipeSweepPending` if `S = 0` and a required sweep has not run since `S` reached 0; as
+/// `WipeSweepPending` if a required sweep has not run since the latest wipe, last exit or flush; as
 /// [`touch`] and [`release`].
 pub fn deposit(
     pool: &mut Pool,
@@ -2151,11 +2189,11 @@ pub fn accrue(
 }
 
 /// Trader sweep or venue cashback to lenders (`pool_model.Pool.sweep_sol`; ARCH §3.3,
-/// §3.9; A44, V2-12, R3A-10, R4A-7): `lender_sol += lamports`; while `S = 0` (a live full-wipe
-/// record or, since AIR-08, after the last lender's exit) the bit of `source` that a deposit
-/// waits for is set (even for 0 lamports); then [`vest`] (with `S > 0` the SOL vests over
-/// `lump_vest_s`; with `S = 0` it tops up the live wipe record — pass it — or goes to the
-/// protocol).
+/// §3.9; A44, V2-12, R3A-10, R4A-7): `lender_sol += lamports`. A pending `source` bit is set
+/// even for zero lamports. After a dust flush that left `S > 0`, this source's first sweep
+/// credits the surviving holders immediately (AIR2-05). Otherwise [`vest`] applies: with
+/// `S > 0` the SOL vests over `lump_vest_s`; with `S = 0` it tops up the live wipe record
+/// (pass it), or goes to the protocol when no live wipe record remains.
 ///
 /// # Errors
 /// As [`vest`]; `Overflow` if `lender_sol` leaves `u64`.
@@ -2171,12 +2209,20 @@ pub fn sweep(
     let (mut p, mut v) = (*pool, *vault);
     let mut rec = wipe_record.as_deref().copied();
     v.lender_sol = add_u64(v.lender_sol, lamports)?;
-    if p.total_shares == 0 {
+    let after_flush = sweep_destination(&p, source) == SweepDestination::Lenders;
+    if p.total_shares == 0 || after_flush {
         // R4A-7; AIR-08: with no live wipe record the SOL goes to the protocol (KI-10), and the
         // bit lets the next deposit in.
         p.wipe_swept |= source.bit();
     }
-    vest_in(&mut p, &mut v, rec.as_mut(), now, lump_vest_s, lamports)?;
+    if after_flush {
+        // The dust-flushed holders keep the pre-flush cashback just as a full-wipe
+        // record does. Re-vesting would let the first permitted deposit dilute it again.
+        release_in(&mut p, now)?;
+        credit_in(&mut p, &mut v, None, i128::from(lamports), true)?;
+    } else {
+        vest_in(&mut p, &mut v, rec.as_mut(), now, lump_vest_s, lamports)?;
+    }
     commit_record(wipe_record, rec);
     *pool = p;
     *vault = v;
@@ -2357,7 +2403,13 @@ pub fn settle(
         p.total_shares != 0 && ovf(p.token_claims()?.checked_mul(VEST_FLUSH_RATIO))? <= claims;
     if flushed {
         flush_vest_in(&mut p, now)?;
+        // The trader and venue-reward sweeps must book the old holders' remaining SOL
+        // before a newcomer can buy shares at the collapsed token-claim price (AIR2-05).
+        p.wipe_swept = 0;
     }
+    // Any removed claims can be split across many settlements. A per-settlement loss
+    // threshold lets all of them evade the hold while cumulatively collapsing the price.
+    let hold = !flushed && p.total_shares != 0 && p.vest_bal != 0;
     let rec = maybe_roll_in(&mut p, &mut v, now)?;
     *pool = p;
     *vault = v;
@@ -2365,6 +2417,7 @@ pub fn settle(
         rec,
         vested,
         flushed,
+        hold,
     })
 }
 
@@ -2383,6 +2436,8 @@ pub struct Settled {
     /// found — a full wipe, or since AIR-07 dust — and so released the whole unreleased vest
     /// to the current shares.
     pub flushed: bool,
+    /// The settlement left shares and a live vest, so deposits must wait until `vest_end`.
+    pub hold: bool,
 }
 
 /// The release due at `now`, then the rest of the unreleased vest to the current shares at
@@ -2893,7 +2948,8 @@ mod tests {
             Ok(Settled {
                 rec: None,
                 vested: 220,
-                flushed: false
+                flushed: false,
+                hold: true,
             })
         );
         assert_eq!(p.vest_bal, 220, "the vest booked is the one returned");
@@ -2906,6 +2962,37 @@ mod tests {
         );
         let paid_h = claim(&p, &mut v, &mut h, &mut [], 60).unwrap();
         assert!(paid_h <= 30 + 65 && paid_h + 2 >= 30 + 65, "{paid_h}");
+    }
+
+    #[test]
+    fn a_settlement_marks_any_remaining_live_vest_for_a_deposit_hold() {
+        let run = |q| {
+            let (mut p, mut v) = (Pool::new(), Vault::new());
+            let mut h = Lender::new(&p);
+            deposit(&mut p, &mut v, &mut h, &mut [], 0, 1_000_000, false).unwrap();
+            borrow(&mut p, 0, q, D).unwrap();
+            let settled = settle(
+                &mut p,
+                &mut v,
+                1,
+                VEST,
+                &Resolution {
+                    q,
+                    credited: 0,
+                    lump: 100,
+                },
+                100,
+                0,
+            )
+            .unwrap();
+            (settled, p.vest_bal)
+        };
+        let (large, vest) = run(600_000);
+        assert!(large.hold && !large.flushed && vest > 0);
+        let (small, vest) = run(400_000);
+        assert!(small.hold && !small.flushed && vest > 0);
+        let (wipe, vest) = run(1_000_000);
+        assert!(!wipe.hold && wipe.flushed && vest == 0);
     }
 
     /// M0B-A-2 (review): "never earlier" needs `lump_vest_s ≥ vest_end − now`. After a

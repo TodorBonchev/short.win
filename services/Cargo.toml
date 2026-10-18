@@ -19,6 +19,13 @@
 [workspace]
 resolver = "3"
 members = ["common", "keeper", "keeper-litesvm", "indexer", "indexer-litesvm", "ops"]
+exclude = ["vendor/postgresql_archive"]
+
+# TEST-ONLY: postgresql_embedded 0.21.0's zonky archives require ZIP support, including on
+# Linux. Its latest published archive helper still requires vulnerable zip 8; this local
+# helper uses patched zip 9 until upstream publishes the dependency update (see PATCH.md).
+[patch.crates-io]
+postgresql_archive = { path = "vendor/postgresql_archive" }
 
 [workspace.package]
 edition = "2024"

@@ -29,6 +29,7 @@ import {
     previewClaimOutcome,
     previewClaimView,
     previewClaimWithPot,
+    previewDepositHold,
     previewDepositView,
     previewPosition,
     previewSubUnitConversion,
@@ -71,6 +72,46 @@ beforeAll(() => {
 
 const resultOf = <T>(r: { ok: true; value: T } | { ok: false; refusal: { name: string } }): T | string =>
     r.ok ? r.value : `!${r.refusal.name}`;
+
+describe('deposits after a halted-venue settlement', () => {
+    const state = (o: Parameters<typeof simplePool>[0] = {}): LendState => ({
+        ...simplePool({ vestBal: 600n, vestLast: 0n, vestEnd: 600n, depositHoldUntil: 600n, ...o }),
+        lender: null,
+        records: [],
+    });
+
+    it('refuses new deposits until the actual vest releases, including its final second', () => {
+        for (const now of [0n, 300n, 599n]) {
+            expect(resultOf(previewDepositHold(m, state(), now))).toBe(600n);
+            expect(resultOf(previewDepositView(m, state(), now, 1_000n, 50))).toBe('!PoolDrained');
+        }
+        expect(resultOf(previewDepositHold(m, state(), 600n))).toBeNull();
+        expect(previewDepositView(m, state(), 600n, 1_000n, 50).ok).toBe(true);
+    });
+
+    it('follows a later sweep’s extended vest instead of the saved marker deadline', () => {
+        const s = state({ vestEnd: 1_200n });
+        expect(resultOf(previewDepositHold(m, s, 900n))).toBe(1_200n);
+        expect(resultOf(previewDepositView(m, s, 900n, 1_000n, 50))).toBe('!PoolDrained');
+        expect(previewDepositView(m, s, 1_200n, 1_000n, 50).ok).toBe(true);
+    });
+
+    it('allows ordinary vesting income without a hold and a hold whose vest was already flushed', () => {
+        for (const s of [state({ depositHoldUntil: -1n }), state({ vestBal: 0n })]) {
+            expect(resultOf(previewDepositHold(m, s, 300n))).toBeNull();
+            expect(previewDepositView(m, s, 300n, 1_000n, 50).ok).toBe(true);
+        }
+    });
+
+    it('protects a legacy market’s existing vest until it releases', () => {
+        const s = state({ depositHoldUntil: 0n });
+        expect(resultOf(previewDepositHold(m, s, 300n))).toBe(600n);
+        expect(resultOf(previewDepositView(m, s, 300n, 1_000n, 50))).toBe('!PoolDrained');
+        expect(resultOf(previewDepositHold(m, s, 600n))).toBeNull();
+        expect(resultOf(previewDepositView(m, s, 600n, 1_000n, 50))).toBe('!WipeSweepPending');
+        expect(previewDepositView(m, s, 600n, 1_000n, 50, true).ok).toBe(true);
+    });
+});
 
 describe('pool_model vectors through the WASM facade', () => {
     it('cover lenders behind share epochs, live wipes, locks and vests', () => {
@@ -402,10 +443,25 @@ describe('lend previews on simple pools', () => {
                 flags: MARKET_FLAG.wipeTraderSwept | MARKET_FLAG.wipeRewardsClaimed,
             }),
         ).toBe(false);
-        // A new market starts with both bits set; a pool with shares never waits, whatever its bits.
+        // A new market starts with both bits set. A dust flush can leave shares and clear both.
         const fresh = { ...emptied.market, flags: MARKET_FLAG.wipeTraderSwept | MARKET_FLAG.wipeRewardsClaimed };
         expect(wipeSweepPending({ ...fresh, venue: 1 })).toBe(false);
-        expect(wipeSweepPending(simplePool({ flags: 0, venue: 1 }).market)).toBe(false);
+        expect(wipeSweepPending(simplePool({ flags: 0, venue: 1 }).market)).toBe(true);
+    });
+
+    it('requires the pending sweep after a dust flush that retains shares', () => {
+        const s: LendState = { ...simplePool({ flags: 0, venue: 1 }), lender: null, records: [] };
+        expect(wipeLive(s.market)).toBe(false);
+        expect(wipeSweepPending(s.market)).toBe(true);
+        expect(resultOf(previewDepositView(m, s, 0n, 1_000n, 50))).toBe('!WipeSweepPending');
+        expect(previewDepositView(m, s, 0n, 1_000n, 50, true).ok).toBe(true);
+    });
+
+    it('rechecks legacy source bits even with surviving shares and no vest', () => {
+        const s: LendState = { ...simplePool({ depositHoldUntil: 0n }), lender: null, records: [] };
+        expect(wipeSweepPending(s.market)).toBe(true);
+        expect(resultOf(previewDepositView(m, s, 0n, 1_000n, 50))).toBe('!WipeSweepPending');
+        expect(previewDepositView(m, s, 0n, 1_000n, 50, true).ok).toBe(true);
     });
 
     it('splits a withdrawal into the allowance, the lock and the forfeited vest', () => {

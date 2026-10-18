@@ -114,7 +114,7 @@ MAX_FILE = 950_000
 # published row (gen_exits.py's ECON_13_EXIT_FUZZ lists both).
 ECON_13_EXIT_FUZZ = {'runs': 1000, 'exits': 697, 'sandwich_attempts': 8948, 'bundles': 253491,
                      'attacker_only_seconds': 772, 'blocker_runs': 192, 'noisy_runs': 490, 'freezer_runs': 267,
-                     'frozen_seconds': 2905, 'penalty_truncated_by_sandwich': 22, 'max_loss_over_bref_bps': 102,
+                     'frozen_seconds': 2905, 'penalty_truncated_by_sandwich': 21, 'max_loss_over_bref_bps': 102,
                      'max_settle_box_bps': 94, 'reserve_waits_liq': 0, 'reserve_waits_exp': 0,
                      'kinds': {'liquidation': 224, 'expiry': 281, 'S1': 147, 'S2': 10, 'S3': 35}}
 ORIG = {name: getattr(M, name) for name in (
@@ -580,6 +580,7 @@ for _name, _fn in PATCHES.items():
 
 # The attack scripts import the (now instrumented) sim through `common`.
 import common  # noqa: E402
+sim.RAW_LOCKED_DEPTH = True  # Current arithmetic vectors, not common's dated comparison tables.
 import arming as ARM  # noqa: E402
 import block_spot as BS  # noqa: E402
 import fixed_delta as FD  # noqa: E402

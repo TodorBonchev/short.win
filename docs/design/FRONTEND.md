@@ -535,20 +535,38 @@ between them.
   their place moved (v1.4 had the acknowledgement above the amount and the risks below the submit). A source with CPI Guard
   shows `token.cpiGuard` (`lendCpiGuardNotice`, plain deposit disabled) and the opt-in bracket
   (`lendCpiGuardBracket`, FE-1). `deposit(amount, min_shares)`; `WipeSweepPending` (*AIR-08,
-  `2bda5f5`:* whenever `S = 0` with a sweep bit clear — after a full wipe or after the last
-  lender's exit, which clears both bits) → prepend the permissionless sweep bundle (ARCH §3.3,
+  `2bda5f5`; *AIR2-05:* whenever a required source bit is clear, including a dust flush with
+  surviving shares — after a flush or after the last lender's exit, which clears both bits)
+  → collect the permissionless sweep bundle (ARCH §3.3,
   §3.9: `sweep_trader`, on pump venues pump's `claim_cashback` first when the UVA holds cashback,
   on PumpSwap pAMM `init_user_volume_accumulator` when missing; *AIR-05, `975f757`:* wherever the
   market's `pump_uva` is set, also on a curve market that left pump, pump's `claim_cashback`
-  first and `sweep_trader` with the trader's pump UVA alone as its token leg). After the last
+  first and `sweep_trader` with the trader's pump UVA alone as its token leg). With surviving
+  shares, offer **Review pool cleanup** (`lend-cleanup-submit`): a separate `lender_cleanup`
+  plan containing only the claims and sweep, with `lender.cleanup` in its review. It needs no
+  token amount, deposit acknowledgement or lender sync. It shows the wallet fee/account-rent
+  change, market SOL vault and remaining vest. Deposit stays disabled until a fresh read shows
+  cleanup complete and any actual vest released; keep the entered amount, source and CPI Guard
+  choice after cleanup confirms. Review/retry of a deposit refuses surviving-share cleanup;
+  review/retry of cleanup never appends a deposit. For an empty pool (`S = 0`), prepend cleanup
+  to the deposit in the existing atomic transaction. After the last
   lender's exit that sweep passes no wipe record and books the trader's SOL to the protocol
   (KI-10); the sweep notice says which (`lend-sweep-notice` `data-kind`), and the review title
   names the step "sweep after the last exit", or "post-wipe sweep" after a wipe. *AIR-07:* a
   deposit into a drained pool is refused `PoolDrained` (6108, action `wait`: at most 1/1,000 of
   the pool's tokens unborrowed; `3c0f602`), and the WASM deposit preview refuses it the same way
-  (`MATH_ERRORS`, `3f224c2`). A lender behind on epochs
+  (`MATH_ERRORS`, `3f224c2`). *AIR2-04:* the same refusal also holds a deposit while a
+  non-flushing settlement's vest remains unreleased; the preview checks the actual vest after
+  accrual, including later credits that extend it. A zero legacy hold marker also requires a
+  one-time source sweep, even when the stored bits are complete and the vest is empty;
+  -1 means initialized without a hold. Pending venue rewards arm a hold before a split claim
+  can re-vest income. *AIR2-05:*
+  pending-source income after a dust flush is credited immediately to the surviving lenders.
+  A split claim can re-vest income through an already completed source; standalone cleanup
+  lets that vest start without a refused deposit rolling it back. A lender behind on epochs
   gets `ShareEpoch` remaining accounts (`getShareEpochAccountMetas`) or `sync_lender` first.
-- **Withdraw:** shares (or %), Max = the pro-rata allowance (`previewAllowance`), preview tokens and
+- **Withdraw:** shares (or %), Max = the pro-rata allowance (`previewAllowance`, capped at the
+  token value of unlocked shares since AIR2-P2-01), preview tokens and
   SOL (`previewWithdraw`), lock and `lock_until` after the withdrawal (`previewLock`,
   `previewLockUntil`), destination account (ATA created idempotently if missing; memo flag →
   `token.memoRequired` and the title; `memo_program` = spl-memo v3 for every Token-2022
@@ -748,6 +766,17 @@ live tier terms), `borrower.residuals` (collapsed), `market.tierAge` (tier popov
 `open_short(nonce, q, min_proceeds, max_margin, max_open_fee)` with a random u64 `nonce` (the
 position PDA is `["position", market, borrower, nonce]`); watched: the wallet's SOL, the new
 position (`q`, `s`, `m`, `v`, deadline), the market's free tokens.
+
+An idle market whose observations exceed the program's 40 s coverage gap offers an explicit
+price refresh after its normal listing and venue warmup prerequisites pass. `short-price-refresh`
+reviews one `crank_price`: first record an observation, then integrate it after a later confirmed
+chain-clock second. Each step has its own simulation, fee review and wallet signature; no
+background transactions. `short-price-refresh-step` carries `data-step=record|wait|integrate`.
+Confirmed market accounts determine the next step, including after reload or another caller's
+crank. New shorts wait for the stored EMA and completed observation to be fresh; all other guards,
+including price deviation, still apply. Finishing a refresh review keeps the mobile trade sheet
+open for the next step. The review watches wallet SOL and the recorded, completed and EMA-update
+timestamps, and holds Sign if simulation did not perform the intended observation step.
 
 *As built (M10-RESP, §7.6):* the submit sits in a sticky form foot (`FormFoot`) with the reason it
 is disabled in one line (`short-submit-reason`; computed from the same predicates as the enabled
@@ -994,6 +1023,15 @@ section's hairline level with the rail's top). Security reads the same way (the 
    `src/config/disclosureVars.ts` and the features' `*DisclosureVars`).
 
 ### 4.2 Catalogue
+
+#### `lender.cleanup` — Clean up pending lender income
+
+*Severity:* info · *Acknowledgement:* none · *Source:* AIR2-05; ARCH §3.3, §3.9
+*Shown:* Deposit when cleanup is pending with surviving shares, and its separate review.
+
+> This transaction collects pending income for the pool’s existing lenders. You pay its network fee and any account rent needed to claim venue cashback.
+
+> Your tokens stay in your wallet. Once cleanup confirms, deposits wait until any income still vesting has released. You review and sign your deposit separately.
 
 #### `lender.solRepayment` — You may be repaid in SOL
 
@@ -1256,6 +1294,15 @@ Checkbox: “I understand my position can be liquidated or settled in SOL.”
 > Anyone can create a market for any token that passes the safety filter. There is no approval and no special status for the creator.
 >
 > You pay the creation fee ({fee}) and the rent for the market’s accounts ({rent}). The rent stays in the accounts.
+
+#### `market.priceRefresh` — Refresh the market price
+
+*Severity:* info · *Acknowledgement:* none · *Source:* open_short stale-price guard; crank_price observation buckets
+*Shown:* Short panel when idle-market observations are stale, and each price-refresh review
+
+> An idle market may need two transactions: record a price observation, then update the smoothed price after the chain clock advances. You review and sign each separately and pay its network fee.
+>
+> Opening a short is a separate action. Refreshing the price does not guarantee that new shorts are available.
 
 #### `token.cpiGuard` — CPI Guard is on for this token account
 
@@ -3302,7 +3349,8 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `lend-blocked-reason` | `T.lendBlocked` | why a lend action is refused now; `data-code` = the program error name (e.g. MintUnsafeFlagged, LenderBehindEpochs, NegativePending) |
 | `lend-position-<…>` | `T.lendPosition` | the panel's position summary; `<field>` ∈ shares, share-bps, value, claimable, lock; `data-value` raw |
 | `lend-slippage-input` | `T.lendSlippageInput` | tolerance in % for `min_shares` / `min_tokens` (default 0.5, FE-D6) |
-| `lend-sweep-notice` | `T.lendSweepNotice` | the post-wipe sweep bundle will be prepended to the deposit; `data-kind` ∈ wipe (after a full wipe), emptied (*AIR-08:* every lender left; the sweep books the trader's SOL to the protocol) |
+| `lend-sweep-notice` | `T.lendSweepNotice` | `data-kind` ∈ wipe (after a full wipe), emptied (*AIR-08:* every lender left; the sweep books to the protocol), lenders (*AIR2-05:* surviving shares, including legacy migration). Empty pools prepend the bundle to deposit; surviving shares get a separate cleanup review |
+| `lend-cleanup-submit` | `T.lendCleanupSubmit` | **Review pool cleanup**: venue claims plus `sweep_trader`, no deposit; keeps the form's amount and waits for cleanup confirmation and any held vest to release |
 | `lend-sync-submit` | `T.lendSyncSubmit` | `sync_lender` of the own position when it is behind more share epochs than one transaction carries |
 | `withdraw-destination-select` | `T.withdrawDestination` | destination token account select (ATA first; a missing ATA is created idempotently); `data-memo` true/false |
 | `withdraw-percent-<…>` | `T.withdrawPercent` | `<pct>` ∈ 25, 50, 75 (*M10-RESP*: 75 added; a chip, `aria-pressed` while the input holds that share): fills that share of the holding |

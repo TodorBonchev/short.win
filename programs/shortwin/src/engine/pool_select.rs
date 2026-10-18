@@ -607,9 +607,12 @@ pub fn adopt(
         let mut obs = market.observation();
         observe::rewrite_liquidity(&mut obs, cap, VenueChange::RaydiumLocked { slow_cap: d })?;
         obs.mark_restart();
+        market.mark_observation_restart(obs.ema.count)?;
         market.set_observation(&obs);
     } else {
-        let obs = observe::initial_raydium(now, &a.state, cap)?;
+        let mut obs = observe::initial_raydium(now, &a.state, cap)?;
+        obs.ema.count = market.ema_count;
+        market.mark_observation_restart(obs.ema.count)?;
         market.set_observation(&obs);
     }
     market.no_route_since = 0;

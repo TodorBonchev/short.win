@@ -111,7 +111,8 @@ use shortwin_math::pool::{Pool, Vault};
 use shortwin_math::tier::Tier;
 
 use crate::constants::{
-    CONFIG_VERSION, MARKET_VERSION, PUMP_AMM_PROGRAM_ID, PUMP_PROGRAM_ID, WSOL_MINT,
+    CONFIG_VERSION, MARKET_VERSION, PUMP_AMM_PROGRAM_ID, PUMP_PROGRAM_ID, VENUE_GUARD_VERSION,
+    WSOL_MINT,
 };
 use crate::engine::guard;
 use crate::errors::{CheckedExt, ShortwinError};
@@ -197,7 +198,12 @@ pub struct CreateMarket<'info> {
     pub config: AccountLoader<'info, GlobalConfig>,
     /// The venue-upgrade latch (A7; M3-SEC-2): a Raydium listing is refused while a bit of the
     /// Raydium mask is set (`VenueUpgraded`), as opens are. Read only.
-    #[account(seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump)]
+    #[account(
+        seeds = [VenueGuard::SEED],
+        bump = venue_guard.load()?.bump,
+        constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION
+            @ ShortwinError::ConfigVersion
+    )]
     pub venue_guard: AccountLoader<'info, VenueGuard>,
     /// One market per mint, whatever its token program.
     #[account(
@@ -652,6 +658,8 @@ pub fn handler<'info>(
         // The lender pool of a new market (`pool_model.Pool()`): no shares, both post-wipe
         // bits set (nothing to sweep before the first deposit).
         m.set_pool(&Pool::new());
+        m.deposit_hold_until = -1;
+        m.restart_ema_count = 1;
         m.last_accrual_ts = now;
         if let Some(a) = adoption.as_ref() {
             // ARCH §3.2 "Effects" for a Raydium pool (module docs): the pool cache, the SOL
@@ -667,6 +675,7 @@ pub fn handler<'info>(
                 u64::from(config.params.pool_lock_min_bps),
             );
             let obs = crate::engine::observe::initial_raydium(now, &a.state, cap)?;
+            m.mark_observation_restart(obs.ema.count)?;
             m.set_observation(&obs);
             m.set_flag(MARKET_FLAG_GRADUATED_ELSEWHERE, graduated_elsewhere);
         }

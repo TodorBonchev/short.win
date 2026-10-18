@@ -60,6 +60,11 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
   lasts for as long as the post-change reference guard is set (`ema_guard == 1`,
   `MarketNeeds::guarded`; M4F-1): every second keeps its honest bucket low, so deposit-wrapped
   cranks in otherwise idle seconds cannot lift the ring's liquidity lows and clear the guard.
+  After that warm-up, an idle market can become too stale for a new open. The client must
+  refresh it: crank, wait for the next observation second, crank again, then re-read the
+  market and calculate the open. A single crank cannot make an old completed bucket fresh.
+  This preserves the idle-market budget while satisfying the open's pre-prologue EMA and
+  completed-bucket age checks (`COVERAGE_GAP_S`).
 - **Duty 2, bursts**: an observation in the open or last completed bucket whose **price**
   deviates by more than 2 % from what the keeper itself read in that second and the one before was
   not the keeper's, and — when its excursion **reverted**, the keeper's latest read more than 2 %
@@ -231,7 +236,8 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
     finds a `P_ema` the pool's own honest buckets seeded — M4V-5's listing-window duty on
     Raydium, for PumpSwap.
 - **Duties 6 and 13, the trader side** (`sweep.rs`, config `[sweep]`; M6; ARCH §3.9, §7.1;
-  R4A-7): right after a full wipe (a live wipe record, the post-wipe bits not both set) the keeper
+  R4A-7): whenever source cleanup is pending after a full wipe, last lender exit, dust flush
+  with surviving shares, or a legacy market's zero migration marker, the keeper
   sends, in the same second, the venue cashback claims the trader needs and `sweep_trader` in one
   transaction — pump `claim_cashback(user = trader)` when the trader's pump UVA holds lamports
   above its rent; on PumpSwap `create_idempotent ATA(trader, WSOL)` and pAMM
@@ -245,7 +251,8 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
   `ATA(trader, WSOL)` exists, the trader PDAs hold lamports or a pump venue's trader base ATA holds
   tokens; on a cashback coin whose claimable cashback reaches `cashback_min_lamports` the claim
   goes with the sweep, at most every `cashback_interval_s` (a week). `Alert::SweepFailed` on a
-  failure (severe after a wipe: deposits wait).
+  failure (severe during pending cleanup: deposits wait). Cleanup fills the required source
+  bits; a deposit also waits for any vest protected by the market's deposit hold to release.
 - **Duty 9, degraded mode** (`coverage.rs`, `alerts.rs`, config `[coverage_pause]`; O17, ARCH
   §3.1 `set_coverage_pause`): three consecutive seconds with a required observation and none landed
   (outage, contested blocks), a `CoverageGap` event from the program (a gap above 40 s since
@@ -313,6 +320,19 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
       flagged in the first slot where short.win runs again; an extension is counted. A stranger
       who extends short.win in every slot delays the flag, not the page; opens ordered before
       each extension in its slot still run.
+
+    **RPC limitations.** A backend that omits the simulation context slot reports it as 0,
+    so every `VenueNotUpgraded` for a later deploy takes the stale-bank path: one whole-account
+    read per deploy slot, and `VenueFlagFailed` if that read identifies an upgrade. If a pool
+    always routes simulations to a node behind the header read, the keeper pages the upgrade
+    but cannot flag it until simulations catch up. The retry needs three sequential RPC round
+    trips per tick (headers, fees/blockhash together, simulations), before the exits. Check the
+    reported simulation and deploy slots and use an RPC backend whose simulations can reach
+    that deploy. A flag or revalidation landing between the header read and simulation can
+    also produce `VenueNotUpgraded`; that race is counted once as an extension, so the extension
+    metric is a classification of the observed response, not a precise count of loader calls.
+    The parallel-simulation tests use an instrumented in-process backend; there is no
+    JSON-RPC-node integration test of that scheduling yet.
 
     The keeper reads a deploy slot's whole account once. During a review, a move past the
     deploy the keeper recorded is read whole after the exits: an extension of the recorded
@@ -433,6 +453,17 @@ lookup tables automatically at a listing (`shortwin-build-alt market` builds one
 
 ### Run
 
+**1.0.2 rollout gate:** update the indexer before the program upgrade so sweep destination
+`3` is classified as lender income. The older indexer falls through to protocol income for
+that new value; the updated projection accepts both old destination `0` and new `3`.
+Deploy this keeper and the corresponding UI with or after the
+short.win 1.0.2 program. They treat a zero `deposit_hold_until` migration marker as pending
+source cleanup. An older program never initializes that marker, so this keeper can repeat
+cleanup against it and spend transaction fees; the new UI can continue displaying cleanup
+as required. The retained V2 trade-extras builder and upgrade-window tests cover trading
+format compatibility, not this migration duty. Keep that builder until the actual release
+gates pass; a draft package version is not evidence of deployment.
+
 ```sh
 cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release
 services/target/release/shortwin-keeper --rpc https://… --keypair keeper.json \
@@ -551,7 +582,9 @@ scripts/build-alt.sh print  --rpc https://api.mainnet-beta.solana.com
 scripts/build-alt.sh create --rpc <url> --keypair payer.json [--authority auth.json] [--freeze]
 scripts/build-alt.sh extend --rpc <url> --keypair payer.json --table <alt>   # add what is missing
 scripts/build-alt.sh check  --rpc <url> --table <alt>        # exit 1 if an address is missing
-scripts/build-alt.sh market --rpc <url> --market <market> [--table <alt>] [--keypair payer.json]
+scripts/build-alt.sh market --rpc <url> --market <market> [--protocol-table <protocol-alt>] [--keypair payer.json]
+scripts/build-alt.sh extend --rpc <url> --keypair payer.json --table <market-alt> --market <market> --protocol-table <protocol-alt>
+scripts/build-alt.sh check  --rpc <url> --table <market-alt> --market <market> --protocol-table <protocol-alt>
 ```
 
 **Per-market tables (M7, OWNER-M7-1's fallback):** `market` lists a market's own table
@@ -563,6 +596,13 @@ open with the largest (4-entry) extras set is over 1,232 B through A28 as ARCH �
 and fits through the table `create` builds (with the `VenueExtras` PDAs) and, with far more
 room, through that table plus the market's; a table per market also lifts the v0 crank batch
 (`tests/bench/m7_keeper/results.md`).
+
+After a pool switch or a new extras set, use `extend` and `check` with `--market`. `--table`
+is the destination table for those commands; `--protocol-table` supplies the keys to exclude.
+Without `--protocol-table`, the current protocol address list is excluded (`--static-only`
+uses its static subset). The `market` command retains `--table` as a legacy alias for
+`--protocol-table`. Restart the keeper after extending a table: it reads configured lookup
+tables once at startup, so a running process still has the old address list.
 
 `create` derives the table from the authority and the latest finalized slot, extends it in chunks
 of 24 and optionally freezes it. A frozen table can never be deactivated (a deactivated table
@@ -583,6 +623,12 @@ before it was deployed, pump-final D2, and a layout naming it is refused) = Gove
 `pause_authority` = Emergency vault 0; each multisig's rent collector is its own vault 0. The
 four authorities must be pairwise distinct (SQ-G8). The example's keys are placeholders and the
 tool refuses to send with it (`example = true`).
+
+`stage propose-oracle-feed` and `apply` of that change fetch the proposed account and verify
+its Pyth receiver owner, `PriceUpdateV2` layout and matching feed ID before sending. These
+checks catch a missing account or mismatched feed; governance still reviews that the feed
+represents SOL/USD. The normal oracle crank enforces verification, freshness, confidence and
+step limits. The preflight is an operations check, not an on-chain restriction on other clients.
 
 ```sh
 G="cargo run --release --manifest-path services/Cargo.toml -p shortwin-ops --bin shortwin-gov --"
@@ -613,9 +659,11 @@ $G close-buffer --ms emergency --config gov.toml --rpc <url> --key member.json [
   (a command of several transactions stops after its first). A sent transaction is awaited for
   90 s (`--confirm-timeout <s>`), past its blockhash's lifetime, so one reported as not
   confirmed has expired; the error says to check `status` before rerunning. There is no priority
-  fee yet, and no compute-budget instruction: a transaction gets the runtime's default limit,
-  200,000 CU per instruction of a non-builtin program such as Squads (a bare `execute` 200,000,
-  `approve --execute` 400,000; see the revalidation after an extension, below).
+  fee yet. `--compute-unit-limit <units>` sets the budget of each outer transaction, from 1 to
+  1,400,000 CU, and its bytes count toward staging and buffer chunk sizes. When omitted, a
+  transaction gets the runtime's default limit: 200,000 CU per instruction of a non-builtin
+  program such as Squads (a bare `execute` 200,000, `approve --execute` 400,000). Staging never
+  stores this option in the vault message: pass it again when executing (see below).
 - **Staging** is one transaction (`vault_transaction_create` + `proposal_create` + the stager's
   approval). A message above about 700 bytes (the transaction would exceed 1,232 B; T-SQ-3's
   worst-case `set_venue_extras` is 1,243 B staged directly) goes through the stager's
@@ -720,12 +768,15 @@ $G approve --ms emergency --index <n> --config gov.toml --rpc <url> --key emg-me
   extensions (KI-73; [below](#extendprogram-griefing-air-18-accepted-by-the-owner-on-2026-10-12))
   needs ≈ 0.48 M (estimated with the tests' cost model, not measured). Execute such a
   revalidation with a compute-unit limit of at least 600,000 (`SetComputeUnitLimit` before
-  `vault_transaction_execute`). `shortwin-gov` sets no limit, so it gets the runtime's default:
+  `vault_transaction_execute`): pass `--compute-unit-limit 600000` to `shortwin-gov execute`
+  or `shortwin-gov approve --execute`. Without that option the runtime's default is:
   200,000 CU for a bare `execute`, 400,000 for `approve --execute` (two Squads instructions,
   the approval's cost included). pump-fees exceeds both and AMM v4 exceeds a bare `execute`;
   whether CPMM, or AMM v4 under `approve --execute`, fits depends on Squads' cost, which is not
   measured. A transaction whose simulation runs out of compute units is not sent.
-  - **Reliable:** execute from a client that sets the limit.
+  - **Example:** `$G execute --config governance.toml --rpc "$RPC" --ms emergency --index
+    <index> --key member.json --compute-unit-limit 600000`. Add `--dry-run` to simulate before
+    executing; the same limit applies to simulation and submission.
   - **Fallback:** stage a new revalidation at the current deploy slot (the same ELF, so the same
     hash; at the exact slot nothing is hashed). Anyone can defeat it again by extending the
     venue before that execution, at ≈ 0.052 SOL a round (KI-73), which puts it back on the
@@ -764,6 +815,10 @@ operators see:
 - **`Alert::ProgramNotDeployed`:** such refusals of one program, at most 5 s apart, have lasted
   30 s (paged once per run). Someone is extending that program every slot or nearly: check its
   ProgramData's growth toward the 10 MiB cap and whether exits land in between.
+  These thresholds are compiled constants, not TOML settings: `events::DEPLOY_SLOT_SLACK = 2`
+  slots, `keeper::NOT_DEPLOYED_RUN_GAP_S = 5` seconds, and
+  `keeper::NOT_DEPLOYED_ALERT_S = 30` seconds. Changing them requires rebuilding the keeper;
+  adding validated operator configuration remains a tooling follow-up.
 - **A program that stays undeployable** (an old deploy slot, or no ProgramData: closed, or
   failing verification after a feature gate) gets the same answer from the loader. Its refusals,
   and those whose header cannot be read, are handled as any refusal: `Alert::ExitRefused`,
@@ -875,7 +930,8 @@ market whose curve becomes readable is cranked onto it, its trader accounts are 
 an open lands.
 
 PumpSwap scenarios (`pamm.rs`, M6; the `pamm_state` pools): a listing nobody observes has its
-price started and its warm-up observed by the keeper (eight seconds), the keeper's PumpSwap lists
+price started and its warm-up observed by the keeper (nine observations; the final bucket
+integrates on the next call), the keeper's PumpSwap lists
 are the harness's for the same recipients, and a ×3 pump is liquidated on the pool in the first
 second the program accepts it; `disable_flags` bit 0 is reported (severe; opens refuse
 `VenueFlagged`), the buy bit as a lost route as well, clearing both as restored; a cashback coin
@@ -1032,7 +1088,7 @@ The in-process chain's failure knobs (`LiteSvmChain::fail_simulations`, `fail_re
 `lag_headers_of`, and `lag_simulations`: simulations answered from an earlier copy of the VM,
 with that copy's slot as their context slot) and its call counter (`other_calls`: blockhash,
 priority-fee and simulation calls) serve the AIR-01 and AIR-18 scenarios. The scenario binary
-holds 142 scenarios; two, the release measurements of `cascade` and `m7_cost`, are ignored by
+holds 151 scenarios; two, the release measurements of `cascade` and `m7_cost`, are ignored by
 default.
 
 The JSON-RPC backend has its own check against a live local cluster (`common/tests/rpc_local.rs`,

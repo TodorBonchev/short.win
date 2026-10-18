@@ -1,0 +1,5 @@
+commit 35558c211f88407d8489e21cd621dfe7ab80bb46
+solana-verify 0.5.2; image solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f
+args: --arch v3 --cargo-build-sbf-args="--tools-version v1.57"
+# program  sha256(file)  executable-hash(trailing zeros trimmed; on-chain comparison)  bytes
+shortwin 72c82879accac8323af6ef0ce777baea6b40c1ce312cefaf65aaa152a3f21429 0610d4196b645c6e5a3130184835289d290e07f8ec239d52bbf427f77ee62dfc 1635424

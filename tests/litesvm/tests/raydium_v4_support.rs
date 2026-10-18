@@ -1938,6 +1938,7 @@ pub fn predict_settle(v: &View) -> SettlePrediction {
         now,
         deadline: pos.deadline,
         ema_count: obs.ema.count,
+        restart_ema_count: market.restart_ema_count,
         p_ema: obs.ema.price,
         l_ema: obs.ema.liq,
         bx,
@@ -2413,6 +2414,7 @@ pub fn thin_pool_market() -> ThinPool {
         f.env.warp(60);
         crank_checked(&mut f.env, &f.rm);
     }
+    f.tick(1);
     let q = max_open_q(&mut f);
     let (x, _) = reserves(&f.env, &f.rm).unwrap();
     assert!(

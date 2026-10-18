@@ -79,7 +79,9 @@ POT_SEED = 20261009
 CHAIN_SEEDS = 3_000
 CHAIN_CASES = 12
 OPEN_CASES = 10
-OPS = 1_200
+# Keep the same random streams; the stricter unlocked-value cap needs a longer trace to
+# retain the pot-moving sync coverage as well as blocked withdrawals.
+OPS = 2_400
 SAMPLE_EVERY = 100
 OUT = HERE / "lend_vectors.json"
 
@@ -156,11 +158,14 @@ def dump_state(p: pm.Pool) -> dict:
     for d, term in p.lock_cal.items():
         if term:
             lock_cal[str(d % BUCKETS)] = u(term, U128)
-    flags = (FLAG_WIPE_LIVE if p.wipe_live else 0) | (FLAG_WIPE_TRADER_SWEPT if p.wipe_swept else 0)
+    flags = (FLAG_WIPE_LIVE if p.wipe_live else 0) | (
+        FLAG_WIPE_TRADER_SWEPT if p.wipe_swept & pm.WIPE_TRADER_SWEPT else 0
+    )
     market = {
         "tokensFree": u(p.T, U64),
         "borrowedQ": u(p.B, U64),
         "totalShares": u(p.S, U128),
+        "depositHoldUntil": s(p.deposit_hold_until, I64),
         "acc": s(p.acc, I128),
         "carry": s(p.carry, I128),
         "accR": u(p.acc_r, U128),
@@ -416,7 +421,7 @@ def emptied_states():
     sweep bits) waits for the sweep before a deposit (`WipeSweepPending`); the sweep (of 0 lamports
     here: the bundle the app prepends) lets deposits in again. Yields (name, pool) right after the last
     exit, with a lender still owed SOL, and after the sweep. The random op mix rarely reaches it."""
-    p = pm.Pool("continuous", util_cap_bps=9_000)
+    p = pm.Pool("continuous", util_cap_bps=9_000, rewards_required=False)
     p.deposit("u0", 10**12)
     p.deposit("u1", 3 * 10**9)
     p.borrow(1, 10**11, 86400)
@@ -443,7 +448,7 @@ def last_share_state():
     S * B < VS * (T + 1): the share price must have risen above its start by more than the borrowed
     tokens' worth, and only rounding raises it, so the op mix never gets there. Here a withdrawal of
     1,999 shares that pays 1 token lifts it, then 1 token is lent. Yields (name, pool)."""
-    p = pm.Pool("continuous", util_cap_bps=9_000)
+    p = pm.Pool("continuous", util_cap_bps=9_000, rewards_required=False)
     p.deposit("u0", 10**6)
     p.withdraw("u0", 1_999)                    # floor(1,999 * (T + B + VA) / (S + VS)) = 1 token
     p.borrow(1, 1, 86400)
@@ -458,7 +463,7 @@ def main():
     cases = []
     skipped = 0
     for run_i in range(3):
-        p = pm.Pool("continuous", util_cap_bps=9_000)
+        p = pm.Pool("continuous", util_cap_bps=9_000, rewards_required=False)
         users = [f"u{i}" for i in range(4)]
         pid = [0]
         wipe_seen = False

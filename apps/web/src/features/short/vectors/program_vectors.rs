@@ -15,6 +15,7 @@
 //! `scripts/build-test-venue.sh` and `target/deploy/mock_cpamm.so` from `anchor build`):
 //!
 //! ```sh
+//! mkdir -p tests/litesvm/examples
 //! cp apps/web/src/features/short/vectors/program_vectors.rs tests/litesvm/examples/web_short_vectors.rs
 //! cargo run -p shortwin-litesvm-tests --example web_short_vectors \
 //!     > apps/web/src/features/short/vectors/program-vectors.json
@@ -187,6 +188,17 @@ fn open_case(
     q: u64,
 ) -> String {
     env.crank(mm);
+    // The first crank after an idle gap can only roll the old sample. Complete a fresh bucket
+    // before snapshotting a successful open; advancing ema_ts alone no longer passes the gate.
+    let m = env.market(&mm.market());
+    let now = env.clock().unix_timestamp;
+    let max_age = shortwin_math::consts::COVERAGE_GAP_S;
+    if now.saturating_sub(m.ema_ts) > max_age
+        || (m.lb_lo.get() != 0 && now.saturating_sub(m.lb_sec) > max_age)
+    {
+        env.warp(1);
+        env.crank(mm);
+    }
     let nonce = b.next_nonce;
     let before = snapshot(env, mm, venue, b, None);
     let at = clock(env);

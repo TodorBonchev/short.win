@@ -72,6 +72,8 @@ fn c0_6_share_blow_up_rebases() {
         let t = lab.market().tokens_free;
         lab.borrow30(&format!("p{i}"), t - 1).unwrap();
         lab.settle(&format!("p{i}"), 7 * U, 0);
+        // AIR2-05: finish the empty old-source sweep before the next deposit.
+        lab.sweep_sol(0);
         let p = lab.market().pool();
         let claims = u128::from(p.tokens_free) + u128::from(p.borrowed_q) + VIRTUAL_ASSETS;
         assert!(

@@ -314,7 +314,11 @@ fn two_markets() -> (Env, [(PumpMarket, u64); 2]) {
     let a = add_market(&mut env, first);
     let c = env.load_pump_coin(T22);
     let b = add_market(&mut env, c);
-    (env, [a, b])
+    let markets = [a, b];
+    crank_all(&mut env, &markets);
+    env.warp(1);
+    crank_all(&mut env, &markets);
+    (env, markets)
 }
 
 fn crank_all(env: &mut Env, markets: &[(PumpMarket, u64)]) {
@@ -578,6 +582,9 @@ fn a_real_upgrade_latches_opens_on_every_curve_market() {
         assert!(!g.is_flagged(venue));
         assert_eq!(g.guard_slot[i], s);
         assert_err(&flag(&mut env, venue), E::VenueNotUpgraded);
+        // Expiry advanced time: complete the fresh bucket before resuming opens.
+        env.warp(1);
+        crank_all(&mut env, &markets);
         for (pm, q) in &markets {
             ok(try_open(&mut env, pm, *q));
         }
@@ -893,6 +900,9 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
     ];
     let [(spl, qs), (t22, qt)] = &markets;
     let (near, qn) = add_market(&mut env, near_curve);
+    crank_all(&mut env, &markets);
+    env.warp(1);
+    crank_all(&mut env, &markets);
     let (b_syn, n_syn) = open_ok(&mut env, &near, qn);
     let curve_len =
         |env: &Env, pm: &PumpMarket| read::account(&env.svm, &pm.curve.curve).unwrap().data.len();
@@ -1073,6 +1083,8 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
         }
     }
     assert_eq!(env.venue_guard().upgraded, 0);
+    env.warp(1);
+    crank_all(&mut env, &markets);
     for (pm, q) in &markets {
         ok(try_open(&mut env, pm, *q));
     }

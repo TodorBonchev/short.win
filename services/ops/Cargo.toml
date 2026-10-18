@@ -23,6 +23,7 @@ toml.workspace = true
 tokio.workspace = true
 # The transaction buffer's `final_buffer_hash` (sha256 of the message).
 sha2.workspace = true
+solana-compute-budget-interface.workspace = true
 solana-hash.workspace = true
 solana-instruction.workspace = true
 solana-keypair.workspace = true

@@ -87,7 +87,7 @@
 use anchor_lang::prelude::*;
 use shortwin_math::pool::Vault;
 
-use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
+use crate::constants::{CONFIG_VERSION, MARKET_VERSION, VENUE_GUARD_VERSION};
 use crate::engine::guard;
 use crate::engine::pool_select::{self, FitAt, Proposal, SelectParams, Situation};
 use crate::engine::prologue;
@@ -111,7 +111,12 @@ pub struct ProposePool<'info> {
     pub config: AccountLoader<'info, GlobalConfig>,
     /// The venue-upgrade latch (A7; module docs step 3): a proposal is refused while the bit of
     /// the candidate's program is set (`VenueUpgraded`, M4-SEC-8). Read only.
-    #[account(seeds = [VenueGuard::SEED], bump = venue_guard.load()?.bump)]
+    #[account(
+        seeds = [VenueGuard::SEED],
+        bump = venue_guard.load()?.bump,
+        constraint = venue_guard.load()?.version == VENUE_GUARD_VERSION
+            @ ShortwinError::ConfigVersion
+    )]
     pub venue_guard: AccountLoader<'info, VenueGuard>,
     #[account(
         mut,

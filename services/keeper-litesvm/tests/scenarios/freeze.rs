@@ -167,6 +167,9 @@ fn slow_catch_up(env: &mut Env, rm: &RayMarket) {
         env.warp(60);
         env.crank(rm);
     }
+    // Each long gap restarts freshness; complete the consecutive observation before opening.
+    env.warp(1);
+    env.crank(rm);
     env.fresh_oracle();
 }
 
@@ -1164,7 +1167,9 @@ fn fit2_a_native_position_at_the_open_cap_is_liquidated_under_the_same_pushes() 
             if res.is_ok() {
                 break nonce;
             }
-            q = q / 1_000 * 995;
+            let next = q / 1_000 * 995;
+            assert!(next > 0 && next < q, "no admissible positive open: {res:?}");
+            q = next;
         };
         for _ in 0..3 {
             env.warp(1);
@@ -1754,7 +1759,9 @@ fn contest_market(fee: u64, lmin: u16, add_pct: u64, qpm: u64) -> ContestMarket 
         if res.is_ok() {
             break nonce;
         }
-        q = q / 1_000 * 995;
+        let next = q / 1_000 * 995;
+        assert!(next > 0 && next < q, "no admissible positive open: {res:?}");
+        q = next;
     };
     for _ in 0..3 {
         env.warp(1);

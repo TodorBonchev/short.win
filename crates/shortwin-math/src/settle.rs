@@ -455,6 +455,10 @@ pub struct SettleInputs {
     pub deadline: i64,
     /// `ema_count` after this instruction's roll.
     pub ema_count: u64,
+    /// Zero if the market has never restarted; otherwise one plus the EMA count at the
+    /// latest venue-observation restart. An older arm cannot reuse pre-restart evidence,
+    /// even if no evaluation observed the intervening warm-up (AIR2-08).
+    pub restart_ema_count: u64,
     /// `P_ema` after the roll (the point FV is paid at, D3).
     pub p_ema: u128,
     /// `L_ema` after the roll.
@@ -591,7 +595,7 @@ pub fn evaluate<Q: BoxQuotes>(
             if not_liquidatable(quotes, expired, inp.ema_leg, v_eff, terms.cr_liq_bps, bx)? {
                 state.armed = 0;
                 out.arm = ArmChange::Disarmed(DisarmReason::NotLiquidatable);
-            } else if state.is_live(now, terms.arm_gap_s) {
+            } else if state.is_live(now, terms.arm_gap_s) && state.count >= inp.restart_ema_count {
                 // AIR-16: only a live clock keeps running; a lapsed one is left for step 3 to
                 // re-arm (ECON §5.6), never revived with its old count.
                 state.last = now;
@@ -603,7 +607,7 @@ pub fn evaluate<Q: BoxQuotes>(
 
     // Step 3: S1 / S2 on one clock, on an executable venue.
     if inp.executable {
-        let live = state.is_live(now, terms.arm_gap_s);
+        let live = state.is_live(now, terms.arm_gap_s) && state.count >= inp.restart_ema_count;
         if state.armed != 0 && refuted(quotes, &inp.budget, terms.sigma_max_bps, inp.l_live, bx)? {
             state.armed = 0;
             out.arm = ArmChange::Disarmed(DisarmReason::Refuted);
@@ -795,6 +799,7 @@ mod tests {
             now,
             deadline: 1_000,
             ema_count: 100,
+            restart_ema_count: 0,
             p_ema: bx.p_lo,
             l_ema: bx.l_hi,
             bx,
@@ -819,6 +824,39 @@ mod tests {
                 migrating: false,
                 migration_seen_at: None,
             },
+        }
+    }
+
+    #[test]
+    fn air2_08_a_restart_rearms_even_when_no_call_observed_the_warmup() {
+        let terms = SettleTerms {
+            persist_n: 40,
+            ..TERMS
+        };
+        for count in [60, 100] {
+            // The restart follows the arm's last evaluation in the same EMA count/second.
+            // Eight warm-up integrations finish inside the 10-second arming gap.
+            let before = ArmState {
+                count,
+                since: 60,
+                last: 100,
+                armed: 1,
+                _pad: [0; 7],
+            };
+            let mut inp = inputs(109, SettleBox::point(10, 2));
+            inp.ema_count = 108;
+            inp.restart_ema_count = 101; // count at restart (100), plus one
+            let mut arm = before;
+            let out = evaluate(&mut arm, &inp, &terms, &mut toy()).unwrap();
+            assert_eq!(out.arm, ArmChange::Armed);
+            assert!(out.settlement.is_none());
+            assert_eq!((arm.count, arm.since), (108, 109));
+            for i in 1..=40 {
+                inp.now += 1;
+                inp.ema_count += 1;
+                let out = evaluate(&mut arm, &inp, &terms, &mut toy()).unwrap();
+                assert_eq!(out.settlement.is_some(), i == 40);
+            }
         }
     }
 

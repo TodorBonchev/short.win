@@ -177,7 +177,8 @@ pub fn init_if_new(
 /// market that has one (off the pump venues the UVA alone is its token leg) and sets the bit when
 /// it holds nothing claimable, so it is met exactly as on the curve — `[pump claim_cashback(user =
 /// trader), sweep_trader]`, no venue CPI, no M1-FID-12 deadlock. A market listed on Raydium or
-/// PumpSwap never had a pump UVA and is unchanged.
+/// PumpSwap has no curve-era cashback to recover and is unchanged (PumpSwap's cache still
+/// records the pump UVA address).
 ///
 /// **`PumpMigrating` (M6-SEC-5).** A full wipe can settle during the migration pause (S3 is the
 /// only settlement there, ARCH §5.3), with the trader's curve-era pump cashback still in its pump

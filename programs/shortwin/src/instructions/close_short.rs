@@ -49,7 +49,7 @@ use crate::constants::{CONFIG_VERSION, MARKET_VERSION};
 use crate::engine::guard::{mint_guard, MintPath};
 use crate::engine::{bounds, lender, prologue, waterfall as engine_waterfall};
 use crate::errors::{CheckedExt, MathResultExt, ShortwinError};
-use crate::events::{Close, MintSafetyTripped, TraderSwept, SWEEP_TO_VEST};
+use crate::events::{Close, MintSafetyTripped, TraderSwept};
 use crate::state::{
     GlobalConfig, Market, MarketVault, ShortPosition, VenueKind, WalletExposure, EXTRAS_IX_BUY,
     POOL_VAULT_SEED,
@@ -234,6 +234,7 @@ pub fn handler<'info>(
     };
     let swept = trader.normalise()?;
     if swept.any() {
+        let sweep_to = crate::events::sweep_to(&pool, SweepSource::Trader);
         if swept.lamports > 0 {
             pool::sweep(
                 &mut pool,
@@ -252,8 +253,8 @@ pub fn handler<'info>(
             ts: clock.unix_timestamp,
             lamports: swept.lamports,
             tokens: swept.tokens,
-            to: SWEEP_TO_VEST,
-            wipe_bits: 0,
+            to: sweep_to,
+            wipe_bits: crate::events::sweep_wipe_bits(&pool),
         });
     }
     let leg = Leg {

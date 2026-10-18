@@ -42,8 +42,9 @@ use crate::constants::{GUARD_PUMP_FEES, VENUE_PROGRAMS};
 pub const GUARD_ELF_FIRST: u8 = GUARD_PUMP_FEES;
 /// Venue programs with an ELF fingerprint: pump-fees, AMM v4, CPMM, Jupiter.
 pub const GUARD_ELF_VENUES: usize = VENUE_PROGRAMS - GUARD_ELF_FIRST as usize;
-/// Bytes of the trimmed ELF's sha256 the guard keeps (96 bits: a second preimage of a recorded
-/// fingerprint costs ~2^96 hashes).
+/// Bytes of the trimmed ELF's sha256 the guard keeps (96 bits). A fixed reviewed fingerprint
+/// has a generic second-preimage cost of ~2^96 hashes, but an authority choosing both ELFs has
+/// a generic collision bound of ~2^48. AIR2-07 tracks the unresolved full-digest migration.
 pub const GUARD_ELF_LEN: usize = 12;
 
 /// The fingerprint `VenueGuard::guard_elf` keeps of a trimmed ELF's sha256: its first

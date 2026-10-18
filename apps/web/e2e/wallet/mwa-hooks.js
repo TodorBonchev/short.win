@@ -2,8 +2,8 @@
  * TEST-ONLY init-script hooks for the Mobile Wallet Adapter E2E (FRONTEND.md §10.2; mobile.md §5.2),
  * installed with `page.addInitScript` by the `mwa` fixture only. Plain browser JS, no imports.
  *
- * Headless Chromium has no app for the `solana-wallet:` intent and `Location`'s members cannot be
- * stubbed, so these hooks stand in for Android's app switch around the protocol
+ * Headless Chromium has no Android wallet app and `Location`'s members cannot be stubbed, so these
+ * hooks stand in for Android's app switch around the protocol
  * (`@solana-mobile/mobile-wallet-adapter-protocol` 3.0.0):
  *
  * - The association. `URLSearchParams.prototype.set` is wrapped (calling through unchanged): when the
@@ -11,6 +11,10 @@
  *   and each pair is recorded as `{ association, port, active, at }`, `active` being
  *   `navigator.userActivation.isActive` at that moment (Android hands the intent to the wallet app
  *   only within the tap's user activation) and `at` `performance.now()`.
+ * - The external intent. The Navigation API cancels only `solana-wallet:` navigations. Chromium
+ *   152 otherwise starts a native external-protocol handoff that leaves subsequent touch input
+ *   blocked, even after a reload. The intent is already recorded above; its fake app switch and
+ *   the real library's association socket still run. Ordinary page navigations are unchanged.
  * - The app switch. The protocol then waits up to 3 s for the page to lose focus (getDetectionPromise:
  *   `window.addEventListener('blur', …)`). `window.addEventListener` is wrapped: the first `blur`
  *   listener `window` gets after a recorded association is that one, and a synthetic `blur`
@@ -31,6 +35,11 @@
     let pending = false;
     /** The `association` value whose `port` has not been set yet. */
     let current = null;
+
+    // jsdom (the protocol unit tests) has no Navigation API or native external-protocol handoff.
+    window.navigation?.addEventListener('navigate', (event) => {
+        if (new URL(event.destination.url).protocol === 'solana-wallet:') event.preventDefault();
+    });
 
     const set = URLSearchParams.prototype.set;
     URLSearchParams.prototype.set = function hookedSet(name, value) {

@@ -48,6 +48,8 @@ fn rebase(lab: &mut Lab, pid: &str, sol: u64, lump: u64) {
     assert_eq!(lab.market().share_epoch, e + 1, "{pid}: the epoch rolled");
     let r = *lab.state().records.last().unwrap();
     assert_eq!(r.num, 1, "{pid}: a rebase, not a wipe");
+    // AIR2-05: clear the empty pre-flush source; the following lump is new income.
+    lab.sweep_sol(0);
     if lump > 0 {
         lab.sweep_sol(lump);
     }
@@ -417,6 +419,8 @@ fn rebase_k1(lab: &mut Lab, pid: &str, sol: u64) {
     assert_eq!(lab.market().share_epoch, e + 1, "{pid}: the epoch rolled");
     let r = *lab.state().records.last().unwrap();
     assert_eq!((r.num, r.den_log1000), (1, 1), "{pid}: a 1/1,000 rebase");
+    // AIR2-05: no old trader SOL remains before the next epoch's deposits.
+    lab.sweep_sol(0);
 }
 
 /// Rent in the current epoch with an early leaver: half the free tokens borrowed, `days` of
@@ -804,6 +808,7 @@ fn term_only_lender() -> Lab {
     lab.borrow30("3", t - 1).unwrap();
     lab.settle("3", 0, 0);
     lab.settle("1", 0, 0);
+    lab.sweep_sol(0);
     lab.touch("X");
     let x = lab.position("X").unwrap();
     assert_eq!(

@@ -102,9 +102,19 @@ fn withdraw_all_free(
     lender: &solana_keypair::Keypair,
     k: &LenderKeys,
 ) {
+    withdraw_leaving(env, market, lender, k, 0);
+}
+
+fn withdraw_leaving(
+    env: &mut Env,
+    market: &Pubkey,
+    lender: &solana_keypair::Keypair,
+    k: &LenderKeys,
+    remaining: u64,
+) {
     let m = env.market(market);
     let pool = m.pool();
-    let want = m.tokens_free;
+    let want = m.tokens_free - remaining;
     let shares = env.lender(market, &lender.pubkey()).expect("lender").shares;
     let (mut lo, mut hi) = (0u128, shares);
     while lo < hi {
@@ -116,7 +126,86 @@ fn withdraw_all_free(
         }
     }
     ok(env.send(&[ix::withdraw(k, lo, want)], &[lender]));
-    assert_eq!(env.market(market).tokens_free, 0);
+    assert_eq!(env.market(market).tokens_free, remaining);
+}
+
+#[test]
+fn a_dust_flush_with_surviving_shares_claims_cashback_and_unlocks_deposits() {
+    let (mut env, pm, q) = pamm_setup(PammCoin::Cashback);
+    let market = pm.market();
+    let mut borrower = env.borrower();
+    let (res, nonce) = env.open(&pm, &mut borrower, q);
+    ok(res);
+    // A real donation/sweep leaves a running vest for the later dust settlement to flush.
+    let payer = env.payer.insecure_clone();
+    ok(env.send(
+        &[transfer_ix(&payer.pubkey(), &pm.trader(), SOL)],
+        &[&payer],
+    ));
+    let sweep = pamm::sweep_trader_pamm_ix(&env, &pm);
+    ok(env.send(&[sweep], &[]));
+    assert!(env.market(&market).vest_bal > 0);
+    let lender = pm.lender.insecure_clone();
+    withdraw_leaving(&mut env, &market, &lender, &pm.lender_keys(), q / 2_000);
+    let whale = PammUser::new(&mut env, &pm.pool, 1_000 * SOL);
+    ok(whale.push_price(&mut env, &pm.pool, 5, 1));
+    let position = shortwin_litesvm_tests::pda::position(&market, &borrower.key(), nonce).0;
+    let mut h = Harness::new(
+        env,
+        covering_all(KeeperConfig {
+            sweep: SweepConfig {
+                post_wipe: false,
+                sweep: false,
+                ..SweepConfig::default()
+            },
+            ..KeeperConfig::default()
+        }),
+    );
+    let mut flushed = false;
+    for _ in 0..240 {
+        let r = h.second().clone();
+        assert!(r.errors.is_empty(), "{:?}", r.errors);
+        if let Some(settled) = r
+            .exits
+            .iter()
+            .find(|e| e.position == position)
+            .and_then(|e| e.result.landed())
+            .and_then(|out| shortwin_keeper::events::of::<SolSettle>(out).pop())
+        {
+            assert!(settled.vest_flushed > 0);
+            flushed = true;
+            break;
+        }
+    }
+    assert!(flushed, "keeper settled and dust-flushed the position");
+    let m = h.with_env(|env| env.market(&market));
+    assert!(m.total_shares.get() > 0);
+    assert!(!m.has_flag(MARKET_FLAG_WIPE_LIVE));
+    assert!(sweep::wipe_pending(&m));
+    let amount = q * 40;
+    let (kp, keys) = h.with_env(|env| new_lender(env, &pm.keys, amount));
+    h.with_env(|env| {
+        assert_err(
+            &deposit(env, &market, &kp, &keys, amount),
+            ShortwinError::WipeSweepPending,
+        )
+    });
+    h.keeper.config_mut().sweep.post_wipe = true;
+    let report = h.second().clone();
+    assert!(report.errors.is_empty(), "{:?}", report.errors);
+    let (_, event) = post_wipe(&report, &market);
+    assert_eq!(event.to, shortwin::events::SWEEP_TO_LENDERS);
+    assert!(event.lamports > 0);
+    assert_eq!(event.wipe_bits, WIPE_TRADER_SWEPT | WIPE_REWARDS_CLAIMED);
+    h.with_env(|env| {
+        let m = env.market(&market);
+        assert!(!sweep::wipe_pending(&m));
+        assert_eq!(
+            m.vest_bal, 0,
+            "old cashback is immediately credited, not re-vested"
+        );
+        ok(deposit(env, &market, &kp, &keys, amount));
+    });
 }
 
 /// A new lender funded with `amount` tokens of `keys`' mint, and its deposit into the market

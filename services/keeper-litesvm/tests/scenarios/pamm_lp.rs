@@ -62,6 +62,9 @@ fn market(position: bool) -> (Env, PammMarket, PammLp) {
         env.warp(60);
         env.crank(&pm);
     }
+    // The last long gap needs a completed consecutive observation before an open.
+    env.warp(1);
+    env.crank(&pm);
     assert_eq!(pm.pool.locked_depth(&env.svm).0, 5_000, "λ 50 %");
     if position {
         let mut b = env.borrower();

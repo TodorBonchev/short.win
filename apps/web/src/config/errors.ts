@@ -322,7 +322,7 @@ const ROWS: readonly Row[] = [
         6101,
         'EmaWarmingUp',
         'wait',
-        'Prices on this market are being confirmed after a venue change or listing (8 seconds of observations). Try again shortly.',
+        'This market needs fresh price observations, or is confirming prices after a venue change or listing (8 seconds of observations). Try again after prices update.',
     ],
     [6102, 'CarriedPositionsTooLarge', 'blocked', 'An open position would not fit the new pool’s opening limits.'],
     [6103, 'ReservedScanOutOfOrder', 'report', 'Reserved error code (never returned).'],
@@ -354,7 +354,7 @@ const ROWS: readonly Row[] = [
         6108,
         'PoolDrained',
         'wait',
-        'This pool is drained: at most 1/1,000 of its tokens are unborrowed. Deposits wait until repayments or settlements free more.',
+        'Deposits wait while at most 1/1,000 of the pool’s tokens are unborrowed, or while settlement income is still vesting. Wait for repayments or the vest to finish.',
     ],
     // pump-final D4: the program's text, as drafted (`copyPump.ts`, FRONTEND §4.3).
     [6109, 'CurveCashbackCoin', 'blocked', PUMP_COPY['error.curveCashbackCoin'].text],

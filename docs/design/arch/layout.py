@@ -5,7 +5,9 @@ Raydium pool's locked depth and, on PumpSwap, the canonical pool's burned-LP dep
 executable observation from the LP mint's supply; 0 at the transition); M6-SEC-1, M6-SEC-3 and M6R-4 add no field.
 
 The AI review's fixes take reserved bytes, no size changes: Market.lender_credit_rem @2,936 (AIR-03) and
-min_open_hard_cap_bps @2,952 (AIR-19), VenueGuard.guard_len @160 and guard_elf @176 (AIR-01)."""
+min_open_hard_cap_bps @2,952 (AIR-19), VenueGuard.guard_len @160 and guard_elf @176 (AIR-01).
+AIR2 adds Market.deposit_hold_until @2,960 and restart_ema_count @2,968, leaving 128 reserved
+bytes @2,976; Market stays 3,104 bytes (unreleased v1.0.2 candidate)."""
 import sys
 SZ = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":32,"PodU128":16,"PodI128":16}
 AL = {"u8":1,"u16":2,"u32":4,"u64":8,"i64":8,"Pubkey":1,"PodU128":1,"PodI128":1}
@@ -75,7 +77,9 @@ g("misc", ("coverage_cleared_at","i64"),   # M7-SEC-3: the second set_coverage_p
   ("lender_credit_rem","PodU128"),         # AIR-03: the lender rent credit's remainder carried between accruals, from _reserved[0..16]
   ("min_open_hard_cap_bps","u16"),         # AIR-19: the lowest venue_fee_hard_cap_bps an open position locked (the S3 chain's cap), from _reserved[16..18]
   ("_pad6",arr("u8",6)),
-  ("_reserved",arr("u8",144)))
+  ("deposit_hold_until","i64"),           # AIR2: -1 initialized/no hold, 0 legacy, positive settlement hold
+  ("restart_ema_count","u64"),            # AIR2: count+1 invalidates settlement arms after observation restart
+  ("_reserved",arr("u8",128)))
 rows, end = layout("Market", M, disc=8)
 
 # v0.4.1 (R4A-2 / R4B-3): MarketVault becomes zero-copy and carries the lock expiry calendar

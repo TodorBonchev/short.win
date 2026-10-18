@@ -619,6 +619,9 @@ fn the_dust_a_run_leaves_counts_as_a_wipe_for_the_vest() {
         s.m.pool.vest_bal, 0,
         "the vest is flushed to the old shares"
     );
+    assert_eq!(s.deposit(2, 1_000_000), Err(MathError::WipeSweepPending));
+    s.m.sweep(0)
+        .expect("complete the pending trader sweep after the dust flush");
     s.deposit(2, 1_000_000).expect("the newcomer");
     s.advance(VEST + 1, 0);
     assert_eq!(s.claim(2), Ok(0), "the newcomer");

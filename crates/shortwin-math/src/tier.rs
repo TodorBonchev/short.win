@@ -163,8 +163,9 @@ pub enum TierVenue {
     /// Pump bonding curve, live or migrating: always Tier D.
     PumpCurve,
     /// PumpSwap canonical pool, bounded by the locked depth of its burned LP (M6R-1, owner
-    /// decision of 2026-09-30; ECON #105, ARCH §4.7): `D = ⌊λ_bps·isqrt(X·(Y + VQR))/10⁴⌋` with
-    /// `λ_bps` from `Pool.lp_supply` and the LP mint's supply
+    /// decision of 2026-09-30; ECON #105, ARCH §4.7): since AIR2-09,
+    /// `D = ⌊(counter − supply)·isqrt(X·(Y + VQR))/counter⌋`, with `counter` from
+    /// `Pool.lp_supply` and `supply` from the LP mint
     /// ([`pool_select::locked_depth`](crate::pool_select::locked_depth)), less the virtual reserve
     /// (`R_eff ≤ ⌊max(⌊D·isqrt(P_ema)/10⁹⌋ − max(VQR + buckets, 0), 0)·10⁴/λ_min⌋`: real SOL only,
     /// Q19).

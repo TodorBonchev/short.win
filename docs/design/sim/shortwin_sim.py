@@ -8,6 +8,10 @@ ECONOMICS §4, §5.7, §8, §10 and §11 were produced by this script; the
 manipulation tables of §12 come from ./attacks/ (which import this module).
 Standard library only (Python >= 3.8).  Deterministic (fixed seeds).
 
+AIR2 current arithmetic: locked depth uses the raw burned-LP ratio, without an
+intermediate whole-bps floor. Historical attack drivers explicitly retain the
+older formula; see README.md for their scope and the current output commands.
+
     python3 shortwin_sim.py                 # everything, Monte Carlo 200 paths/cell
     python3 shortwin_sim.py --mc 400        # the run used for ECONOMICS.md
     python3 shortwin_sim.py --quick         # skip Monte Carlo and fuzz
@@ -231,6 +235,8 @@ import random
 import sys
 from dataclasses import dataclass, replace
 from typing import Callable, Optional
+
+RAW_LOCKED_DEPTH = True  # Historical attack drivers explicitly retain the pre-AIR2 bps floor.
 
 # ----------------------------------------------------------------------------
 # Units & fixed point (ECON §2 numerics table)
@@ -677,12 +683,16 @@ class CPPool(Venue):
         return self.lp_locked * BPS // self.lp_units if self.lp_units else 0
 
     def locked_depth(self) -> int:
-        """D = floor(lambda_bps*isqrt(X*(Y + VQR))/1e4) (M6R-1, #105; ARCH §2.6's metric on the pricing reserves): the
-        depth of the burned LP.  A third-party deposit or withdrawal scales X, Y, VQR and lp_supply together (R-VEN
-        Update H11), so it leaves D unchanged up to the whole-bps floor of lambda; a swap moves it only by the LP fee
+        """D = floor(lp_locked*isqrt(X*(Y + VQR))/lp_units): the depth of the burned LP.
+        AIR2 removes the intermediate whole-bps floor; lock_bps remains the display helper.
+        A third-party deposit or withdrawal scales X, Y, VQR and lp_supply together (R-VEN
+        Update H11), so it leaves D unchanged up to integer reserve/LP rounding; a swap moves it only by the LP fee
         the pool keeps, the boost not at all (up to rounding in the pool's favour).  = sqrt_k() while every LP unit is
         burned (the pre-#105 reading of a canonical pool)."""
-        return self.lock_bps() * self.sqrt_k() // BPS
+        if not RAW_LOCKED_DEPTH:
+            return self.lock_bps() * self.sqrt_k() // BPS
+        return (self.lp_locked * self.sqrt_k() // self.lp_units
+                if self.lp_units > 0 and 0 <= self.lp_locked <= self.lp_units else 0)
 
     def add_liquidity(self, frac_bps: int) -> None:
         """A third-party PumpSwap deposit of frac_bps of the pool (R-VEN Update H11: accepted on canonical pools, boost
@@ -751,8 +761,8 @@ class RaydiumPool(Venue):
     """Raydium AMM v4 / CPMM: constant product with the fee on the INPUT amount
     (D2; exact per-venue forms in ARCH §4.3).  LP units: lp_units ~ sqrt(k) at
     creation, lp_locked = the permanently locked (burned) part; lambda =
-    lp_locked/lp_units; locked depth D = floor(lambda_bps*isqrt(X*Y)/1e4)
-    (R3A-12).  Unlocked LP can be withdrawn only down to the locked part unless
+    lp_locked/lp_units; locked depth D = floor(lp_locked*isqrt(X*Y)/lp_units)
+    (AIR2, without an intermediate bps floor). Unlocked LP can be withdrawn only down to the locked part unless
     force=True (a model case outside what an adopted pool allows)."""
     kind = "ray"
     lp_mutable = True
@@ -784,7 +794,10 @@ class RaydiumPool(Venue):
         return self.lp_locked * BPS // self.lp_units if self.lp_units else 0
 
     def locked_depth(self) -> int:
-        return self.lock_bps() * self.sqrt_k() // BPS
+        if not RAW_LOCKED_DEPTH:
+            return self.lock_bps() * self.sqrt_k() // BPS
+        return (self.lp_locked * self.sqrt_k() // self.lp_units
+                if self.lp_units > 0 and 0 <= self.lp_locked <= self.lp_units else 0)
 
     def _rate(self, cap_ppm):
         r = self.fee_ppm + self.creator_ppm
