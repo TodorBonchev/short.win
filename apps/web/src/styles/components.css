@@ -8,6 +8,8 @@
    strip above the tab bar on a phone). */
 .app {
     display: grid;
+    /* A long RPC slot in the status bar must scroll inside its row, not widen every grid row. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr auto;
     min-height: 100dvh;
 }
@@ -140,6 +142,7 @@
     bottom: 0;
     z-index: var(--z-header);
     display: flex;
+    min-width: 0;
     align-items: center;
     height: calc(var(--statusbar-h) + var(--safe-b));
     /* The page's gutter, as the header: the first dot starts where the title and the panels do. */
@@ -254,7 +257,15 @@ a.statusbar-item {
        the phone's strip instead (the combined block below). */
     .statusbar-items {
         gap: var(--sp-3);
-        overflow: hidden;
+        /* Keep all status facts and links reachable when the RPC slot grows beyond three digits. */
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+    }
+
+    .statusbar-items:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: -2px;
     }
 
     /* The free space moves before the search: ⌕ and the wallet form the trailing group (DOM order unchanged). */
@@ -2742,7 +2753,8 @@ bdi,
     .sheet-host[data-sheet="open"] .sheet-head {
         position: sticky;
         top: 0;
-        z-index: 1;
+        /* A nested price-refresh form foot can scroll under the head. */
+        z-index: 2;
         display: flex;
         align-items: center;
         gap: var(--sp-3);

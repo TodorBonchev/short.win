@@ -27,10 +27,16 @@ const state = vi.hoisted(() => ({
     close: vi.fn(),
     stage: 'idle' as TxStage,
     plan: null as TxPlan | null,
+    walletConnected: true,
 }));
 
 // The panel's Retry rebuilds trades through the app's RPC client (M9-UX-1); not exercised here.
 vi.mock('../../rpc/context.tsx', () => ({ useAppClient: () => ({ rpc: {}, rpcSubscriptions: {} }) }));
+vi.mock('../../wallet/WalletChooser.tsx', () => ({
+    useWalletList: () => [],
+    NoWallet: () => null,
+    WalletOptions: () => null,
+}));
 vi.mock('./hooks.ts', () => ({
     useShortSnapshot: () => ({
         data: state.snapshot,
@@ -49,8 +55,10 @@ vi.mock('../../wallet/useWallet.ts', () => {
     return {
         useWallet: () => ({
             ready: true,
-            status: 'connected',
-            connected: { address, signer: createNoopSigner(address), walletName: 'Test', supportsV0: true },
+            status: state.walletConnected ? 'connected' : 'disconnected',
+            connected: state.walletConnected
+                ? { address, signer: createNoopSigner(address), walletName: 'Test', supportsV0: true }
+                : null,
         }),
     };
 });
@@ -94,6 +102,7 @@ beforeEach(() => {
     state.close.mockClear();
     state.stage = 'idle';
     state.plan = null;
+    state.walletConnected = true;
 });
 
 async function show(name: string, patch?: (s: ChainSnapshot) => ChainSnapshot) {
@@ -144,6 +153,14 @@ describe('ShortPanel', () => {
         fireEvent.click(screen.getByTestId(T.shortPriceRefresh));
         expect(state.start).toHaveBeenCalledTimes(1);
         expect(state.start.mock.calls[0]?.[1]).toEqual([NO_EXTRAS]);
+    });
+
+    it('shows one Connect wallet action when a disconnected short needs a price refresh', async () => {
+        state.walletConnected = false;
+        await show('spl-open-0', (s) => ({ ...s, now: s.now + COVERAGE_GAP_S + 1n }));
+        expect(screen.getByTestId(T.shortPriceRefreshStep).dataset.step).toBe('record');
+        expect(screen.getAllByTestId(T.connectCta('short'))).toHaveLength(1);
+        expect((screen.getByTestId(T.shortPriceRefresh) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it('holds the next review in the recording second and resumes from chain state after reload', async () => {
