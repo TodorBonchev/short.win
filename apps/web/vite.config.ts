@@ -14,7 +14,7 @@
 import { mkdirSync, readFileSync, renameSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defaultClientConditions, defineConfig, loadEnv, type Plugin } from 'vite';
 import { ANTI_FRAMING_HEADERS, contentSecurityPolicy, headersFile } from './src/config/csp.ts';
 import { parseConfig } from './src/config/parseConfig.ts';
 import { SECURITY_TXT_PATH, securityTxtProblems } from './src/config/securityTxt.ts';
@@ -67,6 +67,8 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_');
     return {
         plugins: [react(), securityPlugin(env)],
+        // The workspace's @shortwin/client resolves to its TypeScript sources, not its dist/.
+        resolve: { conditions: ['@shortwin/source', ...defaultClientConditions] },
         build: {
             target: 'es2023',
             sourcemap: 'hidden',

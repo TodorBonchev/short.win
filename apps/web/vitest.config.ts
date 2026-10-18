@@ -1,8 +1,12 @@
 import react from '@vitejs/plugin-react';
+import { defaultClientConditions, defaultServerConditions } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
     plugins: [react()],
+    // The workspace's @shortwin/client resolves to its TypeScript sources, not its dist/.
+    resolve: { conditions: ['@shortwin/source', ...defaultClientConditions] },
+    ssr: { resolve: { conditions: ['@shortwin/source', ...defaultServerConditions] } },
     test: {
         environment: 'jsdom',
         // e2e/**: the E2E harness's own unit tests (the fake MWA wallet against the real library).
