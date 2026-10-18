@@ -232,7 +232,7 @@ final-withdrawal carry correction and keeper/parser fixes to `b815269`. Account 
 and instruction formats are unchanged; the IDL version and WASM/client artifacts were
 regenerated. The same canonical build commands produced:
 
-| Local artifact | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
+| Candidate artifact (local and CI) | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
 |---|---|---|---|
 | `target/deploy/shortwin.so` | `b88aa520c24301522b45871e73622a4d498603dc03a8f34ff8bbb557d7fa0647` | `22d1cda5be8eaae7aa00f45b8a17f64edfb5b4d84d21e3f7ad545f966b83ea1a` | 1,642,664 |
 | `target/test-venue/deploy/shortwin.so` | `994ad12c468f465937af21080ec3c48678bb1f197ab143ab44f91f98ca56132b` | `282998677eea81be8b7711c79177e0424ed8544db3cec28d1ba4289f5e43c682` | 1,673,696 |
@@ -240,8 +240,12 @@ regenerated. The same canonical build commands produced:
 Both are SBPF v3. A49 passes, and the release ELF's `security.txt` names `v1.0.3`.
 The pinned solana-verify 0.5.2 image rebuilt the release program from an isolated
 snapshot of these program sources and reproduced the release file and executable hashes
-byte for byte. Its local hash record is `target/release-gates/verifiable-v103/verifiable-hashes.txt`;
-the final revision still needs CI confirmation. These are not deployment evidence.
+byte for byte. The exact-ref CI verifier job on `9b91060` also passed and its downloaded
+ELF compares byte-for-byte equal to that run's Anchor artifact; the
+[CI hash record](audit/ci-1.0.3-hashes.txt) records the image and both build artifacts.
+[Exact-ref CI run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
+passed on `9b91060`: 25 jobs successful, with only the scheduled fuzz job skipped.
+These are not deployment evidence.
 The [draft validation record](audit/ai-review-3/validation-1.0.3.md) lists the checks
 and remaining release gates; the older build and CI evidence above does not cover
 these bytes.

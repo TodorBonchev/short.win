@@ -74,7 +74,8 @@ exploitable or that the remaining program is safe.
 | AI3-L04 | Preserve all pending rank candidates until every RPC group succeeds | in progress | First/second-group failure and successful retry without rediscovery |
 
 These rows describe draft implementations, not the tracker’s strict **fixed** state.
-There is no release tag, deployment, full-gate claim or external fix review. The earlier
+Exact-ref full CI passed on `9b91060`; this does not complete the 24-hour fuzz or
+independent fix-review requirements. There is no release tag or deployment. The earlier
 AIR-01 … AIR-24 fuzz waiver does not cover this batch. The package and its lock entries
 are 1.0.3; account layouts, instruction formats and program identity are unchanged.
 
@@ -106,8 +107,8 @@ The regression against the previous release ELF completes two cohorts with signe
 deposits/withdrawals and actual System donations plus permissionless trader sweeps. It
 fails because the departing lender receives 1,000,000 instead of 1,001,000 lamports;
 the next cohort receives the missing 1,000. Unit negative controls also fail for carry
-mismatches and sub-lamport residue handling. Combined candidate validation is recorded
-below after the new binaries are built.
+mismatches and sub-lamport residue handling. Implementation checks and final-code gate
+evidence are separated in the [1.0.3 validation record](ai-review-3/validation-1.0.3.md).
 
 ## AI review 2 working-tree batch (2026-10-18)
 

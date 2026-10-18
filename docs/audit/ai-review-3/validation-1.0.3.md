@@ -3,6 +3,14 @@
 Date: 2026-10-18. Base: `b815269224ba0f5d946f49de7e113220c4067041` (draft 1.0.2).
 These checks concern the subsequent unreleased fixes. They are separate from the
 immutable static scan and from any tagged, deployed or externally reviewed release.
+The integrated candidate is `9b910602ed076a6d4359c496960b3ffc0e7c6af8` on
+`audit-1.0.3-gates`; the implementation commit is `60d26ad9541c7894a385118660a0ce75fd088367`.
+The descendant merges upstream `main` and adjusts browser fixtures and the mobile trade
+sheet/status strip. It changes no program or fuzzer source. The opt-in responsive suite
+passed 96/96 on the final web source across eight viewports: no document/main overflow,
+offscreen controls, tap covers or axe violations in its captured states.
+The subsequent gate-evidence update changes only `TODO.md` and documentation; CI
+evidence is tied to the exact code commit above.
 
 ## Changes
 
@@ -18,7 +26,9 @@ immutable static scan and from any tagged, deployed or externally reviewed relea
 - AI3-L01/L03/L04: reject truncated ALT metadata and unsupported typed account versions;
   preserve the complete ranking batch across RPC failures.
 
-Program package and all seven relevant lock entries are 1.0.3. No dependencies changed.
+Program package and all seven relevant lock entries are 1.0.3. No Rust dependencies
+changed. The integrated upstream web-client packaging moves `@solana/kit` from a direct
+dependency to peer and development dependencies; `pnpm-lock.yaml` reflects that move.
 The IDL change is its version only; no account layout or instruction format changes.
 The generated client and WASM were rebuilt. The scope generator now explicitly excludes
 the previously added vendored PostgreSQL archive patch, which is used only by the optional
@@ -69,21 +79,24 @@ repeated per-lender accrual truncation.
 
 | Check | Result |
 |---|---|
+| Exact-ref full CI | [Run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500), `workflow_dispatch` attempt 1 on `9b910602ed076a6d4359c496960b3ffc0e7c6af8`: 25 jobs passed, zero failed, and only `fuzz-nightly` was intentionally skipped. This confirms the integrated code revision; the separate 24-hour local fuzz gate remains open. |
 | Canonical release and test-venue SBF builds | Passed; SBPF v3; local hashes in [AUDIT §0](../../AUDIT.md#0-commit-ids-hashes-contacts) |
 | A49 and release `security.txt` | Passed; source release `v1.0.3` |
 | Generated IDL/client | Sync, generation, typecheck and tests passed |
 | WASM | Web build and Node facade smoke passed |
-| Web | 1,065 tests passed, one skipped; typecheck and lint passed |
+| Web | Earlier local run: 1,065 tests passed, one skipped. Exact-ref CI on `9b91060`: 1,066 passed, one skipped; typecheck, lint and build passed. |
+| Required browser E2E on final commit | Exact-ref CI `web-e2e` passed: 125 cases with two expected skips; the MWA-disabled follow-up passed nine with 19 expected skips. The opt-in responsive run on the final web source passed 96/96 across eight viewports, with no captured overflow, offscreen controls, tap covers or axe violations; [metrics summary](../responsive-1.0.3.md). |
 | Normative pool model | Full script passed, including 180,000 pool operations, 120,000 stranding operations and differential/lazy-conversion checks |
 | Fixture reproducibility | All 21 generated pool/lend files reproduce byte-for-byte |
 | Complete math suite | 382 tests passed before the final added signed-true-up test; the final seven-test carry module passes |
 | Strict Clippy | Root workspace, standalone program, services workspace and standalone keeper passed |
 | Scope classification | Regenerated scope matches tracked files; the prior test-only vendor addition is explicitly classified |
-| Program, venue-state, LiteSVM, math-WASM and Squads core tests | 1,345 passed; five ignored |
+| Program, venue-state, LiteSVM, math-WASM and Squads core tests | Earlier local run: 1,345 passed, five ignored. Exact-ref CI program job: 1,385 passed, zero failed, five ignored. |
 | M1 compute | All 63 instruction cases pass. The new final-share/unequal-carry case consumes 38,264 CU on Mollusk and LiteSVM, within the unchanged 100,000-CU withdrawal budget. Strict M1 Clippy passes. |
 | Fuzz smoke | 21 release smoke tests passed after updating the historical CPMM positive oracle; corpus seed/actions and general bounds are unchanged |
+| Mutations on final commit | Exact-ref CI killed all 19 mutants: seven by named tests plus three-minute fuzz and twelve by named tests; none survived. |
 | Services | Complete workspace: 421 passed, six ignored; the repaired batching case, pool-34 retry and typed-version checks pass |
-| Verifiable build | Pinned solana-verify 0.5.2 rebuilt an isolated snapshot of the candidate program sources; release ELF `b88aa520…a0647` was byte-identical to the canonical Anchor build. A49 and `security.txt` passed on the rebuilt ELF. Final-revision CI confirmation remains pending. |
+| Verifiable build | Pinned solana-verify 0.5.2 rebuilt the release ELF `b88aa520…a0647`. The exact-ref CI verifier job on `9b91060` passed and its downloaded ELF was byte-identical to that run's Anchor artifact; [hashes and tool provenance](../ci-1.0.3-hashes.txt). A49 and `security.txt` passed. |
 | T-POT full traces | All five release LiteSVM traces passed, including 40 stranding seeds and the 60,000-line economic fuzz trace. The updated stranding total is 15,273 lamports, maximum 444, matching the model. |
 | Dependency policy | cargo-deny 0.20.2 passed for root and services; cargo-audit 0.22.2 passed for all eight lockfiles with the five existing CI ignores. |
 | Fixture integrity | 340 pinned entries and archive SHA-256 checks passed; mainnet drift check at slot 458,456,265 found no pinned program or account changes. |
@@ -123,10 +136,10 @@ compilation/replay. Historical attack-rule snapshots and outputs were preserved.
 
 This is an unreleased draft, not a released fix batch. The findings tracker therefore
 uses **in progress**, not **fixed**. Open economic/venue issues need resolution or explicit
-acceptance within their bounds. Release still needs a full gate on the final revision,
-CI, the full browser gate, ≥24 h fuzz on the final program bytes, and external fix review.
-The local verifiable build and compute/size checks passed on the candidate program bytes;
-the final committed revision still needs CI confirmation. Earlier CI and fuzz evidence do not
-cover 1.0.3; the AIR-01 … AIR-24 fuzz waiver does not extend to this batch.
+acceptance within their bounds. Exact-ref full CI, required browser E2E, opt-in
+responsive coverage, the verifiable build and local compute/size checks passed on
+the candidate. Release still needs ≥24 h fuzz on the final program bytes and
+independent fix review. Earlier fuzz evidence does not cover 1.0.3; the AIR-01 …
+AIR-24 fuzz waiver does not extend to this batch.
 The [fix-review packet](fix-review-1.0.3.md) records the questions and boundaries
 for an independent reviewer; it is not a substitute for that review.

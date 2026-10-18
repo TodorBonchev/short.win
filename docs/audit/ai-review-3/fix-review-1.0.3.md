@@ -5,7 +5,12 @@ This packet is for an independent review of the 1.0.3 candidate after the audit 
 review or a sign-off. The [original report](report.md), [31-item triage](triage.md)
 and [validation record](validation-1.0.3.md) are separate: the report describes the
 old tree; the latter two describe the draft changes and their limits. The exact
-candidate commit and CI run must be recorded before sign-off.
+integrated candidate is `9b910602ed076a6d4359c496960b3ffc0e7c6af8` on
+`audit-1.0.3-gates`. Its [CI run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
+is attempt 1 of a `workflow_dispatch` on that SHA. The release and test-venue file
+hashes, tool image and verifier/Anchor byte comparison are in the
+[CI hash record](../ci-1.0.3-hashes.txt). The run passed 25 jobs with only the scheduled
+fuzz job skipped. The separate 24-hour fuzz run and independent fix review remain open.
 
 ## Questions for the reviewer
 

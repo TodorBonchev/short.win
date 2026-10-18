@@ -28,10 +28,21 @@ separates prior issues from new observations and records implementation decision
       parser change and all ten common-library tests pass afterward.
 - [x] Record combined validation and local artifact hashes in the
       [findings tracker](docs/audit/findings.md#ai-review-3-draft-103-2026-10-18).
-- [ ] Complete release gates on the final revision: remaining issue decisions, full CI,
-      full browser gate, ≥24 h fuzz and external fix review. Local verifiable-build and
-      compute/size checks passed on the same program bytes; CI must confirm the final
-      revision. The earlier fuzz waiver covers AIR-01 … AIR-24 only.
+- [x] Complete the opt-in responsive browser gate on the final web source: 96/96 cases
+      passed across eight viewports, with no captured overflow, offscreen controls,
+      tap covers or axe violations. The mobile sheet and long RPC-slot regressions pass.
+- [x] Complete the required browser E2E gate on `9b91060`: CI passed 125 cases
+      with two expected skips; the MWA-disabled follow-up passed nine with 19 expected skips.
+- [x] Complete the exact-ref full CI gate on `9b91060`:
+      [run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
+      passed 25 jobs, with only the scheduled fuzz shard skipped. The Anchor and
+      verifiable release ELFs are byte-identical; 1,385 program tests passed with five
+      ignored, and all 19 mutants were killed.
+- [ ] Complete the ≥24 h fuzz run on the 1.0.3 program and fuzzer bytes. It started
+      2026-10-18 13:44 UTC with four jobs and all venue profiles; the earlier fuzz
+      waiver covers AIR-01 … AIR-24 only.
+- [ ] Resolve or document the remaining issue decisions and obtain independent fix
+      review before marking findings fixed or tagging 1.0.3.
 
 KI-69's hashed-bootstrap procedure and KI-70's authority-transfer behavior retain their
 existing owner decisions. No new acceptance of open fee, cashback, pot-entitlement or
@@ -313,9 +324,10 @@ AUDIT.md §7; the addendum is AUDIT.md §13.
   - [ ] Green full CI on GitHub: run 39073841046 covers the integrated committed code;
         services dependency audit failed. The current working-tree changes need a new run.
 
-## What remains
+## What remained in the earlier AI-review follow-up (historical)
 
 Gathered from the follow-up tracks' reports and the integrated gate of 2026-10-13.
+These unchecked entries record that earlier state; the current 1.0.3 gates are at the top.
 
 **Release evidence (needs CI or tools not on the local machine)**
 - [ ] Green full CI on GitHub: run 39073841046 now supplies committed-tree evidence,
