@@ -4,9 +4,9 @@ use core::fmt;
 
 /// Why a `shortwin-math` computation failed.
 ///
-/// Codes 0–5 are arithmetic and domain failures. Codes 6–13 are lender-pool rule
+/// Codes 0–5 are arithmetic and domain failures. Codes 6–14 are lender-pool rule
 /// refusals (`pool`), one per program error (6–12 ARCH §3.11's lender group, 13 appended
-/// for AIR-07), so the program maps them one to one without re-deriving the reason.
+/// for AIR-07, 14 for AI3-FR01), so the program maps them one to one without re-deriving the reason.
 ///
 /// Codes are stable: the program maps them to its own error enum and the keeper and
 /// frontend log them. Append new variants at the end with the next code; never
@@ -59,11 +59,14 @@ pub enum MathError {
     /// keep its own tokens as claims and stop the flush (AIR-07's residual; program
     /// `PoolDrained`).
     PoolDrained = 13,
+    /// An already-empty legacy pool retains unallocated SOL carry. A new cohort must
+    /// not inherit it; deposits require a separately reviewed historical-state migration.
+    LegacyPoolCarry = 14,
 }
 
 impl MathError {
     /// Every variant, in code order.
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::Overflow,
         Self::Underflow,
         Self::DivByZero,
@@ -78,6 +81,7 @@ impl MathError {
         Self::DepositTooSmall,
         Self::WipeSweepPending,
         Self::PoolDrained,
+        Self::LegacyPoolCarry,
     ];
 
     /// Stable numeric code of the variant.
@@ -102,6 +106,7 @@ impl MathError {
             11 => Some(Self::DepositTooSmall),
             12 => Some(Self::WipeSweepPending),
             13 => Some(Self::PoolDrained),
+            14 => Some(Self::LegacyPoolCarry),
             _ => None,
         }
     }
@@ -123,6 +128,7 @@ impl MathError {
             Self::DepositTooSmall => "deposit too small",
             Self::WipeSweepPending => "post-wipe sweep pending",
             Self::PoolDrained => "pool drained",
+            Self::LegacyPoolCarry => "legacy empty-pool carry requires migration",
         }
     }
 }
@@ -156,6 +162,7 @@ mod tests {
             (MathError::DepositTooSmall, 11),
             (MathError::WipeSweepPending, 12),
             (MathError::PoolDrained, 13),
+            (MathError::LegacyPoolCarry, 14),
         ];
         assert_eq!(all.len(), MathError::ALL.len());
         for ((e, code), listed) in all.into_iter().zip(MathError::ALL) {
@@ -164,7 +171,7 @@ mod tests {
             assert_eq!(MathError::from_code(code), Some(e));
             assert!(!e.as_str().is_empty());
         }
-        assert_eq!(MathError::from_code(14), None);
+        assert_eq!(MathError::from_code(15), None);
         let names: std::collections::BTreeSet<_> =
             MathError::ALL.iter().map(|e| e.as_str()).collect();
         assert_eq!(names.len(), MathError::ALL.len());

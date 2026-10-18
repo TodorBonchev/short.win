@@ -4959,6 +4959,11 @@
       "code": 6109,
       "name": "CurveCashbackCoin",
       "msg": "pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap."
+    },
+    {
+      "code": 6110,
+      "name": "LegacyPoolCarry",
+      "msg": "This empty pool has historical SOL carry: deposits require a reviewed migration"
     }
   ],
   "types": [

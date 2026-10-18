@@ -1527,6 +1527,7 @@ credit while S = 0:   live full-wipe record → acc_end += x·WAD/S_old (V2-12);
 deposit while S = 0: requires sweep_trader and claim_venue_rewards since S reached 0       (v0.4.1, R4A-7: while the wipe
                      record is live; AIR-08, #117: whenever S = 0, also after the last lender's exit)
 deposit while S > 0, B_Q > 0 and 1,000·T ≤ T + B_Q: refused (PoolDrained)                   (AIR-07's residual, #117)
+AI3-FR01: deposit while S = 0 and either current pool carry != 0: refused (LegacyPoolCarry, 6110)
 AIR2: every flushing settlement clears both sweep bits, even with S > 0; deposits require each venue-required bit
       a pending sweep with S > 0 credits immediately; ordinary later sweeps still vest
       every non-flushing settlement with S > 0 and vest_bal > 0 sets a deposit hold
@@ -1543,6 +1544,17 @@ and realised backing separately and normalize surplus into the pot for existing 
 This does not change historical pot entitlement, the last-share borrowed-token prohibition,
 partial withdrawals or rebase-record ownership. Regression and release status are in
 [`AI3-F06`](../audit/ai-review-3/triage.md#ai3-f06).
+
+**Legacy empty-state quarantine (AI3-FR01, unreleased 1.0.3).** A pool emptied before
+the final-carry correction may still hold unallocated carry. New deposits are refused
+while `S=0` and either current pool carry is nonzero, preserving the historical balances
+and allocated old claims. This blocks a new cohort taking them, including fractional
+residue cases; it does not reconstruct the departed owner's entitlement or choose a
+recipient. Affected pools cannot reopen until separately reviewed recovery. Sweeps and
+retries do not clear this guard. Clean empty pools with only old claims, unmatched pot
+or diagnostic dust remain usable; old epoch-record carry is separate. The
+[fix record](../audit/ai-review-3/ai3-fr01-fix-1.0.3.md) and known-issues §8 record this
+availability bound; no owner acceptance of forfeiture or recovery policy is implied.
 
 - **`S = 0` without a wipe (R3A-10).** If every lender withdrew, a later trader sweep or venue cashback used to go to `unassigned`, which the next depositor took in full, even with a dust deposit (and `claim_venue_rewards` is permissionless). No lender exists to own such SOL, so v0.4 sends it to `protocol_fees` and drops `unassigned`:
 

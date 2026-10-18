@@ -227,7 +227,7 @@ including mutations, passed on committed 1.0.1. It does not cover this candidate
 still requires resolution or acceptance of the open findings, the full
 gate on that revision, an exact-tree verifiable build, ≥24 h fuzz and auditor fix review.
 
-**Current unreleased draft: short.win 1.0.3 (2026-10-18).** AI review 3 adds the
+**Earlier 1.0.3 candidate (2026-10-18, before AI3-FR01's guard).** AI review 3 adds the
 final-withdrawal carry correction and keeper/parser fixes to `b815269`. Account layouts
 and instruction formats are unchanged; the IDL version and WASM/client artifacts were
 regenerated. The same canonical build commands produced:
@@ -259,6 +259,25 @@ and [known-issues §8](audit/known-issues.md#8-open-items-from-the-103-fix-revie
 the prior open findings and remaining leads with evidence limits and completion criteria.
 This is not external firm acceptance or new owner sign-off. The ≥24 h zero-failure fuzz
 and release gates remain required; the merge does not tag or deploy 1.0.3.
+
+**Current unreleased 1.0.3 follow-up (2026-10-19): AI3-FR01.**
+[The fix record](audit/ai-review-3/ai3-fr01-fix-1.0.3.md) adds a deposit quarantine:
+`S=0` with either current pool carry nonzero refuses appended error 6110
+`LegacyPoolCarry`, preserving historical balances and old allocated claims. The affected
+pool cannot accept new deposits until separately reviewed recovery; ordinary sweeps do
+not lift this guard. Clean empty pools, nonempty pools and old ShareEpoch record carry
+retain their behavior. The normative model, IDL/client and browser preview match.
+
+| New local artifact | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
+|---|---|---|---|
+| Release `shortwin.so` | `eb9cd3e68c33de8119b11f978ab77f65d4fa41de79904c508f0fd9d519d737dd` | `dba19dcb86aecba7ee4af61c9d66e159ed478101bb65a5af6f40e91027e83649` | 1,643,832 |
+| Test-venue `shortwin.so` | `cf1c44424ff1c879ac5639b432a25c0dc4a81c5842ce047e26668ef920030322` | `14503aa59628825f728ec3322b9eb9bc2d4cd2d889cc574d0acc1f0f3c78cf5a` | 1,674,864 |
+
+These canonical Anchor/test-venue builds passed, but are not a new verifier-image or
+deployment result. Earlier CI/fuzz evidence does not cover the changed program bytes.
+The finding remains **in progress** until the required full gate, ≥24 h zero-failure fuzz
+and review acceptance are established on this fix. Historical ownership/recovery remains
+open; the quarantine does not assign the old carry to a guessed recipient or discard it.
 
 ## 1. The protocol on one page
 

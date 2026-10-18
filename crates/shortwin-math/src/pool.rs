@@ -2020,6 +2020,12 @@ fn deposit_in(
     amount: u64,
     rewards_required: bool,
 ) -> Result<u128, MathError> {
+    // AI3-FR01: old code could leave income carries after the last lender exited.
+    // No remaining shares identify their historical owner. Do not admit a new cohort
+    // or discard/reassign the backed value; quarantine this state before any touch.
+    if p.total_shares == 0 && (p.carry != 0 || p.carry_r != 0) {
+        return Err(MathError::LegacyPoolCarry);
+    }
     release_in(p, now)?;
     touch_in(p, v, l, records, now)?;
     let minted = shares_for_tokens(p, amount)?;
@@ -2073,6 +2079,8 @@ fn deposit_in(
 /// residual). The lender's conversion writes `conv_rem` into `records` ([`convert`]).
 ///
 /// # Errors
+/// `LegacyPoolCarry` if an empty pool retains either SOL carry from pre-fix code;
+/// a separately reviewed migration is required, and sweeps alone do not clear it.
 /// `DepositTooSmall` if nothing would be minted; `Overflow` if `S` or `T` would leave
 /// `u128` / `u64`; `PoolDrained` if `S > 0`, `ΣB_Q > 0` and `VEST_FLUSH_RATIO·T ≤ T + ΣB_Q`;
 /// `WipeSweepPending` if a required sweep has not run since the latest wipe, last exit or flush; as

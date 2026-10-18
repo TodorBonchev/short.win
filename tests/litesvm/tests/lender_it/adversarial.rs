@@ -449,6 +449,119 @@ fn last_exit_pays_swept_carry_before_the_next_cohort() {
     }
 }
 
+/// AI3-FR01: upgrade a saved empty-pool state, rather than letting the corrected final
+/// withdrawal clear it first. The predecessor public-API witness leaves 1,000 whole
+/// lamports in both carries at S=0; retain a separate, already allocated old claim too.
+/// Only the legacy snapshot is seeded here. Sweep, signed deposit and old-owner claim
+/// are production transactions, with all invariant hooks enabled.
+#[test]
+fn legacy_empty_pool_carry_quarantines_signed_deposits_without_erasing_old_claims() {
+    use anchor_lang::AccountSerialize;
+    use shortwin_litesvm_tests::errors::assert_err;
+    use shortwin_litesvm_tests::{engine::sweep_trader_ix, pda};
+
+    let whole_carry = 1_000 * WAD;
+    for (carry, carry_r) in [
+        (whole_carry as i128, whole_carry),
+        (whole_carry as i128, 0),
+        (0, whole_carry),
+        (0, 0),
+    ] {
+        let mut lab = Lab::new(TokenProgram::Spl);
+        shortwin_litesvm_tests::invariants::positions::allow_injected_borrower_side(false);
+        shortwin_litesvm_tests::invariants::lender::allow_shareless_borrow(false);
+        let shares = lab.deposit("old", 1).unwrap();
+        let market = lab.k.market;
+        let old_owner = lab.key("old");
+        let old_key = pda::lender(&market, &old_owner).0;
+        let mut old_account = lab.env.svm.get_account(&old_key).unwrap();
+        let mut old_position = lab.position("old").unwrap();
+        assert_eq!(lab.withdraw("old", shares), Ok((1, 0)));
+
+        // A shareless claimant can survive its withdrawal while an earlier receivable is
+        // unpaid, then remain untouched after realization. Preserve that claim independently
+        // of the still-unallocated carry: neither may be silently reset by a new deposit.
+        let old_claim = 7;
+        old_position.shares = 0;
+        old_position.pending = old_claim;
+        old_position.real = old_claim as u64;
+        old_account.data.clear();
+        old_position.try_serialize(&mut old_account.data).unwrap();
+        lab.env.svm.set_account(old_key, old_account).unwrap();
+        lab.inject(0, 0, |pool, vault, _| {
+            assert_eq!(pool.total_shares, 0);
+            pool.carry = carry;
+            pool.carry_r = carry_r;
+            vault.lender_sol += old_claim as u64 + u64::from(carry != 0 || carry_r != 0) * 1_000;
+            Ok(())
+        })
+        .unwrap();
+
+        // Finish the real empty-pool source sweep. A legacy carry refusal must not be an
+        // accidental WipeSweepPending refusal or an incomplete source-preparation fixture.
+        ok(lab.env.send(&[sweep_trader_ix(&market, None)], &[]));
+        let p = lab.market().pool();
+        assert_eq!(p.wipe_swept & shortwin_math::pool::WIPE_TRADER_SWEPT, 1);
+        assert_eq!((p.total_shares, p.carry, p.carry_r), (0, carry, carry_r));
+
+        let owner = lab.user("new").kp.insecure_clone();
+        let keys = ix::LenderKeys {
+            owner: owner.pubkey(),
+            mint: lab.k.mint,
+            token_program: lab.k.token_program,
+            owner_token_account: lab.user("new").ata,
+        };
+        let new_key = pda::lender(&market, &owner.pubkey()).0;
+        let protected_keys = [
+            market,
+            lab.k.market_vault,
+            lab.k.pool_vault,
+            old_key,
+            old_owner,
+            owner.pubkey(),
+            keys.owner_token_account,
+            pda::trader(&market).0,
+            new_key,
+        ];
+        let before: Vec<_> = protected_keys
+            .iter()
+            .map(|key| lab.env.svm.get_account(key))
+            .collect();
+        let result = lab.env.send(&[ix::deposit(&keys, 1, 0)], &[&owner]);
+        if carry != 0 || carry_r != 0 {
+            assert_eq!(code(ShortwinError::LegacyPoolCarry), 6110);
+            assert_err(&result, ShortwinError::LegacyPoolCarry);
+            let after: Vec<_> = protected_keys
+                .iter()
+                .map(|key| lab.env.svm.get_account(key))
+                .collect();
+            assert_eq!(
+                after, before,
+                "rejected deposit must leave every account intact"
+            );
+            assert!(lab.position("new").is_none());
+        } else {
+            let meta = ok(result);
+            let event = events::one::<shortwin::events::Deposit>(&meta);
+            assert_eq!((event.amount, event.shares), (1, 1_000));
+            assert_eq!(lab.tokens_of("new"), crate::common::USER_TOKENS - 1);
+            assert_eq!(lab.pool_vault_amount(), 1);
+        }
+        assert_eq!(lab.position("old").unwrap(), old_position);
+        assert_eq!(
+            (lab.market().carry.get(), lab.market().carry_r.get()),
+            (carry, carry_r)
+        );
+        // The quarantine applies to admitting a new cohort, not to an old allocated claim.
+        assert_eq!(lab.claim("old"), Ok(old_claim as u64));
+        assert_eq!(
+            (lab.market().carry.get(), lab.market().carry_r.get()),
+            (carry, carry_r)
+        );
+        lab.env.assert_invariants();
+    }
+}
+
 /// Borrower accounting is injected through the math API in this lab case. All lender
 /// instructions are real; in particular the final claim event must report only its pot draw,
 /// and the earlier, shareless lender must retain its full rent claim.

@@ -351,6 +351,41 @@ describe('lend previews on simple pools', () => {
         expect(lessBps(1_000n, 50)).toBe(995n);
     });
 
+    it('refuses old empty-pool carries even when sweeps are complete or bundled', () => {
+        for (const flags of [0, MARKET_FLAG.wipeTraderSwept | MARKET_FLAG.wipeRewardsClaimed]) {
+            const empty = {
+                ...simplePool({ tokensFree: 0n, totalShares: 0n, flags, lenderSol: 1n }),
+                lender: null,
+                records: [],
+            };
+            for (const [carry, carryR] of [
+                [1n, 0n],
+                [-1n, 0n],
+                [0n, 1n],
+                [1n, 1n],
+            ]) {
+                const s = {
+                    ...empty,
+                    market: {
+                        ...empty.market,
+                        carry: bigIntToPodI128(carry),
+                        carryR: bigIntToPodU128(carryR),
+                    },
+                };
+                for (const sweepBundled of [false, true]) {
+                    const r = previewDepositView(m, s, 100n, 1_000_000_000n, 50, sweepBundled);
+                    expect(r.ok).toBe(false);
+                    if (!r.ok) {
+                        expect(r.refusal).toMatchObject({ name: 'LegacyPoolCarry', code: 6110 });
+                        expect(r.refusal.message).toContain('pending a reviewed migration');
+                    }
+                }
+            }
+            // The same empty pool without old carries can take deposits once sweeps are included.
+            expect(previewDepositView(m, empty, 100n, 1_000_000_000n, 50, true).ok).toBe(true);
+        }
+    });
+
     it('refuses a dust deposit and maps it to ZeroAmount', () => {
         const s = { ...simplePool({ tokensFree: 10n ** 15n, totalShares: 1n }), lender: null, records: [] };
         const r = previewDepositView(m, s, 0n, 1n, 50);
@@ -595,6 +630,10 @@ describe('lend previews on simple pools', () => {
         expect(refusalOf(new Error('lender behind share epochs'))).toMatchObject({ name: 'LenderBehindEpochs' });
         expect(refusalOf(new Error('post-wipe sweep pending'))).toMatchObject({ name: 'WipeSweepPending' });
         expect(refusalOf(new Error('pool drained'))).toMatchObject({ name: 'PoolDrained', code: 6108 });
+        expect(refusalOf(new Error('legacy empty-pool carry requires migration'))).toMatchObject({
+            name: 'LegacyPoolCarry',
+            code: 6110,
+        });
         expect(refusalOf(new Error('something else'))).toMatchObject({ name: 'MathOverflow', code: 6000 });
     });
 

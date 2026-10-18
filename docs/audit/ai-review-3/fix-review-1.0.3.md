@@ -1,5 +1,10 @@
 # Draft 1.0.3 fix-review packet
 
+**Follow-up candidate:** [AI3-FR01's guard and regression](ai3-fr01-fix-1.0.3.md)
+refuse new deposits into legacy empty pools retaining carry. The hashes and CI below
+identify the preceding candidate; they do not cover the guard's new bytes. Recovery of
+quarantined historical value remains separate from blocking its capture.
+
 This packet is for an independent review of the 1.0.3 candidate after the audit of
 `b815269224ba0f5d946f49de7e113220c4067041`. It is a review request, not a
 review or a sign-off. The [original report](report.md), [31-item triage](triage.md)

@@ -1,5 +1,9 @@
 # Draft 1.0.3 implementation and validation
 
+**Superseded program bytes:** the later [AI3-FR01 follow-up](ai3-fr01-fix-1.0.3.md)
+adds a legacy empty-carry deposit refusal and its regressions. This record remains
+historical validation for `9b910602`; its CI and fuzz scope do not cover the new guard.
+
 Date: 2026-10-18. Base: `b815269224ba0f5d946f49de7e113220c4067041` (draft 1.0.2).
 These checks concern the subsequent unreleased fixes. They are separate from the
 immutable static scan and from any tagged, deployed or externally reviewed release.

@@ -358,6 +358,12 @@ const ROWS: readonly Row[] = [
     ],
     // pump-final D4: the program's text, as drafted (`copyPump.ts`, FRONTEND §4.3).
     [6109, 'CurveCashbackCoin', 'blocked', PUMP_COPY['error.curveCashbackCoin'].text],
+    [
+        6110,
+        'LegacyPoolCarry',
+        'blocked',
+        'This empty pool still holds income from earlier lenders. Deposits are blocked pending a reviewed migration. Sweeping or retrying will not unblock deposits.',
+    ],
 ];
 
 export const PROGRAM_ERRORS: ReadonlyMap<number, ProgramErrorInfo> = new Map(

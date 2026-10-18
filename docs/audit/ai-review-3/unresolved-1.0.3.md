@@ -1,5 +1,11 @@
 # Unresolved findings: written treatment for draft 1.0.3
 
+**Subsequent correction (2026-10-19):** the [AI3-FR01 guard](ai3-fr01-fix-1.0.3.md)
+now refuses deposits into an already-empty pool with either carry nonzero. The reproduced
+capture below describes the pre-guard candidate. The new guard preserves historical
+value and claims; recovery/ownership remains open, and affected pools stay closed to
+new deposits. Its new bytes require their own full gate and ≥24 h zero-failure fuzz.
+
 Date: 2026-10-19. Reviewed code: `9b910602ed076a6d4359c496960b3ffc0e7c6af8`,
 integrated with `main` at `24f514c1` in `708746eb0085016c37f4d73e2aea02031bd6efc9`.
 The integration changes publishing metadata and documentation, not Rust production source.

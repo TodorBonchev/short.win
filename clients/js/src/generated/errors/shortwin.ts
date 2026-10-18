@@ -234,6 +234,8 @@ export const SHORTWIN_ERROR__REBASE_NEEDS_OWNER = 0x17db; // 6107
 export const SHORTWIN_ERROR__POOL_DRAINED = 0x17dc; // 6108
 /** CurveCashbackCoin: pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap. */
 export const SHORTWIN_ERROR__CURVE_CASHBACK_COIN = 0x17dd; // 6109
+/** LegacyPoolCarry: This empty pool has historical SOL carry: deposits require a reviewed migration */
+export const SHORTWIN_ERROR__LEGACY_POOL_CARRY = 0x17de; // 6110
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -274,6 +276,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__INSUFFICIENT_VAULT
   | typeof SHORTWIN_ERROR__INVALID_PARAMS
   | typeof SHORTWIN_ERROR__LAST_SHARES_BORROWED
+  | typeof SHORTWIN_ERROR__LEGACY_POOL_CARRY
   | typeof SHORTWIN_ERROR__LENDER_BEHIND_EPOCHS
   | typeof SHORTWIN_ERROR__MARGIN_ABOVE_MAX
   | typeof SHORTWIN_ERROR__MARKET_NOTIONAL_CAP
@@ -388,6 +391,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__INSUFFICIENT_VAULT]: `Vault SOL cannot cover the buyback, rent and tolerance`,
     [SHORTWIN_ERROR__INVALID_PARAMS]: `A parameter is outside its compiled bounds or fails a relational check`,
     [SHORTWIN_ERROR__LAST_SHARES_BORROWED]: `The last shares cannot be withdrawn while tokens are borrowed`,
+    [SHORTWIN_ERROR__LEGACY_POOL_CARRY]: `This empty pool has historical SOL carry: deposits require a reviewed migration`,
     [SHORTWIN_ERROR__LENDER_BEHIND_EPOCHS]: `Lender is behind the current share epoch; pass the ShareEpoch records or sync_lender`,
     [SHORTWIN_ERROR__MARGIN_ABOVE_MAX]: `Margin above the maximum`,
     [SHORTWIN_ERROR__MARKET_NOTIONAL_CAP]: `Market notional cap exceeded`,

@@ -1,5 +1,9 @@
 # Independent AI accounting fix review: draft 1.0.3
 
+**Follow-up:** [AI3-FR01's deposit quarantine](ai3-fr01-fix-1.0.3.md) now blocks the
+legacy-state capture reproduced here, without reallocating or erasing historical value.
+This review and its source/binary/probe evidence describe the preceding candidate.
+
 Review date: 2026-10-19 (Europe/Kiev). This is a separate AI code review and local test run, not an external or human audit, release approval, or deployment verification.
 
 ## Identity and scope

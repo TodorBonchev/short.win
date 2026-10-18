@@ -86,6 +86,14 @@ describe('program error messages', () => {
         }
     });
 
+    it('blocks deposits awaiting a reviewed migration of earlier lenders’ income', () => {
+        const info = programError(6110);
+        expect(info).toMatchObject({ name: 'LegacyPoolCarry', action: 'blocked' });
+        expect(info?.message).toContain('income from earlier lenders');
+        expect(info?.message).toContain('pending a reviewed migration');
+        expect(info?.message).toContain('Sweeping or retrying will not unblock deposits');
+    });
+
     it('maps the open-path slippage and pause codes to user actions', () => {
         expect(programError(6063)?.name).toBe('ProceedsBelowMin');
         expect(programError(6063)?.action).toBe('retry');

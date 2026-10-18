@@ -12,6 +12,10 @@ the draft 1.0.2 audit-fix batch.
 ## AI review 3 and draft 1.0.3 (2026-10-18)
 
 This is the current unreleased gate candidate; the 1.0.2 sections below are historical.
+The [2026-10-19 AI3-FR01 follow-up](docs/audit/ai-review-3/ai3-fr01-fix-1.0.3.md)
+adds a legacy empty-carry deposit quarantine, canonical predecessor regression and new
+program hashes. The earlier `9b91060` gate and previously started fuzz do not certify
+these new bytes; ≥24 h fuzz must identify the final program and fuzzer.
 The two-pass rust-auditor scan reviewed `b815269`, before these changes. Its
 [archive](docs/audit/ai-review-3/README.md) preserves all reports, source hashes,
 coverage and dispositions; the [31-item register](docs/audit/ai-review-3/triage.md)
@@ -44,7 +48,10 @@ separates prior issues from new observations and records implementation decision
 - [x] Record [independent AI fix review](docs/audit/ai-review-3/independent-fix-review-1.0.3.md)
       and [written treatment](docs/audit/ai-review-3/unresolved-1.0.3.md) of every
       unresolved packet finding and lead. Q2/Q3/Q4 accepted; Q1 conditional.
-- [ ] Resolve AI3-FR01's pre-fix empty-pool carry migration condition; resolve or
+- [x] Block AI3-FR01's next-cohort capture without discarding or assigning old carry;
+      add old-source/ELF negative controls and math/model/signed-transaction regressions.
+- [ ] Resolve quarantined legacy pools' historical ownership/recovery before reopening
+      them; resolve or
       obtain explicit owner sign-off on the remaining exact residuals, complete
       the ≥24 h zero-failure fuzz run and required review/gates before marking
       findings fixed or tagging 1.0.3. Documentation is not owner acceptance.

@@ -9,6 +9,92 @@ use shortwin_math::MathError;
 use shortwin_math::num::WAD;
 use shortwin_math::pool;
 
+fn legacy_empty_pool() -> Market {
+    let mut m = Market::new();
+    let shares = m.deposit(0, 2_000_000_000_000_000_000).unwrap();
+    m.sweep(1_000).unwrap();
+    m.now += i64::from(LUMP_VEST_S);
+    m.release().unwrap();
+    let (carry, carry_r) = (m.pool.carry, m.pool.carry_r);
+    m.withdraw(0, shares).unwrap();
+    // Reconstruct the old withdrawal's persisted state: it burned the same shares
+    // but neither assigned the carry to the old lender nor cleared those fields.
+    m.lenders[0].1.pending = 0;
+    m.lenders[0].1.real = 0;
+    m.pool.carry = carry;
+    m.pool.carry_r = carry_r;
+    // Captured by the unmodified b815269 public-API generator in the independent
+    // accounting review. Compare the whole state, not just the two carry fields.
+    assert_eq!(
+        m.canonical(),
+        include_str!("fixtures/legacy_empty_carry.canonical").trim_end()
+    );
+    m
+}
+
+#[test]
+fn legacy_empty_pool_carry_refuses_a_new_cohort_after_completed_sweeps() {
+    for rewards_required in [false, true] {
+        let mut m = legacy_empty_pool();
+        m.sweep(0).unwrap();
+        m.pool.wipe_swept |= pool::WIPE_REWARDS_CLAIMED;
+        let mut next = pool::Lender::new(&m.pool);
+        let before = m.clone();
+        let next_before = next;
+        for _ in 0..2 {
+            assert_eq!(
+                pool::deposit(
+                    &mut m.pool,
+                    &mut m.vault,
+                    &mut next,
+                    &mut m.records,
+                    m.now,
+                    1,
+                    rewards_required,
+                ),
+                Err(MathError::LegacyPoolCarry)
+            );
+            assert_eq!(
+                m, before,
+                "old backing, claims and carries must be preserved"
+            );
+            assert_eq!(
+                next, next_before,
+                "no new shares or snapshots may be committed"
+            );
+        }
+        assert_eq!(m.claim(0), Ok(0));
+        assert_eq!(m.vault.lender_sol, 1_000);
+    }
+}
+
+#[test]
+fn legacy_empty_pool_refuses_either_carry_including_sub_lamport_residues() {
+    for (carry, carry_r) in [
+        (1, 0),
+        (0, 1),
+        (-1, 0),
+        (1_000 * WAD as i128, 0),
+        (0, 1_000 * WAD),
+    ] {
+        for swept in [0, pool::WIPE_TRADER_SWEPT | pool::WIPE_REWARDS_CLAIMED] {
+            for rewards_required in [false, true] {
+                let (mut p, mut v) = (pool::Pool::new(), pool::Vault::new());
+                p.carry = carry;
+                p.carry_r = carry_r;
+                p.wipe_swept = swept;
+                let mut lender = pool::Lender::new(&p);
+                let before = (p, v, lender);
+                assert_eq!(
+                    pool::deposit(&mut p, &mut v, &mut lender, &mut [], 0, 1, rewards_required),
+                    Err(MathError::LegacyPoolCarry)
+                );
+                assert_eq!((p, v, lender), before);
+            }
+        }
+    }
+}
+
 #[test]
 fn last_exit_pays_whole_carry_before_a_new_cohort_enters() {
     for (tokens, income, release_first) in [
@@ -94,6 +180,14 @@ fn partial_burn_keeps_carry_and_last_burn_drops_only_sub_lamport_residues() {
     assert_eq!(m.claim(0), Ok(2_000));
     assert_eq!(m.vault.lender_sol, 1);
     assert!(pool::closable(&m.pool, m.lender(0).unwrap()));
+    // Legitimate dust/backing without either pool carry must not quarantine a
+    // clean empty pool. The new cohort earns only its own one-lamport income.
+    m.sweep(0).unwrap();
+    let next = m.deposit(1, 1).unwrap();
+    m.sweep(1).unwrap();
+    m.withdraw(1, next).unwrap();
+    assert_eq!(m.claim(1), Ok(1));
+    assert_eq!(m.vault.lender_sol, 1);
     m.invariants().unwrap();
 }
 

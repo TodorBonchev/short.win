@@ -1,5 +1,10 @@
 # Independent fix review: draft 1.0.3
 
+**Historical review, followed by a correction:** [AI3-FR01's subsequent fix](ai3-fr01-fix-1.0.3.md)
+quarantines legacy empty carry before new deposits and introduces new program bytes.
+This report's original candidate, artifact identities, outcomes and probes remain unchanged
+evidence for the pre-guard revision; they do not certify the new release/fuzz gates.
+
 Date: 2026-10-19. Outcome: **Q2/Q3/Q4 accepted; Q1 conditionally accepted**.
 The new legacy-state migration finding **AI3-FR01 remains open**. This review is
 independent AI code review and executable verification by reviewers separate from the

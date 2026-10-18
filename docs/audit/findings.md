@@ -49,7 +49,7 @@ Status is one of: open, in progress, fixed, acknowledged, duplicate of KI-n, inv
 | AIR2-13 | Keeper receives zero after rent-first liquidation | — | not assessed | `waterfall::liquidate` | open | — | `ai2_accounting`: rent exhaustion | pending | Zero keeper payout reproduced; economic liveness and priority/reserve policy remain open, not automatically accepted under KI-03. |
 | AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | — | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | pending | 670,224 versus 336,779 raw tokens in the loss-control case, beyond KI-13. Draft cap uses the value of unlocked shares. |
 | AIR2-P2-02 | Pot pays a first claimant against unpaid receivable | — | not assessed | `pool::claim` | open | — | `ai2_accounting`: receivable/pot allocation | pending | 75/25 SOL split from 100 SOL repayment with 100 SOL still receivable; report’s proposed current-share subtraction does not repair it. Historical entitlement design remains unresolved. |
-| AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` / `withdraw_in` | open | — | Independent public-API legacy-state probe | Q1 conditional | Pre-fix S=0 state with 1,000 lamports in both carries pays the next cohort 1,001 after only 1 new lamport. New withdrawal reset does not migrate existing empty pools. No affected deployment asserted; requires inventory proof or an ownership-preserving migration. [Review](ai-review-3/independent-accounting-1.0.3.md), [treatment](ai-review-3/unresolved-1.0.3.md). |
+| AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` | in progress | commit introducing `ai3-fr01-fix-1.0.3.md` | Canonical predecessor witness, carry matrix, signed legacy deposit; old source/ELF negative controls fail | Narrow quarantine independently reviewed; release gates pending | New deposits refuse 6110 when S=0 and either carry is nonzero, preserving historical value/claims. This blocks next-cohort capture; recovery remains a separate design. [Fix and new hashes](ai-review-3/ai3-fr01-fix-1.0.3.md). Full CI and ≥24 h zero-failure fuzz must cover these new bytes before **fixed**. |
 
 ## AI review 3: draft 1.0.3 (2026-10-18)
 
@@ -110,6 +110,13 @@ resolution or explicit owner sign-off on the exact residuals, the final-program 
 evidence and the remaining integrated-revision gates.
 
 ### Carry ownership at the final withdrawal
+
+**2026-10-19 follow-up:** [AI3-FR01's deposit quarantine](ai-review-3/ai3-fr01-fix-1.0.3.md)
+now prevents an already-empty legacy pool from admitting a new cohort while either carry
+is nonzero. It preserves the historical balances and old allocated claims; a reviewed
+recovery/migration is still required to reopen that affected pool. The earlier review's
+finding remains evidence of the pre-guard behavior. Neither the new guard nor its local
+tests complete the full CI/24-hour fuzz requirements for its new program bytes.
 
 Both accumulator carries hold value not yet assigned to individual lenders. At high raw
 token/share supplies they can contain whole lamports; retaining them after `S = 0`
