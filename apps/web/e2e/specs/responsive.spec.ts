@@ -51,6 +51,7 @@ import {
 import {
     accrue,
     closeShortFromNode,
+    freshOpenPrice,
     lenderPosition,
     lendFromNode,
     shortPosition,
@@ -964,6 +965,7 @@ for (const vp of VIEWPORTS) {
                 test.skip(!tradingSeeded(state), 'needs the test-venue build (mock venue)');
                 const cap = new Capture(page, vp);
                 const main = state.markets.main;
+                await freshOpenPrice(main);
                 await cap.step('short-preview', async () => {
                     await tradePanel(cap, app, main.mint, 'panel=short', 'short');
                     const panel = app.id(T.shortPanel);

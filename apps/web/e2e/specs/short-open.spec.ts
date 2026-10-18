@@ -3,15 +3,17 @@
  * short panel and venue layer (on MARKETS' market page): `@short`.
  *
  * 1. Every preview field of §3.7 is present with its raw `data-value`; the review's simulated
- *    position equals the preview (`q`, `s` = proceeds, `m` = margin, `v` = proceeds + margin) and the
- *    market's free tokens drop by `q`; the borrower disclosure's checkbox gates Sign; the open lands.
+ *    position has the preview's `q` and proceeds, and its margin stays within the form's 2 %
+ *    tolerance when the EMA advances between preview and simulation. The landed position matches
+ *    the reviewed values; the market's free tokens drop by `q`; the disclosure gates Sign.
  * 2. Blocked state: on the coverage-paused market the panel shows `short-blocked-reason` with
  *    `data-code="CoveragePaused"` and the `market.coveragePause` disclosure (the page's banner; the
  *    panel links to it, O-2), and nothing opens.
  */
 import { DISCLOSURES } from '../../src/config/disclosures.ts';
+import { MARGIN_TOLERANCE_BPS, withTolerance } from '../../src/features/short/previews.ts';
 import { dataValue, expect, need, requireTrading, T, test } from '../fixtures.ts';
-import { shortPosition } from '../validator/actions.ts';
+import { freshOpenPrice, shortPosition } from '../validator/actions.ts';
 import { getBalance } from '../validator/chain.ts';
 
 test.use({ wallet: 'trader' });
@@ -35,13 +37,14 @@ const INTEGER_FIELDS = [
 ] as const;
 
 test.describe('short: open', { tag: '@short' }, () => {
-    test('every preview field, the borrower disclosure gate, the simulated position equals the preview', async ({
+    test('every preview field, the disclosure gate, and the reviewed position within the quote bounds', async ({
         app,
         state,
     }) => {
         requireTrading(state);
         const m = state.markets.main;
         const q = Q_TOKENS * 10n ** BigInt(m.decimals);
+        await freshOpenPrice(m);
         await app.goto(`/m/${m.mint}?panel=short`, 'market');
         await app.connectWallet();
         const panel = app.id(T.shortPanel);
@@ -70,6 +73,7 @@ test.describe('short: open', { tag: '@short' }, () => {
 
         const ack = panel.getByTestId(T.disclosureAck('borrower.liquidation'));
         if (await ack.count()) await ack.check();
+        const marginAtSubmit = await dataValue(panel.getByTestId(T.shortPreview('margin')));
         await panel.getByTestId(T.shortSubmit).click();
         expect(await app.simulated()).toBe('review');
         await expect(app.inModal(T.txSimStatus)).toHaveAttribute('data-ok', 'true');
@@ -81,8 +85,10 @@ test.describe('short: open', { tag: '@short' }, () => {
         const position = dq.address;
         expect(dq.change).toBe(q);
         expect(await app.delta(position, 's')).toBe(proceeds);
-        expect(await app.delta(position, 'm')).toBe(margin);
-        expect(await app.delta(position, 'v')).toBe(proceeds + margin);
+        const simulatedMargin = await app.delta(position, 'm');
+        expect(simulatedMargin).toBeGreaterThan(0n);
+        expect(simulatedMargin).toBeLessThanOrEqual(withTolerance(marginAtSubmit, MARGIN_TOLERANCE_BPS));
+        expect(await app.delta(position, 'v')).toBe(proceeds + simulatedMargin);
         // The market's free tokens drop by q (§5.3 names the field `tokens_free`; `tokensFree` accepted).
         const free = (await app.deltas()).find(
             (d) => d.address === m.market && (d.field === 'tokens_free' || d.field === 'tokensFree'),
@@ -98,7 +104,7 @@ test.describe('short: open', { tag: '@short' }, () => {
         const p = need(await shortPosition(position), 'the opened position');
         expect(p.q).toBe(q);
         expect(p.s).toBe(proceeds);
-        expect(p.m).toBe(margin);
+        expect(p.m).toBe(simulatedMargin);
         expect(await getBalance(app.walletAddress)).toBeLessThan(before);
     });
 
