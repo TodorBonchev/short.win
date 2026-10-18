@@ -44,6 +44,39 @@ allow = [
 # not in Cargo.toml.
 ignore = true
 
+
+# The three crates published to crates.io (shortwin, shortwin-math, shortwin-venue-state) declare
+# `license-file = "../../LICENSE"`, the BUSL-1.1 with the short.win parameters, which the licence
+# scanner reads with low confidence; it is BUSL-1.1 (REUSE.toml).
+[[licenses.clarify]]
+crate = "shortwin"
+expression = "BUSL-1.1"
+license-files = [{ path = "../../LICENSE", hash = 0xf2c05bd3 }]
+
+[[licenses.clarify]]
+crate = "shortwin-math"
+expression = "BUSL-1.1"
+license-files = [{ path = "../../LICENSE", hash = 0xf2c05bd3 }]
+
+[[licenses.clarify]]
+crate = "shortwin-venue-state"
+expression = "BUSL-1.1"
+license-files = [{ path = "../../LICENSE", hash = 0xf2c05bd3 }]
+
+
+# ... and that licence is allowed for those three crates only.
+[[licenses.exceptions]]
+crate = "shortwin"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "shortwin-math"
+allow = ["BUSL-1.1"]
+
+[[licenses.exceptions]]
+crate = "shortwin-venue-state"
+allow = ["BUSL-1.1"]
+
 [bans]
 # anchor-lang 1.2 pulls two majors of several solana-* component crates
 # (solana-address 1/2, solana-pubkey 3/4, solana-instruction 3/4, ...): warn, don't fail.
