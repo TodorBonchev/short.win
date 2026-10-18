@@ -17,6 +17,11 @@ findings unless the stated bound is wrong or can be exceeded. Each row gives:
     gate, but not yet through CI or an external fix review; the ≥ 24 h fuzz run waived by the
     owner for this batch, 2026-10-13); the row stays for its residual, if any.
 
+The [1.0.3 fix-review open-item register](#8-open-items-from-the-103-fix-review) records
+unresolved findings and deferred leads with their rationale and evidence requirements.
+Those rows remain **open**; their inclusion does not supply owner sign-off or extend an
+older acceptance to a new trigger or larger bound.
+
 The register merges these sources:
 
 - ARCH §10 O19 (the disclosed residuals) and the M7 owner items;
@@ -240,3 +245,37 @@ on 2026-10-13 confirmed AIR-21 and AIR-09 and accepted AIR-14's widening (the RE
 | AIR-23 | Exits read `pool_lock_min_bps` live, not the value locked at open (low) | Fixed by AIR-14; pinned (`f726bc6`) | fixed (program) |
 | AIR-24 | A pending `EnableVenues` change undid `disable_venue` (low) | `a113886`: `disable_venue` cancels it; KI-46 | fixed (program) |
 | L-1 | A borrower whose address refuses lamports blocks its own liquidation | Refuted (`docs/audit/ai-review/leads.md`) | refuted |
+
+## 8. Open items from the 1.0.3 fix review
+
+Recorded 2026-10-19 for the unreleased candidate. The canonical finding/lead IDs are
+retained to avoid duplicating them under new KI numbers. Each row is an **open** owner
+item or deferred investigation, not an acknowledged risk. The
+[written treatment](ai-review-3/unresolved-1.0.3.md) gives the evidence, rationale,
+mitigation limits and completion requirements for every row and all 20 unimplemented
+review-3 leads. The [independent fix review](ai-review-3/independent-fix-review-1.0.3.md)
+does not extend older owner decisions or replace the remaining release gates.
+
+| ID | Statement / exposure | Bound and present limitation | Decision needed / rationale | Status |
+|---|---|---|---|---|
+| AIR2-07 / AI3-L12 | 12-byte VenueGuard fingerprints leave a chosen-pair collision threat | Generic fixed-target work 2^96 versus chosen-pair birthday work 2^48; a changed-length upgrade is also needed to evade the unchanged-length latch. No colliding executable pair supplied. | Full-digest versioned migration and reader/governance integration, or explicit acceptance of that threat model; KI-69's original fixed-target argument is insufficient. | open |
+| AIR2-10 | Creator initialization can change PumpSwap risk fees | Current creator-default flag enters the schedule; harmful healthy-position transaction not reproduced in this review. No new quantitative bound. | Separate risk/execution treatment with a pinned-ELF regression; omitting live creator fees would underquote execution. | open |
+| AIR2-11 | Capped risk and live execution quotes can disagree | Source predicates differ; a persistent reachable interval with no affordable available exit is not yet measured. | Quantify the gap and choose a policy preserving AIR-10 sale protection and executable repayment. | open |
+| AIR2-12 | Cashback can remain in a noncanonical trader WSOL account | Historical pinned-ELF fixture stranded 545,713 lamports; that sample is not a maximum. | Validated recovery/discovery and historical counter/completeness migration; dropping the canonical check alone is incomplete. | open |
+| AIR2-13 | Rent-first liquidation can pay the keeper zero | Existing regression reaches zero; no general profitable-keeper liveness guarantee. KI-03 does not accept this distinct incentive issue. | Owner-selected reserve, subsidy or priority policy after cost/reward and lender/protocol tradeoff analysis. | open |
+| AIR2-P2-02 | First claimant can draw historical pot against an unpaid receivable | Prior model pays 75/25 SOL from 100 SOL realization with 100 SOL still receivable; not an all-cost attacker-profit calculation. | Historical entitlement/realization design through deposits, exits and epoch chains; current-share subtraction was disproved. KI-53 alone does not accept this race. | open |
+| AI3-FR01 | An already-empty pre-fix pool can carry old income into the next cohort after upgrade | Public-API review probe retains 1,000 lamports in both old carries at S=0; new cohort receives 1,001 after adding only 1 lamport. Candidate deposit does not migrate that state. No affected deployed market asserted. | Establish that no affected legacy state exists, or implement an explicit ownership-preserving migration with regression and batch gates. F06 is only conditionally accepted for the upgrade case. | open; release precondition |
+| AI3-F06 residual | Final-holder carry allocation does not reconstruct past holders' ownership | The last holder receives each carry's whole lamports; already allocated zero-share claims remain. No historical pro-rata allocation guarantee. | Cross-cohort leak correction is reviewed separately; any alternative historical ownership rule needs design, migration and tests. | open historical-allocation question |
+| AI3-L05 | Prepared external recipient ATA may close after readiness caching | Actual recipient closure plus failed repair not reproduced; indefinite recovery is not established. | Reproduce on the pinned venue and test bounded invalidation/re-preparation before changing caching. | open; deferred hardening |
+| AI3-L07 / L09 / L11 / L14 / L17 | Omitted mint-kind, exit-status, vault-field, UVA-user and post-adoption authority defenses | Current authenticated keys, creation/adoption constraints and OPEN-then-close lifecycle block the asserted substitutions; no current violating writer shown. | Revisit each precise boundary before any new importer, status writer, authority mutation or venue layout; preserve supported account/exit compatibility. | open; deferred hardening |
+| AI3-L10 | Repeated donations/sweeps can prolong a historical-reward deposit hold | Actual vest release is required; sustained cost/duration has no established universal bound. | Measure the availability attack and isolate historical rewards or explicitly accept a quantified hold; simply relaxing the gate reopens AIR2-04/05. | open |
+| AI3-L06 / L18 / L19 / L20 / L21 | Curve fixed/live-supply gates, synthetic execution and historical risk-fee assumptions | KI-77 records a flat pinned schedule and conditional multi-tier cases; that snapshot is not current-mainnet verification or a new worst-case guarantee. | Supported schedule/burn/fee-change transactions and gate/risk/live-CPI comparisons; keep correct live execution pricing and old-owner/borrower protections. | open beyond KI-77's exact accepted bounds |
+| AI3-L13 | Live supply can move the PumpSwap exit-risk tier | KI-72 accepts its specific burn/tier case and magnitude, not every newly asserted decision or loss. | Reproduce and measure a complete decision beyond that case; no blanket extension of KI-72/AIR-10. | open beyond the existing bound |
+| AI3-L16 | Venue fee-tier copies have an unmeasured resource maximum | No maximal reachable supported schedule has been proved to fit or exceed heap/CU limits. | Establish the venue-authorized count and execute maximal schedules before bounding/streaming allocations. | open |
+| AI3-L22 | Cashback claim liveness remains an external dependency | A sweep cannot make an unclaimable reward claimable; no universal recovery-time bound. AIR2-12's diverted rewards are separate. | Current failure reproduction, discovery/recovery policy and historical entitlement tests before clearing source checks. | open |
+| AI3-L23 | Repeated current/parked lender touches accumulate rounding loss | KI-68 accepts ≤1 lamport entitlement and ≤1 realized per intervening touch, not a measured aggregate cap. | Quantify aggregate behavior and any share-change-safe remainder design. The 1.0.3 carry reset does not solve it. | open aggregate/design question; KI-68's existing acceptance retained |
+
+AI3-L02/L08 remain duplicates of **KI-23**, and AI3-L15 remains a duplicate of
+**KI-75/AIR-20**, only within their written mechanism and bounds. AI3-F07 retains
+KI-70's unsigned-authority decision; AI3-F08 retains KI-69(a)'s hashless-bootstrap
+decision. These mappings do not acknowledge any larger or different exposure.

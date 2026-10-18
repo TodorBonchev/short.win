@@ -41,8 +41,13 @@ separates prior issues from new observations and records implementation decision
 - [ ] Complete the ≥24 h fuzz run on the 1.0.3 program and fuzzer bytes. It started
       2026-10-18 13:44 UTC with four jobs and all venue profiles; the earlier fuzz
       waiver covers AIR-01 … AIR-24 only.
-- [ ] Resolve or document the remaining issue decisions and obtain independent fix
-      review before marking findings fixed or tagging 1.0.3.
+- [x] Record [independent AI fix review](docs/audit/ai-review-3/independent-fix-review-1.0.3.md)
+      and [written treatment](docs/audit/ai-review-3/unresolved-1.0.3.md) of every
+      unresolved packet finding and lead. Q2/Q3/Q4 accepted; Q1 conditional.
+- [ ] Resolve AI3-FR01's pre-fix empty-pool carry migration condition; resolve or
+      obtain explicit owner sign-off on the remaining exact residuals, complete
+      the ≥24 h zero-failure fuzz run and required review/gates before marking
+      findings fixed or tagging 1.0.3. Documentation is not owner acceptance.
 
 KI-69's hashed-bootstrap procedure and KI-70's authority-transfer behavior retain their
 existing owner decisions. No new acceptance of open fee, cashback, pot-entitlement or

@@ -250,6 +250,16 @@ The [draft validation record](audit/ai-review-3/validation-1.0.3.md) lists the c
 and remaining release gates; the older build and CI evidence above does not cover
 these bytes.
 
+**Independent fix review (2026-10-19):** the
+[separate AI review](audit/ai-review-3/independent-fix-review-1.0.3.md) accepts the
+keeper, reader/retry and ALT corrections (packet Q2/Q3/Q4). Q1's carry correction is
+accepted conditionally: an already-empty pre-fix pool is not migrated, recorded as
+**AI3-FR01 open**. The [written unresolved treatment](audit/ai-review-3/unresolved-1.0.3.md)
+and [known-issues §8](audit/known-issues.md#8-open-items-from-the-103-fix-review) retain
+the prior open findings and remaining leads with evidence limits and completion criteria.
+This is not external firm acceptance or new owner sign-off. The ≥24 h zero-failure fuzz
+and release gates remain required; the merge does not tag or deploy 1.0.3.
+
 ## 1. The protocol on one page
 
 short.win is permissionless peer-to-peer token lending on Solana, built for shorting memecoins

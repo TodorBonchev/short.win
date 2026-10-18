@@ -139,7 +139,12 @@ uses **in progress**, not **fixed**. Open economic/venue issues need resolution 
 acceptance within their bounds. Exact-ref full CI, required browser E2E, opt-in
 responsive coverage, the verifiable build and local compute/size checks passed on
 the candidate. Release still needs ≥24 h fuzz on the final program bytes and
-independent fix review. Earlier fuzz evidence does not cover 1.0.3; the AIR-01 …
+unconditional fix-review acceptance. The 2026-10-19
+[independent AI review](independent-fix-review-1.0.3.md) accepts Q2/Q3/Q4 but makes
+Q1 conditional on addressing legacy empty-pool carry (AI3-FR01). Its
+[written unresolved treatment](unresolved-1.0.3.md) supplies no new owner acceptance.
+Earlier fuzz evidence does not cover 1.0.3; the AIR-01 …
 AIR-24 fuzz waiver does not extend to this batch.
 The [fix-review packet](fix-review-1.0.3.md) records the questions and boundaries
-for an independent reviewer; it is not a substitute for that review.
+for an independent reviewer and links the resulting review; its original request is
+not itself acceptance.

@@ -10,7 +10,12 @@ integrated candidate is `9b910602ed076a6d4359c496960b3ffc0e7c6af8` on
 is attempt 1 of a `workflow_dispatch` on that SHA. The release and test-venue file
 hashes, tool image and verifier/Anchor byte comparison are in the
 [CI hash record](../ci-1.0.3-hashes.txt). The run passed 25 jobs with only the scheduled
-fuzz job skipped. The separate 24-hour fuzz run and independent fix review remain open.
+fuzz job skipped. The separate 24-hour fuzz run remains open. The
+[independent AI fix review](independent-fix-review-1.0.3.md) of 2026-10-19 accepts
+Q2/Q3/Q4 and conditionally accepts Q1: pre-fix already-empty carry state needs a
+migration or evidence it is absent (AI3-FR01). The original questions below remain
+the review request; the linked report and [written treatment](unresolved-1.0.3.md)
+record the answers and unresolved boundaries.
 
 ## Questions for the reviewer
 
@@ -52,8 +57,8 @@ questions. Prior KI-69 and KI-70 decisions are retained only within their
 documented bounds. Review of this fix batch must not imply acceptance of these
 separate issues.
 
-Independent fix review is **pending**. A reviewer should identify the candidate
-commit and release/test-venue ELF hashes, record any findings and their resolution,
-and state explicitly whether the four questions above are accepted. The findings
-tracker may mark a fix **fixed** only after its own commit, negative and positive
-regression, full gate, 24-hour fuzz run, and this independent review.
+The independent AI fix review is **recorded, with Q1 conditional**. Its new finding
+AI3-FR01 remains open; external firm acceptance is not supplied by this work. The
+findings tracker may mark a fix **fixed** only after its own commit, negative and
+positive regression, full gate, zero-failure 24-hour fuzz run, and required fix-review
+acceptance. None of the separate unresolved findings is newly accepted by this report.

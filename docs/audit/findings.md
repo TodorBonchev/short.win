@@ -49,6 +49,7 @@ Status is one of: open, in progress, fixed, acknowledged, duplicate of KI-n, inv
 | AIR2-13 | Keeper receives zero after rent-first liquidation | — | not assessed | `waterfall::liquidate` | open | — | `ai2_accounting`: rent exhaustion | pending | Zero keeper payout reproduced; economic liveness and priority/reserve policy remain open, not automatically accepted under KI-03. |
 | AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | — | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | pending | 670,224 versus 336,779 raw tokens in the loss-control case, beyond KI-13. Draft cap uses the value of unlocked shares. |
 | AIR2-P2-02 | Pot pays a first claimant against unpaid receivable | — | not assessed | `pool::claim` | open | — | `ai2_accounting`: receivable/pot allocation | pending | 75/25 SOL split from 100 SOL repayment with 100 SOL still receivable; report’s proposed current-share subtraction does not repair it. Historical entitlement design remains unresolved. |
+| AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` / `withdraw_in` | open | — | Independent public-API legacy-state probe | Q1 conditional | Pre-fix S=0 state with 1,000 lamports in both carries pays the next cohort 1,001 after only 1 new lamport. New withdrawal reset does not migrate existing empty pools. No affected deployment asserted; requires inventory proof or an ownership-preserving migration. [Review](ai-review-3/independent-accounting-1.0.3.md), [treatment](ai-review-3/unresolved-1.0.3.md). |
 
 ## AI review 3: draft 1.0.3 (2026-10-18)
 
@@ -74,8 +75,10 @@ exploitable or that the remaining program is safe.
 | AI3-L04 | Preserve all pending rank candidates until every RPC group succeeds | in progress | First/second-group failure and successful retry without rediscovery |
 
 These rows describe draft implementations, not the tracker’s strict **fixed** state.
-Exact-ref full CI passed on `9b91060`; this does not complete the 24-hour fuzz or
-independent fix-review requirements. There is no release tag or deployment. The earlier
+Exact-ref full CI passed on `9b91060`; the 2026-10-19 independent AI fix review accepts
+Q2/Q3/Q4 and conditionally accepts Q1, retaining the newly identified legacy migration
+finding AI3-FR01. The 24-hour fuzz and full release conditions remain open.
+There is no release tag or deployment. The earlier
 AIR-01 … AIR-24 fuzz waiver does not cover this batch. The package and its lock entries
 are 1.0.3; account layouts, instruction formats and program identity are unchanged.
 
@@ -88,6 +91,23 @@ change relaxes the deposit hold (L10), changes pot entitlement (AIR2-P2-02), or 
 the one-lamport sync truncation trace (L23) as a solved accounting problem. Full-digest
 guard migration (AIR2-07), creator/risk fees and exit budgets (AIR2-10/11), cashback
 recovery (AIR2-12), and keeper incentives (AIR2-13) remain open.
+
+### Independent fix review and unresolved treatment (2026-10-19)
+
+The [independent review](ai-review-3/independent-fix-review-1.0.3.md) identifies the
+candidate and verified CI artifacts, source comparisons, newly executed checks and each
+packet answer. Q2 accepts F01–F05, Q3 accepts L03/L04 and Q4 accepts L01. Q1 accepts
+F06's post-fix final-withdrawal behavior only conditionally for an upgrade: an already-empty
+pre-fix pool is not migrated (AI3-FR01). This is independent AI review work, not an
+external firm's sign-off or a full-system audit. Implemented rows remain **in progress**.
+
+The [written treatment](ai-review-3/unresolved-1.0.3.md) and
+[known-issues §8](known-issues.md#8-open-items-from-the-103-fix-review) cover the six
+prior open findings, all 20 unimplemented review-3 leads, and the carry allocation/migration
+boundaries. They give the evidence limits, rationale and completion requirements. None is
+newly **acknowledged**, and no older KI acceptance is broadened. Release still requires
+resolution or explicit owner sign-off on the exact residuals, the final-program ≥24 h fuzz
+evidence and the remaining integrated-revision gates.
 
 ### Carry ownership at the final withdrawal
 
