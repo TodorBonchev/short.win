@@ -4,7 +4,9 @@
 now refuses deposits into an already-empty pool with either carry nonzero. The reproduced
 capture below describes the pre-guard candidate. The new guard preserves historical
 value and claims; recovery/ownership remains open, and affected pools stay closed to
-new deposits. Its new bytes require their own full gate and ≥24 h zero-failure fuzz.
+new deposits. Its [exact-ref full CI](https://github.com/TodorBonchev/short.win/actions/runs/39169016016)
+passed with the verifier rebuild and mutations; the separate final-byte ≥24 h
+zero-failure fuzz and remaining release/recovery requirements stay open.
 
 Date: 2026-10-19. Reviewed code: `9b910602ed076a6d4359c496960b3ffc0e7c6af8`,
 integrated with `main` at `24f514c1` in `708746eb0085016c37f4d73e2aea02031bd6efc9`.

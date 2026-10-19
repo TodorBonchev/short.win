@@ -85,37 +85,68 @@ that narrower behavior and its availability bound.
 | Artifact separation / security metadata | A49 mock-id/marker checks and release `security.txt` passed, source release v1.0.3 |
 | Scope / formatting | Scope classification, Rust formatting and diff whitespace checks passed |
 
-These local checks are distinct from full CI and the required ≥24 h zero-failure run.
-The previous main CI run is on `7c5ae429` and therefore cannot certify this new guard.
-Any CI/fuzz evidence must identify the new source revision and program/fuzzer bytes.
+These local checks are distinct from the completed exact-ref CI below and the still
+required ≥24 h zero-failure run. The predecessor main run is on `7c5ae429`; the full
+fix run directly covers the new guard at `e1d66caa`. Fuzz evidence must identify these
+final program and fuzzer bytes.
 
-### CI checks recorded after push
+### Completed CI checks (verified 2026-10-19)
 
-| Run | Exact revision / event | Last checked result |
+| Run | Exact revision / event | Final result |
 |---|---|---|
-| [Full fix CI 39169016016](https://github.com/TodorBonchev/short.win/actions/runs/39169016016) | `e1d66caa64d076a43618f437c2de9ac9127166b4`, workflow_dispatch | Started successfully on the exact fix commit; in progress, not yet a green-gate claim. Explicit dispatch includes mutation checks. No long fuzz duration was supplied. |
-| [Predecessor main CI 39166689873](https://github.com/TodorBonchev/short.win/actions/runs/39166689873) | `7c5ae42978a32cd7463c6cef991031485c39abb2`, push | 23 jobs passed, zero failed; program-tests still running. Fuzz-nightly and mutants intentionally skipped by push-event conditions. The run was left intact. |
+| [Full fix CI 39169016016](https://github.com/TodorBonchev/short.win/actions/runs/39169016016) | `e1d66caa64d076a43618f437c2de9ac9127166b4`, workflow_dispatch attempt 1 | **Success: 25 jobs passed, zero failed; only fuzz-nightly intentionally skipped.** Mutation checks ran. No long fuzz duration was supplied. |
+| [Predecessor main CI 39166689873](https://github.com/TodorBonchev/short.win/actions/runs/39166689873) | `7c5ae42978a32cd7463c6cef991031485c39abb2`, push | **Success: 24 jobs passed, zero failed.** Fuzz-nightly and mutants intentionally skipped by push-event conditions. |
 
-These are observed snapshots, not final conclusions. The source fix uses `[skip ci]`
+Both runs are complete. No CI failure required a source correction. The source fix uses `[skip ci]`
 for its push because the full workflow was explicitly dispatched on that same SHA:
 this runs the workflow_dispatch-only mutation gate and preserves the predecessor run.
 Subsequent documentation-only evidence updates do not change the program/fuzzer bytes.
+
+Selected job logs were independently checked, rather than inferring test counts from
+the overall green conclusion:
+
+- [Mutation gate](https://github.com/TodorBonchev/short.win/actions/runs/39169016016/job/117798341256):
+  all 19 mutants killed (seven by named tests plus three-minute fuzz, twelve by named
+  tests alone); none survived.
+- [Program tests](https://github.com/TodorBonchev/short.win/actions/runs/39169016016/job/117798341101):
+  1,386 passed, zero failed, five ignored across the program, venue-state and LiteSVM
+  suites. The signed legacy empty-pool quarantine regression explicitly passed.
+- [Browser E2E](https://github.com/TodorBonchev/short.win/actions/runs/39169016016/job/117798341331):
+  profile chain 125 passed / two expected skips; follow-up nine passed / 19 expected skips.
+- [Services](https://github.com/TodorBonchev/short.win/actions/runs/39169016016/job/117798341236):
+  284 passed, zero failed, three ignored, including 150 keeper scenarios, 98 keeper unit
+  tests and four typed-version tests. Indexer suites ran in their separate successful job.
+
+These test counts are executions within each CI job, not deduplicated test names.
+
+The ≥24 h zero-failure final-byte fuzz requirement remains **open**. Neither the skipped
+scheduled-fuzz job, fuzz smoke nor the mutation gate's three-minute runs satisfy it.
 
 The separate accounting reviewer independently inspected the root-authored guard and
 error mapping, reran all nine carry cases and found no blocking issue with the narrow
 quarantine. This review accepts prevention of new-cohort capture; it does not decide
 historical ownership/recovery or supply an external firm's release acceptance.
 
-## New local artifacts
+## Build artifacts: local and exact-ref CI
 
 `anchor build --tools-version v1.57 --arch v3 --ignore-keys` and
 `scripts/build-test-venue.sh`, from the source changes in the commit introducing this
-record. These are canonical local builds, not new verifier-image or deployment evidence.
+record. Their local provenance is retained below; the completed CI independently
+rebuilt and verified the release artifact as described after the table.
 
 | Artifact | File SHA-256 | Trimmed-executable SHA-256 | Bytes |
 |---|---|---|---|
 | Release `shortwin.so` | `eb9cd3e68c33de8119b11f978ab77f65d4fa41de79904c508f0fd9d519d737dd` | `dba19dcb86aecba7ee4af61c9d66e159ed478101bb65a5af6f40e91027e83649` | 1,643,832 |
 | Test-venue `shortwin.so` | `cf1c44424ff1c879ac5639b432a25c0dc4a81c5842ce047e26668ef920030322` | `14503aa59628825f728ec3322b9eb9bc2d4cd2d889cc574d0acc1f0f3c78cf5a` | 1,674,864 |
+
+Downloaded the completed run's `shortwin-program` and `verifiable-build` artifacts,
+independently rehashed the release/test-venue/mock files, and compared the verifier
+release ELF byte-for-byte with the Anchor release ELF: **equal**. The release and
+test-venue also match the earlier local canonical builds. CI's solana-verify 0.5.2 job
+records the exact fix commit, pinned image and reproduced release/executable hashes in
+the [FR01 CI hash record](../ci-1.0.3-fr01-hashes.txt). The verifier covers the release
+ELF; test-venue and mock hashes are measured from the Anchor artifact. This evidence
+update did not rerun the verifier locally or deploy a program.
 
 The old [exact-ref hash record](../ci-1.0.3-hashes.txt) and independent review remain
 historical evidence for `9b910602`; they are not overwritten or presented as a verifier

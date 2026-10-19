@@ -268,16 +268,27 @@ pool cannot accept new deposits until separately reviewed recovery; ordinary swe
 not lift this guard. Clean empty pools, nonempty pools and old ShareEpoch record carry
 retain their behavior. The normative model, IDL/client and browser preview match.
 
-| New local artifact | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
+| AI3-FR01 artifact (local and exact-ref CI) | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
 |---|---|---|---|
 | Release `shortwin.so` | `eb9cd3e68c33de8119b11f978ab77f65d4fa41de79904c508f0fd9d519d737dd` | `dba19dcb86aecba7ee4af61c9d66e159ed478101bb65a5af6f40e91027e83649` | 1,643,832 |
 | Test-venue `shortwin.so` | `cf1c44424ff1c879ac5639b432a25c0dc4a81c5842ce047e26668ef920030322` | `14503aa59628825f728ec3322b9eb9bc2d4cd2d889cc574d0acc1f0f3c78cf5a` | 1,674,864 |
 
-These canonical Anchor/test-venue builds passed, but are not a new verifier-image or
-deployment result. Earlier CI/fuzz evidence does not cover the changed program bytes.
-The finding remains **in progress** until the required full gate, ≥24 h zero-failure fuzz
-and review acceptance are established on this fix. Historical ownership/recovery remains
-open; the quarantine does not assign the old carry to a guessed recipient or discard it.
+**Full fix CI passed** on `e1d66caa64d076a43618f437c2de9ac9127166b4`:
+[run 39169016016](https://github.com/TodorBonchev/short.win/actions/runs/39169016016),
+workflow_dispatch attempt 1, 25 successful jobs, zero failed, only the scheduled fuzz
+job intentionally skipped. All 19 mutants were killed; the program job passed 1,386
+test executions with five ignored, including the signed legacy-carry regression.
+The pinned solana-verify 0.5.2 job rebuilt the release ELF. Downloaded verifier and
+Anchor release artifacts compare byte-for-byte equal, and both CI builds' hashes match
+the local canonical builds above; [exact-ref hashes and provenance](audit/ci-1.0.3-fr01-hashes.txt).
+The verifier covers the release ELF; the test-venue hash is measured from the Anchor
+artifact. The predecessor main CI on `7c5ae429` also completed successfully (24 jobs,
+with fuzz-nightly and mutants intentionally skipped).
+
+The finding remains **in progress**: the ≥24 h zero-failure fuzz gate on final bytes
+and remaining release/review requirements are not established by these CI results.
+Historical ownership/recovery remains open; the quarantine does not assign the old
+carry to a guessed recipient or discard it. This is build/CI evidence, not a deployment.
 
 ## 1. The protocol on one page
 

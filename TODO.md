@@ -42,14 +42,18 @@ separates prior issues from new observations and records implementation decision
       passed 25 jobs, with only the scheduled fuzz shard skipped. The Anchor and
       verifiable release ELFs are byte-identical; 1,385 program tests passed with five
       ignored, and all 19 mutants were killed.
-- [ ] Complete the ≥24 h fuzz run on the 1.0.3 program and fuzzer bytes. It started
-      2026-10-18 13:44 UTC with four jobs and all venue profiles; the earlier fuzz
-      waiver covers AIR-01 … AIR-24 only.
+- [ ] Complete a ≥24 h zero-failure fuzz run identifying the final AI3-FR01 program
+      and fuzzer bytes. The previously started pre-FR01 run does not cover this guard;
+      the earlier fuzz waiver covers AIR-01 … AIR-24 only.
 - [x] Record [independent AI fix review](docs/audit/ai-review-3/independent-fix-review-1.0.3.md)
       and [written treatment](docs/audit/ai-review-3/unresolved-1.0.3.md) of every
       unresolved packet finding and lead. Q2/Q3/Q4 accepted; Q1 conditional.
 - [x] Block AI3-FR01's next-cohort capture without discarding or assigning old carry;
       add old-source/ELF negative controls and math/model/signed-transaction regressions.
+- [x] Complete [full fix CI 39169016016](https://github.com/TodorBonchev/short.win/actions/runs/39169016016)
+      on exact fix `e1d66caa`: 25 jobs passed, zero failed, only fuzz-nightly skipped;
+      all 19 mutants killed. Downloaded verifier/Anchor release ELFs are byte-identical
+      and reproduce the local hashes; [CI hash record](docs/audit/ci-1.0.3-fr01-hashes.txt).
 - [ ] Resolve quarantined legacy pools' historical ownership/recovery before reopening
       them; resolve or
       obtain explicit owner sign-off on the remaining exact residuals, complete
