@@ -79,7 +79,7 @@ repeated per-lender accrual truncation.
 
 | Check | Result |
 |---|---|
-| Exact-ref full CI | [Run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500), `workflow_dispatch` attempt 1 on `9b910602ed076a6d4359c496960b3ffc0e7c6af8`: 25 jobs passed, zero failed, and only `fuzz-nightly` was intentionally skipped. This confirms the integrated code revision; the separate 24-hour local fuzz gate remains open. |
+| Exact-ref full CI | [Run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500), `workflow_dispatch` attempt 1 on `9b910602ed076a6d4359c496960b3ffc0e7c6af8`: 25 jobs passed, zero failed, and only `fuzz-nightly` was intentionally skipped. This confirms the integrated code revision; the separate 24-hour local fuzz gate is recorded below. |
 | Canonical release and test-venue SBF builds | Passed; SBPF v3; local hashes in [AUDIT §0](../../AUDIT.md#0-commit-ids-hashes-contacts) |
 | A49 and release `security.txt` | Passed; source release `v1.0.3` |
 | Generated IDL/client | Sync, generation, typecheck and tests passed |
@@ -94,6 +94,7 @@ repeated per-lender accrual truncation.
 | Program, venue-state, LiteSVM, math-WASM and Squads core tests | Earlier local run: 1,345 passed, five ignored. Exact-ref CI program job: 1,385 passed, zero failed, five ignored. |
 | M1 compute | All 63 instruction cases pass. The new final-share/unequal-carry case consumes 38,264 CU on Mollusk and LiteSVM, within the unchanged 100,000-CU withdrawal budget. Strict M1 Clippy passes. |
 | Fuzz smoke | 21 release smoke tests passed after updating the historical CPMM positive oracle; corpus seed/actions and general bounds are unchanged |
+| ≥24 h all-profile fuzz | [Completed run](../fuzz-1.0.3.md) on the CI-verified release ELF: 86,405 seconds, 73,349 runs, 166,090,860 transactions, zero fuzzer failures and zero anomalies. All six profiles were exercised; the raw [summary](../fuzz-1.0.3-summary.json) is preserved. |
 | Mutations on final commit | Exact-ref CI killed all 19 mutants: seven by named tests plus three-minute fuzz and twelve by named tests; none survived. |
 | Services | Complete workspace: 421 passed, six ignored; the repaired batching case, pool-34 retry and typed-version checks pass |
 | Verifiable build | Pinned solana-verify 0.5.2 rebuilt the release ELF `b88aa520…a0647`. The exact-ref CI verifier job on `9b91060` passed and its downloaded ELF was byte-identical to that run's Anchor artifact; [hashes and tool provenance](../ci-1.0.3-hashes.txt). A49 and `security.txt` passed. |
@@ -138,8 +139,9 @@ This is an unreleased draft, not a released fix batch. The findings tracker ther
 uses **in progress**, not **fixed**. Open economic/venue issues need resolution or explicit
 acceptance within their bounds. Exact-ref full CI, required browser E2E, opt-in
 responsive coverage, the verifiable build and local compute/size checks passed on
-the candidate. Release still needs ≥24 h fuzz on the final program bytes and
-independent fix review. Earlier fuzz evidence does not cover 1.0.3; the AIR-01 …
-AIR-24 fuzz waiver does not extend to this batch.
+the candidate. The [24-hour fuzz gate](../fuzz-1.0.3.md) passed on those
+program bytes. Release still needs independent fix review and written
+disposition of the open issues. The AIR-01 … AIR-24 fuzz waiver does not extend
+to this batch and was not used for its fuzz gate.
 The [fix-review packet](fix-review-1.0.3.md) records the questions and boundaries
 for an independent reviewer; it is not a substitute for that review.

@@ -10,7 +10,8 @@ integrated candidate is `9b910602ed076a6d4359c496960b3ffc0e7c6af8` on
 is attempt 1 of a `workflow_dispatch` on that SHA. The release and test-venue file
 hashes, tool image and verifier/Anchor byte comparison are in the
 [CI hash record](../ci-1.0.3-hashes.txt). The run passed 25 jobs with only the scheduled
-fuzz job skipped. The separate 24-hour fuzz run and independent fix review remain open.
+fuzz job skipped. The separate [24-hour all-profile fuzz run](../fuzz-1.0.3.md)
+completed cleanly on the same program bytes. Independent fix review remains open.
 
 ## Questions for the reviewer
 

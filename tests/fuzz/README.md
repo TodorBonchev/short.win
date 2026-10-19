@@ -413,7 +413,7 @@ that class.
 
 The M10 fuzz follow-ups add no finding (nor do their review fixes: every `credited` cross-check matched to the lamport). Their checks reproduce on the corpus. FUZZ-M7-24H-3's reproducer covers a 1,028.408-SOL deficit (1,044.467 SOL at 99.9998 % before its AIR-07 revision) at 999,998 ppm of the tripwire's bound, and the seeding lender's positive balance, short in the first pass, is paid by the second claim pass. In the 10-minute cpmm and amm-v4 runs, no CPMM or AMM v4 differential exit, no deficit and no second-pass claim disagreed with the program. PumpSwap's decision-level oracle ran only in the smoke (`smoke_pumpswap`), where it found no disagreement.
 
-## Runs so far (M7, M10, pump-final P7)
+## Runs so far
 
 | run | build | wall | jobs | runs | actions | transactions | hook checkpoints | failures | anomalies |
 |---|---|---|---|---|---|---|---|---|---|
@@ -461,6 +461,7 @@ The M10 fuzz follow-ups add no finding (nor do their review fixes: every `credit
 | P7 review fixes, `--profile curve`, `--seed 77600000`, `--actions 400` (10 minutes) | `3e3b43b` as committed (the legacy `complete_curve` parsed with `a` odd; `crowd_v3_trades_land`) | 652 s | 4 | 327 | 58,948 | 779,003 | 1,414,529 | 0 | 0 |
 | run-101 (the 24 h run on 1.0.1, stopped for FUZZ-101-24H-A's fix), `--seed 101000000`, `--actions 400` | `eb84737` (release `72c82879…`, test-venue `fd46da2c…`; the fuzzer before FUZZ-101-24H-A's fix) | 3,903 s (stopped) | 4 | 1,496 | 286,746 | 3,707,965 | — (stopped before its summary) | 1 (FUZZ-101-24H-A: the JIT oracle's minted shares mixed share epochs, in its first minute) | 0 |
 | run-102 (the 24 h run on 1.0.1, the fixed fuzzer), `--seed 101000000`, `--actions 400` | `b13ee22` (the `tests/fuzz` of `9062dabc`; release `72c82879…`, test-venue `fd46da2c…`: the 1.0.1 bytes; re-runs run-101's seed stream, FUZZ-101-24H-A's seed included; the JIT oracle checked 5,510 bundles, 358 around a settlement, 33 with the lender behind the share epoch) | 86,420 s | 4 | 35,016 | 6,775,400 | 87,481,138 | 168,031,994 | 0 | 0 |
+| run-103 (the 24 h run on draft 1.0.3), `--profile all`, `--seed 103000000`, `--actions 400` | `9b91060` (release `b88aa520…a0647`, test-venue `994ad12c…32b`); [run record](../../docs/audit/fuzz-1.0.3.md) and [raw summary](../../docs/audit/fuzz-1.0.3-summary.json) | 86,405 s | 4 | 73,349 | 13,967,758 | 166,090,860 | 301,021,313 | 0 | 0 |
 
 In the M10 fuzz follow-ups' final runs: on `cpmm`, 180 liquidations and 337 expiries landed through
 the CPMM differential oracle (every lamport; 25 / 31 more through AMM v4's on adopted candidates),

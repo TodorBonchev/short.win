@@ -38,9 +38,10 @@ separates prior issues from new observations and records implementation decision
       passed 25 jobs, with only the scheduled fuzz shard skipped. The Anchor and
       verifiable release ELFs are byte-identical; 1,385 program tests passed with five
       ignored, and all 19 mutants were killed.
-- [ ] Complete the ≥24 h fuzz run on the 1.0.3 program and fuzzer bytes. It started
-      2026-10-18 13:44 UTC with four jobs and all venue profiles; the earlier fuzz
-      waiver covers AIR-01 … AIR-24 only.
+- [x] Complete the ≥24 h fuzz run on the 1.0.3 program and fuzzer bytes. The
+      [run record](docs/audit/fuzz-1.0.3.md) shows 86,405 seconds, 73,349 runs,
+      166,090,860 transactions, zero fuzzer failures and zero anomalies across
+      all six profiles. The earlier fuzz waiver covers AIR-01 … AIR-24 only.
 - [ ] Resolve or document the remaining issue decisions and obtain independent fix
       review before marking findings fixed or tagging 1.0.3.
 

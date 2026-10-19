@@ -245,7 +245,10 @@ ELF compares byte-for-byte equal to that run's Anchor artifact; the
 [CI hash record](audit/ci-1.0.3-hashes.txt) records the image and both build artifacts.
 [Exact-ref CI run 39144291500](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
 passed on `9b91060`: 25 jobs successful, with only the scheduled fuzz job skipped.
-These are not deployment evidence.
+The separate [24-hour all-profile fuzz run](audit/fuzz-1.0.3.md) on those
+program bytes completed with zero fuzzer failures and zero anomalies. These
+are not deployment evidence; independent fix review and open-issue decisions
+remain pending.
 The [draft validation record](audit/ai-review-3/validation-1.0.3.md) lists the checks
 and remaining release gates; the older build and CI evidence above does not cover
 these bytes.

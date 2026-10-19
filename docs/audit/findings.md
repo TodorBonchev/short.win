@@ -74,8 +74,9 @@ exploitable or that the remaining program is safe.
 | AI3-L04 | Preserve all pending rank candidates until every RPC group succeeds | in progress | First/second-group failure and successful retry without rediscovery |
 
 These rows describe draft implementations, not the tracker’s strict **fixed** state.
-Exact-ref full CI passed on `9b91060`; this does not complete the 24-hour fuzz or
-independent fix-review requirements. There is no release tag or deployment. The earlier
+Exact-ref full CI passed on `9b91060`, and the [24-hour all-profile fuzz run](fuzz-1.0.3.md)
+completed with zero fuzzer failures and zero anomalies. Independent fix review and
+open-issue decisions remain pending. There is no release tag or deployment. The earlier
 AIR-01 … AIR-24 fuzz waiver does not cover this batch. The package and its lock entries
 are 1.0.3; account layouts, instruction formats and program identity are unchanged.
 
