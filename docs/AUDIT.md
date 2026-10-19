@@ -287,8 +287,14 @@ with fuzz-nightly and mutants intentionally skipped).
 
 The finding remains **in progress**: the ≥24 h zero-failure fuzz gate on final bytes
 and remaining release/review requirements are not established by these CI results.
-Historical ownership/recovery remains open; the quarantine does not assign the old
-carry to a guessed recipient or discard it. This is build/CI evidence, not a deployment.
+On 2026-10-19 the owner confirmed no affected deployed state, making AI3-FR01's
+current-deployment recovery/migration prerequisite **not applicable**. The quarantine
+still requires reviewed recovery if affected legacy state is encountered later.
+The owner reported a separate-machine 24-hour fuzz run at **20 hours with zero anomalies**;
+completion and final-byte evidence remain pending in the
+[dated fix record](audit/ai-review-3/ai3-fr01-fix-1.0.3.md#deployment-and-fuzz-status-2026-10-19).
+The deployment statement is owner-confirmed; no independent chain inventory or deployment
+was performed for this documentation update.
 
 ## 1. The protocol on one page
 

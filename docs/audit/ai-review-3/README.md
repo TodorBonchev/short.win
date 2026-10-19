@@ -2,8 +2,11 @@
 
 **Latest unreleased follow-up:** [AI3-FR01 guard and regression](ai3-fr01-fix-1.0.3.md)
 block legacy empty-carry deposits while preserving historical value. It introduces new
-program hashes; its exact-ref full CI, mutations and verified rebuild passed. Final-byte
-≥24 h zero-failure fuzz remains open; the original archive remains unchanged.
+program hashes; its exact-ref full CI, mutations and verified rebuild passed. On
+2026-10-19 the owner confirmed no affected deployed state, so current-deployment recovery
+is not applicable, and reported a separate-machine fuzz run at 20 hours with zero
+anomalies. Completed final-byte ≥24 h zero-failure evidence remains pending; the original
+archive remains unchanged.
 
 This folder archives the AI-assisted static review completed on 2026-10-18 against
 `b815269224ba0f5d946f49de7e113220c4067041` (draft 1.0.2), using

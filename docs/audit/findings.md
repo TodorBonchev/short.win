@@ -49,7 +49,7 @@ Status is one of: open, in progress, fixed, acknowledged, duplicate of KI-n, inv
 | AIR2-13 | Keeper receives zero after rent-first liquidation | — | not assessed | `waterfall::liquidate` | open | — | `ai2_accounting`: rent exhaustion | pending | Zero keeper payout reproduced; economic liveness and priority/reserve policy remain open, not automatically accepted under KI-03. |
 | AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | — | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | pending | 670,224 versus 336,779 raw tokens in the loss-control case, beyond KI-13. Draft cap uses the value of unlocked shares. |
 | AIR2-P2-02 | Pot pays a first claimant against unpaid receivable | — | not assessed | `pool::claim` | open | — | `ai2_accounting`: receivable/pot allocation | pending | 75/25 SOL split from 100 SOL repayment with 100 SOL still receivable; report’s proposed current-share subtraction does not repair it. Historical entitlement design remains unresolved. |
-| AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` | in progress | `e1d66caa` | Canonical predecessor witness, carry matrix, signed legacy deposit; old source/ELF negative controls fail | Narrow quarantine independently reviewed; ≥24 h fuzz/release requirements pending | New deposits refuse 6110 when S=0 and either carry is nonzero, preserving historical value/claims. Full exact-ref CI passed: 25 jobs, 19 mutants killed, verifier/Anchor ELFs byte-identical. [Fix, hashes and CI](ai-review-3/ai3-fr01-fix-1.0.3.md). Final-byte ≥24 h zero-failure fuzz is still required before **fixed**; historical recovery remains separate. |
+| AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` | in progress | `e1d66caa` | Canonical predecessor witness, carry matrix, signed legacy deposit; old source/ELF negative controls fail | Narrow quarantine independently reviewed; ≥24 h fuzz/release requirements pending | New deposits refuse 6110 when S=0 and either carry is nonzero, preserving historical value/claims. Full exact-ref CI passed: 25 jobs, 19 mutants killed, verifier/Anchor ELFs byte-identical. On 2026-10-19 the owner confirmed no affected deployed state: current-deployment recovery is not applicable. Owner-reported separate-machine fuzz: 20 h, zero anomalies; completed ≥24 h zero-failure evidence on final bytes remains required before **fixed**. [Fix, status, hashes and CI](ai-review-3/ai3-fr01-fix-1.0.3.md). |
 
 ## AI review 3: draft 1.0.3 (2026-10-18)
 
@@ -113,11 +113,14 @@ evidence and the remaining integrated-revision gates.
 
 **2026-10-19 follow-up:** [AI3-FR01's deposit quarantine](ai-review-3/ai3-fr01-fix-1.0.3.md)
 now prevents an already-empty legacy pool from admitting a new cohort while either carry
-is nonzero. It preserves the historical balances and old allocated claims; a reviewed
-recovery/migration is still required to reopen that affected pool. The earlier review's
-finding remains evidence of the pre-guard behavior. Full CI on `e1d66caa` now passed,
-including mutations and the verified release rebuild; the separate final-byte 24-hour
-zero-failure fuzz requirement remains open.
+is nonzero. It preserves the historical balances and old allocated claims. The owner
+confirmed on 2026-10-19 that no affected deployed state exists, so current-deployment
+recovery/migration is not applicable; reviewed recovery would still be required before
+reopening any affected legacy pool encountered later. The earlier review's finding
+remains evidence of the pre-guard behavior. Full CI on `e1d66caa` passed, including
+mutations and the verified release rebuild. The owner reports 20 hours with zero
+anomalies in a separate-machine 24-hour fuzz run; final-byte provenance and completed
+≥24 h zero-failure evidence remain pending in the linked fix record.
 
 Both accumulator carries hold value not yet assigned to individual lenders. At high raw
 token/share supplies they can contain whole lamports; retaining them after `S = 0`

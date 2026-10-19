@@ -43,8 +43,10 @@ separates prior issues from new observations and records implementation decision
       verifiable release ELFs are byte-identical; 1,385 program tests passed with five
       ignored, and all 19 mutants were killed.
 - [ ] Complete a ≥24 h zero-failure fuzz run identifying the final AI3-FR01 program
-      and fuzzer bytes. The previously started pre-FR01 run does not cover this guard;
-      the earlier fuzz waiver covers AIR-01 … AIR-24 only.
+      and fuzzer bytes. On 2026-10-19 the owner reported a separate-machine 24-hour run
+      at 20 hours with zero anomalies; completion, exact-byte provenance and retained
+      results are pending in the [fix record](docs/audit/ai-review-3/ai3-fr01-fix-1.0.3.md#deployment-and-fuzz-status-2026-10-19).
+      The earlier fuzz waiver covers AIR-01 … AIR-24 only.
 - [x] Record [independent AI fix review](docs/audit/ai-review-3/independent-fix-review-1.0.3.md)
       and [written treatment](docs/audit/ai-review-3/unresolved-1.0.3.md) of every
       unresolved packet finding and lead. Q2/Q3/Q4 accepted; Q1 conditional.
@@ -54,9 +56,11 @@ separates prior issues from new observations and records implementation decision
       on exact fix `e1d66caa`: 25 jobs passed, zero failed, only fuzz-nightly skipped;
       all 19 mutants killed. Downloaded verifier/Anchor release ELFs are byte-identical
       and reproduce the local hashes; [CI hash record](docs/audit/ci-1.0.3-fr01-hashes.txt).
-- [ ] Resolve quarantined legacy pools' historical ownership/recovery before reopening
-      them; resolve or
-      obtain explicit owner sign-off on the remaining exact residuals, complete
+- [x] Record the owner's 2026-10-19 confirmation that no affected deployed state exists;
+      AI3-FR01's current-deployment recovery/migration prerequisite is not applicable.
+      If affected legacy state is encountered later, reviewed recovery is still required
+      before reopening it.
+- [ ] Resolve or obtain explicit owner sign-off on the remaining exact residuals, complete
       the ≥24 h zero-failure fuzz run and required review/gates before marking
       findings fixed or tagging 1.0.3. Documentation is not owner acceptance.
 

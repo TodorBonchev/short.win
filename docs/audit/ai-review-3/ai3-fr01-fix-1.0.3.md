@@ -6,6 +6,22 @@ This is a further **unreleased 1.0.3** fix, superseding the earlier candidate's 
 behavior and program hashes. The finding remains **in progress** under AUDIT §12;
 this record is not a release, 24-hour fuzz result, or owner acceptance of historical loss.
 
+## Deployment and fuzz status (2026-10-19)
+
+The owner confirmed that **no affected deployed state exists**. On that confirmation,
+the historical-state recovery/migration prerequisite is **not applicable to the current
+deployment**. No recovery transaction is required. This records the owner's deployment
+confirmation, not an independently performed chain inventory or an implemented migration.
+If affected legacy state is encountered later, the quarantine and reviewed-recovery
+requirement below still apply. Other pot, fee, incentive and historical-allocation
+findings retain their existing dispositions.
+
+The owner also reported a **24-hour fuzz run on a separate machine, 20 hours elapsed
+with zero anomalies**. This is an ongoing, owner-reported progress snapshot, not a
+completed zero-failure result. The ≥24 h gate remains open; completion evidence must
+identify the fix commit, program and fuzzer bytes, and retained results. Those run
+details and final results have not yet been recorded here.
+
 ## Correction and availability boundary
 
 At the start of `pool::deposit_in`, before release, touch, share minting or wipe-record
@@ -18,8 +34,9 @@ blocked and explains that sweeps and retries cannot resolve it.
 This closes the next-cohort capture path by quarantining the affected pool. It deliberately
 preserves both carries, lender SOL, pot backing, old allocated claims and epoch records.
 It neither erases value nor guesses a recipient: the old state has no authenticated record
-of the departed final owner's identity. Claims by existing lenders still work. No affected
-deployed market is asserted or inspected by this change.
+of the departed final owner's identity. Claims by existing lenders still work. The owner
+confirmed no affected deployed state as recorded above; this code change did not inspect
+deployed markets.
 
 **Availability cost:** an affected already-empty pool cannot accept any new deposit until
 a separately reviewed recovery/migration handles it. Ordinary sweeps cannot clear the
@@ -31,8 +48,9 @@ even with old allocated claims, unmatched pot or rounding dust. Carries in an ol
 No new account layout, instruction, authority or transfer is introduced; the new error is
 an append to the existing error interface. Package version remains the unreleased 1.0.3.
 
-Historical ownership/recovery and the other unresolved pot/fee/incentive findings remain
-open. This quarantine does not claim to pay the departed lender or complete a migration.
+Current-deployment recovery is not applicable on the owner's confirmation above. The other
+unresolved pot/fee/incentive findings remain open. This quarantine does not claim to pay
+a departed lender or complete a migration.
 The [known-issues register](../known-issues.md#8-open-items-from-the-103-fix-review) records
 that narrower behavior and its availability bound.
 
@@ -121,6 +139,8 @@ These test counts are executions within each CI job, not deduplicated test names
 
 The ≥24 h zero-failure final-byte fuzz requirement remains **open**. Neither the skipped
 scheduled-fuzz job, fuzz smoke nor the mutation gate's three-minute runs satisfy it.
+The separate-machine run's reported 20 hours with zero anomalies is recorded in the
+[dated status](#deployment-and-fuzz-status-2026-10-19); completion evidence is pending.
 
 The separate accounting reviewer independently inspected the root-authored guard and
 error mapping, reran all nine carry cases and found no blocking issue with the narrow

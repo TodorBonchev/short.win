@@ -3,10 +3,14 @@
 **Subsequent correction (2026-10-19):** the [AI3-FR01 guard](ai3-fr01-fix-1.0.3.md)
 now refuses deposits into an already-empty pool with either carry nonzero. The reproduced
 capture below describes the pre-guard candidate. The new guard preserves historical
-value and claims; recovery/ownership remains open, and affected pools stay closed to
-new deposits. Its [exact-ref full CI](https://github.com/TodorBonchev/short.win/actions/runs/39169016016)
-passed with the verifier rebuild and mutations; the separate final-byte ≥24 h
-zero-failure fuzz and remaining release/recovery requirements stay open.
+value and claims. The owner confirmed on 2026-10-19 that no affected deployed state
+exists, making current-deployment recovery/migration not applicable; affected legacy
+state encountered later would still require reviewed recovery before new deposits.
+Its [exact-ref full CI](https://github.com/TodorBonchev/short.win/actions/runs/39169016016)
+passed with the verifier rebuild and mutations. The owner reports a separate-machine
+24-hour fuzz run at 20 hours with zero anomalies; completed final-byte ≥24 h zero-failure
+evidence and remaining release requirements stay open. See the
+[dated status and evidence limits](ai3-fr01-fix-1.0.3.md#deployment-and-fuzz-status-2026-10-19).
 
 Date: 2026-10-19. Reviewed code: `9b910602ed076a6d4359c496960b3ffc0e7c6af8`,
 integrated with `main` at `24f514c1` in `708746eb0085016c37f4d73e2aea02031bd6efc9`.
@@ -67,7 +71,7 @@ keys and the original claims remain in the [31-item triage](triage.md).
 
 ## Accepted duplicates and the F06 allocation boundary
 
-**AI3-FR01 — legacy empty-pool carry migration (open).** Independent public-API
+**AI3-FR01 — legacy empty-pool carry (original review).** Independent public-API
 characterization reconstructs a pre-fix final withdrawal leaving `S=0`,
 `carry=carry_r=1,000*WAD`, and 1,000 lamports of old lender SOL. After required sweep
 completion, a new one-token cohort deposits, adds one lamport, withdraws and receives
@@ -81,6 +85,13 @@ evidence proving no affected old empty state, or a separately designed migration
 historical entitlement/backing and regression evidence. Simply discarding both carries
 could strand backing or erase old claims and is not an approved migration. The issue is
 logged in the tracker and known-issues register; merging the candidate does not close it.
+
+**2026-10-19 deployment follow-up:** the owner has confirmed the absence of affected
+deployed state. On that confirmation, the original Q1 deployment-state condition is
+satisfied for the current deployment and recovery/migration is not applicable. This
+is an owner-confirmed deployment fact, not an independent chain inventory. The guard
+correction and its CI/review evidence are recorded above; AI3-FR01 remains **in progress**
+until the completed ≥24 h final-byte fuzz evidence and remaining gates are recorded.
 
 AI3-F07 remains a duplicate of KI-70/AIR-04/AIR2-06: unsigned successor keys can be
 installed only through approved governance, with the documented recovery path. AI3-F08
