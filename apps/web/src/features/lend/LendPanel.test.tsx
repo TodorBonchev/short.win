@@ -246,6 +246,8 @@ describe('Lend → Deposit', () => {
         const view = renderPanel('deposit');
         // The old marker has expired at now=1,000, but a sweep extended the shared vest to 1,200.
         expect(screen.getByTestId(T.lendDepositReason).textContent).toContain(formatUtc(1_200n));
+        expect(screen.getByTestId(T.lendDepositReason).textContent).toContain('Further donations can extend the hold');
+        expect(screen.getByTestId(T.lendDepositReason).textContent).toContain('no guaranteed reopening time');
         fireEvent.change(screen.getByTestId(T.lendAmountInput), { target: { value: '1' } });
         fireEvent.click(screen.getByTestId(T.disclosureAck('lender.solRepayment')));
         expect(submit().disabled).toBe(true);
@@ -773,6 +775,10 @@ describe('Lend → Claim', () => {
         expect(screen.getByTestId(T.claimValue('claimable')).dataset.value).toBe('300000');
         expect(screen.getByTestId(T.claimValue('deficit')).dataset.value).toBe('0');
         expect(screen.getByTestId(T.claimValue('pot')).dataset.value).toBe('0');
+        expect(screen.getByText(/earlier claims can leave less for later claimants/)).toBeTruthy();
+        expect(
+            screen.getByText(/Some credited income may never be paid if the shortfall is never covered/),
+        ).toBeTruthy();
         expect(screen.queryByTestId(T.coverDeficitSubmit)).toBeNull();
         fireEvent.click(screen.getByTestId(T.claimSubmit));
         await waitFor(() => expect(started).toHaveLength(1));

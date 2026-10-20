@@ -209,7 +209,7 @@ export const GLOSSARY = {
     keeper: g({
         id: 'keeper',
         term: 'a keeper',
-        text: 'A bot that liquidates, expires and settles positions. Anyone can run one; short.win runs its own as a backstop and is paid like any other keeper.',
+        text: 'A bot that liquidates, expires and settles positions. Anyone can run one. Small positions can depend on a short.win backstop with operating funds; timely third-party execution is not guaranteed.',
         labels: ['Keeper paid'],
     }),
     keeperReward: g({
@@ -419,7 +419,7 @@ export const GLOSSARY = {
     credited: g({
         id: 'credited',
         term: 'credited SOL',
-        text: 'Rent and released income credited to your shares that you have not claimed yet. Credited rent is not guaranteed: rent a position never pays is taken back from the lenders who hold shares at that moment.',
+        text: 'Rent and released income credited to your shares that you have not claimed yet. Credited rent is not guaranteed: rent a position never pays is taken back from the lenders who hold shares at that moment. Credited income does not guarantee a particular cash payout from the shared pot.',
         labels: ['Credited to you', 'Rent credited'],
     }),
     claimable: g({
@@ -437,7 +437,7 @@ export const GLOSSARY = {
     pot: g({
         id: 'pot',
         term: 'the market pot',
-        text: 'Spare SOL in this market: SOL allocated to other lenders’ shares beyond their own credit, moved here when they are synced. When the SOL allocated to your shares does not cover what is credited to you, a claim can draw on the pot, and it can first sync such lenders.',
+        text: 'Spare SOL in this market: SOL allocated to other lenders’ shares beyond their own credit, moved here when they are synced. When the SOL allocated to your shares does not cover what is credited to you, a claim can draw on the pot, and it can first sync such lenders. Claims draw on it in transaction order; an earlier claim can leave less cash for later claims against credited income. Some credited income may never be paid if the shortfall is never covered.',
         labels: ['Market pot'],
     }),
     deficit: g({

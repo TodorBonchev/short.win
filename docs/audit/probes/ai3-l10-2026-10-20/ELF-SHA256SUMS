@@ -1,0 +1,3 @@
+eb9cd3e68c33de8119b11f978ab77f65d4fa41de79904c508f0fd9d519d737dd  target/deploy/shortwin.so
+cf1c44424ff1c879ac5639b432a25c0dc4a81c5842ce047e26668ef920030322  target/test-venue/deploy/shortwin.so
+4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9  target/deploy/mock_cpamm.so

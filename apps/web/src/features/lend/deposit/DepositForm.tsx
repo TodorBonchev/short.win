@@ -100,7 +100,7 @@ export function DepositForm({ ctx }: { ctx: LendCtx }) {
     const hold = previewDepositHold(math, lendStateOf(chain), now);
     const holdReason =
         hold.ok && hold.value !== null
-            ? `Settlement income is vesting. Deposits resume at ${formatUtc(hold.value)} if the vest is not extended.`
+            ? `Settlement income is vesting. The current vest ends at ${formatUtc(hold.value)}. Further donations can extend the hold; there is no guaranteed reopening time while they continue.`
             : null;
     const preview =
         !cleanup && amount !== null && tolBps !== null

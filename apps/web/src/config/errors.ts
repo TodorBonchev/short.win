@@ -362,7 +362,7 @@ const ROWS: readonly Row[] = [
         6110,
         'LegacyPoolCarry',
         'blocked',
-        'This empty pool still holds income from earlier lenders. Deposits are blocked pending a reviewed migration. Sweeping or retrying will not unblock deposits.',
+        'This empty pool contains unassigned income from earlier shares. Deposits are blocked until the accounting is reviewed. Sweeping or retrying will not unblock deposits.',
     ],
 ];
 

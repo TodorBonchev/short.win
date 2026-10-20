@@ -1,0 +1,99 @@
+diff --git a/tests/litesvm/tests/ai2_halted_s3_vest_it.rs b/tests/litesvm/tests/ai2_halted_s3_vest_it.rs
+index 0ba347a3..207b4d7c 100644
+--- a/tests/litesvm/tests/ai2_halted_s3_vest_it.rs
++++ b/tests/litesvm/tests/ai2_halted_s3_vest_it.rs
+@@ -298,7 +298,7 @@ fn a_deposit_after_a_halted_venue_s3_takes_none_of_the_old_lenders_vest() {
+ 
+     // A later vested sweep moves the common vest end. The stored timestamp alone must not
+     // admit X while any of the S3 payment remains unreleased.
+-    f.env.svm = ready;
++    f.env.svm = ready.clone();
+     assert!(f.settle(&b.key(), nonce).ev.is_some());
+     let first_end = f.market().deposit_hold_until;
+     assert_eq!(
+@@ -332,4 +332,85 @@ fn a_deposit_after_a_halted_venue_s3_takes_none_of_the_old_lenders_vest() {
+     crank(&mut f);
+     assert_eq!(f.market().vest_bal, 0);
+     ok(f.env.send(&[ix::deposit(&keys, d, 0)], &[&x]));
++
++    // TEMPORARY AI3-L10 characterization: same organically reached S3, repeated atomic
++    // donations/sweeps. No production source or economic policy is changed.
++    f.env.svm = ready.clone();
++    assert!(f.settle(&b.key(), nonce).ev.is_some());
++    let original_end = f.market().vest_end;
++    let donor = f.env.payer.pubkey();
++    let trader = f.market().trader;
++    let donate = |f: &mut Fart, amount: u64| -> u64 {
++        let before = read::lamports(&f.env.svm, &donor);
++        let sweep = shortwin_litesvm_tests::engine::sweep_trader_ix_for(&f.env, &market);
++        let tx = f.env.transaction(
++            &[system_instruction::transfer(&donor, &trader, amount), sweep],
++            &[],
++        );
++        // The 1-lamport intermediate trader is not rent exempt. The full atomic
++        // transaction closes it again and is valid; checking the transfer prefix as
++        // a separate transaction would incorrectly reject that intermediate state.
++        ok(shortwin_litesvm_tests::env::send_direct(&mut f.env.svm, |svm| svm.send_transaction(tx)));
++        f.env.assert_invariants();
++        let spent = before - read::lamports(&f.env.svm, &donor);
++        assert_eq!(spent - amount, 5_000);
++        spent - amount
++    };
++    let blocked = |f: &mut Fart| {
++        let normal_payer = f.env.payer.insecure_clone();
++        f.env.payer = x.insecure_clone();
++        let before = read::lamports(&f.env.svm, &x.pubkey());
++        let attempt = f.env.send(&[ix::deposit(&keys, d, 0)], &[&x]);
++        let fee = before - read::lamports(&f.env.svm, &x.pubkey());
++        f.env.payer = normal_payer;
++        assert_err(&attempt, E::PoolDrained);
++        assert_eq!(fee, 5_000);
++        assert!(f.env.lender(&market, &x.pubkey()).is_none());
++        fee
++    };
++    let mut donated = 0u64;
++    let mut attack_fees = 0u64;
++    let mut honest_fees = 0u64;
++    f.env.warp(vest_s / 2);
++    attack_fees += donate(&mut f, 1);
++    donated += 1;
++    assert_eq!(f.market().vest_end, original_end, "one-lamport dust does not initially extend");
++    println!("L10 initial dust: amount=1 fee=5000 end={original_end} unchanged");
++    for round in 0..30 {
++        let old_end = f.market().vest_end;
++        f.env.warp(old_end - f.env.now() - 1);
++        let mut projected = f.market().pool();
++        pool::release(&mut projected, f.env.now()).unwrap();
++        let balance = projected.vest_bal;
++        let left = old_end - f.env.now();
++        let denominator = u64::try_from(vest_s - left - 1).unwrap();
++        let minimum = balance.div_ceil(denominator).max(1);
++        if round == 0 && minimum > 1 {
++            let saved = f.env.svm.clone();
++            let below = minimum - 1;
++            let fee = donate(&mut f, below);
++            assert_eq!(f.market().vest_end, old_end);
++            println!("L10 counterfactual threshold: bal={balance} left={left} donation={below} fee={fee} end unchanged; minimum={minimum}");
++            f.env.svm = saved;
++        }
++        let fee = donate(&mut f, minimum);
++        donated += minimum;
++        attack_fees += fee;
++        let next_end = f.market().vest_end;
++        assert!(next_end > old_end);
++        f.env.warp(old_end - f.env.now());
++        honest_fees += blocked(&mut f);
++        println!("L10 round={round} bal_before={balance} donation={minimum} fee={fee} old_end={old_end} new_end={next_end} extension={} blocked_at={} vest_left={}", next_end-old_end, f.env.now(), f.market().vest_bal);
++    }
++    let last_end = f.market().vest_end;
++    println!("L10 attack totals: donations={donated} donation_tx_fees={attack_fees} donor_cost={} honest_blocked_deposit_fees={honest_fees} extension_seconds={} vest_s={vest_s}", donated+attack_fees, last_end-original_end);
++    f.env.warp(last_end - f.env.now() + 1);
++    crank(&mut f);
++    assert_eq!(f.market().vest_bal, 0);
++    let old_paid = claim_twice(&mut f.env, &market, &h);
++    assert!(old_paid + 2 >= h_control + donated);
++    ok(f.env.send(&[ix::deposit(&keys, d, 0)], &[&x]));
++    let new_paid = claim_twice(&mut f.env, &market, &x);
++    assert!(new_paid <= 2);
++    println!("L10 eventual release: old_paid={old_paid} baseline_old_paid={h_control} donations={donated} new_paid={new_paid}; honest deposit admitted after last_end+1");
+ }

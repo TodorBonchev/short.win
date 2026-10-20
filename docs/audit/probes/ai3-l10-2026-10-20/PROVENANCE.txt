@@ -1,0 +1,52 @@
+AI3-L10 finite production characterization (2026-10-20)
+Source checkout: 007915da9d9c7a764783683f38bd3f4b961e6398
+Original tracked test: tests/litesvm/tests/ai2_halted_s3_vest_it.rs
+Original SHA256: ef475a95bd86519d929d13b63028ec224913bc7c409e00021add1af199925ec7
+The tracked test was restored byte-for-byte. No program, fuzzer, or committed test changes.
+
+Reproduce in a disposable checkout at that revision:
+git apply /absolute/path/to/probe.patch
+CARGO_BUILD_JOBS=2 CARGO_TARGET_DIR=/root/short.win/target \
+SHORTWIN_SO=/root/short.win-audit-review/target/deploy/shortwin.so \
+SHORTWIN_TEST_VENUE_SO=/root/short.win-audit-review/target/test-venue/deploy/shortwin.so \
+MOCK_CPAMM_SO=/root/short.win-audit-review/target/deploy/mock_cpamm.so \
+cargo test -p shortwin-litesvm-tests --test ai2_halted_s3_vest_it --locked -- --nocapture
+Use the exact ELFs whose full hashes are recorded in ELF-SHA256SUMS.
+
+Result: 1 test passed, 0 failed, 3.56 seconds test execution.
+Reachability: existing genuine Raydium halt/S3 fixture, actual signed Solana transactions,
+default 21,600-second lump vest, no policy/account-state injection in the new probe.
+The preexisting test restores VM clones for control comparisons; the new trace restores
+the exact reached pre-S3 snapshot, settles again, and runs the successive donation trace.
+One threshold-minus-one sample uses a saved counterfactual VM clone; its donation/fee
+is printed separately and excluded from the main-branch cost totals.
+
+A one-lamport standalone transfer to the emptied trader would be a non-rent-exempt
+intermediate state. The probe executes signed [SystemTransfer, SweepTrader] atomically
+through LiteSVM and asserts all global invariants after each full transaction.
+Env::send checks the transfer prefix as an independent transaction, which would reject
+that intermediate state although the full bundle ends with a zero/closed trader.
+Thus these bundles bypass only that prefix-test limitation, not runtime rent checks.
+Honest blocked deposits use Env::send and the honest depositor as fee payer.
+Default VM base fees measured from actual payer deltas are 5,000 lamports per transaction.
+No priority fees, live RPC latency or external fee-market estimate is asserted.
+
+Observed finite trace:
+- Initial one-lamport donation halfway through the old vest: no end extension.
+- At first old deadline minus one second, 542,211 lamports remain: donation 25
+  leaves the end unchanged on the counterfactual branch; donation 26 extends by one second.
+- Successive smallest one-second-extension donations: 26, 13, 7, 4, 2, then 1.
+- Once one old lamport remains, each one-lamport donation sets a two-lamport vest and
+  extends the old deadline by 10,799 seconds. Twenty such long extensions were executed.
+- Main branch: 31 donation+sweep transactions, 78 donated lamports, 155,000 transaction
+  fees, 155,078 total donor lamports. Thirty honest deposit attempts all fail PoolDrained
+  and cost that separate depositor 150,000 transaction-fee lamports.
+- Total measured extension beyond the original S3 end: 219,140 seconds (60.87 hours).
+- Stop donating, advance past final deadline, release: old lender receives 11,711,842,891
+  lamports versus 11,711,842,813 baseline, exactly plus all 78 donations. New lender can
+  deposit and receives 0 historical SOL.
+
+Conclusion: the repeated-donation availability premise is demonstrated, rather than invalid.
+The finite sample establishes neither a universal duration/cost bound nor attacker profit.
+This probe supplies evidence for an explicit L10 availability-policy disposition; it does
+not approve weakening the hold, allocate historical rewards to newcomers, or change policy.

@@ -377,7 +377,7 @@ describe('lend previews on simple pools', () => {
                     expect(r.ok).toBe(false);
                     if (!r.ok) {
                         expect(r.refusal).toMatchObject({ name: 'LegacyPoolCarry', code: 6110 });
-                        expect(r.refusal.message).toContain('pending a reviewed migration');
+                        expect(r.refusal.message).toContain('until the accounting is reviewed');
                     }
                 }
             }

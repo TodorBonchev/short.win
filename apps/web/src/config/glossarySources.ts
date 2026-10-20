@@ -38,7 +38,7 @@ export const GLOSSARY_SOURCES: Readonly<Record<GlossaryId, string>> = {
     penalty: 'SPEC §5.2 step 3, §6.3.',
     maxLiqSlippage: 'SPEC §5.3 table row S2; D:borrower.liquidation (S2 line).',
     buyback: 'SPEC §2.2 step 2; INDEXER §8.4 buyback_cost.',
-    keeper: 'SPEC §5.1 (“Anyone can call liquidate … short.win runs its own keeper as a backstop”), §6.3.',
+    keeper: 'SPEC §5.1 (“Anyone can call liquidate … short.win runs its own keeper as a backstop”), §6.3; AIR2-13 operating-funding and third-party incentive limitations (owner, 2026-10-21).',
     keeperReward:
         'SPEC §6.3 (SOL settlement row); features/short/ui.tsx TierTerms; disclosureVars.ts keeperRewardText.',
     venueFeeHardCap:
@@ -82,17 +82,17 @@ export const GLOSSARY_SOURCES: Readonly<Record<GlossaryId, string>> = {
         'ECON §9.2 (share value); FE §3.8 (dashboard KPI “≈ SOL at each market’s indexer EMA price, display only”).',
     minSharesTolerance: 'FE-D6 (min_shares, min_tokens); FE §3.6.',
     credited:
-        'ECON §9.4 (entitlement pending; claim_sol pending −= pay; a shortfall is debited pro-rata); LenderDashboardPage.tsx (Rent credited = Σ pending); previews.ts entitled = max(pending, 0); SPEC §2.4 step 5; D:lender.unpaidRent ¶1.',
+        'ECON §9.4 (entitlement pending; claim_sol pending −= pay; a shortfall is debited pro-rata); LenderDashboardPage.tsx (Rent credited = Σ pending); previews.ts entitled = max(pending, 0); SPEC §2.4 step 5; D:lender.unpaidRent ¶1; AIR2-P2-02 cash-first claim policy (owner, 2026-10-21).',
     claimable:
         'programs/shortwin/src/instructions/claim_sol.rs (pay = min(pending, real − claimed, lender_sol)); ECON §9.4 (“rent is paid only at exit”); ClaimForm.tsx previewClaim (no syncs); build.ts claimPlanFrom (syncs when shortfall > 0). Paid-in rent can still wait on other lenders’ syncs (claim.note.shortfall), so the text does not say “claimable once paid”.',
     vesting:
         'D:lender.risks ¶4 (one-off income vests over {vestPeriod}); D:lender.exitForfeitsVest (“the unvested part stays with the lenders who remain”), KI-09; ClaimForm.tsx note (rent paid above what accrued vests, M10-8C-1); ECON §9.3; ECON §15 lump_vest_s.',
-    pot: 'ECON §9.4 touch (surplus → MarketVault.unmatched), “Why the pot (R3A-2)”; claim_sol.rs (draw = min(unmatched, max(0, pending − own))); D:lender.potSyncs ¶1.',
+    pot: 'ECON §9.4 touch (surplus → MarketVault.unmatched), “Why the pot (R3A-2)”; claim_sol.rs (draw = min(unmatched, max(0, pending − own))); D:lender.potSyncs ¶1; AIR2-P2-02 cash-first claim policy (owner, 2026-10-21).',
     deficit: 'SPEC §2.4 step 5; ECON §9.4; D:lender.unpaidRent ¶3 (sentence 2 verbatim).',
     locked: 'D:lender.risks ¶3, verbatim ({lockGrace} from GlobalConfig lock_grace_s).',
     unpaidRent: 'D:lender.unpaidRent ¶1; SPEC §2.4 step 5; ECON §9.4.',
     shareEpoch:
-        'ECON §9.5 (roll(0, 1) on a full wipe; roll(1, 1,000^k) when S + VS > R_MAX·(T + B_Q + VA); “lender touch: for each epoch behind”); D:lender.residuals last ¶.',
+        'ECON §9.5 (roll(0, 1) on a full wipe; roll(1, 1,000^k) when S + VS > R_MAX·(T + B_Q + VA); “lender touch: for each epoch behind”); D:lender.residuals ¶10.',
     sync: 'FE §3.6, §3.8 (sync_lender); ECON §9.4 (touch).',
     poolWiped:
         'ECON §9.5 (full-wipe record; “the wiped lenders keep their unreleased lumps”); claim_sol.rs header (“A lender parked on a live full-wipe record claims from that record”).',

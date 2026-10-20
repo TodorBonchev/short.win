@@ -1077,8 +1077,9 @@ Checkbox: “I understand I give up my unvested income.”
 
 #### `lender.residuals` — Known limits (accepted by the protocol)
 
-*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5 (KI-65, KI65-REV-SEC1), §12.9–§12.11
+*Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11, R4B-10); ECON §8.2, §9.3, §9.5 (KI-65, KI65-REV-SEC1), §12.9–§12.11; owner-selected policies of 2026-10-21 (AIR2-P2-02, AIR2-12, AI3-F06, AI3-L10)
 *Shown:* Lend → Deposit (collapsed `<details>`), FAQ link. *v1.2 (M9-UX-2):* the three O19 residuals that fall on lenders — the liquidation that reserves nothing (ARCH §8.5's Tier A figures), Raydium pool pinning by a standing minimum position (R4B-10), the notional-cap exceedance of M7-SEC-4 in a lender's framing — were missing and are added. *M10 (owner decision of 2026-10-07, seventh round: approved):* the last paragraph, KI-65's conversion-order residual after a rebase (known-issues KI-65). *FE-31 (approved by the owner on 2026-10-13):* the liquidation paragraph's Tier A figures are the held model's under AIR-22's lower-median growth (ECON §8.2, §12.6; `sim/out/attacks/sandwich.out`, no reserve: fresh +3.340, aged 25 d at 90 % +4.543 SOL; before AIR-22 2.06 / 8.02 SOL)
+
 
 > If lenders withdraw ahead of a loss, those who leave first can take more than their fair share and those who stay less: about 4% of value at 90% utilisation, up to about 11% at 50–60%.
 >
@@ -1088,7 +1089,7 @@ Checkbox: “I understand I give up my unvested income.”
 >
 > If the keeper loses coverage, 5 consecutive seconds of attacker-controlled observations can turn a capped settlement into a full one.
 >
-> Small positions depend on short.win’s own keeper. A liquidating keeper is paid at least the SOL-settlement keeper reward.
+> Small positions may need short.win’s keeper as a backstop, which needs operating funds. A liquidation pays its keeper only from equity left after the buyback and rent. When enough remains, it pays at least the SOL-settlement keeper reward; otherwise it can pay less or zero. Timely execution by a third-party keeper is not guaranteed.
 >
 > A liquidation sets nothing aside for the lenders: when buying the tokens back uses up the position’s vault, the lenders and the protocol lose the penalty and, on a position open for a long time, the rent the vault no longer covers. In the protocol’s Tier A model this is about 3.34 SOL on a fresh position and about 4.54 SOL on one open for 25 days at 90% utilisation.
 >
@@ -1099,6 +1100,14 @@ Checkbox: “I understand I give up my unvested income.”
 > Tiny dust amounts can be left behind when a pool rebases.
 >
 > After a pool rebase, only you can convert your position, but a position worth less than one new share can convert to none when you next claim, deposit or withdraw. A lender converting after you, at any later time, can receive that share, and if that leaves it holding every share, its exit takes the income still vesting.
+>
+> Claims use the SOL available to each position and a shared market pot. Claiming from that pot earlier can leave less cash for later claimants, even when both have credited income; unpaid rent does not guarantee an equal cash payout. Some credited income may never be paid if the shortfall is never covered.
+>
+> Venue cashback sent outside the protocol’s supported collection accounts may remain unrecoverable. Do not count it as guaranteed lending income.
+>
+> The lender who withdraws the final shares receives the remaining vesting income and whole-lamport rounding carry. These amounts can include income from before that lender joined; other lenders’ recorded claims are not erased.
+>
+> While deposits wait for old income to vest, further external donations can extend that wait. There is no guaranteed reopening time while donations continue; the hold protects existing lenders’ income.
 
 #### `lender.unpaidRent` — Rent this pool has not been paid yet
 
@@ -1171,11 +1180,12 @@ Checkbox: “I understand my position can be liquidated or settled in SOL.”
 *Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11); ECON §8.2, §12.2, §12.5, §12.6
 *Shown:* Short panel (collapsed `<details>`), position detail; `{keeperReward}` from `GlobalConfig` (`settle_keeper_fixed`, `_bps`, `_cap`) on the panel and from the position's locked terms on its page, `{maxDuration}` as for `borrower.liquidation`
 
+
 > A keeper that liquidates you may pay up to 2% more than the protocol’s reference price for the buyback; that comes out of what is returned to you.
 >
 > If someone holds the price up while your position is being liquidated, the keeper can take most of what would otherwise come back to you.
 >
-> A liquidating keeper is paid at least {keeperReward}, topped up from what would come back to you.
+> If enough equity remains after the buyback and rent, a liquidating keeper receives at least {keeperReward}, with any top-up taken from what would come back to you. Otherwise the reward can be smaller or zero; timely execution by a third-party keeper is not guaranteed.
 >
 > If the venue halts or breaks, a healthy position can be neither closed nor settled until the route returns, an adapter upgrade lands (48-hour timelock), or the position reaches its deadline (up to {maxDuration}).
 >
@@ -1477,7 +1487,7 @@ simulation would pay 0 is held with "Nothing to claim yet" (§3.6). No string ch
 - `howItWorks.fees.rate` (How it works: Fees list):
   > The Rate (APR) on each market page is what a new short pays at the market’s utilisation now.
 - `howItWorks.fees.penalty` (How it works: Fees list):
-  > Liquidation penalty: set by the tier and split between the lenders ({penLender}), the protocol ({penProtocol}) and the keeper that liquidates ({penKeeper}). If the keeper’s share is less than the settlement keeper reward, the difference comes out of what would come back to you.
+  > Liquidation penalty: set by the tier and split between the lenders ({penLender}), the protocol ({penProtocol}) and the keeper that liquidates ({penKeeper}). If enough equity remains after the buyback and rent, the keeper’s share is topped up to the settlement keeper reward from what would come back to you. Otherwise its reward can be smaller or zero.
 - `howItWorks.fees.expiry` (How it works: Fees list):
   > Expiry fee: {expiryFee} of the buyback cost, paid instead of the penalty by a position closed after its deadline while still above its liquidation CR, all to the lenders. The keeper that closes it is also paid a small, capped reward from the position.
 - `howItWorks.fees.settle` (How it works: Fees list):
@@ -1611,7 +1621,7 @@ simulation would pay 0 is held with "Nothing to claim yet" (§3.6). No string ch
 - `glossary.buyback` (the buyback; beside “Buyback”):
   > The SOL it costs to buy the borrowed tokens back.
 - `glossary.keeper` (a keeper; beside “Keeper paid”):
-  > A bot that liquidates, expires and settles positions. Anyone can run one; short.win runs its own as a backstop and is paid like any other keeper.
+  > A bot that liquidates, expires and settles positions. Anyone can run one. Small positions can depend on a short.win backstop with operating funds; timely third-party execution is not guaranteed.
 - `glossary.keeperReward` (the settlement keeper reward; beside “Keeper reward (settlement)”, “Settlement keeper reward”):
   > What the keeper that settles a position in SOL is paid from the vault: a fixed amount plus a share of the vault, capped.
 - `glossary.venueFeeHardCap` (the venue fee hard cap; beside “Venue fee hard cap”):
@@ -1679,13 +1689,13 @@ simulation would pay 0 is held with "Nothing to claim yet" (§3.6). No string ch
 - `glossary.minSharesTolerance` (the tolerance; beside “Min shares tolerance”, “Min tokens tolerance”):
   > How many fewer shares (or tokens) than the quote you accept. If the pool changes more than this before the transaction is confirmed, it fails instead.
 - `glossary.credited` (credited SOL; beside “Credited to you”, “Rent credited”):
-  > Rent and released income credited to your shares that you have not claimed yet. Credited rent is not guaranteed: rent a position never pays is taken back from the lenders who hold shares at that moment.
+  > Rent and released income credited to your shares that you have not claimed yet. Credited rent is not guaranteed: rent a position never pays is taken back from the lenders who hold shares at that moment. Credited income does not guarantee a particular cash payout from the shared pot.
 - `glossary.claimable` (claimable SOL; beside “Claimable now”, “SOL claimable”, “Claimable”):
   > What a claim would pay you now, from the SOL allocated to your shares and the market’s pot as they stand. Rent is paid in only when borrowers’ positions end, so rent credited to you may not be claimable yet. A claim that first syncs other lenders (see Market pot) can pay more.
 - `glossary.vesting` (vesting; beside “Still vesting (your share)”, “Vesting”, “Vest you give up”):
   > Income credited to you bit by bit over {vestPeriod} instead of all at once: one-off income, such as your share of liquidation penalties and expiry fees, and rent paid above what accrued (the minimum rent of an early exit). If you withdraw before it has vested, the unvested part stays with the lenders who remain.
 - `glossary.pot` (the market pot; beside “Market pot”):
-  > Spare SOL in this market: SOL allocated to other lenders’ shares beyond their own credit, moved here when they are synced. When the SOL allocated to your shares does not cover what is credited to you, a claim can draw on the pot, and it can first sync such lenders.
+  > Spare SOL in this market: SOL allocated to other lenders’ shares beyond their own credit, moved here when they are synced. When the SOL allocated to your shares does not cover what is credited to you, a claim can draw on the pot, and it can first sync such lenders. Claims draw on it in transaction order; an earlier claim can leave less cash for later claims against credited income. Some credited income may never be paid if the shortfall is never covered.
 - `glossary.deficit` (a deficit; beside “Deficit”):
   > A negative SOL balance in this pool: rent that borrowers never paid was taken from the lenders, and your part was more than your SOL balance here. You must pay the difference in SOL (Cover deficit, on the Claim tab) before you can withdraw your tokens.
 - `glossary.locked` — locked shares; beside “Locked”, “Locked shares now”, “Locked shares after”, “Lock ends”, “Current lock ends”, “Locked until”, “A new lock would end”: *verbatim, D:lender.risks ¶3*

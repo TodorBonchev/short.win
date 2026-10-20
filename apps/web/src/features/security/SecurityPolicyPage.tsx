@@ -133,8 +133,10 @@ export function SecurityPolicyPage() {
 
                 <Panel title="Audits" label="Audits">
                     <p>
-                        No audit has been published yet: a full private audit, then a public audit contest, is planned
-                        before mainnet. Reports will be listed on this page once published.
+                        The repository includes AI-assisted code reviews and validation records. These are not an audit
+                        by an independent security firm. No professional audit has been published yet; a private audit
+                        and a public audit contest are planned before mainnet. Reports will be listed here once
+                        published.
                     </p>
                 </Panel>
 

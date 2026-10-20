@@ -171,7 +171,7 @@ export const COPY = {
         'features/markets/market/StatStrip.tsx (“for a new short at … utilisation”); FE §3.4.',
     ),
     'howItWorks.fees.penalty': c(
-        'Liquidation penalty: set by the tier and split between the lenders ({penLender}), the protocol ({penProtocol}) and the keeper that liquidates ({penKeeper}). If the keeper’s share is less than the settlement keeper reward, the difference comes out of what would come back to you.',
+        'Liquidation penalty: set by the tier and split between the lenders ({penLender}), the protocol ({penProtocol}) and the keeper that liquidates ({penKeeper}). If enough equity remains after the buyback and rent, the keeper’s share is topped up to the settlement keeper reward from what would come back to you. Otherwise its reward can be smaller or zero.',
         'How it works: Fees list',
         'SPEC §4 table, §6.3 (N22: “Any top-up above its 30% penalty share comes from the borrower’s remainder”); ECON §15 penalty_bps (T), penalty split (G); D:borrower.residuals ¶3. Fill: percent(params.penalty{Lender,Protocol,Keeper}Bps).',
     ),

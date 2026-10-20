@@ -1,0 +1,48 @@
+   Compiling shortwin-litesvm-tests v0.1.0 (/root/short.win-audit-review/tests/litesvm)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.52s
+     Running tests/ai2_halted_s3_vest_it.rs (/root/short.win/target/debug/deps/ai2_halted_s3_vest_it-7699009910f28dda)
+
+running 1 test
+X's deposit after the S3 is refused: InstructionError(0, Custom(6108))
+S3 on the halted pool: q 3149121988 tokens extinguished, V 15039559560 lamports, lenders' take 11711842814, R_due 285389, lump 11711557425, vest 11711752240 lamports (lump_vest_s 21600 s)
+control (no late deposit): H is paid 11711842813 lamports after the vest
+attack: X (deposit 1000000000000 tokens after the S3, share 0.0000) is paid 0 lamports and gets 1000000000000 of 1000000000000 tokens back; H is paid 11711842813 lamports
+H loses 0 lamports; X gains 0 lamports (0.00 % of the vest)
+L10 initial dust: amount=1 fee=5000 end=1790589094 unchanged
+L10 counterfactual threshold: bal=542211 left=1 donation=25 fee=5000 end unchanged; minimum=26
+L10 round=0 bal_before=542211 donation=26 fee=5000 old_end=1790589094 new_end=1790589095 extension=1 blocked_at=1790589094 vest_left=542237
+L10 round=1 bal_before=271119 donation=13 fee=5000 old_end=1790589095 new_end=1790589096 extension=1 blocked_at=1790589095 vest_left=271132
+L10 round=2 bal_before=135566 donation=7 fee=5000 old_end=1790589096 new_end=1790589097 extension=1 blocked_at=1790589096 vest_left=135573
+L10 round=3 bal_before=67787 donation=4 fee=5000 old_end=1790589097 new_end=1790589098 extension=1 blocked_at=1790589097 vest_left=67791
+L10 round=4 bal_before=33896 donation=2 fee=5000 old_end=1790589098 new_end=1790589099 extension=1 blocked_at=1790589098 vest_left=33898
+L10 round=5 bal_before=16949 donation=1 fee=5000 old_end=1790589099 new_end=1790589100 extension=1 blocked_at=1790589099 vest_left=16950
+L10 round=6 bal_before=8475 donation=1 fee=5000 old_end=1790589100 new_end=1790589102 extension=2 blocked_at=1790589100 vest_left=8476
+L10 round=7 bal_before=2826 donation=1 fee=5000 old_end=1790589102 new_end=1790589109 extension=7 blocked_at=1790589102 vest_left=2827
+L10 round=8 bal_before=354 donation=1 fee=5000 old_end=1790589109 new_end=1790589169 extension=60 blocked_at=1790589109 vest_left=355
+L10 round=9 bal_before=6 donation=1 fee=5000 old_end=1790589169 new_end=1790592254 extension=3085 blocked_at=1790589169 vest_left=7
+L10 round=10 bal_before=1 donation=1 fee=5000 old_end=1790592254 new_end=1790603053 extension=10799 blocked_at=1790592254 vest_left=2
+L10 round=11 bal_before=1 donation=1 fee=5000 old_end=1790603053 new_end=1790613852 extension=10799 blocked_at=1790603053 vest_left=2
+L10 round=12 bal_before=1 donation=1 fee=5000 old_end=1790613852 new_end=1790624651 extension=10799 blocked_at=1790613852 vest_left=2
+L10 round=13 bal_before=1 donation=1 fee=5000 old_end=1790624651 new_end=1790635450 extension=10799 blocked_at=1790624651 vest_left=2
+L10 round=14 bal_before=1 donation=1 fee=5000 old_end=1790635450 new_end=1790646249 extension=10799 blocked_at=1790635450 vest_left=2
+L10 round=15 bal_before=1 donation=1 fee=5000 old_end=1790646249 new_end=1790657048 extension=10799 blocked_at=1790646249 vest_left=2
+L10 round=16 bal_before=1 donation=1 fee=5000 old_end=1790657048 new_end=1790667847 extension=10799 blocked_at=1790657048 vest_left=2
+L10 round=17 bal_before=1 donation=1 fee=5000 old_end=1790667847 new_end=1790678646 extension=10799 blocked_at=1790667847 vest_left=2
+L10 round=18 bal_before=1 donation=1 fee=5000 old_end=1790678646 new_end=1790689445 extension=10799 blocked_at=1790678646 vest_left=2
+L10 round=19 bal_before=1 donation=1 fee=5000 old_end=1790689445 new_end=1790700244 extension=10799 blocked_at=1790689445 vest_left=2
+L10 round=20 bal_before=1 donation=1 fee=5000 old_end=1790700244 new_end=1790711043 extension=10799 blocked_at=1790700244 vest_left=2
+L10 round=21 bal_before=1 donation=1 fee=5000 old_end=1790711043 new_end=1790721842 extension=10799 blocked_at=1790711043 vest_left=2
+L10 round=22 bal_before=1 donation=1 fee=5000 old_end=1790721842 new_end=1790732641 extension=10799 blocked_at=1790721842 vest_left=2
+L10 round=23 bal_before=1 donation=1 fee=5000 old_end=1790732641 new_end=1790743440 extension=10799 blocked_at=1790732641 vest_left=2
+L10 round=24 bal_before=1 donation=1 fee=5000 old_end=1790743440 new_end=1790754239 extension=10799 blocked_at=1790743440 vest_left=2
+L10 round=25 bal_before=1 donation=1 fee=5000 old_end=1790754239 new_end=1790765038 extension=10799 blocked_at=1790754239 vest_left=2
+L10 round=26 bal_before=1 donation=1 fee=5000 old_end=1790765038 new_end=1790775837 extension=10799 blocked_at=1790765038 vest_left=2
+L10 round=27 bal_before=1 donation=1 fee=5000 old_end=1790775837 new_end=1790786636 extension=10799 blocked_at=1790775837 vest_left=2
+L10 round=28 bal_before=1 donation=1 fee=5000 old_end=1790786636 new_end=1790797435 extension=10799 blocked_at=1790786636 vest_left=2
+L10 round=29 bal_before=1 donation=1 fee=5000 old_end=1790797435 new_end=1790808234 extension=10799 blocked_at=1790797435 vest_left=2
+L10 attack totals: donations=78 donation_tx_fees=155000 donor_cost=155078 honest_blocked_deposit_fees=150000 extension_seconds=219140 vest_s=21600
+L10 eventual release: old_paid=11711842891 baseline_old_paid=11711842813 donations=78 new_paid=0; honest deposit admitted after last_end+1
+test a_deposit_after_a_halted_venue_s3_takes_none_of_the_old_lenders_vest ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.56s
+

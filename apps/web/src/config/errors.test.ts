@@ -86,11 +86,11 @@ describe('program error messages', () => {
         }
     });
 
-    it('blocks deposits awaiting a reviewed migration of earlier lenders’ income', () => {
+    it('blocks deposits until unassigned income has an accounting review', () => {
         const info = programError(6110);
         expect(info).toMatchObject({ name: 'LegacyPoolCarry', action: 'blocked' });
-        expect(info?.message).toContain('income from earlier lenders');
-        expect(info?.message).toContain('pending a reviewed migration');
+        expect(info?.message).toContain('unassigned income from earlier shares');
+        expect(info?.message).toContain('until the accounting is reviewed');
         expect(info?.message).toContain('Sweeping or retrying will not unblock deposits');
     });
 
