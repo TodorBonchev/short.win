@@ -50,7 +50,9 @@ Writes, under ``tests/fixtures/``:
   (``programs/{pump,pump_amm}_2026_10_08.so``, ``programs/pump_fees_2026_10_12.so`` and
   ``accounts/pump_2026_10_13/*.bin``: the pump and PumpSwap redeploys of 2026-10-08 at slots
   454,596,459 / 454,596,406 and pump-fees' of 2026-10-12 at 456,132,171, the 2026-10-13 re-pin; the
-  2026-10-02 group stays T-LATCH's "before"); ``pump_programs_2026_10_13b``
+  2026-10-02 group stays T-LATCH's "before"); ``pump_programs_2026_10_21`` adds the pump and PumpSwap ELFs observed in the 2026-10-21
+  preflight (read 2026-10-20 UTC) at slots 458,921,440 / 458,921,517, retaining all old groups;
+  ``pump_programs_2026_10_13b``
   (``programs/pump_2026_10_13.so`` and ``accounts/pump_2026_10_13b/*.bin``: pump alone as
   redeployed on 2026-10-13 at slot 456,494,698, the re-pin moved to it; PumpSwap and pump-fees
   stay ``pump_programs_2026_10_13``'s, and that group keeps pump's 2026-10-08 build). Each of them
@@ -2016,6 +2018,16 @@ PUMP_PROGRAMS_2026_10_13B = [
         456_494_698,
     ),
 ]
+# Read on 2026-10-20 UTC (2026-10-21 local preflight); preserve all earlier groups.
+PUMP_2026_10_21_ACCOUNT_DIR = "accounts/pump_2026_10_21"
+PUMP_PROGRAMS_2026_10_21 = [
+    ("pump_2026_10_21", PUMP,
+     "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+     "756c04ab1ac76122dcdcf2eeb0073bb139087b23d58d3f0d6c895510ab59d582", 458_921_440),
+    ("pump_amm_2026_10_21", PUMP_AMM,
+     "6naEzKeUuFh1Jeeu51NXQgr5qkXgXtc9WKNct4xynVJc",
+     "4d5fc41918374b24b16d8372d14a1ac64c768c83a2971bfeef1c8660dad649e7", 458_921_517),
+]
 SPL_PROGRAMS = [
     (
         "token_2022",
@@ -2103,6 +2115,17 @@ PROGRAM_SOURCES = {
         "derivation changed; the other instructions differ in the error tables and source line "
         "numbers alone (tests/fixtures/README.md)",
     },
+    **{
+        name: {
+            "repository": "https://github.com/pump-fun/pump-public-docs",
+            "commit": "639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22",
+            "status": "UNVERIFIED: no published program source or verified build. The latest "
+            "official IDL commit was dated 2026-10-13, before these observed ELFs; it is an "
+            "interface reference, not proof of their source or compatibility. See the scoped "
+            "signed SOL/WSOL-path review in tests/fixtures/README.md.",
+        }
+        for name in ("pump_2026_10_21", "pump_amm_2026_10_21")
+    },
     "squads_v4": {
         "repository": "https://github.com/Squads-Protocol/v4",
         "commit": "64af7330413d5c85cbbccfd8c27a05d45b6e666f",
@@ -2146,6 +2169,13 @@ M10_GROUP_USE = {
         "the ELF as redeployed on 2026-10-13 at 456,494,698 (UNVERIFIED source, see `source`). The "
         "ELF only: the state stays `pump_state_2026_10_13`'s (no layout changed), and "
         "`pump_programs_2026_10_13` keeps the 2026-10-08 build",
+    ),
+    "pump_programs_2026_10_21": (
+        "The pump and PumpSwap builds observed by the 2026-10-21 local preflight (read on "
+        "2026-10-20 UTC); earlier groups remain available for historical tests",
+        "the live ELF at deploy slots 458,921,440 (pump) and 458,921,517 (PumpSwap). "
+        "UNVERIFIED source; scoped SOL/WSOL compatibility only, no new quote-asset support. "
+        "State fixtures remain historical and pump-fees remains the reviewed 2026-10-12 build",
     ),
     "spl_programs": (
         "The deployed mainnet program, so T-MEMO and the suites run the mainnet build instead of "
@@ -2291,7 +2321,8 @@ def check_m10(m, only=None):
                             ("spl_programs", SPL_PROGRAMS), ("squads_programs", SQUADS_PROGRAMS),
                             ("pump_programs_2026_10", PUMP_PROGRAMS_2026_10),
                             ("pump_programs_2026_10_13", PUMP_PROGRAMS_2026_10_13),
-                            ("pump_programs_2026_10_13b", PUMP_PROGRAMS_2026_10_13B)):
+                            ("pump_programs_2026_10_13b", PUMP_PROGRAMS_2026_10_13B),
+                            ("pump_programs_2026_10_21", PUMP_PROGRAMS_2026_10_21)):
         if only not in (None, group):
             continue
         by_name = in_group(group)
@@ -2346,7 +2377,7 @@ PUMP_GROUPS = ("pump_programs", "pump_state")
 PAMM_GROUPS = ("pamm_state", "pamm_synthetic")
 M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "squads_programs",
                       "pump_programs_2026_10", "pump_programs_2026_10_13",
-                      "pump_programs_2026_10_13b")
+                      "pump_programs_2026_10_13b", "pump_programs_2026_10_21")
 # The state the 2026-10-08/12 redeploys introduced (the 2026-10-13 re-pin), after its programs.
 PUMP_STATE_2026_10_13_GROUPS = ("pump_state_2026_10_13",)
 GROUPS = (RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS + M10_PROGRAM_GROUPS
@@ -2737,6 +2768,9 @@ def cmd_fetch(args):
         elif g == "pump_programs_2026_10_13b":
             entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS_2026_10_13B, g,
                                                   PUMP_2026_10_13B_ACCOUNT_DIR)
+        elif g == "pump_programs_2026_10_21":
+            entries, files, snap = fetch_programs(rpc, PUMP_PROGRAMS_2026_10_21, g,
+                                                  PUMP_2026_10_21_ACCOUNT_DIR)
         elif g == PUMP_STATE_2026_10_13:
             entries, files, snap = fetch_pump_state_2026_10_13(
                 rpc, pump_coins_2026_10_13(args.coin, rpc), m)
@@ -2759,7 +2793,9 @@ def cmd_fetch(args):
         "the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: "
         "Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, "
         "pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of "
-        "2026-10-08/12; pump_programs_2026_10_13b: pump's of 2026-10-13) and the state those "
+        "2026-10-08/12; pump_programs_2026_10_13b: pump's of 2026-10-13; "
+        "pump_programs_2026_10_21: pump/PumpSwap builds observed in the 2026-10-21 local "
+        "preflight) and the state those "
         "introduced (group pump_state_2026_10_13) are written "
         "by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group "
         "(`vendored`: files taken from a pinned source)."
@@ -2960,7 +2996,8 @@ def cmd_check_live(args):
     seen = {p for _, p, _, _ in targets}
     for name, program, program_data, _, _ in (CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SQUADS_PROGRAMS
                                               + PUMP_PROGRAMS_2026_10 + PUMP_PROGRAMS_2026_10_13
-                                              + PUMP_PROGRAMS_2026_10_13B):
+                                              + PUMP_PROGRAMS_2026_10_13B
+                                              + PUMP_PROGRAMS_2026_10_21):
         if program not in seen:
             targets.append((name, program, program_data, None))
             seen.add(program)

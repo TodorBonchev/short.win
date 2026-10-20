@@ -232,6 +232,19 @@ pub const VENUE_GUARD_SLOTS_2026_10_13: [u64; VENUE_PROGRAMS] = [
     454_465_850,
 ];
 
+/// Live deploy slots observed in the 2026-10-21 local preflight (read 2026-10-20 UTC).
+/// pump and PumpSwap actually deployed on 2026-10-19 at 17:47:02 / 17:47:20 UTC;
+/// pump-fees and the other slots are unchanged from the 2026-10-13 baseline.
+/// Test/live-drift baseline only: initialization takes live slots as arguments.
+pub const VENUE_GUARD_SLOTS_2026_10_21: [u64; VENUE_PROGRAMS] = [
+    458_921_440,
+    458_921_517,
+    456_132_171,
+    445_763_204,
+    452_376_460,
+    454_465_850,
+];
+
 /// The ProgramData address of venue program `venue` (a `VenueGuard` index), or `None`.
 pub const fn venue_program_data(venue: u8) -> Option<Pubkey> {
     let i = venue as usize;

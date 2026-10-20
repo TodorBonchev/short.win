@@ -24,8 +24,10 @@
 //!
 //! **pump v3 (design pump-final §8, PUMP-V3 P5):** with the argument `pump` it prints
 //! `pump-vectors.json` instead: the **release** build on the dumped pump, PumpSwap and pump-fees
-//! ELFs of 2026-10-13 (`Env::fork_pump_coin(Near166)`, needs `target/deploy/shortwin.so` and the
-//! fixtures): a curve open (`sell_v3`), a close below the curve's `rT` and a close past it, which
+//! ELFs selected by `PumpDeploy::CURRENT` (the pump/PumpSwap 2026-10-19 deploys
+//! observed on 2026-10-21 local; pump-fees remains the 2026-10-12 build).
+//! `Env::fork_pump_coin(Near166)` needs `target/deploy/shortwin.so` and the
+//! fixtures. It records a curve open (`sell_v3`), a close below the curve's `rT` and a close past it, which
 //! completes the curve by pump's synthetic migration in one `close_short` (`B̂_v3`, owner D3),
 //! and the keeper's `liquidate` past `rT` (T-SYNTH-2's ECON D@80 % on the fresh curve): its event
 //! carries the program's risk view — `B̂_v3` at the exit risk cap (`b_live_risk`) and the EMA leg's

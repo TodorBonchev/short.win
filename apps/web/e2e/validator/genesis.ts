@@ -101,7 +101,7 @@ export function fixtureAddress(name: string): Address {
 /**
  * Groups deployed as programs (or not deployed at all), never loaded as accounts. The M10 groups
  * (scripts/dump-fixtures.py `M10_PROGRAM_GROUPS`: the CPMM redeploy, the mainnet SPL programs,
- * Squads v4, the pump redeploys of 2026-10-02, 2026-10-08/12 and pump's of 2026-10-13) hold
+ * Squads v4, historical pump redeploys and the pump/PumpSwap builds observed on 2026-10-21) hold
  * program accounts at genesis-program or venue addresses; a validator that runs them deploys them
  * itself (the SPL programs: splPrograms()).
  */
@@ -114,6 +114,7 @@ const PROGRAM_GROUPS = new Set([
     'pump_programs_2026_10',
     'pump_programs_2026_10_13',
     'pump_programs_2026_10_13b',
+    'pump_programs_2026_10_21',
 ]);
 const SYSVAR_PREFIX = 'Sysvar';
 
@@ -121,9 +122,9 @@ const SYSVAR_PREFIX = 'Sysvar';
  * The dumped venue programs: `[program id, ELF path, upgrade authority]` for `--upgradeable-program`.
  * CPMM is the 2026-10 redeploy (group `raydium_cpmm_2026_10`, M10 WP-2), the build every CPMM test
  * runs on; its program account and upgrade authority equal `raydium_programs`' 445,763,504 build's.
- * pump is its 2026-10-13 redeploy (group `pump_programs_2026_10_13b`, trimmed ELF `e2020969…`),
- * PumpSwap its 2026-10-08 one and pump-fees its 2026-10-12 one (group `pump_programs_2026_10_13`;
- * `3ffd5e3b…`, `8ad2ca93…`): the builds of the 2026-10-13 re-pin, with the same program accounts
+ * pump/PumpSwap are their 2026-10-19 deploys, observed on 2026-10-21 local
+ * (group `pump_programs_2026_10_21`, trimmed ELF `756c04ab…` / `4d5fc419…`);
+ * pump-fees remains its reviewed 2026-10-12 build (`8ad2ca93…`). The same program accounts
  * and upgrade authority as `pump_programs`'; the state the 2026-10-08 builds introduced (group
  * `pump_state_2026_10_13`: the 1,088-byte `Global`, 166-byte curves) is loaded after
  * `pump_state`, so an address both hold takes the newer bytes.
@@ -133,8 +134,8 @@ export function venuePrograms(): [string, string, string][] {
     const out: [string, string, string][] = [];
     const byName = new Map(m.accounts.map((a) => [a.name, a]));
     for (const [prog, dataName] of [
-        ['pump_2026_10_13_program', 'pump_2026_10_13_program_data'],
-        ['pump_amm_2026_10_08_program', 'pump_amm_2026_10_08_program_data'],
+        ['pump_2026_10_21_program', 'pump_2026_10_21_program_data'],
+        ['pump_amm_2026_10_21_program', 'pump_amm_2026_10_21_program_data'],
         ['pump_fees_2026_10_12_program', 'pump_fees_2026_10_12_program_data'],
         ['raydium_amm_v4_program', 'raydium_amm_v4_program_data'],
         ['raydium_cpmm_2026_10_program', 'raydium_cpmm_2026_10_program_data'],

@@ -964,7 +964,7 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
     for program in [PumpProgram::Pump, PumpProgram::Amm] {
         assert!(
             env.pump_build_running(program)
-                .same_build(PumpDeploy::CURRENT, program),
+                .same_build(PumpDeploy::CURRENT.probe_profile(), program),
             "{program:?}"
         );
     }
@@ -1091,7 +1091,7 @@ fn the_2026_10_08_pump_redeploys_latch_until_revalidated() {
     env.warp(1);
     assert_eq!(
         env.pump_build_running(PumpProgram::Pump),
-        PumpDeploy::CURRENT
+        PumpDeploy::CURRENT.probe_profile()
     );
 }
 

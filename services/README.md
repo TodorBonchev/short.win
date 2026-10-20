@@ -727,7 +727,12 @@ $G approve --ms emergency --index <n> --config gov.toml --rpc <url> --key emg-me
   its 2026-10-12 build) and recorded as `elf_trimmed_sha256` in
   [`tests/fixtures/manifest.json`](../tests/fixtures/manifest.json)
   (`raydium_amm_v4_program_data`, `raydium_cpmm_2026_10_program_data`,
-  `pump_fees_2026_10_12_program_data`; the latch baseline is `VENUE_GUARD_SLOTS_2026_10_13`).
+  `pump_fees_2026_10_12_program_data`; the current test/live-drift baseline is
+  `VENUE_GUARD_SLOTS_2026_10_21`). Pump and PumpSwap's observed October 19 builds
+  are `PUMP_PROGRAMS_2026_10_21` / `pump_programs_2026_10_21`, slots 458,921,440 and
+  458,921,517. They remain exact-slot-latched at the 10 MiB allocation; their full hashes
+  are off-chain review identities, not the extensible-venue digest fallback. See the
+  [scoped live review](../docs/audit/live-preflight-1.0.3-2026-10-21.md).
   [`tests/fixtures/README.md`](../tests/fixtures/README.md) shortens them to 12 digits and gives
   none for AMM v4. **pump-fees' 2026-10-12 build is not revalidated on mainnet before R-PFEE**
   (pump-final §3.2, PUMP-2026-10-13-5: `withdraw`'s accounts and authority read from a mainnet

@@ -1678,9 +1678,18 @@ was never deployed. The curve adapter is rewritten (below).
 
 ### 13.1 Steps 1–3: the re-pin
 
-| Program | Build | Deploy slot | Trimmed-ELF sha256 (the on-chain comparison) | Fixture group |
+**Historical 1.0.1 evidence below.** The October 21 preflight observed new pump and
+PumpSwap deploys from October 19, now retained additively as `pump_programs_2026_10_21`.
+The current test/tool baseline is `VENUE_GUARD_SLOTS_2026_10_21`; the program does not
+read this constant. [Current live review](audit/live-preflight-1.0.3-2026-10-21.md)
+records actual deployment times, full off-chain byte identities, supported-path checks
+and final gates. Pump/PumpSwap remain exact-slot-latched; complete digest storage is
+for the four extensible venues. The older table and clean-check timestamps are not
+current deployment approval or proof of a verified upstream build.
+
+| Program | Build | Deploy slot | Trimmed-ELF SHA-256 (off-chain identity; enforcement differs by venue) | Fixture group |
 |---|---|---|---|---|
-| pump | 2026-10-13 15:40 UTC (in force) | 456,494,698 | `e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be` | `pump_programs_2026_10_13b` |
+| pump | 2026-10-13 15:40 UTC (historical 1.0.1 baseline) | 456,494,698 | `e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be` | `pump_programs_2026_10_13b` |
 | pump | 2026-10-08 (superseded the same week) | 454,596,459 | `6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f` | `pump_programs_2026_10_13` |
 | PumpSwap | 2026-10-08 | 454,596,406 | `3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1` | `pump_programs_2026_10_13` |
 | pump-fees | 2026-10-12 (a 10-08 build at 454,596,501 preceded it, never examined: it can no longer be fetched) | 456,132,171 | `8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8` | `pump_programs_2026_10_13` |

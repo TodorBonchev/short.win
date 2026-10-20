@@ -23,8 +23,9 @@ how the harness loads them.
 | `raydium_cpmm_2026_10` (M10) | `programs/raydium_cpmm_2026_10.so`, `accounts/raydium_cpmm_2026_10/*` | CPMM **as redeployed at 452,376,460**. This group holds the ELF only. The pools and configs stay `raydium_state`'s, because the redeploy kept their layouts (AmmConfig 236 B, PoolState 637 B) and the 21 live configs still equal the fixture bytes. Every CPMM test loads this build |
 | `spl_programs` (M10) | `programs/token_2022.so`, `accounts/spl/*`, `programs/spl_memo_v3.so` | the deployed Token-2022 (upgradeable, a verified build) and spl-memo v3 (BPFLoader2, where the account data *is* the ELF) |
 | `pump_programs_2026_10` (M10) | `programs/pump{,_fees,_amm}_2026_10.so`, `accounts/pump_2026_10/*` | pump, pump-fees and PumpSwap **as redeployed on 2026-10-02**. ELFs only: the state stays `pump_state`'s and `pamm_state`'s, because the redeploy only appends fee buckets (`BondingCurve` @125/@133, `Pool` @271/@279) and pump `Global`, both `FeeConfig`s, `GlobalConfig` and the volume accumulators still equal the fixture bytes on mainnet (slot 452,964,363). T-LATCH's "before" since the 2026-10-13 re-pin |
-| `pump_programs_2026_10_13` | `programs/pump_2026_10_08.so`, `programs/pump_amm_2026_10_08.so`, `programs/pump_fees_2026_10_12.so`, `accounts/pump_2026_10_13/*_program*.bin` | pump and PumpSwap **as redeployed on 2026-10-08** and pump-fees **as redeployed on 2026-10-12** (the 2026-10-13 re-pin; dumped at slot 456,395,404). Every curve and PumpSwap test loads its PumpSwap and pump-fees builds; its pump build, superseded on mainnet by `pump_programs_2026_10_13b`, is kept (never refreshed) as the differential's other side |
-| `pump_programs_2026_10_13b` | `programs/pump_2026_10_13.so`, `accounts/pump_2026_10_13b/*` | pump **as redeployed on 2026-10-13** at 15:40 UTC (slot 456,494,698; dumped at slot 456,535,056), the build the re-pin moved to. PumpSwap and pump-fees were not redeployed. Every curve test loads it |
+| `pump_programs_2026_10_13` | `programs/pump_2026_10_08.so`, `programs/pump_amm_2026_10_08.so`, `programs/pump_fees_2026_10_12.so`, `accounts/pump_2026_10_13/*_program*.bin` | pump and PumpSwap **as redeployed on 2026-10-08** and pump-fees **as redeployed on 2026-10-12** (the 2026-10-13 re-pin; dumped at slot 456,395,404). Retains the historical PumpSwap build and the still-current pump-fees build; its pump build is kept (never refreshed) as the differential's other side |
+| `pump_programs_2026_10_13b` | `programs/pump_2026_10_13.so`, `accounts/pump_2026_10_13b/*` | Historical pump **as redeployed on 2026-10-13** at 15:40 UTC (slot 456,494,698; dumped at slot 456,535,056), retained for the differential and latch tests |
+| `pump_programs_2026_10_21` | `programs/{pump,pump_amm}_2026_10_21.so`, `accounts/pump_2026_10_21/*` | pump/PumpSwap deploys of **2026-10-19**, observed during the **2026-10-21 local preflight** (read 2026-10-20 UTC). Additive ELFs/header snapshots; pump-fees and historical state groups remain unchanged. Current supported SOL/WSOL-path tests use these builds |
 | `pump_state_2026_10_13` | `accounts/pump_2026_10_13/*` | the state those builds introduced, one snapshot (slot 456,395,752): pump's 1,088-byte `Global` (`pump_state`'s 1,087 bytes, then `max_curve_depth` = 1 at the snapshot; mainnet's is 2 since slot 456,495,021), pump's `FeeConfig`, PumpSwap's `GlobalConfig` and `FeeConfig` (byte-identical to `pump_state`'s), and ten coin roles: 166-byte curves (`near166`, `fresh166`, `buckets166`), dormant 141- and 151-byte curves (`grow141`, `grow151`), a complete unmigrated synthetic completion of depth 1 (`synthetic_stuck`), a migrated one with its pool (`graduated_synthetic`, 98u8RJ), a cashback and a mayhem 166-byte curve, a WSOL pool carrying fee buckets (`wsol_pool_buckets`). An address both state groups hold resolves to this group |
 | `squads_programs` (M10) | `programs/squads_v4.so`, `accounts/squads/*`, `idl/squads_multisig_program.json` | Squads v4 (immutable), its `ProgramConfig` and the IDL 2.1.0 vendored from `Squads-Protocol/v4@64af733` |
 
@@ -63,21 +64,24 @@ fetched has passed its checks.
   `venuePrograms()`).
 - Every `Env` runs on the mainnet SPL ELFs (WP-3).
 - WP-7 uses `squads_programs`.
-- Every curve and PumpSwap test, bench and fuzz profile runs on the 2026-10-13 re-pin's builds:
-  pump of `pump_programs_2026_10_13b`, PumpSwap and pump-fees of `pump_programs_2026_10_13`.
+- Every current curve/PumpSwap test, bench and freshly built fuzz profile loads the observed
+  `pump_programs_2026_10_21` pump/PumpSwap ELFs and the unchanged 2026-10-12 pump-fees ELF.
+  Previously frozen fuzz runners retain their own source and fixture identities.
   `fork.rs` keeps loading `pump_programs`, `pump_programs_2026_10` and pump's 2026-10-08 build
-  too and picks a build by name (`PumpDeploy::Oct2026Chain`, the default `PumpDeploy::CURRENT`;
+  too and picks a build by name (`PumpDeploy::Oct2026QuoteFees`, the default `PumpDeploy::CURRENT`;
+  `PumpDeploy::Oct2026Chain`, the historical 2026-10-13 pump build;
   `PumpDeploy::Oct2026Synth`, pump's 2026-10-08 build with the same PumpSwap and pump-fees;
   `PumpDeploy::Oct2026`; `PumpDeploy::Sep2026`); an address lookup resolves to the latest group
   holding it, and `fork::FIXTURE_GUARD_SLOTS` carries the three deploy slots (=
-  `VENUE_GUARD_SLOTS_2026_10_13`, the newest baseline). `Env::pump_build_running` tells the
-  builds apart by the instructions each added (pump `buy_v3`, then `multi_hop_curve_swap`;
+  `VENUE_GUARD_SLOTS_2026_10_21`, the newest baseline's pump slots). `Env::pump_build_running`
+  distinguishes historical behavior profiles by the instructions each added (pump `buy_v3`, then `multi_hop_curve_swap`;
   PumpSwap `buy_v2`, then `multi_hop_swap`; pump-fees `withdraw`) and pump's last two, which
   share their instructions, by the 2026-10-13 build's depth cap (`pump_create_v2_depth_probe`:
   `create_v2` one level too deep at `max_curve_depth` = 1, which the probe sets for its call,
   fails 6105 on both, its message naming "the program's cap of 5" on the 2026-10-13 build
   only; it needs the 1,088-byte `Global` and restores every account it writes for the call).
-  The coin roles of both state groups load with their own snapshot's clock. The web e2e
+  The newly observed ELFs share that last probe profile; exact identity comes from full
+  manifest/ProgramData hashes, not equal probe answers. The coin roles of both state groups load with their own snapshot's clock. The web e2e
   validator deploys the same builds.
 
 `raydium_programs` stays for T-LATCH. It is the deploy that `VENUE_GUARD_SLOTS_2026_09_27` names.
@@ -405,3 +409,57 @@ When a program is redeployed:
 1. Dump it as a **new** group; never refresh an old one, because the tests that need the old deploy (T-LATCH) still load it.
 2. Pin the new group in the script.
 3. Move the test baseline deliberately.
+
+## 2026-10-21 observation: pump/PumpSwap redeploys of 2026-10-19
+
+The additive group `pump_programs_2026_10_21` records a local observation date, not
+an upstream deployment date. Read-only RPC fetched the program/ProgramData bytes on
+**2026-10-20 at 21:51:03 UTC**, beginning at slot **459,385,526**. `getBlockTime` gives
+pump's actual deployment as **2026-10-19 17:47:02 UTC**, and PumpSwap's as **17:47:20 UTC**.
+Both retain upgrade authority `7gZufwwAo17y5kg8FMyJy2phgpvv9RSdzWtdXiWHjFr8`.
+Every earlier manifest entry, snapshot and blob is preserved.
+
+| Program | Deploy slot | Full trimmed-ELF SHA-256 |
+|---|---|---|
+| pump | 458,921,440 | `756c04ab1ac76122dcdcf2eeb0073bb139087b23d58d3f0d6c895510ab59d582` |
+| PumpSwap | 458,921,517 | `4d5fc41918374b24b16d8372d14a1ac64c768c83a2971bfeef1c8660dad649e7` |
+| pump-fees, unchanged | 456,132,171 | `8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8` |
+
+The published `pump-fun/pump-public-docs` head inspected was
+`639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22`, dated **2026-10-13**. Its IDLs predate these
+ELFs; they are interface references, not matching-source or verified-build evidence.
+The new binaries remain **UNVERIFIED** beyond the explicitly inspected/executed scope.
+No new Token-2022 quote asset or other unsupported quote path is admitted.
+
+ELF inspection finds larger `.text` sections (+32,656 bytes for pump, +32,504 for
+PumpSwap), and +304 `.rodata` bytes in each. The pump strings add `QuoteMintNotWritable`
+and a Token-2022 quote transfer-fee harvest message. Strings alone do not establish
+control-flow equivalence. Actual new pump `TradeEvent` emissions on the exercised SOL
+quote paths preserve the complete old payload and append **eight zero bytes**. Their
+meaning is not inferred from the stale IDL. The new signed differential asserts the
+exact old event prefix and exactly that zero suffix; it does not discard event evidence.
+
+Before promoting `PumpDeploy::CURRENT`, the explicit old/new curve differential passed
+**180 signed transactions**, including **79 matching refusals**, v2/v3 buys/sells,
+exact-quote-in, synthetic completions, token donations and migrations. Every named
+post-transaction account agrees. Initial executable program-account funding is matched
+between the two synthetic banks because donations differ between fetches; the loaded
+ELF/ProgramData bytes stay intact. The old October 8/13 differential retains exact log
+and CU equality. The new comparison permits changed source-line origins, records CU
+separately and retains existing performance budgets. A post-deploy-clock SOL buy/sell
+control also passed, using historical curve/config state; this is synthetic compatibility
+evidence, not a coherent fresh mainnet bank snapshot.
+
+The explicit new PumpSwap caller test, on SPL-Token and Token-2022 base-token pools
+quoted in WSOL, passed signed short.win opens/closes. It sees one read-only pump-fees
+query per leg, with the same constrained accounts, and no `withdraw` call
+(`pamm_it::v3_era::observed_2026_10_21_pumpswap_keeps_fee_cpis_read_only`). The retained
+R-PFEE `withdraw` analysis therefore continues to apply to the byte-identical pump-fees
+callee, with renewed caller-path evidence for these tested paths. It does not certify
+unexercised new quote features or future upstream builds.
+
+`CURRENT` is now `Oct2026QuoteFees`; `VENUE_GUARD_SLOTS_2026_10_21` is the live-drift/test
+baseline. `initialize_config` still accepts live slots as arguments. Current-default
+latch, exit, graduation, compute and integration results are recorded in the dated
+[readiness record](../../docs/audit/release-readiness-1.0.3-2026-10-21.md); full final-source
+CI/verifier and a new final-runner ≥24-hour fuzz gate remain required.

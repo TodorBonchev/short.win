@@ -488,8 +488,27 @@ fn r_pfee_withdraw_probe() {
 /// fee queries about PumpSwap's `FeeConfig`, seeing no short.win account.
 #[test]
 fn pump_fees_runs_read_only_inside_a_pumpswap_leg() {
+    fee_cpi_on_deploy(PumpDeploy::CURRENT);
+}
+
+/// Repeat the signed open/close CPI-account inspection on the new observed
+/// PumpSwap caller, not only the unchanged pump-fees callee.
+#[test]
+fn observed_2026_10_21_pumpswap_keeps_fee_cpis_read_only() {
+    fee_cpi_on_deploy(PumpDeploy::Oct2026QuoteFees);
+}
+
+fn fee_cpi_on_deploy(deploy: PumpDeploy) {
     for coin in [PammCoin::Mature, PammCoin::Legacy261] {
         let (mut env, pm, q) = setup(coin);
+        for program in PumpProgram::ALL {
+            fork::load_pump_deploy(&mut env.svm, program, deploy);
+            assert!(
+                PumpDeploy::held(&env.svm, program)
+                    .unwrap()
+                    .same_build(deploy, program)
+            );
+        }
         assert!(
             env.pump_build_running(PumpProgram::Fees)
                 .same_build(PumpDeploy::Oct2026Synth, PumpProgram::Fees),

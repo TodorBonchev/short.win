@@ -43,12 +43,14 @@
 //!   [`cpmm_swap_events`] CPMM's `SwapEvent` (`emit!`, "Program data:").
 //!
 //! **The pump fork (M5, appended below the Raydium part).** Groups `pump_programs`,
-//! `pump_programs_2026_10`, `pump_programs_2026_10_13`, `pump_programs_2026_10_13b`, `pump_state`
+//! `pump_programs_2026_10`, `pump_programs_2026_10_13`, `pump_programs_2026_10_13b`,
+//! `pump_programs_2026_10_21`, `pump_state`
 //! and `pump_state_2026_10_13` of the same manifest: the pump, pump-fees and PumpSwap ELFs
 //! (deployed from their dumped ProgramData, sha256-checked like the Raydium ones, so the latch
-//! reads the real deploy slots: since the 2026-10-13 re-pin pump's redeploy of 2026-10-13
-//! (456,494,698), PumpSwap's of 2026-10-08 (454,596,406) and pump-fees' of 2026-10-12
-//! (456,132,171), [`PumpDeploy::CURRENT`] = [`PumpDeploy::Oct2026Chain`]; pump's 2026-10-08 build
+//! reads real deploy slots: the 2026-10-21 observation pins pump/PumpSwap's 2026-10-19
+//! deploys (458,921,440 / 458,921,517) and unchanged pump-fees (456,132,171).
+//! [`PumpDeploy::CURRENT`] = [`PumpDeploy::Oct2026QuoteFees`]; the 2026-10-13 build
+//! ([`PumpDeploy::Oct2026Chain`]), pump's 2026-10-08 build
 //! ([`PumpDeploy::Oct2026Synth`], the differential's other side), the 2026-10-02 builds of
 //! `pump_programs_2026_10` ([`PumpDeploy::Oct2026`]) and the 2026-09 builds of `pump_programs`
 //! ([`PumpDeploy::Sep2026`]) stay loadable through [`load_pump_deploy`] for T-LATCH), and pump's
@@ -137,16 +139,17 @@ pub const RAYDIUM_GROUPS: [&str; 3] = ["raydium_programs", "raydium_cpmm_2026_10
 /// The manifest groups of the pump fork (loaded separately, on first use of a pump fixture, so
 /// the Raydium tests never rebuild the 10 MiB pump ProgramData accounts). The three programs'
 /// addresses are in the program groups; [`pump_fixture_at`] resolves each to the latest group
-/// holding it — pump to `pump_programs_2026_10_13b`, PumpSwap and pump-fees to
+/// holding it — pump/PumpSwap to `pump_programs_2026_10_21`, pump-fees to
 /// `pump_programs_2026_10_13` ([`PumpDeploy::CURRENT`]) —, and the loaders pick a deploy by
 /// name. The statics both state groups hold resolve to `pump_state_2026_10_13` the same way.
-pub const PUMP_GROUPS: [&str; 6] = [
+pub const PUMP_GROUPS: [&str; 7] = [
     "pump_programs",
     "pump_programs_2026_10",
     "pump_state",
     "pump_programs_2026_10_13",
     "pump_state_2026_10_13",
     "pump_programs_2026_10_13b",
+    "pump_programs_2026_10_21",
 ];
 /// The pump fork's state groups, each one `getMultipleAccounts` snapshot with its coin roles:
 /// `pump_state` (the older suites' roles and T-LATCH) and `pump_state_2026_10_13` (the state the
@@ -480,9 +483,9 @@ pub const CPMM_DEPLOY_SLOT_2026_10: u64 = 452_376_460;
 
 /// The venue deploy slots the harness's ProgramData carry and [`Env::default_init_args`] records
 /// as `guard_slot` (A7; by `VenueGuard` index): `VENUE_GUARD_SLOTS_2026_09_27` with CPMM at
-/// [`CPMM_DEPLOY_SLOT_2026_10`], pump at its 2026-10-13 redeploy, PumpSwap at its 2026-10-08 one
-/// and pump-fees at its 2026-10-12 one ([`PumpDeploy::Oct2026Chain`]), the builds every fork
-/// loads ([`CpmmDeploy::CURRENT`], [`PumpDeploy::CURRENT`]); `VENUE_GUARD_SLOTS_2026_10_13`'s
+/// [`CPMM_DEPLOY_SLOT_2026_10`], pump/PumpSwap at their 2026-10-19 redeploys observed on
+/// 2026-10-21 local, and pump-fees at its 2026-10-12 one ([`PumpDeploy::Oct2026QuoteFees`]),
+/// the builds every fork loads; `VENUE_GUARD_SLOTS_2026_10_21`'s
 /// three pump slots. The tests use it wherever they mean "the deploy slot the fork holds";
 /// `VENUE_GUARD_SLOTS_2026_09_27` stays the 2026-09-27 baseline and `VENUE_GUARD_SLOTS_2026_10_03`
 /// the 2026-10-02 builds', which T-LATCH's old→new upgrades start from ([`CpmmDeploy::Sep2026`],
@@ -490,8 +493,8 @@ pub const CPMM_DEPLOY_SLOT_2026_10: u64 = 452_376_460;
 pub const FIXTURE_GUARD_SLOTS: [u64; VENUE_PROGRAMS] = {
     let mut s = VENUE_GUARD_SLOTS_2026_09_27;
     s[GUARD_RAYDIUM_CPMM as usize] = CPMM_DEPLOY_SLOT_2026_10;
-    s[GUARD_PUMP as usize] = PUMP_DEPLOY_SLOT_2026_10_13;
-    s[GUARD_PUMP_AMM as usize] = PUMP_AMM_DEPLOY_SLOT_2026_10_08;
+    s[GUARD_PUMP as usize] = PUMP_DEPLOY_SLOT_2026_10_21;
+    s[GUARD_PUMP_AMM as usize] = PUMP_AMM_DEPLOY_SLOT_2026_10_21;
     s[GUARD_PUMP_FEES as usize] = PUMP_FEES_DEPLOY_SLOT_2026_10_12;
     s
 };
@@ -2078,6 +2081,10 @@ pub const CURVE_LEN_2026_10_08: usize = 166;
 /// pump's deploy slot since its 2026-10-13 15:40 UTC redeploy (group `pump_programs_2026_10_13b`;
 /// `VENUE_GUARD_SLOTS_2026_10_13`'s pump slot).
 pub const PUMP_DEPLOY_SLOT_2026_10_13: u64 = 456_494_698;
+/// pump's deploy observed in the 2026-10-21 local preflight (read 2026-10-20 UTC).
+pub const PUMP_DEPLOY_SLOT_2026_10_21: u64 = 458_921_440;
+/// PumpSwap's deploy observed in the same preflight.
+pub const PUMP_AMM_DEPLOY_SLOT_2026_10_21: u64 = 458_921_517;
 
 /// A curve's fee buckets `(creator_fee @125, protocol_fees @133)` from its data (0 past the
 /// account's end: a curve shorter than 141 bytes carries none).
@@ -2145,18 +2152,24 @@ pub enum PumpDeploy {
     /// account, event or layout changed; outside `create_v2` the ELF differs from the 2026-10-08
     /// one in its error tables and source line numbers only (`tests/fixtures/README.md`).
     Oct2026Chain,
+    /// pump and PumpSwap observed in the 2026-10-21 local preflight, at slots
+    /// 458,921,440 / 458,921,517 (group `pump_programs_2026_10_21`); pump-fees unchanged.
+    /// The published 2026-10-13 IDL predates these ELFs. Supported SOL/WSOL paths are
+    /// reviewed separately; this does not admit new quote assets.
+    Oct2026QuoteFees,
 }
 
 impl PumpDeploy {
     /// The builds every fork loads ([`PumpProgram`], [`Env::load_pump_programs`]).
-    pub const CURRENT: Self = Self::Oct2026Chain;
+    pub const CURRENT: Self = Self::Oct2026QuoteFees;
 
     /// Every build the fixtures hold, oldest first.
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::Sep2026,
         Self::Oct2026,
         Self::Oct2026Synth,
         Self::Oct2026Chain,
+        Self::Oct2026QuoteFees,
     ];
 
     fn prefix(self, program: PumpProgram) -> &'static str {
@@ -2168,9 +2181,14 @@ impl PumpDeploy {
             (Self::Oct2026, PumpProgram::Fees) => "pump_fees_2026_10",
             (Self::Oct2026, PumpProgram::Amm) => "pump_amm_2026_10",
             (Self::Oct2026Synth, PumpProgram::Pump) => "pump_2026_10_08",
-            (Self::Oct2026Synth | Self::Oct2026Chain, PumpProgram::Fees) => "pump_fees_2026_10_12",
+            (
+                Self::Oct2026Synth | Self::Oct2026Chain | Self::Oct2026QuoteFees,
+                PumpProgram::Fees,
+            ) => "pump_fees_2026_10_12",
             (Self::Oct2026Synth | Self::Oct2026Chain, PumpProgram::Amm) => "pump_amm_2026_10_08",
             (Self::Oct2026Chain, PumpProgram::Pump) => "pump_2026_10_13",
+            (Self::Oct2026QuoteFees, PumpProgram::Pump) => "pump_2026_10_21",
+            (Self::Oct2026QuoteFees, PumpProgram::Amm) => "pump_amm_2026_10_21",
         }
     }
 
@@ -2178,6 +2196,16 @@ impl PumpDeploy {
     /// of [`Self::Oct2026Synth`] and [`Self::Oct2026Chain`]).
     pub fn same_build(self, other: Self, program: PumpProgram) -> bool {
         self.prefix(program) == other.prefix(program)
+    }
+
+    /// The historical instruction/depth probe profile. The 2026-10-21 observed ELFs
+    /// retain that interface on the supported paths; these probes do not distinguish
+    /// their exact bytes from `Oct2026Chain`. Use `held` and signed path checks too.
+    pub const fn probe_profile(self) -> Self {
+        match self {
+            Self::Oct2026QuoteFees => Self::Oct2026Chain,
+            other => other,
+        }
     }
 
     /// The deploy slot `program`'s ProgramData header carries in this build.
@@ -2189,7 +2217,13 @@ impl PumpDeploy {
             (Self::Oct2026Synth, PumpProgram::Pump) => PUMP_DEPLOY_SLOT_2026_10_08,
             (Self::Oct2026Synth, PumpProgram::Amm) => PUMP_AMM_DEPLOY_SLOT_2026_10_08,
             (Self::Oct2026Synth, PumpProgram::Fees) => PUMP_FEES_DEPLOY_SLOT_2026_10_12,
-            (Self::Oct2026Chain, _) => FIXTURE_GUARD_SLOTS[g],
+            (Self::Oct2026Chain, PumpProgram::Pump) => PUMP_DEPLOY_SLOT_2026_10_13,
+            (Self::Oct2026Chain, PumpProgram::Amm) => PUMP_AMM_DEPLOY_SLOT_2026_10_08,
+            (Self::Oct2026Chain | Self::Oct2026QuoteFees, PumpProgram::Fees) => {
+                PUMP_FEES_DEPLOY_SLOT_2026_10_12
+            }
+            (Self::Oct2026QuoteFees, PumpProgram::Pump) => PUMP_DEPLOY_SLOT_2026_10_21,
+            (Self::Oct2026QuoteFees, PumpProgram::Amm) => PUMP_AMM_DEPLOY_SLOT_2026_10_21,
         }
     }
 
@@ -2239,7 +2273,9 @@ impl PumpDeploy {
         match self {
             Self::Sep2026 => pump::CURVE_LEN_V2,
             Self::Oct2026 => CURVE_LEN_2026_10,
-            Self::Oct2026Synth | Self::Oct2026Chain => CURVE_LEN_2026_10_08,
+            Self::Oct2026Synth | Self::Oct2026Chain | Self::Oct2026QuoteFees => {
+                CURVE_LEN_2026_10_08
+            }
         }
     }
 
@@ -2249,7 +2285,7 @@ impl PumpDeploy {
     pub fn pool_len(self) -> usize {
         match self {
             Self::Sep2026 => pump_amm::POOL_LEN_CREATE,
-            Self::Oct2026 | Self::Oct2026Synth | Self::Oct2026Chain => {
+            Self::Oct2026 | Self::Oct2026Synth | Self::Oct2026Chain | Self::Oct2026QuoteFees => {
                 crate::pamm::POOL_LEN_2026_10
             }
         }
@@ -2476,8 +2512,11 @@ impl Env {
         (crate::errors::custom_code(&res), logs)
     }
 
-    /// Which build of `program` **executes** (not only what its ProgramData holds,
-    /// [`PumpDeploy::held`]), asked of the program with instructions each build added, sent
+    /// Which historical instruction/depth profile `program` executes. The
+    /// `Oct2026QuoteFees` ELFs share `Oct2026Chain`'s profile on these probes;
+    /// this method does not distinguish their exact bytes (see `PumpDeploy::held`).
+    /// For the earlier builds it distinguishes execution, not only what ProgramData holds
+    /// ([`PumpDeploy::held`]), asked of the program with instructions each build added, sent
     /// without accounts ([`Env::pump_probe`]: 101 = absent, 3005 = dispatched), and for pump's
     /// last two builds, which share their instructions, with the depth cap the 2026-10-13 one
     /// added ([`Env::pump_create_v2_depth_probe`]):
@@ -3957,11 +3996,17 @@ mod tests {
                 );
             }
             env.warp(1);
-            let newer = matches!(deploy, PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain);
-            assert_eq!(env.pump_build_running(PumpProgram::Pump), deploy);
+            let newer = matches!(
+                deploy,
+                PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain | PumpDeploy::Oct2026QuoteFees
+            );
+            assert_eq!(
+                env.pump_build_running(PumpProgram::Pump),
+                deploy.probe_profile()
+            );
             let amm = env.pump_build_running(PumpProgram::Amm);
             assert!(
-                amm.same_build(deploy, PumpProgram::Amm),
+                amm.same_build(deploy.probe_profile(), PumpProgram::Amm),
                 "{deploy:?}: {amm:?}"
             );
             // pump-fees: `withdraw` tells the 2026-10-12 build from the older two, which share
@@ -3999,7 +4044,11 @@ mod tests {
                     let (code, logs) = env.pump_create_v2_depth_probe();
                     assert_eq!(code, Some(PUMP_ERR_CURVE_DEPTH_EXCEEDED), "{what}");
                     let cap = logs.iter().any(|l| l.contains(PUMP_DEPTH_CAP_MESSAGE));
-                    assert_eq!(cap, deploy == PumpDeploy::Oct2026Chain, "{what}: {logs:#?}");
+                    assert_eq!(
+                        cap,
+                        deploy.probe_profile() == PumpDeploy::Oct2026Chain,
+                        "{what}: {logs:#?}"
+                    );
                     let left: Vec<_> = written.iter().map(|k| env.svm.get_account(k)).collect();
                     assert_eq!(
                         left, found,
@@ -4007,7 +4056,11 @@ mod tests {
                          curve as it found them"
                     );
                     env.warp(1);
-                    assert_eq!(env.pump_build_running(PumpProgram::Pump), deploy, "{what}");
+                    assert_eq!(
+                        env.pump_build_running(PumpProgram::Pump),
+                        deploy.probe_profile(),
+                        "{what}"
+                    );
                 }
             }
         }

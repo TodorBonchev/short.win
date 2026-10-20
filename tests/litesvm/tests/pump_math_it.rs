@@ -1396,12 +1396,13 @@ fn random_sequences_on_every_live_curve() {
 
 // ---- fixtures, programs, readers ---------------------------------------------------------------------
 
-/// The dumped programs are mainnet's, in the four deploys the fixtures hold: the 2026-09 deploys
+/// The dumped programs are mainnet's, in the five deploys the fixtures hold: the 2026-09 deploys
 /// ARCH §8.2 names (deploy slots = `VENUE_GUARD_SLOTS_2026_09_27`), the 2026-10-02 redeploys
 /// (`VENUE_GUARD_SLOTS_2026_10_03`; both kept for T-LATCH), the 2026-10-08/12 redeploys (pump's
 /// 2026-10-08 build kept for the differential) and pump's 2026-10-13 redeploy with PumpSwap's
-/// 2026-10-08 and pump-fees' 2026-10-12 builds, which every fork loads ([`PumpDeploy::CURRENT`],
-/// slots = [`fork::FIXTURE_GUARD_SLOTS`] = `VENUE_GUARD_SLOTS_2026_10_13`'s): trimmed-ELF sha256
+/// 2026-10-08 and pump-fees' 2026-10-12 builds, then the pump/PumpSwap 2026-10-19 builds
+/// observed on 2026-10-21 local ([`PumpDeploy::CURRENT`], `VENUE_GUARD_SLOTS_2026_10_21`).
+/// Each deploy retains its own slots and trimmed-ELF sha256
 /// as pinned by `scripts/dump-fixtures.py`, SBPF v0, one upgrade authority, ELF headers that tell
 /// the builds apart ([`PumpDeploy::held`]), the ProgramData rebuilt to the mainnet sha256 when
 /// loaded. Every
@@ -1434,19 +1435,29 @@ fn fixtures_programs_and_readers() {
         (PumpDeploy::Oct2026Synth, PumpProgram::Pump) => {
             "6956c2f83297b6f7f06bbe8033241589c39da9650597dc5c59fb5a431906bf6f"
         }
-        (PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain, PumpProgram::Fees) => {
-            "8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8"
-        }
+        (
+            PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain | PumpDeploy::Oct2026QuoteFees,
+            PumpProgram::Fees,
+        ) => "8ad2ca93c7ae97a7fb0de8a99de4d8825ccfdf89f73138cd49bda948e124b8b8",
         (PumpDeploy::Oct2026Synth | PumpDeploy::Oct2026Chain, PumpProgram::Amm) => {
             "3ffd5e3b5a31ccc86b434405e8a1876926da1e8685f891dc964b7f919c172ee1"
         }
         (PumpDeploy::Oct2026Chain, PumpProgram::Pump) => {
             "e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be"
         }
+        (PumpDeploy::Oct2026QuoteFees, PumpProgram::Pump) => {
+            "756c04ab1ac76122dcdcf2eeb0073bb139087b23d58d3f0d6c895510ab59d582"
+        }
+        (PumpDeploy::Oct2026QuoteFees, PumpProgram::Amm) => {
+            "4d5fc41918374b24b16d8372d14a1ac64c768c83a2971bfeef1c8660dad649e7"
+        }
     };
     // The 2026-10-08/12 deploy: today's slots but pump's 2026-10-08 one.
-    let mut synth_slots = fork::FIXTURE_GUARD_SLOTS;
+    let mut synth_slots = shortwin::constants::VENUE_GUARD_SLOTS_2026_10_13;
     synth_slots[usize::from(PumpProgram::Pump.guard())] = fork::PUMP_DEPLOY_SLOT_2026_10_08;
+    let mut observed_slots = shortwin::constants::VENUE_GUARD_SLOTS_2026_10_13;
+    observed_slots[usize::from(PumpProgram::Pump.guard())] = fork::PUMP_DEPLOY_SLOT_2026_10_21;
+    observed_slots[usize::from(PumpProgram::Amm.guard())] = fork::PUMP_AMM_DEPLOY_SLOT_2026_10_21;
     for (deploy, slots) in [
         (PumpDeploy::Sep2026, VENUE_GUARD_SLOTS_2026_09_27),
         (
@@ -1454,7 +1465,11 @@ fn fixtures_programs_and_readers() {
             shortwin::constants::VENUE_GUARD_SLOTS_2026_10_03,
         ),
         (PumpDeploy::Oct2026Synth, synth_slots),
-        (PumpDeploy::Oct2026Chain, fork::FIXTURE_GUARD_SLOTS),
+        (
+            PumpDeploy::Oct2026Chain,
+            shortwin::constants::VENUE_GUARD_SLOTS_2026_10_13,
+        ),
+        (PumpDeploy::Oct2026QuoteFees, observed_slots),
     ] {
         for p in PumpProgram::ALL {
             let pd = deploy.program_data(p);
@@ -1489,17 +1504,17 @@ fn fixtures_programs_and_readers() {
             assert_eq!(prog.account.data[4..36], pd.address.to_bytes());
         }
     }
-    assert_eq!(PumpDeploy::CURRENT, PumpDeploy::Oct2026Chain);
+    assert_eq!(PumpDeploy::CURRENT, PumpDeploy::Oct2026QuoteFees);
     assert_eq!(
         fork::FIXTURE_GUARD_SLOTS[usize::from(PumpProgram::Pump.guard())],
-        456_494_698,
-        "pump's 2026-10-13 redeploy"
+        458_921_440,
+        "pump's 2026-10-19 redeploy observed in the 2026-10-21 preflight"
     );
     for p in PumpProgram::ALL {
         let g = usize::from(p.guard());
         assert_eq!(
             fork::FIXTURE_GUARD_SLOTS[g],
-            shortwin::constants::VENUE_GUARD_SLOTS_2026_10_13[g],
+            shortwin::constants::VENUE_GUARD_SLOTS_2026_10_21[g],
             "{p:?}: the fork's slot is the newest baseline's"
         );
         assert_eq!(p.elf(), PumpDeploy::CURRENT.elf(p));
@@ -3187,11 +3202,11 @@ fn v3_buy_past_rt_reverts_on_the_2026_10_02_build() {
 
 // ---- the 2026-10-13 build against the 2026-10-08 build (the re-pin to 456,494,698) ------------
 
-/// Two forks of one coin driven in lockstep: `old` runs pump's 2026-10-08 build
-/// ([`PumpDeploy::Oct2026Synth`]), `new` its 2026-10-13 build ([`PumpDeploy::CURRENT`]); PumpSwap,
-/// pump-fees and every account start equal. Each fork is asked which build executes
-/// ([`Env::pump_build_running`], whose `create_v2` depth probe tells the two apart), not only
-/// which one its ProgramData holds, so the comparison cannot pass on one ELF run twice.
+/// Two explicitly selected fixture builds driven in lockstep. Their full ProgramData
+/// bytes are verified when loaded, and their historical instruction/depth profiles
+/// are probed separately. Different ELFs may share that behavior profile. Executable
+/// account funding is normalized for the new comparison, not their ELF/ProgramData.
+/// The original Oct08/Oct13 differential retains exact logs and CU equality.
 struct Twin {
     old: Env,
     new: Env,
@@ -3201,32 +3216,47 @@ struct Twin {
     sent: usize,
     failed: usize,
     units: u64,
+    equal_compute: bool,
 }
 
 impl Twin {
-    fn fork(coin: PumpCoin) -> Self {
+    fn builds(coin: PumpCoin, older: PumpDeploy, newer: PumpDeploy, equal_compute: bool) -> Self {
         let (mut old, c) = Env::fork_pump_coin(coin);
-        fork::load_pump_deploy(&mut old.svm, PumpProgram::Pump, PumpDeploy::Oct2026Synth);
         let (mut new, _) = Env::fork_pump_coin(coin);
-        assert_eq!(
-            PumpDeploy::held(&old.svm, PumpProgram::Pump),
-            Some(PumpDeploy::Oct2026Synth)
-        );
-        assert_eq!(
-            PumpDeploy::held(&new.svm, PumpProgram::Pump),
-            Some(PumpDeploy::Oct2026Chain)
-        );
+        for program in PumpProgram::ALL {
+            fork::load_pump_deploy(&mut old.svm, program, older);
+            fork::load_pump_deploy(&mut new.svm, program, newer);
+            if !equal_compute {
+                // Program-account donations changed between snapshots. Match this
+                // unrelated initial funding; keep every ProgramData/ELF byte intact.
+                let old_program = old.svm.get_account(&program.id()).unwrap();
+                let mut new_program = new.svm.get_account(&program.id()).unwrap();
+                assert_eq!(old_program.data, new_program.data);
+                new_program.lamports = old_program.lamports;
+                new.svm.set_account(program.id(), new_program).unwrap();
+            }
+            assert!(
+                PumpDeploy::held(&old.svm, program)
+                    .unwrap()
+                    .same_build(older, program)
+            );
+            assert!(
+                PumpDeploy::held(&new.svm, program)
+                    .unwrap()
+                    .same_build(newer, program)
+            );
+        }
+        assert!(!older.same_build(newer, PumpProgram::Pump));
+        assert_eq!(PumpDeploy::held(&old.svm, PumpProgram::Pump), Some(older));
+        assert_eq!(PumpDeploy::held(&new.svm, PumpProgram::Pump), Some(newer));
         // The probes run alike on both forks: refused transactions, which leave every account
         // as they found it but for the fee the harness payer pays.
-        for (env, deploy) in [
-            (&mut old, PumpDeploy::Oct2026Synth),
-            (&mut new, PumpDeploy::Oct2026Chain),
-        ] {
+        for (env, deploy) in [(&mut old, older), (&mut new, newer)] {
             env.warp(1);
             assert_eq!(
                 env.pump_build_running(PumpProgram::Pump),
-                deploy,
-                "{coin:?}: the build that executes"
+                deploy.probe_profile(),
+                "{coin:?}: the instruction/depth profile that executes"
             );
         }
         Self {
@@ -3236,6 +3266,7 @@ impl Twin {
             sent: 0,
             failed: 0,
             units: 0,
+            equal_compute,
         }
     }
 
@@ -3287,6 +3318,16 @@ impl Twin {
         let strip = |l: Vec<String>| -> Vec<String> {
             l.into_iter()
                 .filter(|s| !(s.contains(" consumed ") && s.ends_with(" compute units")))
+                .map(|s| {
+                    if !self.equal_compute && s.starts_with("Program log: AnchorError thrown in ") {
+                        s.split_once(". Error Code: ").map_or_else(
+                            || s.clone(),
+                            |(_, rest)| format!("AnchorError. Error Code: {rest}"),
+                        )
+                    } else {
+                        s
+                    }
+                })
                 .collect()
         };
         assert_eq!(
@@ -3297,10 +3338,48 @@ impl Twin {
             describe(&a),
             describe(&b)
         );
-        assert_eq!(strip(la), strip(lb), "{what}: logs");
+        let old_logs = strip(la);
+        let mut new_logs = strip(lb);
+        if !self.equal_compute {
+            for (old_log, new) in old_logs.iter().zip(&mut new_logs) {
+                if let (Some(old), Some(new_data)) = (
+                    old_log
+                        .strip_prefix("Program data: ")
+                        .and_then(fork::base64_decode),
+                    new.strip_prefix("Program data: ")
+                        .and_then(fork::base64_decode),
+                ) && old.starts_with(&fork::PUMP_TRADE_EVENT)
+                {
+                    assert_eq!(
+                        new_data.len(),
+                        old.len() + 8,
+                        "{what}: observed TradeEvent tail length"
+                    );
+                    assert!(
+                        new_data.starts_with(&old),
+                        "{what}: complete prior TradeEvent fields"
+                    );
+                    assert_eq!(
+                        &new_data[old.len()..],
+                        &[0; 8],
+                        "{what}: new opaque TradeEvent tail on supported SOL quote"
+                    );
+                    // Preserve exact comparison of every old field. The new
+                    // eight-byte tail is measured, not assigned a guessed meaning.
+                    *new = old_log.clone();
+                }
+            }
+        }
+        assert_eq!(old_logs, new_logs, "{what}: logs");
         if ea.is_none() {
-            assert_eq!(ua, ub, "{what}: compute units");
-            self.units += ua;
+            if self.equal_compute {
+                assert_eq!(ua, ub, "{what}: compute units");
+            } else {
+                println!(
+                    "{what}: old {ua} CU, new {ub} CU; existing program budgets are unchanged"
+                );
+            }
+            self.units += ub;
         } else {
             self.failed += 1;
         }
@@ -3342,6 +3421,60 @@ impl Twin {
 /// changed; short.win never calls them.
 #[test]
 fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
+    compare_curve_builds(PumpDeploy::Oct2026Synth, PumpDeploy::Oct2026Chain, true);
+}
+
+/// Signed differential on every retained SOL-quoted curve path. The actual new
+/// ELF bytes are checked separately from the historical instruction/depth profile.
+/// Error-origin source lines and CU may change; errors, events, balances and named
+/// accounts must agree. Existing CU budgets remain the separate performance gate.
+#[test]
+fn the_2026_10_21_observed_build_preserves_supported_sol_curve_paths() {
+    compare_curve_builds(
+        PumpDeploy::Oct2026Chain,
+        PumpDeploy::Oct2026QuoteFees,
+        false,
+    );
+}
+
+/// A modern-clock control using historical SOL curve state, not a claim that the
+/// complete bank is a fresh mainnet snapshot.
+#[test]
+fn observed_build_supports_sol_trades_after_its_deploy_slot() {
+    let mut t = Twin::builds(
+        PumpCoin::Fresh166,
+        PumpDeploy::Oct2026Chain,
+        PumpDeploy::Oct2026QuoteFees,
+        false,
+    );
+    t.both(|env| env.set_clock(1_792_432_041, 458_921_518));
+    let (user, ata) = t.user(100_000_000_000);
+    let buyback = fork::pump_buyback_fee_recipient(&t.new.svm, 1);
+    let q = t.c.state(&t.new.svm).real_token_reserves / 50;
+    let buy = t.c.v3_ix(
+        fork::PumpV3::Buy,
+        &user.pubkey(),
+        &ata,
+        &buyback,
+        q,
+        u64::MAX,
+        None,
+    );
+    t.send("post-deploy SOL buy", &[buy], &[&user], None);
+    let sell = t.c.v3_ix(
+        fork::PumpV3::Sell,
+        &user.pubkey(),
+        &ata,
+        &buyback,
+        q / 2,
+        0,
+        None,
+    );
+    t.send("post-deploy SOL sell", &[sell], &[&user], None);
+}
+
+fn compare_curve_builds(older: PumpDeploy, newer: PumpDeploy, equal_compute: bool) {
+    let make = |coin| Twin::builds(coin, older, newer, equal_compute);
     const SOL: u64 = 1_000_000_000;
     let (mut sent, mut failed, mut units) = (0, 0, 0);
     let mut tally = |t: &Twin| {
@@ -3353,7 +3486,7 @@ fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
         .into_iter()
         .chain(PumpCoin::LIVE_SOL_2026_10_13)
     {
-        let mut t = Twin::fork(coin);
+        let mut t = make(coin);
         let c = t.c;
         let (u, ata) = t.user(10_000 * SOL);
         let up = u.pubkey();
@@ -3422,7 +3555,7 @@ fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
     // The synthetic migration on near166, without and with a donation to curve_base_ata (before
     // the completion, and after it), and `migrate_v2`.
     for donation in [0, 1_000_000_000_000] {
-        let mut t = Twin::fork(PumpCoin::Near166);
+        let mut t = make(PumpCoin::Near166);
         let c = t.c;
         let (u, ata) = t.user(2_000 * SOL);
         let bb = fork::pump_buyback_fee_recipient(&t.new.svm, 1);
@@ -3509,7 +3642,7 @@ fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
     }
 
     // buy_exact_quote_in_v3 past rT: the rest from the would-be pool.
-    let mut t = Twin::fork(PumpCoin::Near166);
+    let mut t = make(PumpCoin::Near166);
     let c = t.c;
     let (u, ata) = t.user(2_000 * SOL);
     let bb = fork::pump_buyback_fee_recipient(&t.new.svm, 1);
@@ -3527,7 +3660,7 @@ fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
     tally(&t);
 
     // The cashback coin: every v3 trade refused (6094); v2 trades and claim_cashback run.
-    let mut t = Twin::fork(PumpCoin::Cashback166);
+    let mut t = make(PumpCoin::Cashback166);
     let c = t.c;
     let (u, ata) = t.user(100 * SOL);
     let up = u.pubkey();
@@ -3573,7 +3706,7 @@ fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
         PumpCoin::SyntheticStuck,
         PumpCoin::GraduatedSynthetic,
     ] {
-        let mut t = Twin::fork(coin);
+        let mut t = make(coin);
         let c = t.c;
         let (u, ata) = t.user(100 * SOL);
         let up = u.pubkey();
@@ -3602,9 +3735,9 @@ fn the_2026_10_13_build_runs_short_wins_paths_as_the_2026_10_08_build() {
     // The total varies from run to run: the users are random keys, whose PDA and ATA bump
     // searches cost different units. Only the per-transaction equality is asserted.
     println!(
-        "G0b differential: {sent} transactions on pump's 2026-10-08 and 2026-10-13 builds, \
-         {failed} refused on both with the same error; equal logs, accounts and compute units \
-         per transaction ({units} CU over the successful ones in this run, random keys)"
+        "Curve differential: {sent} transactions on {older:?} and {newer:?}, \
+         {failed} refused on both with the same error; equal events and accounts; \
+         exact-CU comparison={equal_compute} ({units} new-build CU over successes)"
     );
     assert!(sent >= 150 && failed >= 60, "{sent} / {failed}");
 }
