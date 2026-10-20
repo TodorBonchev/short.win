@@ -4,8 +4,8 @@ import { type BrowserContext, expect, type Locator, type Page } from '@playwrigh
  * A DOM pointer is visible in Playwright's video, including above native dialogs.
  * Its position and click rings come from the browser's actual pointer events.
  */
-export async function installPointer(context: BrowserContext): Promise<void> {
-    await context.addInitScript(() => {
+export async function installPointer(context: BrowserContext, touch = false): Promise<void> {
+    await context.addInitScript((touch) => {
         const install = () => {
             if (document.getElementById('shortwin-demo-pointer')) return;
 
@@ -80,7 +80,7 @@ export async function installPointer(context: BrowserContext): Promise<void> {
                 const card = document.getElementById('shortwin-demo-overlay');
                 const cardVisible = !!card && card.checkVisibility();
                 layer.style.visibility = cardVisible ? 'hidden' : 'visible';
-                pointer.style.visibility = seenPointer && !cardVisible ? 'visible' : 'hidden';
+                pointer.style.visibility = !touch && seenPointer && !cardVisible ? 'visible' : 'hidden';
             };
             const raise = () => {
                 const open = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')];
@@ -145,22 +145,35 @@ export async function installPointer(context: BrowserContext): Promise<void> {
         };
         if (document.body) install();
         else document.addEventListener('DOMContentLoaded', install, { once: true });
-    });
+    }, touch);
 }
 
 /** Deliberate cursor travel and short pauses make each recorded action readable. */
 export class DemoGuide {
     private readonly page: Page;
     private readonly cue: (text: string) => void;
+    private readonly touch: boolean;
     private position = { x: 0, y: 0 };
 
-    constructor(page: Page, cue: (text: string) => void) {
+    constructor(page: Page, cue: (text: string) => void, touch = false) {
         this.page = page;
         this.cue = cue;
+        this.touch = touch;
     }
 
     async move(target: Locator, label: string): Promise<void> {
         await target.waitFor({ state: 'visible' });
+        if (this.touch) {
+            this.cue(label);
+            await target.evaluate((element) =>
+                element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' }),
+            );
+            await this.page.waitForTimeout(650);
+            await target.scrollIntoViewIfNeeded();
+            await expect(target).toBeEnabled();
+            await this.page.waitForTimeout(350);
+            return;
+        }
         await target.scrollIntoViewIfNeeded();
         await expect(target).toBeEnabled();
         const box = await target.boundingBox();
@@ -182,7 +195,8 @@ export class DemoGuide {
 
     async click(target: Locator, label: string): Promise<void> {
         await this.move(target, label);
-        await target.click({ delay: 80 });
+        if (this.touch) await target.tap();
+        else await target.click({ delay: 80 });
         await this.page.waitForTimeout(500);
     }
 
@@ -194,7 +208,8 @@ export class DemoGuide {
 
     async fill(target: Locator, value: string, label: string): Promise<void> {
         await this.move(target, label);
-        await target.click({ delay: 80 });
+        if (this.touch) await target.tap();
+        else await target.click({ delay: 80 });
         await target.fill(value);
         await this.page.waitForTimeout(500);
     }

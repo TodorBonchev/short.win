@@ -73,6 +73,33 @@ curve position, PumpMigrating close, Liquidate event, S1 event, and the real ind
 The [capture record](../../../../docs/demo/local-validator-v1.0.3-2026-10-20.md) lists the
 transaction signatures and media hashes for this take.
 
+## Phone edition
+
+The separate portrait edition records the responsive app in **Chromium phone emulation**:
+390×780 CSS pixels, touch input, DPR 2 and an Android user agent. It uses the injected local
+test wallet; it does not demonstrate a physical handset, a native keyboard or an external
+wallet handoff. Lending, borrowing and closing use the app's real mobile bottom sheets.
+Gold pulses mark actual taps, including acknowledgements and transaction signing.
+
+Start a **fresh full-profile validator and indexer database** using the commands above, then
+run these commands from `apps/web`:
+
+```sh
+node e2e/demo/record.ts --phone
+node e2e/demo/render.ts --phone
+node e2e/validator/stop.ts
+```
+
+Phone artifacts are isolated under `.e2e/demo/phone/`; the desktop artifacts remain alongside
+that directory. The MP4 is `shortwin-local-validator-v1.0.3-phone.mp4`, **1080×1920 at 30 fps**,
+with the complete phone viewport, chapter progress, readable action captions and labelled
+**8×** waits. The matching GIF is **540×960, 10 seconds at 10 fps**. Playwright records the
+390×780 CSS viewport and the renderer enlarges it; this is not native 1080p app detail.
+
+The [phone capture record](../../../../docs/demo/local-validator-phone-v1.0.3-2026-10-20.md)
+contains its own transaction evidence, timing and media hashes. Replaying either edition
+changes validator state, so reseed and archive the indexer database between recordings.
+
 Suggested unlisted-video description (add the URL after upload):
 
 > short.win local-validator walkthrough — v1.0.3 candidate, not deployed; no external audit

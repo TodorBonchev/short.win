@@ -45,7 +45,8 @@ The 1.0.3 candidate is unreleased; do not tag or deploy it from this checklist.
 
 ## Later or conditional follow-ups
 
-- [ ] Upload the [local-validator demo](apps/web/e2e/demo/README.md)'s MP4 as
+- [ ] Upload the [local-validator demo](apps/web/e2e/demo/README.md)'s desktop
+      or portrait phone MP4 as
       an unlisted video, add its URL to the site/pinned post and share the
       10-second GIF. The recorded files are local and gitignored; the scripts
       can regenerate them from a fresh validator seed.
