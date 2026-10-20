@@ -1,0 +1,24 @@
+Draft 1.0.3 AI3-FR01 exact-ref CI artifacts (unreleased)
+fix commit: e1d66caa64d076a43618f437c2de9ac9127166b4
+CI: https://github.com/TodorBonchev/short.win/actions/runs/39169016016
+event: workflow_dispatch; attempt: 1
+conclusion: success; 25 jobs passed, 1 scheduled fuzz job skipped, 0 failed
+solana-verify: 0.5.2
+image: solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f
+args: --arch v3 --cargo-build-sbf-args="--tools-version v1.57"
+
+# artifact  SHA-256(file)  executable-hash(trailing zeros trimmed)  bytes
+release shortwin.so  eb9cd3e68c33de8119b11f978ab77f65d4fa41de79904c508f0fd9d519d737dd  dba19dcb86aecba7ee4af61c9d66e159ed478101bb65a5af6f40e91027e83649  1643832
+test-venue shortwin.so  cf1c44424ff1c879ac5639b432a25c0dc4a81c5842ce047e26668ef920030322  14503aa59628825f728ec3322b9eb9bc2d4cd2d889cc574d0acc1f0f3c78cf5a  1674864
+mock_cpamm.so  4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9  -  281240
+
+Verified on 2026-10-19: downloaded shortwin-program and verifiable-build artifacts
+from this run, independently computed SHA-256 and byte sizes, and compared the
+verifier release ELF byte-for-byte with the Anchor release ELF (equal). The verifier
+hash record identifies this exact source commit and the pinned image above.
+The Anchor release and test-venue files also equal the earlier local canonical builds.
+The test-venue and mock hashes were measured from the Anchor artifact; the verifier
+job covers only the release ELF, not those test-only artifacts. No verifier was rerun
+locally during this evidence update, and no deployment was performed.
+
+The separate >=24 h zero-failure fuzz gate on final program/fuzzer bytes remains open.

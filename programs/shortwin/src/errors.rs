@@ -370,11 +370,18 @@ pub enum ShortwinError {
         "pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap."
     )]
     CurveCashbackCoin,
+
+    // ---- Appended for AI3-FR01 (6110; group in brackets) ----
+    /// [Lender] An already-empty pre-fix pool retains unallocated SOL carry. Neither
+    /// a deposit nor the normal sweeps may assign that historical value to new shares.
+    #[msg("This empty pool has historical SOL carry: deposits require a reviewed migration")]
+    LegacyPoolCarry,
 }
 
 impl From<MathError> for ShortwinError {
     /// `shortwin-math` refusals map one to one onto the lender codes (the crate's codes 6–12
-    /// mirror ARCH §3.11's lender group, 13 the appended `PoolDrained`); arithmetic and domain
+    /// mirror ARCH §3.11's lender group, 13 the appended `PoolDrained`, 14 `LegacyPoolCarry`);
+    /// arithmetic and domain
     /// failures are `MathOverflow`, malformed inputs `InvalidParams`.
     fn from(e: MathError) -> Self {
         match e {
@@ -392,6 +399,7 @@ impl From<MathError> for ShortwinError {
             MathError::DepositTooSmall => Self::ZeroAmount,
             MathError::WipeSweepPending => Self::WipeSweepPending,
             MathError::PoolDrained => Self::PoolDrained,
+            MathError::LegacyPoolCarry => Self::LegacyPoolCarry,
         }
     }
 }
@@ -470,6 +478,7 @@ mod tests {
             (ShortwinError::RebaseNeedsOwner, 6107),
             (ShortwinError::PoolDrained, 6108),
             (ShortwinError::CurveCashbackCoin, 6109),
+            (ShortwinError::LegacyPoolCarry, 6110),
             (ShortwinError::CurveStraddle, 6031),
         ];
         for (e, c) in pins {
@@ -486,6 +495,7 @@ mod tests {
                 3 => assert_eq!(mapped, ShortwinError::InvalidParams),
                 // AIR-07's residual, appended after the lender group.
                 13 => assert_eq!(mapped, ShortwinError::PoolDrained),
+                14 => assert_eq!(mapped, ShortwinError::LegacyPoolCarry),
                 _ => assert!(code(mapped) >= 6076 && code(mapped) <= 6084, "{e:?}"),
             }
         }

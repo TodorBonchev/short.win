@@ -97,6 +97,7 @@ FLAG_WIPE_TRADER_SWEPT = 1 << 7
 
 # pool_model's refusal messages -> the program error names (ARCH §3.11; errors.rs `From<MathError>`)
 REFUSALS = [
+    ("legacy_pool_carry", "LegacyPoolCarry"),
     ("deposit too small", "ZeroAmount"),
     ("share overflow", "MathOverflow"),
     ("WipeSweepPending", "WipeSweepPending"),

@@ -1,5 +1,10 @@
 # Draft 1.0.3: completed 24-hour fuzz gate
 
+**Scope after the 2026-10-20 integration:** this completed run covers the
+preceding `9b91060` candidate and its hashes below. The later AI3-FR01 quarantine
+changes release and test-venue program bytes. A new ≥24 h run on those final
+bytes is required; this historical clean result does not close that gate.
+
 The all-profile run against the unreleased 1.0.3 candidate completed on 2026-10-19.
 It began at 2026-10-18 13:44:14 UTC and ran for 86,405.2476 seconds (24 hours
 and 5.25 seconds). Its final [raw summary](fuzz-1.0.3-summary.json) records
@@ -36,6 +41,7 @@ the copied summary above has the same hash. The final `run.log` has SHA-256
 Its final sections say `anomalies: none` and `failures: none`. The raw log and
 run metadata remain in `target/fuzz-103-20261018` on the runner machine.
 
-This closes the 1.0.3 fuzz gate. [Independent fix review](ai-review-3/fix-review-1.0.3.md)
+This closes the fuzz gate for the identified `9b91060` candidate only.
+[Independent fix review](ai-review-3/fix-review-1.0.3.md)
 and written disposition of the remaining open findings are still required
 before marking fixes final or tagging a release.

@@ -1,5 +1,9 @@
 # Draft 1.0.3 implementation and validation
 
+**Superseded program bytes:** the later [AI3-FR01 follow-up](ai3-fr01-fix-1.0.3.md)
+adds a legacy empty-carry deposit refusal and its regressions. This record remains
+historical validation for `9b910602`; its CI and fuzz scope do not cover the new guard.
+
 Date: 2026-10-18. Base: `b815269224ba0f5d946f49de7e113220c4067041` (draft 1.0.2).
 These checks concern the subsequent unreleased fixes. They are separate from the
 immutable static scan and from any tagged, deployed or externally reviewed release.
@@ -139,12 +143,17 @@ This is an unreleased draft, not a released fix batch. The findings tracker ther
 uses **in progress**, not **fixed**. Open economic/venue issues need resolution or explicit
 acceptance within their bounds. Exact-ref full CI, required browser E2E, opt-in
 responsive coverage, the verifiable build and local compute/size checks passed on
-the candidate. The [24-hour fuzz gate](../fuzz-1.0.3.md) passed on those
-program bytes. Release still needs independent fix review and written
-disposition of the open issues. The AIR-01 … AIR-24 fuzz waiver does not extend
-to this batch and was not used for its fuzz gate.
-The [fix-review packet](fix-review-1.0.3.md) records the questions and boundaries
-for an independent reviewer; it is not a substitute for that review.
+the preceding candidate. The [24-hour fuzz run](../fuzz-1.0.3.md) passed on
+those program bytes; it does not cover the later AI3-FR01 guard. The final-byte
+≥24 h gate remains open. The 2026-10-19
+[independent AI review](independent-fix-review-1.0.3.md) accepts Q2/Q3/Q4 but makes
+Q1 conditional on addressing legacy empty-pool carry (AI3-FR01). The guard and
+owner-confirmed absence of affected deployed state are in the
+[FR01 record](ai3-fr01-fix-1.0.3.md). Its exact-ref full CI passed separately;
+external auditor acceptance remains required. The
+[written unresolved treatment](unresolved-1.0.3.md) supplies no new owner risk acceptance.
+The AIR-01 … AIR-24 fuzz waiver does not extend to this batch.
+The [fix-review packet](fix-review-1.0.3.md) records the original questions and boundaries.
 The later [internal handoff](../handoff-1.0.3-2026-10-20.md) changes keeper
-ranking recovery and adds characterization tests. Full CI above belongs to the
-earlier `9b91060` code commit; the follow-up requires its own exact-ref run.
+ranking recovery and adds characterization tests; the combined candidate requires
+its own exact-ref full CI run.

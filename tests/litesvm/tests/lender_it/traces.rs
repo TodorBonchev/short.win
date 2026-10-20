@@ -67,6 +67,7 @@ fn vcode(e: MathError) -> &'static str {
         MathError::DepositTooSmall => "deposit_too_small",
         MathError::WipeSweepPending => "wipe_sweep_pending",
         MathError::PoolDrained => "pool_drained",
+        MathError::LegacyPoolCarry => "legacy_pool_carry",
     }
 }
 

@@ -227,7 +227,7 @@ including mutations, passed on committed 1.0.1. It does not cover this candidate
 still requires resolution or acceptance of the open findings, the full
 gate on that revision, an exact-tree verifiable build, ≥24 h fuzz and auditor fix review.
 
-**Current unreleased draft: short.win 1.0.3 (2026-10-18).** AI review 3 adds the
+**Earlier 1.0.3 candidate (2026-10-18, before AI3-FR01's guard).** AI review 3 adds the
 final-withdrawal carry correction and keeper/parser fixes to `b815269`. Account layouts
 and instruction formats are unchanged; the IDL version and WASM/client artifacts were
 regenerated. The same canonical build commands produced:
@@ -252,6 +252,52 @@ remain pending.
 The [draft validation record](audit/ai-review-3/validation-1.0.3.md) lists the checks
 and remaining release gates; the older build and CI evidence above does not cover
 these bytes.
+
+**Independent fix review (2026-10-19):** the
+[separate AI review](audit/ai-review-3/independent-fix-review-1.0.3.md) accepts the
+keeper, reader/retry and ALT corrections (packet Q2/Q3/Q4). Q1's carry correction is
+accepted conditionally: an already-empty pre-fix pool is not migrated, recorded as
+**AI3-FR01 open**. The [written unresolved treatment](audit/ai-review-3/unresolved-1.0.3.md)
+and [known-issues §8](audit/known-issues.md#8-open-items-from-the-103-fix-review) retain
+the prior open findings and remaining leads with evidence limits and completion criteria.
+This is not external firm acceptance or new owner sign-off. The ≥24 h zero-failure fuzz
+and release gates remain required; the merge does not tag or deploy 1.0.3.
+
+**Current unreleased 1.0.3 follow-up (2026-10-19): AI3-FR01.**
+[The fix record](audit/ai-review-3/ai3-fr01-fix-1.0.3.md) adds a deposit quarantine:
+`S=0` with either current pool carry nonzero refuses appended error 6110
+`LegacyPoolCarry`, preserving historical balances and old allocated claims. The affected
+pool cannot accept new deposits until separately reviewed recovery; ordinary sweeps do
+not lift this guard. Clean empty pools, nonempty pools and old ShareEpoch record carry
+retain their behavior. The normative model, IDL/client and browser preview match.
+
+| AI3-FR01 artifact (local and exact-ref CI) | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
+|---|---|---|---|
+| Release `shortwin.so` | `eb9cd3e68c33de8119b11f978ab77f65d4fa41de79904c508f0fd9d519d737dd` | `dba19dcb86aecba7ee4af61c9d66e159ed478101bb65a5af6f40e91027e83649` | 1,643,832 |
+| Test-venue `shortwin.so` | `cf1c44424ff1c879ac5639b432a25c0dc4a81c5842ce047e26668ef920030322` | `14503aa59628825f728ec3322b9eb9bc2d4cd2d889cc574d0acc1f0f3c78cf5a` | 1,674,864 |
+
+**Full fix CI passed** on `e1d66caa64d076a43618f437c2de9ac9127166b4`:
+[run 39169016016](https://github.com/TodorBonchev/short.win/actions/runs/39169016016),
+workflow_dispatch attempt 1, 25 successful jobs, zero failed, only the scheduled fuzz
+job intentionally skipped. All 19 mutants were killed; the program job passed 1,386
+test executions with five ignored, including the signed legacy-carry regression.
+The pinned solana-verify 0.5.2 job rebuilt the release ELF. Downloaded verifier and
+Anchor release artifacts compare byte-for-byte equal, and both CI builds' hashes match
+the local canonical builds above; [exact-ref hashes and provenance](audit/ci-1.0.3-fr01-hashes.txt).
+The verifier covers the release ELF; the test-venue hash is measured from the Anchor
+artifact. The predecessor main CI on `7c5ae429` also completed successfully (24 jobs,
+with fuzz-nightly and mutants intentionally skipped).
+
+The finding remains **in progress**: the ≥24 h zero-failure fuzz gate on final bytes
+and remaining release/review requirements are not established by these CI results.
+On 2026-10-19 the owner confirmed no affected deployed state, making AI3-FR01's
+current-deployment recovery/migration prerequisite **not applicable**. The quarantine
+still requires reviewed recovery if affected legacy state is encountered later.
+The owner reported a separate-machine 24-hour fuzz run at **20 hours with zero anomalies**;
+completion and final-byte evidence remain pending in the
+[dated fix record](audit/ai-review-3/ai3-fr01-fix-1.0.3.md#deployment-and-fuzz-status-2026-10-19).
+The deployment statement is owner-confirmed; no independent chain inventory or deployment
+was performed for this documentation update.
 
 ## 1. The protocol on one page
 

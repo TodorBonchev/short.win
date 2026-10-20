@@ -49,6 +49,7 @@ Status is one of: open, in progress, fixed, acknowledged, duplicate of KI-n, inv
 | AIR2-13 | Keeper receives zero after rent-first liquidation | — | not assessed | `waterfall::liquidate` | open | — | `ai2_accounting`: rent exhaustion | pending | Zero keeper payout reproduced; economic liveness and priority/reserve policy remain open, not automatically accepted under KI-03. |
 | AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | — | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | pending | 670,224 versus 336,779 raw tokens in the loss-control case, beyond KI-13. Draft cap uses the value of unlocked shares. |
 | AIR2-P2-02 | Pot pays a first claimant against unpaid receivable | — | not assessed | `pool::claim` | open | — | `ai2_accounting`: receivable/pot allocation | pending | 75/25 SOL split from 100 SOL repayment with 100 SOL still receivable; report’s proposed current-share subtraction does not repair it. Historical entitlement design remains unresolved. |
+| AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` | in progress | `e1d66caa` | Canonical predecessor witness, carry matrix, signed legacy deposit; old source/ELF negative controls fail | Narrow quarantine independently reviewed; ≥24 h fuzz/release requirements pending | New deposits refuse 6110 when S=0 and either carry is nonzero, preserving historical value/claims. Full exact-ref CI passed: 25 jobs, 19 mutants killed, verifier/Anchor ELFs byte-identical. On 2026-10-19 the owner confirmed no affected deployed state: current-deployment recovery is not applicable. Owner-reported separate-machine fuzz: 20 h, zero anomalies; completed ≥24 h zero-failure evidence on final bytes remains required before **fixed**. [Fix, status, hashes and CI](ai-review-3/ai3-fr01-fix-1.0.3.md). |
 
 ## AI review 3: draft 1.0.3 (2026-10-18)
 
@@ -75,8 +76,12 @@ exploitable or that the remaining program is safe.
 
 These rows describe draft implementations, not the tracker’s strict **fixed** state.
 Exact-ref full CI passed on `9b91060`, and the [24-hour all-profile fuzz run](fuzz-1.0.3.md)
-completed with zero fuzzer failures and zero anomalies. Independent fix review and
-open-issue decisions remain pending. There is no release tag or deployment. The earlier
+completed with zero fuzzer failures and anomalies on those preceding bytes. It does
+not cover the later AI3-FR01 guard: final-byte ≥24 h evidence remains pending.
+The 2026-10-19 independent AI fix review accepts Q2/Q3/Q4 and conditionally accepts
+Q1; the guard and owner-confirmed absence of affected deployed state are recorded
+below. External auditor acceptance and open-issue decisions remain pending.
+There is no release tag or deployment. The earlier
 AIR-01 … AIR-24 fuzz waiver does not cover this batch. The package and its lock entries
 are 1.0.3; account layouts, instruction formats and program identity are unchanged.
 
@@ -90,7 +95,35 @@ the one-lamport sync truncation trace (L23) as a solved accounting problem. Full
 guard migration (AIR2-07), creator/risk fees and exit budgets (AIR2-10/11), cashback
 recovery (AIR2-12), and keeper incentives (AIR2-13) remain open.
 
+### Independent fix review and unresolved treatment (2026-10-19)
+
+The [independent review](ai-review-3/independent-fix-review-1.0.3.md) identifies the
+candidate and verified CI artifacts, source comparisons, newly executed checks and each
+packet answer. Q2 accepts F01–F05, Q3 accepts L03/L04 and Q4 accepts L01. Q1 accepts
+F06's post-fix final-withdrawal behavior only conditionally for an upgrade: an already-empty
+pre-fix pool is not migrated (AI3-FR01). This is independent AI review work, not an
+external firm's sign-off or a full-system audit. Implemented rows remain **in progress**.
+
+The [written treatment](ai-review-3/unresolved-1.0.3.md) and
+[known-issues §8](known-issues.md#8-open-items-from-the-103-fix-review) cover the six
+prior open findings, all 20 unimplemented review-3 leads, and the carry allocation/migration
+boundaries. They give the evidence limits, rationale and completion requirements. None is
+newly **acknowledged**, and no older KI acceptance is broadened. Release still requires
+resolution or explicit owner sign-off on the exact residuals, the final-program ≥24 h fuzz
+evidence and the remaining integrated-revision gates.
+
 ### Carry ownership at the final withdrawal
+
+**2026-10-19 follow-up:** [AI3-FR01's deposit quarantine](ai-review-3/ai3-fr01-fix-1.0.3.md)
+now prevents an already-empty legacy pool from admitting a new cohort while either carry
+is nonzero. It preserves the historical balances and old allocated claims. The owner
+confirmed on 2026-10-19 that no affected deployed state exists, so current-deployment
+recovery/migration is not applicable; reviewed recovery would still be required before
+reopening any affected legacy pool encountered later. The earlier review's finding
+remains evidence of the pre-guard behavior. Full CI on `e1d66caa` passed, including
+mutations and the verified release rebuild. The owner reports 20 hours with zero
+anomalies in a separate-machine 24-hour fuzz run; final-byte provenance and completed
+≥24 h zero-failure evidence remain pending in the linked fix record.
 
 Both accumulator carries hold value not yet assigned to individual lenders. At high raw
 token/share supplies they can contain whole lamports; retaining them after `S = 0`

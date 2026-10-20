@@ -665,6 +665,10 @@ class Pool:
 
     # ---- lender actions -------------------------------------------------------
     def deposit(self, who, amount: int) -> int:
+        # AI3-FR01: an old empty pool can retain unallocated carry without a recorded
+        # last owner. Quarantine deposits without reassigning or discarding its value.
+        if self.S == 0 and (self.carry != 0 or self.carry_r != 0):
+            raise ValueError("legacy_pool_carry")
         self._prepare_program_accounting()
         self._release()
         L = self._touch(who)
@@ -1479,6 +1483,85 @@ def empty_pool_gate_demo():
         rows.append((label, first, p.claim_sol("ATT"), p.protocol))
     return rows
 
+
+
+def legacy_pool_carry_check():
+    """AI3-FR01 quarantine: old empty pools keep their value and cannot admit a cohort.
+
+    The legacy witness restores only the four effects added by the final-carry fix
+    after an ordinary public-operation last exit; the independent fix review checked
+    that persisted state against a public-API run of the actual preceding math source.
+    No recovery owner or migration transfer is chosen here.
+    """
+    import pickle
+
+    def empty_after_exit():
+        p = Pool(audit2=True)
+        p.deposit("old", 2 * 10**18)
+        p.sweep_sol(1_000)
+        p.advance(p.lump_vest_s)
+        assert (p.carry, p.carry_r) == (1_000 * WAD, 1_000 * WAD)
+        p.withdraw("old", p.lenders["old"].shares)
+        assert (p.S, p.carry, p.carry_r) == (0, 0, 0)
+        return p
+
+    blocked = 0
+    for carry, carry_r in ((1_000 * WAD, 1_000 * WAD), (WAD, 0), (0, WAD),
+                           (1, 0), (0, 1), (-1, 0)):
+        for rewards_required in (False, True):
+            for swept in (0, WIPE_BOTH):
+                p = empty_after_exit()
+                p.lenders["old"].pending = p.lenders["old"].real = 0
+                p.carry, p.carry_r = carry, carry_r
+                p.wipe_swept = swept
+                p.rewards_required = rewards_required
+                # A refusal must precede the program-accounting preparation, release,
+                # lender creation/touch, and live-record finalization.
+                p.deposit_hold_until = 0
+                p.now += 1
+                before = pickle.dumps(p)
+                for _ in range(2):
+                    try:
+                        p.deposit("new", 1)
+                    except ValueError as e:
+                        assert str(e) == "legacy_pool_carry", (carry, carry_r, str(e))
+                    else:
+                        raise AssertionError("legacy carry admitted a new cohort")
+                    assert pickle.dumps(p) == before
+                    assert "new" not in p.lenders
+                    blocked += 1
+
+    # A normal new market and an empty pool with allocated old claims/pot are allowed.
+    p = Pool(audit2=True)
+    assert p.deposit("new", 1) > 0
+    p = empty_after_exit()
+    # A realised surplus may already be pooled for an allocated old claim.
+    p.lenders["old"].real = 0
+    p.unmatched = 1_000
+    p.sweep_sol(0)
+    assert (p.S, p.carry, p.carry_r) == (0, 0, 0)
+    assert p.deposit("new", 1) > 0
+    assert p.claim_sol("old") == 1_000
+
+    # Carries in a nonempty pool retain the existing allocation behavior.
+    p = Pool(audit2=True)
+    p.deposit("old", 2 * 10**18)
+    p.sweep_sol(1_000)
+    p.advance(p.lump_vest_s)
+    assert p.S > 0 and p.carry == p.carry_r == 1_000 * WAD
+    assert p.deposit("new", 1) > 0
+
+    # A full-wipe epoch's old-owner carry is separate from current pool carry.
+    p = Pool(audit2=True, util_cap_bps=10_000)
+    p.deposit("old", 10**6)
+    p.borrow(1, p.T)
+    p.settle(1, 1_000)
+    assert p.S == 0 and p.wipe_live and p.carry == p.carry_r == 0
+    p.epochs[0][5], p.epochs[0][6] = 1, 1
+    p.sweep_sol(0)
+    assert p.deposit("new", 1) > 0
+    assert p.epochs[0][5:7] == [1, 1]
+    return {"blocked_attempts": blocked, "accepted_controls": 4}
 
 def protocol_change_demo():
     """R3B-9 / R3A-5: rent_protocol_bps rises 15 % -> 30 % halfway through a position's life."""
@@ -2618,6 +2701,8 @@ def main():
     ap.add_argument("--historical", action="store_true", help="reproduce the pre-AIR2 reference output")
     a = ap.parse_args()
     AUDIT2_MODEL = not a.historical
+    legacy_carry = legacy_pool_carry_check()
+    print(f"AI3-FR01 legacy_pool_carry: {legacy_carry}")
     for mode, cap in (("continuous", 9_000), ("continuous", 10_000), ("release", 9_000)):
         c, ep, mneg, strand = fuzz(a.ops, a.seed, mode, cap)
         print(f"fuzz[{mode}, util cap {cap/100:.0f}%]: {a.ops} ops, invariants held (liveness checked every "

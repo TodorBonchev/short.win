@@ -222,6 +222,7 @@ LENDER_T = [("shares", "u128"), ("snap", "i128"), ("pending", "i64"), ("epoch", 
             ("fwd_lag", "u8")]
 RECORD_T = [(0, "i128"), (3, "u128"), (4, "u128"), (5, "i128"), (6, "u128"), (7, "u128")]
 MODEL_ERRORS = {
+    "legacy_pool_carry": "legacy_pool_carry",
     "deposit too small": "deposit_too_small",
     "share overflow": "overflow",
     "WipeSweepPending: sweep_trader / claim_venue_rewards first": "wipe_sweep_pending",

@@ -5,6 +5,10 @@ This file lists unfinished work only. Completed audit and release evidence is in
 [the findings tracker](docs/audit/findings.md), and
 [the validation record](docs/audit/ai-review-3/validation-1.0.3.md).
 The 1.0.3 candidate is unreleased; do not tag or deploy it from this checklist.
+The 2026-10-20 integration also includes `main`'s AI3-FR01 deposit quarantine.
+The completed fuzz record below covers the earlier `9b91060` program, not those
+new bytes. The owner's confirmation that no affected deployed state exists makes
+current-deployment FR01 recovery/migration not applicable.
 
 ## 1.0.3 release blockers
 
@@ -16,9 +20,9 @@ The 1.0.3 candidate is unreleased; do not tag or deploy it from this checklist.
       Reconfirm verifiable/Anchor ELF equality, keeper scenarios, browser E2E,
       dependency policy and mutations. The prior [green CI run](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
       covers `9b91060`, before this keeper change.
-- [ ] If a subsequent fix changes program or fuzzer bytes, rerun the ≥24 h
-      all-profile fuzz gate on those final bytes. The current keeper/test
-      handoff leaves the [clean run's](docs/audit/fuzz-1.0.3.md) bytes unchanged.
+- [ ] Run the ≥24 h all-profile fuzz gate on the final AI3-FR01 program and
+      fuzzer bytes. The [completed clean run](docs/audit/fuzz-1.0.3.md) identifies
+      the older `9b91060` program and does not cover the integrated quarantine.
 - [ ] Obtain an external auditor's fix review for the AIR2 and AI3 batches and
       the keeper follow-up. The [internal review handoff](docs/audit/handoff-1.0.3-2026-10-20.md)
       is reviewer input, not the sign-off required by

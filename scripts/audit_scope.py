@@ -85,6 +85,10 @@ UNITS = [
 # names makes `write` and `check` fail.
 EXCLUDED = [
     ("crates/shortwin-math/README.md", "documentation (the math derivations; read for context)"),
+    ("crates/shortwin-math/LICENSE-APACHE", "published crate license text; not built"),
+    ("crates/shortwin-math/NOTICE", "published crate attribution; not built"),
+    ("crates/shortwin-venue-state/README.md", "published crate documentation; read for context"),
+    ("programs/shortwin/README.md", "published program crate documentation; read for context"),
     ("crates/shortwin-math/tests", "tests"),
     ("crates/shortwin-math-wasm", "the WASM facade for the frontend; never linked on-chain"),
     ("services/README.md", "documentation"),

@@ -4,7 +4,8 @@
     "name": "shortwin",
     "version": "1.0.3",
     "spec": "0.1.0",
-    "description": "short.win: permissionless P2P token lending for shorting memecoins (Anchor program)"
+    "description": "short.win: permissionless P2P token lending for shorting memecoins (Anchor program)",
+    "repository": "https://github.com/TodorBonchev/short.win"
   },
   "instructions": [
     {
@@ -4958,6 +4959,11 @@
       "code": 6109,
       "name": "CurveCashbackCoin",
       "msg": "pump.fun's current trades do not support cashback coins on the curve. This coin can be shorted once it graduates to PumpSwap."
+    },
+    {
+      "code": 6110,
+      "name": "LegacyPoolCarry",
+      "msg": "This empty pool has historical SOL carry: deposits require a reviewed migration"
     }
   ],
   "types": [

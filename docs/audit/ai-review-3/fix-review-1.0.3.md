@@ -1,5 +1,12 @@
 # Draft 1.0.3 fix-review packet
 
+**Follow-up candidate:** [AI3-FR01's guard and regression](ai3-fr01-fix-1.0.3.md)
+refuse new deposits into legacy empty pools retaining carry. The hashes and CI below
+identify the preceding candidate; they do not cover the guard's new bytes. The owner
+confirmed on 2026-10-19 that no affected deployed state exists, so current-deployment
+recovery/migration is not applicable. The linked fix record contains that confirmation
+and the ongoing fuzz status; the original review request below remains historical.
+
 This packet is for an independent review of the 1.0.3 candidate after the audit of
 `b815269224ba0f5d946f49de7e113220c4067041`. It is a review request, not a
 review or a sign-off. The [original report](report.md), [31-item triage](triage.md)
@@ -11,10 +18,16 @@ is attempt 1 of a `workflow_dispatch` on that SHA. The release and test-venue fi
 hashes, tool image and verifier/Anchor byte comparison are in the
 [CI hash record](../ci-1.0.3-hashes.txt). The run passed 25 jobs with only the scheduled
 fuzz job skipped. The separate [24-hour all-profile fuzz run](../fuzz-1.0.3.md)
-completed cleanly on the same program bytes. Independent fix review remains open.
-The later [internal handoff](../handoff-1.0.3-2026-10-20.md) adds focused
-review evidence and a keeper retry correction. It does not supply the external
-auditor acceptance requested here; the keeper change needs a new exact-ref CI run.
+completed cleanly on those preceding program bytes. It does not cover the newer
+AI3-FR01 guard; the final-byte ≥24 h gate remains open. The
+[independent AI fix review](independent-fix-review-1.0.3.md) of 2026-10-19 accepts
+Q2/Q3/Q4 and conditionally accepts Q1. The owner subsequently confirmed no affected
+deployed state, so current-deployment recovery is not applicable; see the
+[FR01 fix record](ai3-fr01-fix-1.0.3.md). The later
+[internal handoff](../handoff-1.0.3-2026-10-20.md) adds a keeper retry correction;
+its full CI and the external auditor's fix acceptance remain required. The original
+questions below remain the review request, with the answers and boundaries in the
+linked review and [written treatment](unresolved-1.0.3.md).
 
 ## Questions for the reviewer
 
@@ -56,8 +69,8 @@ questions. Prior KI-69 and KI-70 decisions are retained only within their
 documented bounds. Review of this fix batch must not imply acceptance of these
 separate issues.
 
-Independent fix review is **pending**. A reviewer should identify the candidate
-commit and release/test-venue ELF hashes, record any findings and their resolution,
-and state explicitly whether the four questions above are accepted. The findings
-tracker may mark a fix **fixed** only after its own commit, negative and positive
-regression, full gate, 24-hour fuzz run, and this independent review.
+The independent AI fix review is **recorded, with Q1 conditional**. Its new finding
+AI3-FR01 remains open; external firm acceptance is not supplied by this work. The
+findings tracker may mark a fix **fixed** only after its own commit, negative and
+positive regression, full gate, zero-failure 24-hour fuzz run, and required fix-review
+acceptance. None of the separate unresolved findings is newly accepted by this report.

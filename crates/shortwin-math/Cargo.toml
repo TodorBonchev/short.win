@@ -5,7 +5,13 @@ description = "short.win protocol math: U256, constant-product quotes, observati
 edition = "2024"
 # On-chain crate: must build with the platform-tools rustc (v1.57 = 1.95) (ARCHITECTURE §1.1).
 rust-version = "1.89"
-publish = false
+license-file = "../../LICENSE"
+repository = "https://github.com/TodorBonchev/short.win"
+homepage = "https://short.win"
+readme = "README.md"
+keywords = ["solana", "defi", "amm", "lending", "no-std"]
+categories = ["cryptography::cryptocurrencies", "mathematics", "no-std"]
+include = ["/src/**", "/Cargo.toml", "/README.md", "/NOTICE", "/LICENSE-APACHE"]
 
 # Zero runtime dependencies, by design (ARCHITECTURE §2.2, A30).
 [dependencies]
@@ -15,3 +21,6 @@ proptest = "1.11.0"
 num-bigint = "0.5.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+
+[package.metadata.docs.rs]
+all-features = true

@@ -267,6 +267,7 @@ const MATH_ERRORS: Readonly<Record<string, string>> = {
     'lender behind share epochs': 'LenderBehindEpochs',
     'deposit too small': 'ZeroAmount',
     'post-wipe sweep pending': 'WipeSweepPending',
+    'legacy empty-pool carry requires migration': 'LegacyPoolCarry',
     // AIR-07's residual: no deposit while at most 1/1,000 of the token claims is unborrowed.
     'pool drained': 'PoolDrained',
 };

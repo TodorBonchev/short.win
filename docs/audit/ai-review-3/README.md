@@ -1,5 +1,13 @@
 # AI review 3: draft 1.0.2, two passes
 
+**Latest unreleased follow-up:** [AI3-FR01 guard and regression](ai3-fr01-fix-1.0.3.md)
+block legacy empty-carry deposits while preserving historical value. It introduces new
+program hashes; its exact-ref full CI, mutations and verified rebuild passed. On
+2026-10-19 the owner confirmed no affected deployed state, so current-deployment recovery
+is not applicable, and reported a separate-machine fuzz run at 20 hours with zero
+anomalies. Completed final-byte ≥24 h zero-failure evidence remains pending; the original
+archive remains unchanged.
+
 This folder archives the AI-assisted static review completed on 2026-10-18 against
 `b815269224ba0f5d946f49de7e113220c4067041` (draft 1.0.2), using
 [rust-auditor](https://github.com/TodorBonchev/rust-auditor) at
@@ -11,7 +19,10 @@ The original result is in [`report.md`](report.md). Current implementation work 
 draft 1.0.3 belongs in [`../findings.md`](../findings.md); the
 [`31-item triage index`](triage.md) and [draft validation record](validation-1.0.3.md)
 track the follow-up. The [fix-review packet](fix-review-1.0.3.md) states what an
-independent reviewer still needs to assess. The index assigns stable `AI3-F01`–`AI3-F08` and
+independent reviewer needs to assess; the [2026-10-19 independent AI fix review](independent-fix-review-1.0.3.md)
+records Q2/Q3/Q4 acceptance, Q1's legacy-state migration condition (AI3-FR01), and
+the [written unresolved treatment](unresolved-1.0.3.md). These follow-up documents
+are separate from the immutable original scan. The index assigns stable `AI3-F01`–`AI3-F08` and
 `AI3-L01`–`AI3-L23` IDs without changing the historical evidence.
 
 ## Status and limits
@@ -50,7 +61,9 @@ separately.
 | [`report.md`](report.md) | The pinned upstream assembler's `full-report.md`, copied byte for byte under this archive name |
 | [`run-1.md`](run-1.md), [`run-2.md`](run-2.md) | Both judged pass reports, unchanged |
 | [`triage.md`](triage.md) | The 31 stable IDs, canonical keys, prior relationships and implementation-status table |
-| [`fix-review-1.0.3.md`](fix-review-1.0.3.md) | Draft fix-review questions and unresolved boundaries; external review is pending |
+| [`fix-review-1.0.3.md`](fix-review-1.0.3.md) | Draft fix-review questions and unresolved boundaries, linked to the independent AI review; external firm acceptance is not supplied |
+| [`independent-fix-review-1.0.3.md`](independent-fix-review-1.0.3.md) | Independent AI fix review: candidate/artifact identity, Q1 conditional, Q2/Q3/Q4 accepted, and new AI3-FR01 |
+| [`unresolved-1.0.3.md`](unresolved-1.0.3.md) | Written treatment of the six prior open findings, all 20 unimplemented review-3 leads and carry boundaries; no new owner acceptance |
 | [`account-map.md`](account-map.md) | Instruction accounts, constraints, helper locations and generated review leads |
 | [`provenance.json`](provenance.json), [`final-verification.json`](final-verification.json) | Pinned commits, procedure, final counts, limitations and the original scan's consistency checks |
 | [`files.txt`](files.txt), [`scope.tsv`](scope.tsv) | Frozen scope and run scope metadata |
@@ -59,7 +72,7 @@ separately.
 | [`project-issue-comparison.json`](project-issue-comparison.json) | All 31 canonical keys mapped to raw candidates, exact prior sources and relationship reasons |
 | [`coverage-check.json`](coverage-check.json) | Final pass-1 coverage reconciliation, also preserved in `pass-1/coverage.json` |
 | [`coverage-check.txt`](coverage-check.txt), [`coverage-progress.json`](coverage-progress.json) | Historical intermediate coverage snapshots; use the final per-pass JSON for the final coverage result |
-| [`SHA256SUMS`](SHA256SUMS) | SHA-256 hashes of all 90 unchanged archived artifacts; excludes the new README, triage, validation and fix-review documents |
+| [`SHA256SUMS`](SHA256SUMS) | SHA-256 hashes of all 90 unchanged archived artifacts; excludes follow-up indexes, triage, validation, fix-review and unresolved-treatment documents |
 
 ## Candidate judgments and patch evidence
 

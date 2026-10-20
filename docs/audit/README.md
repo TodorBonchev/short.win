@@ -14,4 +14,5 @@ The audit package for short.win's external security review (M10). The entry poin
 | [`ai-review-3/`](ai-review-3/README.md) | AI review 3, a static two-pass review of draft 1.0.2 at `b815269`: 8 findings, 23 leads, all 83 raw candidate dispositions, coverage and patch-check evidence; draft 1.0.3 implementation tracked separately | 2026-10-18 |
 | [`fuzz-1.0.3.md`](fuzz-1.0.3.md) | Completed 24-hour all-profile fuzz gate on the draft 1.0.3 bytes, with frozen artifact hashes and the raw summary | 2026-10-19 |
 | [`handoff-1.0.3-2026-10-20.md`](handoff-1.0.3-2026-10-20.md) | Internal fix-review results, new carry and keeper findings, written technical dispositions and remaining release work | 2026-10-20 |
+| [`ai-review-3/independent-fix-review-1.0.3.md`](ai-review-3/independent-fix-review-1.0.3.md) | Independent AI fix review: Q2/Q3/Q4 accepted; Q1 conditional with new open legacy migration finding AI3-FR01; linked written treatment covers all unresolved packet items | 2026-10-19 |
 | `README.md` | This index | |
