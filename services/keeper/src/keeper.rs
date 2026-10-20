@@ -3305,7 +3305,32 @@ impl<C: Chain> Keeper<C> {
             let accs = if keys.is_empty() {
                 Vec::new()
             } else {
-                self.chain.accounts(&keys).await?
+                let fetched = self.chain.accounts(&keys).await.and_then(|accounts| {
+                    anyhow::ensure!(
+                        accounts.len() == keys.len(),
+                        "incomplete pool evaluation read: {} accounts for {} keys",
+                        accounts.len(),
+                        keys.len()
+                    );
+                    Ok(accounts)
+                });
+                match fetched {
+                    Ok(accounts) => accounts,
+                    Err(error) => {
+                        report
+                            .errors
+                            .push(format!("{key}: pool evaluation: {error:#}"));
+                        // The incumbent was read and projected independently above. A sibling
+                        // RPC failure is no fresh eligibility evidence, but must not interrupt
+                        // observations of a currently failing zero-position incumbent. Leave
+                        // the evaluation due and retry before proposing any candidate.
+                        if s.pool_fail && s.open_positions == 0 {
+                            let every = self.cfg.coverage.no_route_interval_s;
+                            keep_pool_fail_chain(key, mv.as_ref(), now, every, report, crank_queue);
+                        }
+                        return Ok(());
+                    }
+                }
             };
             let mut at = 0usize;
             let mut evaluated = Vec::with_capacity(cands.len());

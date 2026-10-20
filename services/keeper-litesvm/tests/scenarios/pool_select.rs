@@ -1442,6 +1442,146 @@ fn sustained_ranking_failure_keeps_cached_fast_path_and_chain() {
     assert_eq!(proposed_at, Some(since + fast_route));
 }
 
+/// A failed sibling evaluation must not interrupt observations of the independently read
+/// incumbent. Keep the failure chain across transport errors and incomplete batches, but
+/// never propose from stale sibling evidence; a fresh successful evaluation may then act.
+#[test]
+fn sustained_evaluation_rpc_failure_preserves_the_incumbent_chain() {
+    for incomplete in [false, true] {
+        let (mut h, ms) = ray_setup(&[FART], KeeperConfig::default());
+        let (rm, _) = ms.into_iter().next().expect("market");
+        let key = rm.market();
+        let sibling = h.with_env(|env| {
+            let lam = lambda_of(env, &rm.pool);
+            plant(env, &rm.pool, Plant::V4, false, (50, 100), lam)
+        });
+        let sibling_key = ps::pool_key(&sibling);
+        h.seconds(3);
+        let track = h.keeper.pool_track(&key).unwrap();
+        let candidate = track
+            .candidates
+            .iter()
+            .find(|c| c.pool == sibling_key)
+            .unwrap();
+        let evaluation_key = *candidate
+            .read_keys
+            .iter()
+            .find(|k| !candidate.rank_keys().contains(k))
+            .expect("the non-SOL vault is read only during evaluation");
+        h.with_env(|env| halt(env, &rm.pool));
+        let first = h.second().clone();
+        assert!(first.errors.is_empty(), "{:?}", first.errors);
+        let since = market(&h, &key).pool_fail_since;
+        assert_ne!(since, 0);
+        assert!(h.keeper.pool_track(&key).unwrap().keep_chain);
+        let last_eval = h.keeper.pool_track(&key).unwrap().last_eval;
+        if incomplete {
+            h.chain().short_reads_of(evaluation_key, 1_000);
+        } else {
+            h.chain().fail_reads_of(evaluation_key, 1_000);
+        }
+
+        let fast_route = i64::from(h.with_env(|env| env.config().params.pool_fast_route_s));
+        let mut failed_ticks = 0;
+        let mut last_crank = since;
+        for _ in 0..fast_route + 40 {
+            let report = h.second().clone();
+            let now = h.now();
+            if report.cranked.contains(&key) {
+                assert!(now - last_crank <= 30, "crank gap {} s", now - last_crank);
+                last_crank = now;
+            }
+            assert!(
+                now - last_crank <= 30,
+                "evaluation errors stopped the incumbent cranks for {} s",
+                now - last_crank
+            );
+            assert_eq!(market(&h, &key).pool_fail_since, since, "chain restarted");
+            assert!(
+                report.pool_actions.is_empty(),
+                "no proposal from stale evaluation"
+            );
+            if !report.errors.is_empty() {
+                assert!(
+                    report.errors.iter().all(|e| e.contains(if incomplete {
+                        "incomplete pool evaluation read"
+                    } else {
+                        "getMultipleAccounts: injected failure"
+                    })),
+                    "{:?}",
+                    report.errors
+                );
+                failed_ticks += 1;
+                let track = h.keeper.pool_track(&key).unwrap();
+                assert!(
+                    track
+                        .last_eval
+                        .is_none_or(|at| last_eval.is_some_and(|last| at <= last)),
+                    "a failed read must not record a successful evaluation"
+                );
+                assert!(track.candidates.iter().any(|c| c.pool == sibling_key));
+            }
+        }
+        assert!(
+            failed_ticks > 120,
+            "only {failed_ticks} failed evaluation ticks"
+        );
+        h.chain().fail_reads_of(evaluation_key, 0);
+        h.chain().short_reads_of(evaluation_key, 0);
+        let recovered = h.second().clone();
+        assert!(recovered.errors.is_empty(), "{:?}", recovered.errors);
+        let proposal = event(&recovered, PoolEventKind::Proposed).expect("fresh evaluation acts");
+        assert_eq!(proposal.candidate, sibling_key);
+        assert_eq!(market(&h, &key).pool_fail_since, since);
+    }
+}
+
+/// An unavailable sibling does not mean that a healthy or unreadable incumbent failed.
+#[test]
+fn evaluation_rpc_failure_does_not_invent_an_incumbent_failure() {
+    use shortwin_keeper_litesvm::block_on;
+
+    let (mut h, ms) = ray_setup(&[FART], KeeperConfig::default());
+    let (rm, _) = ms.into_iter().next().expect("market");
+    let key = rm.market();
+    let sibling = h.with_env(|env| {
+        let lam = lambda_of(env, &rm.pool);
+        plant(env, &rm.pool, Plant::V4, false, (50, 100), lam)
+    });
+    let sibling_key = ps::pool_key(&sibling);
+    h.seconds(3);
+    let track = h.keeper.pool_track(&key).unwrap();
+    let candidate = track
+        .candidates
+        .iter()
+        .find(|c| c.pool == sibling_key)
+        .unwrap();
+    let evaluation_key = *candidate
+        .read_keys
+        .iter()
+        .find(|k| !candidate.rank_keys().contains(k))
+        .unwrap();
+    h.chain().fail_reads_of(evaluation_key, 1_000);
+    let mut errors = 0;
+    for _ in 0..40 {
+        let report = h.second().clone();
+        errors += usize::from(!report.errors.is_empty());
+        assert!(report.pool_actions.is_empty());
+        assert_eq!(market(&h, &key).pool_fail_since, 0);
+        assert!(!h.keeper.pool_track(&key).unwrap().keep_chain);
+    }
+    assert!(errors > 0);
+    let before = market(&h, &key);
+    // A transport error reading the incumbent aborts the fresh view. It must not be
+    // replaced by a synthetic "failed pool" observation or any stale-sibling proposal.
+    h.chain().fail_reads_of(ps::pool_key(&rm.pool), 1);
+    h.idle(1);
+    assert!(block_on(h.keeper.tick()).is_err());
+    let after = market(&h, &key);
+    assert_eq!(after.pool_fail_since, before.pool_fail_since);
+    assert_eq!(after.last_pool_fail_obs, before.last_pool_fail_obs);
+}
+
 /// The `getMultipleAccounts` calls the default ranking budget can add to a tick.
 fn h_budget_calls() -> usize {
     (KeeperConfig::default().pool_select.rank_keys_per_tick / 3).div_ceil(33)
