@@ -63,10 +63,14 @@ function securityPlugin(env: Record<string, string>): Plugin {
     };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
     const env = loadEnv(mode, process.cwd(), 'VITE_');
     return {
         plugins: [react(), securityPlugin(env)],
+        // Codama's generated errors read process.env["NODE_ENV"]. Vite replaces the dotted
+        // spelling by default, but the bracket spelling survives in source modules during dev.
+        // Define only the public development value; production builds keep Vite's own handling.
+        define: command === 'serve' ? { 'process.env': { NODE_ENV: 'development' } } : {},
         // The workspace's @shortwin/client resolves to its TypeScript sources, not its dist/.
         resolve: { conditions: ['@shortwin/source', ...defaultClientConditions] },
         build: {

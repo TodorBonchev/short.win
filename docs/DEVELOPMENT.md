@@ -936,6 +936,10 @@ node e2e/validator/stop.ts             # stop the validator (and the preview / i
 - The mock venue (`VITE_ENABLE_TEST_VENUE=true`) exists only in the test-venue program build and
   on localnet; the configuration refuses it anywhere else (FE-D7).
 
+The [local-validator growth demo](../apps/web/e2e/demo/README.md) records this environment with
+Playwright and renders a captioned MP4 plus a 10-second GIF with ffmpeg. It uses the `full` indexer
+profile and the E2E production preview so liquidation and settlement history appear in the app.
+
 ### Web E2E (M9; `apps/web/e2e`)
 
 Playwright 1.63 against the production build, a local `solana-test-validator` and an injected
