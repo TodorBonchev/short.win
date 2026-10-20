@@ -14,7 +14,7 @@
  */
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromium } from '@playwright/test';
+import { chromium, devices } from '@playwright/test';
 import type { Address } from '@solana/kit';
 import { chromiumPath, E2E_DIR, URLS } from '../env.ts';
 import { App, E2E_WALLET_NAME, expect, T, walletInitScript } from '../fixtures.ts';
@@ -26,7 +26,9 @@ import { loadState } from '../validator/state.ts';
 import { DemoGuide, installPointer } from './guide.ts';
 import { liquidateSeededPosition } from './liquidate.ts';
 
-const DIR = join(E2E_DIR, 'demo');
+const PHONE = process.argv.includes('--phone');
+const VIEWPORT = PHONE ? { width: 390, height: 780 } : { width: 1440, height: 900 };
+const DIR = join(E2E_DIR, 'demo', ...(PHONE ? ['phone'] : []));
 const RAW_DIR = join(DIR, 'playwright');
 const RAW = join(DIR, 'raw.webm');
 const MANIFEST = join(DIR, 'recording.json');
@@ -40,7 +42,7 @@ interface Mark {
 /** Text cards are browser overlays; product UI and all transactions remain untouched. */
 async function card(page: import('@playwright/test').Page, title: string, detail: string, ms = 2_200): Promise<void> {
     await page.evaluate(
-        ({ title, detail }) => {
+        ({ title, detail, phone }) => {
             document.getElementById('shortwin-demo-overlay')?.remove();
             const overlay = document.createElement('div');
             overlay.id = 'shortwin-demo-overlay';
@@ -57,22 +59,23 @@ async function card(page: import('@playwright/test').Page, title: string, detail
                 color: '#f3f5f7',
                 fontFamily: 'Inter, system-ui, sans-serif',
                 textAlign: 'center',
+                padding: phone ? '24px' : '0',
             });
             const heading = document.createElement('div');
             heading.textContent = title;
             Object.assign(heading.style, {
                 color: '#f0b90b',
-                fontSize: '46px',
+                fontSize: phone ? '30px' : '46px',
                 fontWeight: '750',
                 letterSpacing: '.02em',
             });
             const sub = document.createElement('div');
             sub.textContent = detail;
-            Object.assign(sub.style, { maxWidth: '950px', fontSize: '23px', lineHeight: '1.4' });
+            Object.assign(sub.style, { maxWidth: '950px', fontSize: phone ? '18px' : '23px', lineHeight: '1.4' });
             overlay.append(heading, sub);
             document.body.append(overlay);
         },
-        { title, detail },
+        { title, detail, phone: PHONE },
     );
     await page.waitForTimeout(ms);
     await page.evaluate(() => document.getElementById('shortwin-demo-overlay')?.remove());
@@ -102,15 +105,17 @@ async function main(): Promise<void> {
     const browser = await chromium.launch({ executablePath: chromiumPath(), headless: true });
     const context = await browser.newContext({
         baseURL: URLS.app,
-        viewport: { width: 1440, height: 900 },
-        deviceScaleFactor: 1,
+        viewport: VIEWPORT,
+        deviceScaleFactor: PHONE ? 2 : 1,
+        ...(PHONE ? { isMobile: true, hasTouch: true, userAgent: devices['Pixel 7'].userAgent } : {}),
         colorScheme: 'dark',
         locale: 'en-US',
         timezoneId: 'UTC',
-        recordVideo: { dir: RAW_DIR, size: { width: 1440, height: 900 } },
+        // Playwright records CSS pixels; a larger size pads instead of increasing detail.
+        recordVideo: { dir: RAW_DIR, size: VIEWPORT },
     });
     await context.addInitScript({ content: walletInitScript('curveLender') });
-    await installPointer(context);
+    await installPointer(context, PHONE);
     const page = await context.newPage();
     const app = new App(page, state, 'curveLender');
     const started = Date.now();
@@ -120,7 +125,28 @@ async function main(): Promise<void> {
     const signatures: Record<string, string> = {};
     const elapsed = () => (Date.now() - started) / 1000;
     const cue = (text: string) => cues.push({ text, seconds: elapsed() });
-    const guide = new DemoGuide(page, cue);
+    const guide = new DemoGuide(page, cue, PHONE);
+    const sheetReady = async (selector: string): Promise<void> => {
+        await expect(page.locator(selector)).toHaveAttribute('data-sheet', 'open');
+        await page.evaluate(() =>
+            Promise.all(
+                document
+                    .getAnimations()
+                    .filter(
+                        (animation) =>
+                            animation.playState === 'running' && animation.effect?.getTiming().iterations !== Infinity,
+                    )
+                    .map((animation) => animation.finished.catch(() => undefined)),
+            ).then(() => undefined),
+        );
+    };
+    const showExitHistory = async (mint: string): Promise<void> => {
+        await app.goto(`/m/${mint}?tab=${PHONE ? 'positions' : 'liquidations'}`, 'market');
+        if (PHONE) {
+            await guide.click(app.id(T.marketTab('liquidations')), 'Tap Liquidations · inspect the confirmed exit');
+            await expect(page).toHaveURL(/tab=liquidations/);
+        }
+    };
     const indexedSignature = async (kind: string): Promise<string> => {
         for (let attempt = 0; attempt < 30; attempt++) {
             const response = await fetch(`${URLS.indexer}/v1/markets/${coin.mint}/events`);
@@ -170,7 +196,11 @@ async function main(): Promise<void> {
     page.on('pageerror', (error) => pageErrors.push(error.message));
     let failure: unknown;
     try {
-        cue('Follow the gold cursor · rings mark clicks · all transactions use a local validator');
+        cue(
+            PHONE
+                ? 'Gold rings mark taps · real transactions on a local validator'
+                : 'Follow the gold cursor · rings mark clicks · all transactions use a local validator',
+        );
         await app.goto('/markets', 'markets');
         await card(
             page,
@@ -208,9 +238,16 @@ async function main(): Promise<void> {
             '02 · Deposit tokens',
             'A lender supplies inventory; the SOL repayment risk is shown before signing.',
         );
+        if (PHONE) {
+            await guide.click(app.id(T.marketActionLend), 'Tap Lend · open the deposit sheet');
+            await sheetReady('.trade-panel');
+        }
         const panel = app.id(T.lendPanel);
         const source = await ata(app.walletAddress, coin.mint, coin.tokenProgram);
-        await guide.move(panel.getByTestId(T.lendTokenAccount), 'Choose the lender’s funded token account');
+        await guide.move(
+            panel.getByTestId(T.lendTokenAccount),
+            PHONE ? 'Use the lender’s funded token account' : 'Choose the lender’s funded token account',
+        );
         await app.selectTokenAccount(panel.getByTestId(T.lendTokenAccount), source);
         await guide.fill(
             panel.getByTestId(T.lendAmountInput),
@@ -218,6 +255,12 @@ async function main(): Promise<void> {
             'Enter 60,000,000 tokens to lend',
         );
         await expect(panel.getByTestId(T.lendPreview('shares'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
+        if (PHONE) {
+            await guide.click(
+                panel.getByTestId(T.lendDepositReason).getByRole('button'),
+                'Tap the reminder · read the repayment disclosure',
+            );
+        }
         await guide.check(
             panel.getByTestId(T.disclosureAck('lender.solRepayment')),
             'Acknowledge that repayment may be in SOL',
@@ -245,11 +288,21 @@ async function main(): Promise<void> {
             '03 · Open a curve short',
             'Borrow tokens, sell them on the Pump.fun curve, and lock the proceeds.',
         );
+        if (PHONE) {
+            await guide.click(app.id(T.marketActionShort), 'Tap Short · open the borrowing sheet');
+            await sheetReady('.trade-panel');
+        }
         const short = app.id(T.shortPanel);
         await expect(short.getByTestId(T.shortBlocked)).toHaveCount(0);
         await guide.fill(short.getByTestId(T.shortQInput), '1500000', 'Enter a short size of 1,500,000 tokens');
         await expect(short.getByTestId(T.shortPreview('proceeds'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
         const shortAck = short.getByTestId(T.disclosureAck('borrower.liquidation'));
+        if (PHONE && (await shortAck.count())) {
+            await guide.click(
+                short.getByTestId(T.shortSubmitReason).getByRole('button'),
+                'Tap the reminder · read the liquidation risk',
+            );
+        }
         if (await shortAck.count()) await guide.check(shortAck, 'Acknowledge the liquidation and SOL settlement risk');
         await guide.click(short.getByTestId(T.shortSubmit), 'Open short · preview the borrow, sale and collateral');
         if ((await app.simulated()) !== 'review') throw new Error('curve open simulation failed');
@@ -277,8 +330,12 @@ async function main(): Promise<void> {
         mark('close-curve-short');
         cue('Close the borrower’s position at the current buyback cost');
         await app.goto(`/positions/${position}`, 'position');
-        await expect(app.id(T.closePreview('buyback'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
         await card(page, '04 · Close the short', 'The borrower buys back the tokens and settles the position.');
+        if (PHONE) {
+            await guide.click(app.id(T.positionActionClose), 'Tap Close · open the position management sheet');
+            await sheetReady('.manage-panel');
+        }
+        await expect(app.id(T.closePreview('buyback'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
         await guide.click(app.id(T.closeSubmit), 'Close short · preview the buyback and settlement');
         if ((await app.simulated()) !== 'review') throw new Error('curve close simulation failed');
         cue('Review the final buyback cost and the amount returned to the borrower');
@@ -326,7 +383,7 @@ async function main(): Promise<void> {
         waits.push({ kind: 'liquidation', start: liquidationStart, end: elapsed(), speed: 8 });
         signatures.liquidation = liquidation.signature;
         cue('Liquidation confirmed · open the market’s liquidation history');
-        await app.goto(`/m/${move.mint}?tab=liquidations`, 'market');
+        await showExitHistory(move.mint);
         await expect(app.id(T.marketLiquidationRow(liquidation.signature))).toHaveAttribute(
             'data-kind',
             'liquidation',
@@ -335,7 +392,9 @@ async function main(): Promise<void> {
             },
         );
         await guide.move(
-            app.id(T.marketLiquidationRow(liquidation.signature)),
+            PHONE
+                ? app.id(T.marketLiquidationRow(liquidation.signature)).locator('[data-col="kind"]')
+                : app.id(T.marketLiquidationRow(liquidation.signature)),
             'Liquidation recorded · the keeper closed the at-risk position',
         );
         await page.waitForTimeout(4_000);
@@ -357,14 +416,22 @@ async function main(): Promise<void> {
         if (settlement.settle.condition !== 1) throw new Error('settlement was not S1');
         signatures.s1 = settlement.signature;
         cue('S1 settlement confirmed · inspect the exit record');
-        await app.goto(`/m/${wipe.mint}?tab=liquidations`, 'market');
+        await showExitHistory(wipe.mint);
         await expect(app.id(T.marketLiquidationRow(settlement.signature))).toHaveAttribute('data-condition', 'S1', {
             timeout: 45_000,
         });
         await guide.move(
-            app.id(T.marketLiquidationRow(settlement.signature)),
+            PHONE
+                ? app.id(T.marketLiquidationRow(settlement.signature)).locator('[data-col="condition"]')
+                : app.id(T.marketLiquidationRow(settlement.signature)),
             'S1 settlement recorded · lenders receive the remaining SOL',
         );
+        if (PHONE) {
+            await guide.move(
+                app.id(T.marketLiquidationRow(settlement.signature)).locator('[data-col="lenders"]'),
+                'Lenders’ SOL · remaining collateral is distributed in SOL',
+            );
+        }
         await page.waitForTimeout(4_000);
 
         mark('outro');
@@ -386,7 +453,7 @@ async function main(): Promise<void> {
         await browser.close();
         writeFileSync(
             MANIFEST,
-            `${JSON.stringify({ version, started: new Date(started).toISOString(), pointer: true, marks, cues, waits, signatures, raw: RAW, failure: failure ? String(failure) : null, pageErrors }, null, 2)}\n`,
+            `${JSON.stringify({ version, variant: PHONE ? 'phone' : 'desktop', viewport: VIEWPORT, started: new Date(started).toISOString(), pointer: true, marks, cues, waits, signatures, raw: RAW, failure: failure ? String(failure) : null, pageErrors }, null, 2)}\n`,
         );
         console.log(`[demo] raw recording: ${RAW}`);
     }
