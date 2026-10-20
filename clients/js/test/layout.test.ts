@@ -124,3 +124,30 @@ test('every asserted account size matches the client', () => {
         assert.equal(size(), space, `${name} size`);
     }
 });
+
+test('VenueGuard retains all four full SHA-256 digests through byte 303', () => {
+    const bytes = new Uint8Array(304);
+    bytes.set(client.VENUE_GUARD_DISCRIMINATOR);
+    const view = new DataView(bytes.buffer);
+    view.setUint16(8, 1, true);
+    bytes[10] = 254;
+    view.setUint32(12, 1 << 4, true);
+    const hashes = Array.from({ length: 4 }, (_, i) =>
+        Uint8Array.from({ length: 32 }, (_, j) => (i * 64 + j + 1) & 0xff),
+    );
+    for (let i = 0; i < 4; i++) {
+        view.setUint32(160 + i * 4, 1_000 + i, true);
+        bytes.set(hashes[i], 176 + i * 32);
+    }
+    const codec = client.getVenueGuardCodec();
+    const decoded = codec.decode(bytes);
+    assert.equal(client.getVenueGuardSize(), 304);
+    assert.deepEqual(decoded.guardElf, hashes);
+    assert.deepEqual(codec.encode(decoded), bytes);
+    const altered = bytes.slice();
+    altered[303] ^= 0xff;
+    const other = codec.decode(altered);
+    assert.deepEqual(other.guardElf[3].slice(0, 12), decoded.guardElf[3].slice(0, 12));
+    assert.notDeepEqual(other.guardElf[3], decoded.guardElf[3], 'a change outside the former prefix must survive');
+    assert.throws(() => codec.decode(bytes.slice(0, 224)), 'a truncated account must not decode as a full digest');
+});

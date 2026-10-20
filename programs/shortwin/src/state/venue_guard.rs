@@ -1,4 +1,4 @@
-//! `VenueGuard` (zero-copy, seeds `["venue_guard"]`, 224 B): the event-driven venue-upgrade
+//! `VenueGuard` (zero-copy, seeds `["venue_guard"]`, 304 B): the event-driven venue-upgrade
 //! latch (ARCH §2.3.2, §3.1, A7; decision 4; hardened in v0.4.1, R4B-7; AIR-01).
 //!
 //! The permissionless `flag_venue_upgraded` sets bit `venue` of `upgraded` when a venue
@@ -10,13 +10,13 @@
 //! mask is set (`GUARD_MASK_*`). Kept out of `GlobalConfig` so a permissionless writer never
 //! write-locks the account every instruction reads (V1-11).
 //!
-//! **The ELF fingerprint (AIR-01, from `_reserved`).** The loader's `ExtendProgram` is
+//! **The ELF digest (AIR-01; full SHA-256 for AIR2-07).** The loader's `ExtendProgram` is
 //! permissionless (Agave 4.2) and moves the deploy slot without touching the ELF, so the slot alone
 //! let anyone set the latch. For the four venue programs whose ProgramData can still grow (pump-fees,
 //! AMM v4, CPMM, Jupiter: guard indices [`GUARD_ELF_FIRST`]`..`; pump and PumpSwap sit at the
 //! loader's 10 MiB cap, V9, so only an `Upgrade` moves their slot) the guard keeps, per venue,
 //! `guard_len` — the ProgramData's data length when it was revalidated — and `guard_elf` — the
-//! first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF
+//! full sha256 of the reviewed trimmed ELF
 //! (`shortwin_venue_state::program_data::trimmed_elf`). An unchanged length means only `Upgrade`
 //! can have moved the slot (it never resizes the account; `ExtendProgram` always grows it); a
 //! changed length means an extension, and then only a different trimmed ELF is an upgrade.
@@ -30,7 +30,7 @@
 //! | 64 | 48 | `flagged_slot` [u64; 6] |
 //! | 112 | 48 | `flagged_at` [i64; 6] |
 //! | 160 | 16 | `guard_len` [u32; 4] (AIR-01, was `_reserved[0..16]`) |
-//! | 176 | 48 | `guard_elf` [[u8; 12]; 4] (AIR-01, was `_reserved[16..64]`) |
+//! | 176 | 128 | `guard_elf` [[u8; 32]; 4] (full SHA-256, AIR2-07) |
 //!
 //! Index order (`GUARD_*` in `constants.rs`): pump, pAMM, pfee, AMM v4, CPMM, Jupiter.
 
@@ -42,19 +42,12 @@ use crate::constants::{GUARD_PUMP_FEES, VENUE_PROGRAMS};
 pub const GUARD_ELF_FIRST: u8 = GUARD_PUMP_FEES;
 /// Venue programs with an ELF fingerprint: pump-fees, AMM v4, CPMM, Jupiter.
 pub const GUARD_ELF_VENUES: usize = VENUE_PROGRAMS - GUARD_ELF_FIRST as usize;
-/// Bytes of the trimmed ELF's sha256 the guard keeps (96 bits). A fixed reviewed fingerprint
-/// has a generic second-preimage cost of ~2^96 hashes, but an authority choosing both ELFs has
-/// a generic collision bound of ~2^48. AIR2-07 tracks the unresolved full-digest migration.
-pub const GUARD_ELF_LEN: usize = 12;
+/// Bytes of the reviewed trimmed ELF's SHA-256 stored and compared in full (AIR2-07).
+pub const GUARD_ELF_LEN: usize = 32;
 
-/// The fingerprint `VenueGuard::guard_elf` keeps of a trimmed ELF's sha256: its first
-/// [`GUARD_ELF_LEN`] bytes (AIR-01).
-pub fn elf_fingerprint_of(sha256: &[u8; 32]) -> [u8; GUARD_ELF_LEN] {
-    let mut fp = [0u8; GUARD_ELF_LEN];
-    for (d, s) in fp.iter_mut().zip(sha256.iter()) {
-        *d = *s;
-    }
-    fp
+/// The complete reviewed ELF digest stored by `VenueGuard::guard_elf`.
+pub const fn elf_fingerprint_of(sha256: &[u8; 32]) -> [u8; GUARD_ELF_LEN] {
+    *sha256
 }
 
 /// The venue-upgrade latch.
@@ -76,9 +69,9 @@ pub struct VenueGuard {
     /// AIR-01: the ProgramData data length at the last revalidation with a hash, per venue from
     /// [`GUARD_ELF_FIRST`]; 0 = no fingerprint.
     pub guard_len: [u32; 4],
-    /// AIR-01: the first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF, per
+    /// AIR-01: the full sha256 of the reviewed trimmed ELF, per
     /// venue from [`GUARD_ELF_FIRST`] (meaningful while `guard_len` is not 0).
-    pub guard_elf: [[u8; 12]; 4],
+    pub guard_elf: [[u8; GUARD_ELF_LEN]; GUARD_ELF_VENUES],
 }
 
 impl VenueGuard {
@@ -142,6 +135,31 @@ mod tests {
         assert_eq!(VenueGuard::elf_index(GUARD_JUPITER), Some(3));
         assert_eq!(VenueGuard::elf_index(GUARD_JUPITER + 1), None);
         assert_eq!(GUARD_ELF_VENUES, 4);
+    }
+
+    #[test]
+    fn the_full_digest_survives_storage_and_every_suffix_byte_distinguishes_it() {
+        let hash = core::array::from_fn(|i| i.to_le_bytes()[0]);
+        let mut g: VenueGuard = bytemuck::Zeroable::zeroed();
+        g.set_elf_fingerprint(
+            GUARD_RAYDIUM_CPMM,
+            Some((793_869, elf_fingerprint_of(&hash))),
+        );
+        let restored = bytemuck::pod_read_unaligned::<VenueGuard>(bytemuck::bytes_of(&g));
+        assert_eq!(
+            restored.elf_fingerprint(GUARD_RAYDIUM_CPMM),
+            Some((793_869, elf_fingerprint_of(&hash)))
+        );
+        assert_eq!(GUARD_ELF_LEN, 32);
+        for i in 12..32 {
+            let mut changed = hash;
+            changed[i] ^= 1;
+            assert_ne!(
+                elf_fingerprint_of(&hash),
+                elf_fingerprint_of(&changed),
+                "a matching 12-byte prefix must not hide changed digest byte {i}"
+            );
+        }
     }
 
     #[test]

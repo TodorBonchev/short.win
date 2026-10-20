@@ -16,7 +16,7 @@ use shortwin_venue_state::bytes::{i64_at, key_at, u8_at, u16_at, u32_at, u64_at}
 #[test]
 fn documented_sizes() {
     assert_eq!(GlobalConfig::SPACE, 1_448);
-    assert_eq!(VenueGuard::SPACE, 224);
+    assert_eq!(VenueGuard::SPACE, 304);
     assert_eq!(VenueExtras::SPACE, 6_512); // 4,352 before M2-SEC-2 (`stable`, `current_since`)
     assert_eq!(OracleCache::SPACE, 45);
     assert_eq!(Market::SPACE, 3_104);

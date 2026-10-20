@@ -746,7 +746,7 @@ $G approve --ms emergency --index <n> --config gov.toml --rpc <url> --key emg-me
   (pump-final §3.2, PUMP-2026-10-13-5: `withdraw`'s accounts and authority read from a mainnet
   transaction or the ELF and recorded in the audit addendum; stop if it can write an account
   short.win's legs pass or a `FeeConfig` short.win reads). The execution records the account's
-  length and the hash's first 12 bytes. From then on a pure extension of that venue is
+  length and the complete 32-byte SHA-256 digest. From then on a pure extension of that venue is
   `VenueNotUpgraded`; a moved deploy slot latches it only if the account kept the recorded
   length (an `Upgrade`, even of the same ELF) or its trimmed ELF no longer matches or is above
   2 MiB, which is never hashed (KI-69).

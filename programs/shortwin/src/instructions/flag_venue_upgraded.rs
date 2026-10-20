@@ -17,7 +17,7 @@
 //! moved slot is an upgrade if the ProgramData kept the length recorded with the fingerprint
 //! (only `Upgrade` moves the slot without resizing the account; `ExtendProgram` always grows it),
 //! or if the account grew and the sha256 of its trimmed ELF
-//! (`shortwin_venue_state::program_data::trimmed_elf`) no longer starts with the fingerprint; a
+//! (`shortwin_venue_state::program_data::trimmed_elf`) no longer equals the recorded digest; a
 //! grown account whose trimmed ELF still matches was only extended (`VenueNotUpgraded`). The hash
 //! runs only after an extension and costs half a CU per trimmed-ELF byte plus about 1 CU per
 //! 250 bytes of zero tail (pump-fees' 0.85 MB ELF ≈ 0.43 M CU: a flagger requests the compute
@@ -155,4 +155,40 @@ pub fn handler(ctx: Context<FlagVenueUpgraded>, venue: u8) -> Result<()> {
         flagged_at: clock.unix_timestamp,
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_extension_with_a_matching_digest_prefix_and_changed_suffix_is_an_upgrade(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let elf = [1u8, 2, 3, 4, 5, 6, 7, 8];
+        let reviewed_hash = solana_sha256_hasher::hashv(&[&elf]).to_bytes();
+        let header = shortwin_venue_state::program_data::HEADER_LEN;
+        let old_len = u32::try_from(header + elf.len())?;
+        let mut data = vec![0u8; header + elf.len() + 16];
+        data[..4].copy_from_slice(&3u32.to_le_bytes());
+        data[4..12].copy_from_slice(&2u64.to_le_bytes());
+        data[header..header + elf.len()].copy_from_slice(&elf);
+        let key = Pubkey::new_unique();
+        let owner = bpf_loader_upgradeable::ID;
+        let mut lamports = 1;
+        let info = AccountInfo::new(&key, false, false, &mut lamports, &mut data, &owner, false);
+        assert!(!is_upgrade(
+            &info,
+            (old_len, elf_fingerprint_of(&reviewed_hash))
+        )?);
+        for i in 12..32 {
+            let mut other_hash = reviewed_hash;
+            other_hash[i] ^= 1;
+            assert_eq!(&other_hash[..12], &reviewed_hash[..12]);
+            assert!(
+                is_upgrade(&info, (old_len, elf_fingerprint_of(&other_hash)))?,
+                "the full recorded digest must distinguish byte {i}"
+            );
+        }
+        Ok(())
+    }
 }

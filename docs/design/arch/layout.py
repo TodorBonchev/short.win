@@ -88,9 +88,9 @@ MV = [("","lender_sol","u64"),("","unmatched","u64"),("","protocol_fees","u64"),
       ("","lock_cal",arr("PodU128",128)),("","_reserved",arr("u8",64))]
 _, mv_end = layout("MarketVault", MV, disc=8)
 
-# AIR-01: guard_len / guard_elf (the ELF fingerprints of pump-fees, AMM v4, CPMM and Jupiter) take the 64 reserved bytes
+# AIR2-07: fresh 1.0.3 stores four complete SHA-256 digests; VenueGuard is 304 bytes.
 VG = [("","version","u16"),("","bump","u8"),("","_pad0","u8"),("","upgraded","u32"),("","guard_slot",arr("u64",6)),("","flagged_slot",arr("u64",6)),("","flagged_at",arr("i64",6)),
-      ("","guard_len",arr("u32",4)),("","guard_elf",arr(arr("u8",12),4))]
+      ("","guard_len",arr("u32",4)),("","guard_elf",arr(arr("u8",32),4))]
 _, vg_end = layout("VenueGuard", VG, disc=8)
 
 def dump(name, rows, total):

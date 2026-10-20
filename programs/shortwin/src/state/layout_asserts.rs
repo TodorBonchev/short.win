@@ -98,8 +98,8 @@ const _: () = assert!(
         && size_of::<Params>() + 4 * size_of::<TierParams>() == PENDING_PAYLOAD_LEN
 );
 
-// ---- VenueGuard (224 B; AIR-01: `guard_len` and `guard_elf` from `_reserved`) ----
-layout!(acct VenueGuard, 224, {
+// ---- VenueGuard (304 B; AIR2-07: complete SHA-256 digests) ----
+layout!(acct VenueGuard, 304, {
     version @ 8, bump @ 10, _pad0 @ 11, upgraded @ 12, guard_slot @ 16, flagged_slot @ 64,
     flagged_at @ 112, guard_len @ 160, guard_elf @ 176,
 });
@@ -198,7 +198,7 @@ const _: () = {
     assert!(WalletExposure::SPACE == 81);
     assert!(OracleCache::SPACE == 45);
     assert!(GlobalConfig::SPACE == 1_448);
-    assert!(VenueGuard::SPACE == 224);
+    assert!(VenueGuard::SPACE == 304);
     assert!(VenueExtras::SPACE == 6_512);
     assert!(Market::SPACE == 3_104);
     assert!(MarketVault::SPACE == 2_200);

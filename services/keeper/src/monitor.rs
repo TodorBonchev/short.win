@@ -22,7 +22,7 @@
 //! whose ProgramData can still grow (pump-fees, AMM v4, CPMM, Jupiter) once `revalidate_venue`
 //! recorded a fingerprint (`VenueGuard::guard_len` / `guard_elf`): with the bit clear, a moved
 //! slot is an upgrade if the account kept the recorded length or its trimmed ELF's sha256 no
-//! longer starts with the fingerprint (or is too large to hash), and a grown account with the
+//! longer equals the recorded digest (or is too large to hash), and a grown account with the
 //! reviewed ELF is `VenueNotUpgraded`. The keeper mirrors it: [`latch_action`] answers
 //! [`LatchAction::Inspect`] when only the whole account can decide. Then the flag's simulation
 //! decides, before the keeper's exits — the program's rule, so an upgrade is flagged in the slot
@@ -177,7 +177,7 @@ pub fn latch_action(guard: &VenueGuard, venue: u8, deploy_slot: u64) -> LatchAct
 }
 
 /// What the AIR-01 rule reads of a whole ProgramData account: its data length and the
-/// `VenueGuard` fingerprint (the first `GUARD_ELF_LEN` bytes) of its trimmed ELF's sha256 —
+/// `VenueGuard` complete `GUARD_ELF_LEN`-byte SHA-256 of its trimmed ELF —
 /// the program's own `trimmed_elf_hash_of` and `elf_fingerprint_of`, so `None` above
 /// `ELF_HASH_MAX_LEN` (not hashed).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -954,6 +954,34 @@ mod tests {
 
     fn facts(acc: &AccountData) -> ElfFacts {
         ElfFacts::of(acc).expect("a ProgramData")
+    }
+
+    /// AIR2-07 compares all digest suffix bytes even when the old prefix matches.
+    #[test]
+    fn air2_07_a_matching_twelve_byte_prefix_never_hides_a_digest_suffix_change() {
+        let venue = GUARD_RAYDIUM_CPMM;
+        let reviewed_hash = core::array::from_fn(|i| i.to_le_bytes()[0]);
+        let mut guard = guard();
+        guard.guard_slot[usize::from(venue)] = 1;
+        let facts = ElfFacts {
+            len: Some(20_000),
+            fingerprint: Some(elf_fingerprint_of(&reviewed_hash)),
+        };
+        guard.set_elf_fingerprint(venue, Some((10_000, elf_fingerprint_of(&reviewed_hash))));
+        assert_eq!(
+            latch_action_with(&guard, venue, 2, &facts),
+            LatchAction::Extended
+        );
+        for i in 12..32 {
+            let mut changed_hash = reviewed_hash;
+            changed_hash[i] ^= 1;
+            guard.set_elf_fingerprint(venue, Some((10_000, elf_fingerprint_of(&changed_hash))));
+            assert_eq!(
+                latch_action_with(&guard, venue, 2, &facts),
+                LatchAction::Flag,
+                "the keeper must compare stored digest byte {i}"
+            );
+        }
     }
 
     /// AIR-01, the program's `flag_venue_upgraded` rule on whole accounts: once CPMM was

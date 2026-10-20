@@ -9551,7 +9551,7 @@
           {
             "name": "guard_elf",
             "docs": [
-              "AIR-01: the first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF, per",
+              "AIR-01: the full sha256 of the reviewed trimmed ELF, per",
               "venue from [`GUARD_ELF_FIRST`] (meaningful while `guard_len` is not 0)."
             ],
             "type": {
@@ -9559,7 +9559,7 @@
                 {
                   "array": [
                     "u8",
-                    12
+                    32
                   ]
                 },
                 4

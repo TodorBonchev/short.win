@@ -9,7 +9,7 @@
 //! `VenueSlotMismatch`, so an upgrade that lands while the Squads proposal collects signatures
 //! cannot be validated silently. Then `guard_slot[venue]` = the current deploy slot and bit
 //! `venue` is cleared; for a fingerprinted venue the guard records the ProgramData's length and
-//! the hash's first 12 bytes (`VenueGuard::guard_len` / `guard_elf`), or clears them without a
+//! the complete 32-byte hash (`VenueGuard::guard_len` / `guard_elf`), or clears them without a
 //! hash. Same address and owner checks as `flag_venue_upgraded`.
 //!
 //! **Extensions during review (AIR-01).** The loader's permissionless `ExtendProgram` moves the

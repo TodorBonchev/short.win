@@ -74,7 +74,7 @@ export type VenueGuard = {
    */
   guardLen: Array<number>;
   /**
-   * AIR-01: the first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF, per
+   * AIR-01: the full sha256 of the reviewed trimmed ELF, per
    * venue from [`GUARD_ELF_FIRST`] (meaningful while `guard_len` is not 0).
    */
   guardElf: Array<ReadonlyUint8Array>;
@@ -100,7 +100,7 @@ export type VenueGuardArgs = {
    */
   guardLen: Array<number>;
   /**
-   * AIR-01: the first [`GUARD_ELF_LEN`] bytes of the sha256 of the reviewed trimmed ELF, per
+   * AIR-01: the full sha256 of the reviewed trimmed ELF, per
    * venue from [`GUARD_ELF_FIRST`] (meaningful while `guard_len` is not 0).
    */
   guardElf: Array<ReadonlyUint8Array>;
@@ -121,7 +121,7 @@ export function getVenueGuardEncoder(): FixedSizeEncoder<VenueGuardArgs> {
       ["guardLen", getArrayEncoder(getU32Encoder(), { size: 4 })],
       [
         "guardElf",
-        getArrayEncoder(fixEncoderSize(getBytesEncoder(), 12), { size: 4 }),
+        getArrayEncoder(fixEncoderSize(getBytesEncoder(), 32), { size: 4 }),
       ],
     ]),
     (value) => ({ ...value, discriminator: VENUE_GUARD_DISCRIMINATOR }),
@@ -142,7 +142,7 @@ export function getVenueGuardDecoder(): FixedSizeDecoder<VenueGuard> {
     ["guardLen", getArrayDecoder(getU32Decoder(), { size: 4 })],
     [
       "guardElf",
-      getArrayDecoder(fixDecoderSize(getBytesDecoder(), 12), { size: 4 }),
+      getArrayDecoder(fixDecoderSize(getBytesDecoder(), 32), { size: 4 }),
     ],
   ]);
 }
@@ -209,5 +209,5 @@ export async function fetchAllMaybeVenueGuard(
 }
 
 export function getVenueGuardSize(): number {
-  return 224;
+  return 304;
 }

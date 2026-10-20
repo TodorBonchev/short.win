@@ -1117,6 +1117,59 @@ fn air01_an_extension_during_review_does_not_block_the_revalidation() {
     }
 }
 
+/// AIR2-07: the guard stores all 32 digest bytes. Supplying a review hash with the
+/// same 12-byte prefix but a different suffix at the exact slot preserves the existing
+/// fail-safe policy: it is recorded as supplied, then a later extension latches.
+/// This synthetic review mismatch is not a claim of finding a SHA-256 collision.
+#[test]
+fn air2_07_a_matching_digest_prefix_does_not_clear_or_hide_a_changed_suffix() {
+    let program = RaydiumProgram::AmmV4;
+    let venue = guard_index(program);
+    let (mut env, markets) = three_markets();
+    let slot = header(&env, program).slot;
+    let reviewed = reviewed_hash(&env, program);
+    let mut mismatched = reviewed;
+    for byte in &mut mismatched[12..] {
+        *byte ^= 0x80;
+    }
+    assert_eq!(&mismatched[..12], &reviewed[..12]);
+    ok(revalidate_reviewed(&mut env, program, slot, mismatched));
+    assert_eq!(
+        env.venue_guard()
+            .elf_fingerprint(venue)
+            .unwrap()
+            .1
+            .as_slice(),
+        mismatched.as_slice(),
+        "all reviewed bytes persist"
+    );
+    env.warp(1);
+    stranger_extends(&mut env, program, 10_240);
+    env.warp(1);
+    let meta = ok(flag_hashing(&mut env, venue));
+    let _: VenueUpgradeFlagged = events::one(&meta);
+    assert!(env.venue_guard().is_flagged(venue));
+    crank_all(&mut env, &markets);
+    for (market, q) in &markets {
+        assert_err(&try_open(&mut env, market, *q), E::VenueUpgraded);
+    }
+    assert_err(
+        &revalidate_reviewed(&mut env, program, slot, mismatched),
+        E::VenueSlotMismatch,
+    );
+    ok(revalidate_reviewed(&mut env, program, slot, reviewed));
+    let guard = env.venue_guard();
+    assert!(!guard.is_flagged(venue));
+    assert_eq!(
+        guard.elf_fingerprint(venue).unwrap().1.as_slice(),
+        reviewed.as_slice()
+    );
+    env.warp(1);
+    stranger_extends(&mut env, program, 10_240);
+    env.warp(1);
+    assert_err(&flag_hashing(&mut env, venue), E::VenueNotUpgraded);
+}
+
 /// AIR-01, the other half: an upgrade next to an extension still latches — the case the deploy
 /// slot cannot tell from a pure extension. AMM v4 is upgraded to its own ELF with one byte
 /// changed (same size, inside the old account), once after a stranger's extension and once

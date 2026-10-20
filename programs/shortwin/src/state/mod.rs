@@ -3,7 +3,7 @@
 //! | Account | Kind | Seeds | Size |
 //! |---|---|---|---|
 //! | [`GlobalConfig`] | zero-copy | `["config"]` | 1,448 |
-//! | [`VenueGuard`] | zero-copy | `["venue_guard"]` | 224 |
+//! | [`VenueGuard`] | zero-copy | `["venue_guard"]` | 304 |
 //! | [`VenueExtras`] | zero-copy | `["venue_extras", venue u8]` | 4,352 |
 //! | [`OracleCache`] | Borsh | `["sol_usd"]` | 45 |
 //! | [`Market`] | zero-copy | `["market", mint]` | 3,104 |
