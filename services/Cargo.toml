@@ -86,7 +86,12 @@ axum = { version = "0.8", default-features = false, features = ["http1", "json",
 tower = { version = "0.5", default-features = false, features = ["util", "limit", "timeout"] }
 tower-http = { version = "0.6", default-features = false, features = ["cors", "trace", "timeout", "limit", "request-id", "util"] }
 # The live source's `logsSubscribe` client (the version axum's `ws` uses).
-tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+# Deliberately use the pinned backend feature without an automatic root loader: the live
+# source passes the public Rustls Connector with the fixed Mozilla roots below. A default
+# TLS call without that connector has no trust anchors and fails closed.
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "__rustls-tls"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1.0.10"
 sha2 = "0.10"
 thiserror = "2"
 # TEST-ONLY (the indexer's `embedded-pg` feature): PostgreSQL binaries downloaded at first use into

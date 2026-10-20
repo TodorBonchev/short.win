@@ -20,6 +20,7 @@
 //! error. URLs and errors are logged through the endpoint's redactor (M8-SEC-15).
 
 use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, bail};
@@ -147,6 +148,19 @@ impl SlotBuffer {
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()
     }
+}
+
+/// The same Mozilla trust anchors and rustls defaults as the upstream WebSocket connector,
+/// loaded directly from the patched root package instead of the 0.26 compatibility wrapper.
+/// Standard certificate and hostname verification remain enabled; OS roots are not loaded.
+fn websocket_tls_connector() -> tokio_tungstenite::Connector {
+    let roots = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
+    let config = rustls::ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    tokio_tungstenite::Connector::Rustls(Arc::new(config))
 }
 
 /// The finality tracker's view of the cluster through JSON-RPC.
@@ -377,10 +391,15 @@ impl<'a> LiveSource<'a> {
     /// (1) Subscribes (the reader task buffers into the channel) and (2) prepares the gap-fill.
     async fn connect(&mut self) -> anyhow::Result<()> {
         let addresses: Vec<_> = self.streams.iter().map(|s| s.address).collect();
-        let (ws, _) = tokio_tungstenite::connect_async(self.ws_url.as_str())
-            .await
-            .map_err(|e| anyhow::anyhow!(self.ws_redactor.redact(&e.to_string())))
-            .with_context(|| format!("connecting to {}", self.ws_redactor.shown()))?;
+        let (ws, _) = tokio_tungstenite::connect_async_tls_with_config(
+            self.ws_url.as_str(),
+            None,
+            false,
+            Some(websocket_tls_connector()),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!(self.ws_redactor.redact(&e.to_string())))
+        .with_context(|| format!("connecting to {}", self.ws_redactor.shown()))?;
         let (mut sink, mut stream) = ws.split();
         for req in subscribe_requests(&addresses) {
             sink.send(Message::text(req)).await?;
@@ -621,6 +640,71 @@ pub async fn run(cfg: &IndexerConfig, pool: &PgPool) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn websocket_mozilla_roots_exclude_distrusted_emsign_key() {
+        use base64::Engine;
+        use sha2::{Digest, Sha256};
+        // Full DER SPKI removed by upstream webpki-roots 1.0.10 (PR 133).
+        let removed_spki = base64::engine::general_purpose::STANDARD
+            .decode("MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEI6UMuC0S9SjzsbLd4gISgJ45X0lNn8klNFl07LsGHOfAcq/ori/hQVSHFKhKsuh8guZbarXcs3XOiwbQhiO/RtWODz8E9Ncckn72pWPC9V+OLk+hGBkCKzIKgmR9FpPR")
+            .unwrap();
+        let distrusted = [
+            0x8d, 0x41, 0x7d, 0xb2, 0xdd, 0x8b, 0xf5, 0xe3, 0x08, 0x4d, 0x1e, 0x3f, 0x19, 0x6d,
+            0x58, 0x38, 0x49, 0xd8, 0x1b, 0xdd, 0x4c, 0x00, 0xc7, 0x0b, 0x9d, 0x39, 0x36, 0x9e,
+            0x96, 0xb8, 0xc7, 0x82,
+        ];
+        assert_eq!(Sha256::digest(&removed_spki)[..], distrusted);
+        assert!(!webpki_roots::TLS_SERVER_ROOTS.is_empty());
+        for root in webpki_roots::TLS_SERVER_ROOTS {
+            // TrustAnchor stores the SPKI sequence contents without its DER header.
+            assert_ne!(root.subject_public_key_info.as_ref(), &removed_spki[2..]);
+        }
+    }
+
+    #[test]
+    fn websocket_connector_rejects_untrusted_server_certificate() {
+        use base64::Engine;
+        use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName};
+        use std::io::Cursor;
+        // Public TEST-ONLY self-signed localhost certificate and key. No network is used.
+        let cert = base64::engine::general_purpose::STANDARD.decode("MIIBuTCCAV+gAwIBAgIULC8JS7nFdEkosxiUqO7nz3HkCX8wCgYIKoZIzj0EAwIwFDESMBAGA1UEAwwJbG9jYWxob3N0MCAXDTI2MTAyMDIxNTM0MFoYDzIxMjYwOTI2MjE1MzQwWjAUMRIwEAYDVQQDDAlsb2NhbGhvc3QwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASMETyHZWhIZqlpCmlwJNUvVQxdvNWqrj/9HxFYVjxpMf7qhaCFfxHYyTT0nqogIEoX62RHO/yrAPGStteuTxuZo4GMMIGJMB0GA1UdDgQWBBTZzP70T5VE/IpZyOeG7vb/HwL8yDAfBgNVHSMEGDAWgBTZzP70T5VE/IpZyOeG7vb/HwL8yDAUBgNVHREEDTALgglsb2NhbGhvc3QwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwEwCgYIKoZIzj0EAwIDSAAwRQIhAKqeTkUPrpmZ5+3OYHcaMHGp+2Ts+MRK/rB1WDTtBu6wAiA+0KdPS2JAbVfQQXnynQ0U/ROMaYsaAFzrQhOFDwcL4A==").unwrap();
+        let key = base64::engine::general_purpose::STANDARD.decode("MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgBpE7yfHTRWrDJwc+Ge76JzRwYwchBuVpjQen69XcOSChRANCAASMETyHZWhIZqlpCmlwJNUvVQxdvNWqrj/9HxFYVjxpMf7qhaCFfxHYyTT0nqogIEoX62RHO/yrAPGStteuTxuZ").unwrap();
+        let server_config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(
+                vec![CertificateDer::from(cert)],
+                PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key)),
+            )
+            .unwrap();
+        let tokio_tungstenite::Connector::Rustls(config) = websocket_tls_connector() else {
+            panic!("the live WebSocket source must use rustls");
+        };
+        let mut client =
+            rustls::ClientConnection::new(config, ServerName::try_from("localhost").unwrap())
+                .unwrap();
+        let mut server = rustls::ServerConnection::new(Arc::new(server_config)).unwrap();
+        for _ in 0..8 {
+            let mut to_server = Vec::new();
+            client.write_tls(&mut to_server).unwrap();
+            server.read_tls(&mut Cursor::new(to_server)).unwrap();
+            server.process_new_packets().unwrap();
+            let mut to_client = Vec::new();
+            server.write_tls(&mut to_client).unwrap();
+            client.read_tls(&mut Cursor::new(to_client)).unwrap();
+            if let Err(error) = client.process_new_packets() {
+                assert!(
+                    matches!(
+                        error,
+                        rustls::Error::InvalidCertificate(rustls::CertificateError::UnknownIssuer)
+                    ),
+                    "{error:?}"
+                );
+                return;
+            }
+        }
+        panic!("the untrusted certificate was not rejected");
+    }
 
     #[test]
     fn notifications_parse() {
