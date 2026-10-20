@@ -1,0 +1,53 @@
+{
+  "source_commit": "b8183266655def0195ad18608f103d15ebc03ac6",
+  "prepared_utc": "2026-10-20T08:03:16.869822+00:00",
+  "cwd": "/root/short.win-audit-review",
+  "command": [
+    "/root/fuzz/fr01-20261020-b8183266/bin/shortwin-fuzz",
+    "run",
+    "--profile",
+    "all",
+    "--duration",
+    "24h",
+    "--jobs",
+    "2",
+    "--actions",
+    "400",
+    "--seed",
+    "103200000",
+    "--out",
+    "/root/fuzz/fr01-20261020-b8183266/results",
+    "--minimize"
+  ],
+  "artifacts": {
+    "release": {
+      "path": "/root/fuzz/fr01-20261020-b8183266/bin/shortwin-release.so",
+      "sha256": "eb9cd3e68c33de8119b11f978ab77f65d4fa41de79904c508f0fd9d519d737dd",
+      "bytes": 1643832
+    },
+    "test_venue": {
+      "path": "/root/fuzz/fr01-20261020-b8183266/bin/shortwin-test-venue.so",
+      "sha256": "cf1c44424ff1c879ac5639b432a25c0dc4a81c5842ce047e26668ef920030322",
+      "bytes": 1674864
+    },
+    "mock": {
+      "path": "/root/fuzz/fr01-20261020-b8183266/bin/mock_cpamm.so",
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "bytes": 281240
+    },
+    "runner": {
+      "path": "/root/fuzz/fr01-20261020-b8183266/bin/shortwin-fuzz",
+      "sha256": "26de7dbf83edd78ec9439929f4ee963da296e7efc20b3f24b3f16dbbe3866c0c",
+      "bytes": 11685976
+    }
+  },
+  "source_archive_sha256": "50e4ea510622dbf082e5d9fff33cf7a63d066fd596444e7920cb0134c6e6fb44",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "build_env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/root/short.win/target",
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16",
+    "CARGO_INCREMENTAL": "0"
+  }
+}

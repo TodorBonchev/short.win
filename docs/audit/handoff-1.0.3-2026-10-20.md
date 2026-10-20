@@ -1,5 +1,11 @@
 # Draft 1.0.3 audit handoff (2026-10-20)
 
+**Historical handoff:** the integration with `main` now also includes AI3-FR01's
+quarantine and newer program bytes. The completed fuzz run described here remains
+evidence for `9b91060` only. Current policy choices are collected in the
+[release decision packet](release-decisions-1.0.3-2026-10-20.md); the work below
+records the original handoff, before the evaluation-read and frontend follow-ups.
+
 The working branch is `audit-1.0.3-gates`. **Do not tag or deploy 1.0.3 yet.**
 The integrated program/fuzzer candidate is `9b910602ed076a6d4359c496960b3ffc0e7c6af8`.
 Its [exact-ref CI run](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)

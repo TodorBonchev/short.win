@@ -2,6 +2,7 @@
 
 This file lists unfinished work only. Completed audit and release evidence is in
 [the 1.0.3 handoff](docs/audit/handoff-1.0.3-2026-10-20.md),
+[the current readiness record](docs/audit/release-readiness-1.0.3-2026-10-20.md),
 [the findings tracker](docs/audit/findings.md), and
 [the validation record](docs/audit/ai-review-3/validation-1.0.3.md).
 The 1.0.3 candidate is unreleased; do not tag or deploy it from this checklist.
@@ -12,16 +13,13 @@ current-deployment FR01 recovery/migration not applicable.
 
 ## 1.0.3 release blockers
 
-- [ ] Review the handoff's keeper ranking-retry change and the remaining
-      candidate-evaluation RPC error path. Add a focused regression that shows
-      whether `pool_fail` observations continue during a sustained evaluation
-      read failure; fix that path if needed.
 - [ ] Run the full gate and exact-ref GitHub CI on the new handoff commit.
       Reconfirm verifiable/Anchor ELF equality, keeper scenarios, browser E2E,
       dependency policy and mutations. The prior [green CI run](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
       covers `9b91060`, before this keeper change.
 - [ ] Run the ≥24 h all-profile fuzz gate on the final AI3-FR01 program and
-      fuzzer bytes. The [completed clean run](docs/audit/fuzz-1.0.3.md) identifies
+      fuzzer bytes. The [new frozen-binary run](docs/audit/fuzz-1.0.3-fr01.md) started
+      on 2026-10-20; completion remains pending. The [completed clean run](docs/audit/fuzz-1.0.3.md) identifies
       the older `9b91060` program and does not cover the integrated quarantine.
 - [ ] Obtain an external auditor's fix review for the AIR2 and AI3 batches and
       the keeper follow-up. The [internal review handoff](docs/audit/handoff-1.0.3-2026-10-20.md)
@@ -38,7 +36,9 @@ current-deployment FR01 recovery/migration not applicable.
       final-holder allocation or redesign before declaring the fix complete.
 - [ ] Disposition the remaining AI3 leads, especially L10's repeat-donation
       deposit hold, L13/L19–L21 fee/supply crossings, L16 tier-allocation
-      bound, L22 cashback claim liveness and L23's exact KI-68 comparison.
+      bound and L22 cashback claim liveness. L23's original per-touch trace is
+      a scoped KI-68 duplicate; aggregate/design extensions remain open in the
+      [decision packet](docs/audit/release-decisions-1.0.3-2026-10-20.md).
       Carry forward the substantive AI2 configuration/economic leads in the
       [triage registers](docs/audit/ai-review-3/triage.md).
 - [ ] Only after the review and owner decisions, update
@@ -53,12 +53,6 @@ current-deployment FR01 recovery/migration not applicable.
       an unlisted video, add its URL to the site/pinned post and share the
       10-second GIF. The recorded files are local and gitignored; the scripts
       can regenerate them from a fresh validator seed.
-- [ ] Investigate exit-history refresh when the Liquidations tab opens
-      before a keeper event reaches the indexer. In the guided demo rehearsal,
-      the tab stayed empty for 45 seconds while the API already contained the
-      exit; reloading showed it. The demo waits for ingestion before opening
-      the tab. Also check the transient pre-close status retained on the
-      closed-position screen.
 - [ ] Complete the original AI review 2 pass-2 judge run, pass 3 and an
       independent keeper-core review if that broader audit scope is resumed.
 - [ ] After 2026-10-21, remove the two remaining `@solana-mobile`

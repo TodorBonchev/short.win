@@ -22,6 +22,11 @@ completed zero-failure result. The ≥24 h gate remains open; completion evidenc
 identify the fix commit, program and fuzzer bytes, and retained results. Those run
 details and final results have not yet been recorded here.
 
+**2026-10-20 evidence follow-up:** the now-recorded [completed 24-hour run](../fuzz-1.0.3.md)
+identifies `9b91060` and release `b88aa520…`, preceding this guard's release `eb9cd3e6…`.
+It preserves a clean historical result but does not complete this fix's final-byte gate.
+The integrated branch retains the guard and the owner's no-affected-state confirmation.
+
 ## Correction and availability boundary
 
 At the start of `pool::deposit_in`, before release, touch, share minting or wipe-record

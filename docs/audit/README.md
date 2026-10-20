@@ -12,7 +12,10 @@ The audit package for short.win's external security review (M10). The entry poin
 | [`ai-review/`](ai-review/README.md) | An AI-assisted review of v1.0.0 (not a formal audit): its findings, the triage of its leads, and the proposed fixes on the `ai-review-fixes` branch | 2026-10-12 |
 | [`ai-review-2/`](ai-review-2/README.md) | AI review 2, of short.win 1.0.1 (not a formal audit; stopped after pass 1 of 3): the report, the proofs of concept, pass 2's unjudged agent reports, and what it did not cover | 2026-10-17 |
 | [`ai-review-3/`](ai-review-3/README.md) | AI review 3, a static two-pass review of draft 1.0.2 at `b815269`: 8 findings, 23 leads, all 83 raw candidate dispositions, coverage and patch-check evidence; draft 1.0.3 implementation tracked separately | 2026-10-18 |
-| [`fuzz-1.0.3.md`](fuzz-1.0.3.md) | Completed 24-hour all-profile fuzz gate on the draft 1.0.3 bytes, with frozen artifact hashes and the raw summary | 2026-10-19 |
+| [`fuzz-1.0.3.md`](fuzz-1.0.3.md) | Historical clean 24-hour run on `9b91060`, before AI3-FR01; frozen hashes and raw summary | 2026-10-19 |
+| [`fuzz-1.0.3-fr01.md`](fuzz-1.0.3-fr01.md) | New all-profile final-byte fuzz launch, frozen artifact/runner hashes and completion requirements | 2026-10-20 |
+| [`release-readiness-1.0.3-2026-10-20.md`](release-readiness-1.0.3-2026-10-20.md) | Integrated keeper/web corrections, local validation and remaining release gates | 2026-10-20 |
+| [`release-decisions-1.0.3-2026-10-20.md`](release-decisions-1.0.3-2026-10-20.md) | Six concrete owner choices, precise bounds, L23 comparison and unresolved evidence requirements | 2026-10-20 |
 | [`handoff-1.0.3-2026-10-20.md`](handoff-1.0.3-2026-10-20.md) | Internal fix-review results, new carry and keeper findings, written technical dispositions and remaining release work | 2026-10-20 |
 | [`ai-review-3/independent-fix-review-1.0.3.md`](ai-review-3/independent-fix-review-1.0.3.md) | Independent AI fix review: Q2/Q3/Q4 accepted; Q1 conditional with new open legacy migration finding AI3-FR01; linked written treatment covers all unresolved packet items | 2026-10-19 |
 | `README.md` | This index | |

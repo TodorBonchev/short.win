@@ -64,7 +64,7 @@ context; the full comparison preserves exact source references where no formal I
 | <a id="ai3-l20"></a>AI3-L20 | `shortwin\|pricing-inputs\|synthetic-fee-gate-basis-mismatch` | Exact known; KI-77 | Open under KI-77 — reproduce a supported tier boundary between gate and synthetic execution supply bases. |
 | <a id="ai3-l21"></a>AI3-L21 | `shortwin\|read-state-boxed-for-exit\|curve-risk-fee-at-spot` | Exact known; AIR-10, KI-77 | Open under AIR-10 / KI-77 — establish supported curve fee change and wrong historical risk decision. |
 | <a id="ai3-l22"></a>AI3-L22 | `shortwin\|sweep-trader\|external-cashback-recovery-dependency` | Exact known | Open — external claim liveness remains a dependency; reproduce a current unclaimable reward and preserve old-owner entitlement in any recovery. |
-| <a id="ai3-l23"></a>AI3-L23 | `shortwin\|sync-lender\|repeated-accrual-truncation` | Exact known; KI-68 | Open — one-lamport two-release truncation trace retained; material aggregate bound and share-change-safe remainder design still needed. |
+| <a id="ai3-l23"></a>AI3-L23 | `shortwin\|sync-lender\|repeated-accrual-truncation` | Exact known; KI-68 | Original per-touch trace is a duplicate of KI-68 within its accepted ≤1 lamport per index per intervening touch. Aggregate strategies, changing shares and any remainder redesign remain open; [exact comparison](../release-decisions-1.0.3-2026-10-20.md#exact-comparison-for-ai3-l23). |
 
 For each completed triage row, preserve the canonical key and distinguish the audit
 claim from the current decision: implemented with linked checks; deferred with the exact
