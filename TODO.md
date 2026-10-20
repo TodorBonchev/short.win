@@ -50,7 +50,7 @@ current-deployment FR01 recovery/migration not applicable.
 ## Later or conditional follow-ups
 
 - [ ] Upload the [local-validator demo](apps/web/e2e/demo/README.md)'s desktop
-      or portrait phone MP4 as
+      or portrait phone MP4 (or the [56-second promo](tools/promo/README.md)) as
       an unlisted video, add its URL to the site/pinned post and share the
       10-second GIF. The recorded files are local and gitignored; the scripts
       can regenerate them from a fresh validator seed.

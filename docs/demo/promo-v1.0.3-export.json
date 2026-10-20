@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "version": "v1.0.3",
+  "mode": "final",
+  "source": {
+    "frames": 1680,
+    "fps": 30,
+    "durationSeconds": 56
+  },
+  "verifiedAt": "2026-10-20T21:30:25.683Z",
+  "variants": {
+    "landscape": {
+      "composition": "PromoLandscape",
+      "video": {
+        "path": "out/ShortWin-promo-landscape-v1.0.3.mp4",
+        "width": 1920,
+        "height": 1080,
+        "fps": 30,
+        "frames": 1680,
+        "durationSeconds": 56,
+        "videoCodec": "h264",
+        "pixelFormat": "yuv420p",
+        "colorSpace": "bt709",
+        "colorRange": "tv",
+        "audioCodec": "aac",
+        "audioSampleRate": 48000,
+        "integratedLufs": -16.07,
+        "truePeakDbtp": -1.68,
+        "sizeBytes": 6227229,
+        "sha256": "5500a667cf03351126355ea3a0dfb67a89434b0214cfa7e726362af25b29adf7"
+      },
+      "poster": {
+        "path": "out/ShortWin-promo-landscape-v1.0.3-poster.png",
+        "width": 1920,
+        "height": 1080,
+        "frame": 65,
+        "sizeBytes": 842508,
+        "sha256": "f3dd768bf5d7cf3d82799d1d850971551f0b05906d259f4c87e1671769b6adb3"
+      }
+    },
+    "phone": {
+      "composition": "PromoPhone",
+      "video": {
+        "path": "out/ShortWin-promo-phone-v1.0.3.mp4",
+        "width": 1080,
+        "height": 1920,
+        "fps": 30,
+        "frames": 1680,
+        "durationSeconds": 56,
+        "videoCodec": "h264",
+        "pixelFormat": "yuv420p",
+        "colorSpace": "bt709",
+        "colorRange": "tv",
+        "audioCodec": "aac",
+        "audioSampleRate": 48000,
+        "integratedLufs": -16.07,
+        "truePeakDbtp": -1.68,
+        "sizeBytes": 7284977,
+        "sha256": "0b8308c923942e4f046de69369595db2d7442ed0082a6a88dd6b641237619903"
+      },
+      "poster": {
+        "path": "out/ShortWin-promo-phone-v1.0.3-poster.png",
+        "width": 1080,
+        "height": 1920,
+        "frame": 65,
+        "sizeBytes": 1013888,
+        "sha256": "f7f55aa53b217476f91ada43e29717b0da809b9ee886c2cb69f71152880f6c3d"
+      }
+    }
+  }
+}

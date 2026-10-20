@@ -33,12 +33,19 @@ precedence = "override"
 SPDX-FileCopyrightText = "2026 Todor Bonchev"
 SPDX-License-Identifier = "Apache-2.0"
 
-# The web app, its WebAssembly package and the brand (the logo, the icons and their sources).
+# The web app, its WebAssembly package, promotional editor and brand assets.
 [[annotations]]
-path = ["apps/**", "packages/**", "docs/design/design-pass-2026-10/artifacts/logo/**"]
+path = ["apps/**", "packages/**", "tools/promo/**", "docs/design/design-pass-2026-10/artifacts/logo/**"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Todor Bonchev"
 SPDX-License-Identifier = "LicenseRef-Proprietary"
+
+# The generated editable promo bundle includes this font with its upstream licence.
+[[annotations]]
+path = "tools/promo/public/fonts/**"
+precedence = "override"
+SPDX-FileCopyrightText = ["2016 The Inter Project Authors", "2015-2025 Renzhi Li", "2025 Jamie Gravendeel", "2025 Florian Müllner"]
+SPDX-License-Identifier = "OFL-1.1"
 
 # Quote arithmetic adapted from Raydium's Apache-2.0 sources (THIRD_PARTY_NOTICES.md).
 [[annotations]]

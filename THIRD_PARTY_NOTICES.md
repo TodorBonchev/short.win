@@ -3,7 +3,18 @@
 This repository includes or adapts the third-party material below. [`REUSE.toml`](REUSE.toml)
 gives each file's licence, and the licence texts are in [`LICENSES/`](LICENSES/). Dependencies
 that Cargo and pnpm download are not part of the repository; they come under their own licences
-(all permissive; `deny.toml` enforces the Rust allow-list).
+(`deny.toml` enforces the Rust allow-list).
+
+## Promotional-video tooling
+
+`tools/promo/` is an isolated workspace using Remotion 4.0.533 under the
+[Remotion license](https://www.remotion.dev/docs/license/pricing), rather than
+a permissive software license. Its dependencies are installed, not vendored.
+The generated local media bundle includes Adwaita Sans with its original SIL
+Open Font License notice in `public/fonts/LICENSE`. The original synthesized
+score uses no external recordings or samples. Existing ShortWin brand artwork
+retains the proprietary brand/application terms; see the
+[promo production instructions](tools/promo/README.md).
 
 ## Vendored PostgreSQL archive helper
 

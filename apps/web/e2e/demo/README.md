@@ -1,5 +1,8 @@
 # Local-validator growth demo
 
+The full recordings also have separate [56-second promotional edits](../../../../tools/promo/README.md)
+with Remotion sources, fresh narration, timed captions and landscape/phone exports.
+
 The growth plan calls for a 2–3 minute,
 one-take local-validator demo and a 10-second GIF. The current program is **v1.0.3**, so the
 burned-in caption says **“local validator, v1.0.3, not a deployment.”** The plan's v1.0.1 caption
