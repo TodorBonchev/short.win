@@ -1,6 +1,7 @@
 //! T-SELF-UPGRADE (pump-final §14, §15 "Release coordination"; review R-8, R-9 (d)): short.win's
-//! own Governance upgrade, from release 1.0.0 to the build under test, under positions the 1.0.0
-//! curve adapter opened, on pump's 2026-10-13 build (`PumpDeploy::CURRENT`, the re-pin).
+//! own Governance upgrade. The historical scenario goes from release 1.0.0 to the build under test,
+//! under positions the 1.0.0
+//! curve adapter opened, on the selected `PumpDeploy::CURRENT` fixture build.
 //!
 //! **The 1.0.0 program** is `tests/fixtures/shortwin/shortwin_1_0_0.so`: the `v1.0.0` tag
 //! (`e4895c2`) built with the pinned toolchain, whose sha256 and trimmed-ELF sha256 must equal
@@ -8,9 +9,8 @@
 //! and was not verified). It trades the curve with `sell_v2` / `buy_v2` and the 20-key v2-era
 //! TradeExtras (`pump::v2_trade_extras`); the build under test with `sell_v3` / `buy_v3` and 10.
 //!
-//! **The upgrade is the loader's own** (`Env::upgrade_shortwin`, shared with the keeper-litesvm
-//! `upgrade_window` scenario): `ExtendProgram` of short.win's ProgramData to the new ELF's
-//! size (the build under test is 25,808 bytes longer), one slot later a buffer holding the new ELF
+//! **The upgrade is the loader's own** (`Env::upgrade_shortwin`): `ExtendProgram` of short.win's
+//! ProgramData when needed for the build under test, one slot later a buffer holding the new ELF
 //! under the upgrade authority, then `Upgrade` signed by that authority (`Env::upgrade_authority`,
 //! a real signature) — what Governance's vault transaction executes after its time lock (§15: at
 //! a slot nobody chooses). Only the buffer is planted (the loader's `Write` chunks would carry the
@@ -29,9 +29,15 @@
 //! - a pre-upgrade position on the now migrating market settles S3 at §5.4's ρ-scaled FV on the
 //!   live `(X₁, Y₁)` once the pause and `s3_wait_s` have passed.
 //!
-//! The keeper's own format choice across the same upgrade (§7 `CurveExtrasFormat`) is the
-//! keeper-litesvm `upgrade_window` scenario (P4). Every transaction goes through `Env::send`: the
-//! invariant hooks run on the 1.0.0 program's transactions too.
+//! **Historical scope:** the old 224-byte VenueGuard is left unchanged; this scenario makes no
+//! claim that new guard readers, opens or latches migrate it. Native hooks cannot decode that old
+//! guard as the current layout. It preserves unique position-exit evidence only. The program has
+//! never been deployed, so no old-layout migration is promised for first deployment.
+//!
+//! `current_schema_upgrade_preserves_full_guard_and_latched_exit_recovery` separately covers a
+//! 304-byte current-schema upgrade, preserving all four complete digests and live financial state,
+//! blocked new opens, allowed old exits, exact-slot revalidation and open recovery. Every
+//! transaction uses `Env::send` or the standard test-only venue admin helper.
 
 #![allow(clippy::result_large_err)]
 
@@ -148,7 +154,7 @@ fn snapshot(env: &Env, keys: &[Pubkey]) -> Vec<Option<Account>> {
     keys.iter().map(|k| env.svm.get_account(k)).collect()
 }
 
-/// T-SELF-UPGRADE (module docs).
+/// Historical position-exit compatibility only; no VenueGuard layout migration (module docs).
 #[test]
 fn v1_0_0_positions_close_and_liquidate_after_the_v3_upgrade() {
     let (mut env, curves) = fork_on_1_0_0(&[PumpCoin::T22_115, PumpCoin::Near166]);
@@ -196,6 +202,12 @@ fn v1_0_0_positions_close_and_liquidate_after_the_v3_upgrade() {
         pos(&near, &e, ne),
     ];
     let held = snapshot(&env, &kept);
+    let legacy_guard = env.svm.get_account(&pda::venue_guard()).unwrap();
+    assert_eq!(
+        legacy_guard.data.len(),
+        224,
+        "the historical guard is not the current layout"
+    );
     let pos_e_v1 = env.position(&near, &e.key(), ne);
 
     // Governance's upgrade to the build under test.
@@ -211,6 +223,11 @@ fn v1_0_0_positions_close_and_liquidate_after_the_v3_upgrade() {
         "the build under test runs"
     );
     assert_eq!(snapshot(&env, &kept), held, "the upgrade wrote no account");
+    assert_eq!(
+        env.svm.get_account(&pda::venue_guard()).unwrap(),
+        legacy_guard,
+        "the loader does not migrate the legacy guard"
+    );
 
     // A client close with the 20-key list fails cleanly; with the 10-key list it lands.
     let watched = [
@@ -347,5 +364,236 @@ fn v1_0_0_positions_close_and_liquidate_after_the_v3_upgrade() {
         "T-SELF-UPGRADE: the 20-key close refused {code:?}; liquidation B {} (q {qt}), \
          synthetic expiry B {} (q {qn}, rT {rt}), S3 FV {} on (X1, Y1) = ({x1}, {y1})",
         liq.buyback_cost, ex.buyback_cost, ev.fv
+    );
+}
+
+/// Re-deploys the current fixture pump ELF through the real loader. Only the buffer is planted;
+/// the mainnet authority signature is forged by the existing TEST-ONLY admin-send helper.
+fn redeploy_current_pump(env: &mut Env) -> u64 {
+    use anchor_lang::solana_program::bpf_loader_upgradeable;
+    use shortwin_litesvm_tests::fork::PumpProgram;
+    use shortwin_venue_state::program_data;
+    let program = PumpProgram::Pump;
+    let account = env
+        .svm
+        .get_account(&program.program_data().address)
+        .unwrap();
+    let authority = Pubkey::new_from_array(
+        program_data::read(&account.owner.to_bytes(), &account.data)
+            .unwrap()
+            .upgrade_authority
+            .unwrap(),
+    );
+    let mut data = vec![1, 0, 0, 0, 1];
+    data.extend_from_slice(authority.as_ref());
+    data.extend_from_slice(program.elf());
+    let buffer = Pubkey::new_unique();
+    env.svm
+        .set_account(
+            buffer,
+            Account {
+                lamports: env.svm.minimum_balance_for_rent_exemption(data.len()),
+                data,
+                owner: bpf_loader_upgradeable::ID,
+                executable: false,
+                rent_epoch: 0,
+            },
+        )
+        .unwrap();
+    let spill = env.funded_keypair().pubkey();
+    let instruction = Instruction {
+        program_id: bpf_loader_upgradeable::ID,
+        accounts: vec![
+            AccountMeta::new(program.program_data().address, false),
+            AccountMeta::new(program.id(), false),
+            AccountMeta::new(buffer, false),
+            AccountMeta::new(spill, false),
+            AccountMeta::new_readonly(
+                Pubkey::from_str_const("SysvarRent111111111111111111111111111111111"),
+                false,
+            ),
+            AccountMeta::new_readonly(
+                Pubkey::from_str_const("SysvarC1ock11111111111111111111111111111111"),
+                false,
+            ),
+            AccountMeta::new_readonly(authority, true),
+        ],
+        data: vec![3, 0, 0, 0],
+    };
+    let slot = env.clock().slot;
+    ok(fork::admin_send(env, instruction, &[authority]));
+    let account = env
+        .svm
+        .get_account(&program.program_data().address)
+        .unwrap();
+    assert_eq!(
+        program_data::read(&account.owner.to_bytes(), &account.data)
+            .unwrap()
+            .slot,
+        slot,
+        "the loader records the venue upgrade"
+    );
+    env.warp(1);
+    slot
+}
+
+/// Current-schema upgrades preserve the complete guard and live financial state. This is
+/// current304→current304 coverage, not a migration of the historical 224-byte account.
+/// The three unrelated extensible venues use the normal harness ProgramData mocks; their
+/// reviewed hashes test all four storage slots, not their venue adapter execution.
+#[test]
+fn current_schema_upgrade_preserves_full_guard_and_latched_exit_recovery() {
+    use shortwin::constants::{GUARD_PUMP, VENUE_PROGRAM_DATA};
+    use shortwin::instructions::flag_venue_upgraded::trimmed_elf_hash_of;
+    use shortwin::state::{GUARD_ELF_FIRST, GUARD_ELF_VENUES, VenueGuard};
+
+    let (mut env, curve) = Env::fork_pump_coin(PumpCoin::Fresh166);
+    // A post-deploy clock over retained historical SOL-curve state, not a fresh live bank.
+    env.set_clock(1_792_432_041, 458_921_518);
+    let (pm, q) = add_market(&mut env, curve);
+    env.warp(1);
+    let mut a = env.borrower();
+    let (res, na) = env.open(&pm, &mut a, q);
+    ok(res);
+    let mut b = env.borrower();
+    let (res, nb) = env.open(&pm, &mut b, q);
+    ok(res);
+    let pa = pda::position(&pm.market(), &a.key(), na).0;
+    let pb = pda::position(&pm.market(), &b.key(), nb).0;
+    let guard_key = pda::venue_guard();
+    assert_eq!(env.svm.get_account(&guard_key).unwrap().data.len(), 304);
+    assert_eq!(VenueGuard::SPACE, 304);
+
+    // Use authorized instructions rather than editing the guard bytes. Every recorded
+    // digest has nonzero suffix bytes outside the retired 12-byte prefix.
+    let authority = env.pause_authority.insecure_clone();
+    let mut reviewed = Vec::new();
+    for offset in 0..GUARD_ELF_VENUES {
+        let venue = GUARD_ELF_FIRST + u8::try_from(offset).unwrap();
+        let slot = env.venue_guard().guard_slot[usize::from(venue)];
+        if env
+            .svm
+            .get_account(&VENUE_PROGRAM_DATA[usize::from(venue)])
+            .is_none()
+        {
+            env.set_venue_program_data(venue, slot);
+        }
+        let account = env
+            .svm
+            .get_account(&VENUE_PROGRAM_DATA[usize::from(venue)])
+            .unwrap();
+        let digest = trimmed_elf_hash_of(&account.owner.to_bytes(), &account.data)
+            .unwrap()
+            .expect("hashable fixture or harness ProgramData");
+        assert!(digest[12..].iter().any(|byte| *byte != 0));
+        ok(env.send(
+            &[ix::revalidate_venue_reviewed(
+                &authority.pubkey(),
+                venue,
+                slot,
+                digest,
+            )],
+            &[&authority],
+        ));
+        reviewed.push((venue, u32::try_from(account.data.len()).unwrap(), digest));
+    }
+    let check_digests = |env: &Env| {
+        let guard = env.venue_guard();
+        for (venue, len, digest) in &reviewed {
+            assert_eq!(guard.elf_fingerprint(*venue), Some((*len, *digest)));
+        }
+    };
+    check_digests(&env);
+
+    // A real same-ELF venue upgrade still changes its slot and latches new opens.
+    let pump_slot = redeploy_current_pump(&mut env);
+    ok(env.send(&[ix::flag_venue_upgraded(GUARD_PUMP)], &[]));
+    assert_ne!(env.venue_guard().upgraded & (1 << GUARD_PUMP), 0);
+    let mut blocked = env.borrower();
+    assert_err(&env.open(&pm, &mut blocked, q).0, E::VenueUpgraded);
+    let watched = [
+        pda::config(),
+        guard_key,
+        pm.market(),
+        pda::market_vault(&pm.market()).0,
+        pm.keys.pool_vault,
+        pa,
+        pb,
+    ];
+    let before = snapshot(&env, &watched);
+
+    // The actual current release is loaded again by a real, signed short.win loader upgrade.
+    let program = std::fs::read(shortwin_litesvm_tests::env::program_so_path()).unwrap();
+    env.upgrade_shortwin(&program);
+    assert_eq!(
+        env.deployed_shortwin_hash(),
+        fork::sha256_hex(trimmed_elf(&program))
+    );
+    assert_eq!(
+        snapshot(&env, &watched),
+        before,
+        "loader upgrade preserves all watched bytes"
+    );
+    check_digests(&env);
+    assert_err(&env.open(&pm, &mut blocked, q).0, E::VenueUpgraded);
+
+    // A pre-upgrade borrower can still repay while new opens are held by the venue latch.
+    let vault_before = tokens(&env, &pm.keys.pool_vault);
+    let closed: Close = events::one(&ok(env.close(&pm, &a, na)));
+    assert_eq!(closed.q, q);
+    assert_eq!(tokens(&env, &pm.keys.pool_vault) - vault_before, q);
+    assert!(read::borsh::<ShortPosition>(&env.svm, &pa).is_none());
+    assert!(read::borsh::<ShortPosition>(&env.svm, &pb).is_some());
+
+    // Pump is at the loader cap and is slot-latched, not one of the four digest slots:
+    // even a supplied reviewed hash cannot validate a different expected slot.
+    let pump_data = env
+        .svm
+        .get_account(&VENUE_PROGRAM_DATA[usize::from(GUARD_PUMP)])
+        .unwrap();
+    let pump_hash = trimmed_elf_hash_of(&pump_data.owner.to_bytes(), &pump_data.data)
+        .unwrap()
+        .expect("hashable current pump fixture");
+    let guard_before = env.svm.get_account(&guard_key).unwrap();
+    assert_err(
+        &env.send(
+            &[ix::revalidate_venue_reviewed(
+                &authority.pubkey(),
+                GUARD_PUMP,
+                pump_slot - 1,
+                pump_hash,
+            )],
+            &[&authority],
+        ),
+        E::VenueSlotMismatch,
+    );
+    assert_eq!(env.svm.get_account(&guard_key).unwrap(), guard_before);
+    ok(env.send(
+        &[ix::revalidate_venue_reviewed(
+            &authority.pubkey(),
+            GUARD_PUMP,
+            pump_slot,
+            pump_hash,
+        )],
+        &[&authority],
+    ));
+    assert_eq!(env.venue_guard().upgraded & (1 << GUARD_PUMP), 0);
+    assert_eq!(
+        env.venue_guard().guard_slot[usize::from(GUARD_PUMP)],
+        pump_slot
+    );
+    assert_eq!(env.venue_guard().elf_fingerprint(GUARD_PUMP), None);
+    check_digests(&env);
+    env.crank(&pm);
+    env.warp(1);
+    let (res, nonce) = env.open(&pm, &mut blocked, q);
+    let opened: Open = events::one(&ok(res));
+    assert_eq!(opened.q, q);
+    assert!(
+        read::borsh::<ShortPosition>(
+            &env.svm,
+            &pda::position(&pm.market(), &blocked.key(), nonce).0
+        )
+        .is_some()
     );
 }
