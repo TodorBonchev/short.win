@@ -49,6 +49,12 @@ The 1.0.3 candidate is unreleased; do not tag or deploy it from this checklist.
       an unlisted video, add its URL to the site/pinned post and share the
       10-second GIF. The recorded files are local and gitignored; the scripts
       can regenerate them from a fresh validator seed.
+- [ ] Investigate exit-history refresh when the Liquidations tab opens
+      before a keeper event reaches the indexer. In the guided demo rehearsal,
+      the tab stayed empty for 45 seconds while the API already contained the
+      exit; reloading showed it. The demo waits for ingestion before opening
+      the tab. Also check the transient pre-close status retained on the
+      closed-position screen.
 - [ ] Complete the original AI review 2 pass-2 judge run, pass 3 and an
       independent keeper-core review if that broader audit scope is resumed.
 - [ ] After 2026-10-21, remove the two remaining `@solana-mobile`

@@ -113,14 +113,18 @@ export interface LiquidationOutcome {
     readonly event: LiquidateEvent;
     /** Number of 4% spot-price moves before the liquidation landed. */
     readonly priceMoves: number;
+    /** Completed observation buckets held at a fixed price while the reference caught up. */
+    readonly heldBuckets: number;
 }
 
 /**
- * Raise a seeded mock pool's price by 4% per chain second until `liquidate` simulates
- * successfully, then send it. The gradual path is the keeper scenario in
- * `services/keeper-litesvm/tests/scenarios/liquidate.rs`. Each refusal records a fresh price
- * bucket for the next attempt. The exact buyback is checked against the vault before every
- * attempt; an S1 result or an unexpected program error stops the driver.
+ * Raise a seeded mock pool's price in 4% steps until `liquidate` simulates successfully,
+ * then send it. Hold the price while a stale/reference-bound refusal clears, or when another
+ * increase would cross the conservative buyback ceiling. Each refusal records a completed
+ * price bucket, allowing the EMA persistence leg and fixed exit reference to catch up. These
+ * trend/held-spike paths mirror `services/keeper-litesvm/tests/scenarios/liquidate.rs`.
+ * The exact buyback is checked against the vault before every attempt; an S1 result or an
+ * unexpected program error stops the driver. Price moves and elapsed time are bounded.
  */
 export async function liquidateSeededPosition(m: MarketInfo, p: PositionInfo): Promise<LiquidationOutcome> {
     if (!m.pool || m.venue !== 'mock' || p.market !== m.market || p.mint !== m.mint) {
@@ -144,10 +148,13 @@ export async function liquidateSeededPosition(m: MarketInfo, p: PositionInfo): P
 
     // A long-idle seed needs a completed bucket before the first exit simulation.
     await crankPrice(m);
-    await waitForClock((await clock()).unixTimestamp + 1n);
+    await waitForClock((await clock()).unixTimestamp + 1n, Math.max(1, deadline - Date.now()));
     await crankPrice(m);
 
-    for (let priceMoves = 0; priceMoves <= MAX_STEPS; priceMoves++) {
+    let priceMoves = 0;
+    let heldBuckets = 0;
+    let lastRefusal: number | null = null;
+    while (Date.now() < deadline) {
         const pos = await shortPosition(p.position);
         if (!pos) throw new Error(`position ${p.position} is already closed`);
         const { x, y, feePpm } = await reserves(pool);
@@ -162,7 +169,7 @@ export async function liquidateSeededPosition(m: MarketInfo, p: PositionInfo): P
             const signature = await send(keeper, [instruction], { computeUnits: COMPUTE_UNITS });
             const [event] = await eventsOf(signature, LIQUIDATE_EVENT_DISCRIMINATOR, getLiquidateEventDecoder());
             if (!event || event.position !== p.position) throw new Error(`no matching Liquidate event in ${signature}`);
-            return { signature, event, priceMoves };
+            return { signature, event, priceMoves, heldBuckets };
         }
         if (simulation.code === SHORTWIN_ERROR__USE_SOL_SETTLE) {
             throw new Error(`stopped because the program requires SOL settlement: ${simulation.detail}`);
@@ -174,19 +181,30 @@ export async function liquidateSeededPosition(m: MarketInfo, p: PositionInfo): P
         ) {
             throw new Error(`liquidation simulation failed: ${simulation.detail}`);
         }
-        if (priceMoves === MAX_STEPS || Date.now() >= deadline) {
-            throw new Error(`position ${p.position} did not become safely liquidatable`);
-        }
+        lastRefusal = simulation.code;
         const next = reservesAfterBuy(x, y, feePpm, PRICE_STEP_BPS);
         const nextCost = buybackCost(pos.q, next.x, next.y, feePpm);
-        if (nextCost > limit) {
-            throw new Error(`stopped before the next price move: projected buyback ${nextCost} exceeds ${limit}`);
-        }
+        const advance =
+            simulation.code === SHORTWIN_ERROR__NOT_LIQUIDATABLE && priceMoves < MAX_STEPS && nextCost <= limit;
+        // A failed simulation does not persist its observation. Record the current spot
+        // without changing reserves, then let that bucket complete before retrying.
         await crankPrice(m);
-        await waitForClock((await clock()).unixTimestamp + 1n);
-        await movePrice(m, PRICE_STEP_BPS);
+        await waitForClock((await clock()).unixTimestamp + 1n, Math.max(1, deadline - Date.now()));
+        if (advance) {
+            await movePrice(m, PRICE_STEP_BPS);
+            priceMoves++;
+        } else {
+            heldBuckets++;
+            if (heldBuckets === 1 || heldBuckets % 10 === 0) {
+                console.log(
+                    `[demo] holding safe price for observation ${heldBuckets}: buyback ${cost} <= ${limit}, refusal ${simulation.code}`,
+                );
+            }
+        }
     }
-    throw new Error('unreachable');
+    throw new Error(
+        `position ${p.position} did not become safely liquidatable within ${MAX_DURATION_MS}ms (${priceMoves} moves, ${heldBuckets} held buckets, last refusal ${lastRefusal})`,
+    );
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
@@ -199,6 +217,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const name = choice as keyof typeof positionName;
     const outcome = await liquidateSeededPosition(state.markets[name], state.positions[positionName[name]]);
     console.log(
-        `[demo] liquidated ${outcome.event.position} in ${outcome.priceMoves} price moves: ${outcome.signature}`,
+        `[demo] liquidated ${outcome.event.position} in ${outcome.priceMoves} price moves and ${outcome.heldBuckets} held buckets: ${outcome.signature}`,
     );
 }

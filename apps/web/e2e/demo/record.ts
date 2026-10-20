@@ -17,12 +17,13 @@ import { join } from 'node:path';
 import { chromium } from '@playwright/test';
 import type { Address } from '@solana/kit';
 import { chromiumPath, E2E_DIR, URLS } from '../env.ts';
-import { App, expect, T, walletInitScript } from '../fixtures.ts';
+import { App, E2E_WALLET_NAME, expect, T, walletInitScript } from '../fixtures.ts';
 import { fullWipe, shortPosition } from '../validator/actions.ts';
 import { ata, clock, getAccount, marketKeys, waitForClock } from '../validator/chain.ts';
 import { crowdBuy, curveCoin, curveState, freshCurveOpenPrice, marketVenue } from '../validator/curve.ts';
 import { CURVE_LEND_RAW } from '../validator/genesis.ts';
 import { loadState } from '../validator/state.ts';
+import { DemoGuide, installPointer } from './guide.ts';
 import { liquidateSeededPosition } from './liquidate.ts';
 
 const DIR = join(E2E_DIR, 'demo');
@@ -77,30 +78,6 @@ async function card(page: import('@playwright/test').Page, title: string, detail
     await page.evaluate(() => document.getElementById('shortwin-demo-overlay')?.remove());
 }
 
-async function note(page: import('@playwright/test').Page, message: string | null): Promise<void> {
-    await page.evaluate((text) => {
-        document.getElementById('shortwin-demo-note')?.remove();
-        if (!text) return;
-        const n = document.createElement('div');
-        n.id = 'shortwin-demo-note';
-        n.textContent = text;
-        Object.assign(n.style, {
-            position: 'fixed',
-            left: '24px',
-            bottom: '48px',
-            zIndex: '2147483647',
-            padding: '11px 16px',
-            maxWidth: '680px',
-            border: '1px solid #f0b90b',
-            background: '#0b0e11ee',
-            color: '#f3f5f7',
-            borderRadius: '8px',
-            font: '600 17px Inter, system-ui, sans-serif',
-        });
-        document.body.append(n);
-    }, message);
-}
-
 async function main(): Promise<void> {
     mkdirSync(RAW_DIR, { recursive: true });
     const state = loadState();
@@ -114,6 +91,13 @@ async function main(): Promise<void> {
     const keys = await marketKeys(coin.mint, coin.tokenProgram);
     if (await getAccount(keys.market)) throw new Error('the demo curve market already exists; reseed the validator');
     if (!(await fetch(`${URLS.indexer}/v1/status`)).ok) throw new Error('the real local indexer is not running');
+    const priorEvents = await fetch(`${URLS.indexer}/v1/markets/${coin.mint}/events`);
+    if (priorEvents.ok) {
+        const body = (await priorEvents.json()) as { data?: { kind?: string }[] };
+        if (body.data?.some((event) => event.kind === 'MarketCreated')) {
+            throw new Error('indexer contains a prior take; stop the stack and archive .e2e/pg before reseeding');
+        }
+    }
 
     const browser = await chromium.launch({ executablePath: chromiumPath(), headless: true });
     const context = await browser.newContext({
@@ -126,13 +110,59 @@ async function main(): Promise<void> {
         recordVideo: { dir: RAW_DIR, size: { width: 1440, height: 900 } },
     });
     await context.addInitScript({ content: walletInitScript('curveLender') });
+    await installPointer(context);
     const page = await context.newPage();
     const app = new App(page, state, 'curveLender');
     const started = Date.now();
     const marks: Mark[] = [];
+    const cues: { text: string; seconds: number }[] = [];
+    const waits: { kind: 'warmup' | 'liquidation' | 'settlement'; start: number; end: number; speed: number }[] = [];
     const signatures: Record<string, string> = {};
+    const elapsed = () => (Date.now() - started) / 1000;
+    const cue = (text: string) => cues.push({ text, seconds: elapsed() });
+    const guide = new DemoGuide(page, cue);
+    const indexedSignature = async (kind: string): Promise<string> => {
+        for (let attempt = 0; attempt < 30; attempt++) {
+            const response = await fetch(`${URLS.indexer}/v1/markets/${coin.mint}/events`);
+            if (response.ok) {
+                const body = (await response.json()) as { data?: { kind?: string; signature?: string }[] };
+                const signature = body.data?.find((event) => event.kind === kind)?.signature;
+                if (signature) return signature;
+            }
+            await page.waitForTimeout(1_000);
+        }
+        throw new Error(`indexer did not report ${kind}`);
+    };
+    const waitForIndexedExit = async (mint: string, signature: string): Promise<void> => {
+        await expect
+            .poll(
+                async () => {
+                    const response = await fetch(`${URLS.indexer}/v1/markets/${mint}/liquidations`);
+                    if (!response.ok) return false;
+                    const body = (await response.json()) as { data?: { signature?: string }[] };
+                    return body.data?.some((event) => event.signature === signature) ?? false;
+                },
+                { timeout: 45_000, intervals: [500, 1_000] },
+            )
+            .toBe(true);
+        // The API allows two seconds of HTTP caching. Let any earlier empty response expire
+        // before navigating, so the result hold shows the real exit without a manual refresh.
+        await page.waitForTimeout(2_100);
+    };
+    const sign = async (label: string): Promise<string> => {
+        await guide.click(app.inModal(T.txSign), label);
+        cue('Transaction submitted · waiting for local-validator confirmation');
+        await app.expectStage('confirmed', 90_000);
+        const signature = await app.inModal(T.txSignature).getAttribute('data-value');
+        if (!signature) throw new Error('confirmed transaction has no signature');
+        cue('Confirmed on the local validator');
+        await page.waitForTimeout(1_600);
+        await guide.click(app.modal.getByRole('button', { name: 'Done' }), 'Done · return to the market');
+        await expect(app.modal).toHaveCount(0);
+        return signature;
+    };
     const mark = (step: string) => {
-        const seconds = (Date.now() - started) / 1000;
+        const seconds = elapsed();
         marks.push({ step, seconds });
         console.log(`[demo] ${seconds.toFixed(1)}s ${step}`);
     };
@@ -140,6 +170,7 @@ async function main(): Promise<void> {
     page.on('pageerror', (error) => pageErrors.push(error.message));
     let failure: unknown;
     try {
+        cue('Follow the gold cursor · rings mark clicks · all transactions use a local validator');
         await app.goto('/markets', 'markets');
         await card(
             page,
@@ -149,22 +180,27 @@ async function main(): Promise<void> {
         );
 
         mark('create-market');
+        cue('Create a lending market for a token on the Pump.fun curve');
         await app.goto(`/markets/new?mint=${coin.mint}`, 'create-market');
-        await app.connectWallet();
+        await card(page, '01 · Create a market', 'Detect the Pump.fun curve, review the transaction, then sign.');
+        await guide.click(app.id(T.walletButton), 'Connect wallet · use the funded local test wallet');
+        await guide.click(app.id(T.walletOption(E2E_WALLET_NAME)), 'Select the ShortWin E2E wallet');
+        await expect(app.id(T.walletAddress)).toHaveAttribute('data-value', app.walletAddress);
         await expect(app.id(T.createVerdict)).toHaveAttribute('data-verdict', 'ok');
         await expect(app.id(T.createVenue)).toHaveAttribute('data-value', 'pump_curve');
-        await card(page, '01 · Create a market', 'The app detects the live Pump.fun curve and checks the mint.');
-        await page.waitForTimeout(2_500);
-        await app.id(T.createSubmit).click();
+        await guide.click(app.id(T.createSubmit), 'Create market · simulate the transaction first');
         if ((await app.simulated()) !== 'review') throw new Error('create-market simulation failed');
+        cue('Simulation passed · review the accounts and network fee');
         await page.waitForTimeout(2_500);
-        await app.inModal(T.txSign).click();
+        await guide.click(app.inModal(T.txSign), 'Sign in wallet · create the market on the local validator');
         await expect(page).toHaveURL(new RegExp(`/m/${coin.mint}`), { timeout: 90_000 });
         if (!(await getAccount(keys.market))) throw new Error('market create did not land');
         const m = { mint: coin.mint, market: keys.market, createdAt: (await clock()).unixTimestamp };
+        cue('Market created · the lender can now supply token inventory');
         await page.waitForTimeout(1_500);
 
         mark('deposit');
+        cue('Supply tokens to the market so borrowers can open shorts');
         await app.goto(`/m/${coin.mint}?panel=lend&action=deposit`, 'market');
         await app.connectWallet();
         await card(
@@ -174,27 +210,35 @@ async function main(): Promise<void> {
         );
         const panel = app.id(T.lendPanel);
         const source = await ata(app.walletAddress, coin.mint, coin.tokenProgram);
+        await guide.move(panel.getByTestId(T.lendTokenAccount), 'Choose the lender’s funded token account');
         await app.selectTokenAccount(panel.getByTestId(T.lendTokenAccount), source);
-        await panel.getByTestId(T.lendAmountInput).fill((CURVE_LEND_RAW / 1_000_000n).toString());
+        await guide.fill(
+            panel.getByTestId(T.lendAmountInput),
+            (CURVE_LEND_RAW / 1_000_000n).toString(),
+            'Enter 60,000,000 tokens to lend',
+        );
         await expect(panel.getByTestId(T.lendPreview('shares'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
-        await panel.getByTestId(T.disclosureAck('lender.solRepayment')).check();
-        await page.waitForTimeout(2_200);
-        await panel.getByTestId(T.lendSubmit).click();
+        await guide.check(
+            panel.getByTestId(T.disclosureAck('lender.solRepayment')),
+            'Acknowledge that repayment may be in SOL',
+        );
+        await guide.click(panel.getByTestId(T.lendSubmit), 'Deposit · preview the token transfer and lender shares');
         if ((await app.simulated()) !== 'review') throw new Error('deposit simulation failed');
+        cue('Review the deposit · tokens leave the wallet and lender shares are issued');
         await page.waitForTimeout(2_200);
-        await app.ackInReview('lender.solRepayment');
-        signatures.deposit = await app.signAndConfirm();
-        await page.waitForTimeout(1_800);
-        await app.closeModal();
+        await guide.check(app.inModal(T.disclosureAck('lender.solRepayment')), 'Confirm the SOL repayment disclosure');
+        signatures.deposit = await sign('Sign in wallet · confirm the token deposit');
 
         // Pump's first validator trade tops up the dumped curve to the local rent minimum.
         await crowdBuy(1_000_000_000n, 1_000_000_000n);
-        await note(page, 'The protocol enforces a 50-second market warm-up. Recording continues in one take.');
+        cue('The market must be 50 seconds old before borrowing can begin');
+        const warmupStart = elapsed();
         await waitForClock(m.createdAt + 52n);
         await freshCurveOpenPrice(m);
-        await note(page, null);
+        waits.push({ kind: 'warmup', start: warmupStart, end: elapsed(), speed: 8 });
 
         mark('open-curve-short');
+        cue('Borrow tokens and sell them on the curve · sale proceeds stay locked as collateral');
         await app.goto(`/m/${coin.mint}?panel=short`, 'market');
         await card(
             page,
@@ -203,22 +247,23 @@ async function main(): Promise<void> {
         );
         const short = app.id(T.shortPanel);
         await expect(short.getByTestId(T.shortBlocked)).toHaveCount(0);
-        await short.getByTestId(T.shortQInput).fill('1500000');
+        await guide.fill(short.getByTestId(T.shortQInput), '1500000', 'Enter a short size of 1,500,000 tokens');
         await expect(short.getByTestId(T.shortPreview('proceeds'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
         const shortAck = short.getByTestId(T.disclosureAck('borrower.liquidation'));
-        if (await shortAck.count()) await shortAck.check();
-        await page.waitForTimeout(2_400);
-        await short.getByTestId(T.shortSubmit).click();
+        if (await shortAck.count()) await guide.check(shortAck, 'Acknowledge the liquidation and SOL settlement risk');
+        await guide.click(short.getByTestId(T.shortSubmit), 'Open short · preview the borrow, sale and collateral');
         if ((await app.simulated()) !== 'review') throw new Error('curve open simulation failed');
         const opened = await app.deltaOfNew('q', [app.walletAddress, keys.market]);
         const position = opened.address as Address;
         if (opened.change !== Q) throw new Error(`wrong open size: ${opened.change}`);
+        cue('Review the borrowed tokens, sale proceeds and locked collateral');
         await page.waitForTimeout(2_400);
-        await app.ackInReview('borrower.liquidation');
-        signatures.open = await app.signAndConfirm();
+        await guide.check(
+            app.inModal(T.disclosureAck('borrower.liquidation')),
+            'Confirm the risk disclosure before signing',
+        );
+        signatures.open = await sign('Sign in wallet · open the curve short');
         if (!(await shortPosition(position))) throw new Error('curve short did not land');
-        await page.waitForTimeout(1_500);
-        await app.closeModal();
 
         // The existing pump v3 E2E scenario moves the curve across rT; the UI then closes the
         // position in one transaction through pump's synthetic migration path.
@@ -230,48 +275,57 @@ async function main(): Promise<void> {
         const beforeBuy = await curveState();
         await crowdBuy(beforeBuy.rt - Q / 2n, 100n * 1_000_000_000n);
         mark('close-curve-short');
+        cue('Close the borrower’s position at the current buyback cost');
         await app.goto(`/positions/${position}`, 'position');
         await expect(app.id(T.closePreview('buyback'))).toHaveAttribute('data-value', /^[1-9]\d*$/);
         await card(page, '04 · Close the short', 'The borrower buys back the tokens and settles the position.');
-        await page.waitForTimeout(2_400);
-        await app.id(T.closeSubmit).click();
+        await guide.click(app.id(T.closeSubmit), 'Close short · preview the buyback and settlement');
         if ((await app.simulated()) !== 'review') throw new Error('curve close simulation failed');
+        cue('Review the final buyback cost and the amount returned to the borrower');
         await page.waitForTimeout(2_400);
-        await app.inModal(T.txSign).click();
+        await guide.click(app.inModal(T.txSign), 'Sign in wallet · buy back tokens and close the short');
         await expect.poll(async () => shortPosition(position), { timeout: 90_000 }).toBeNull();
         if ((await marketVenue(keys.market)) !== 2) throw new Error('the curve did not move to PumpMigrating');
-        await page.waitForTimeout(2_000);
+        cue('Closed on chain · loading the confirmed exit history');
+        signatures.close = await indexedSignature('Close');
+        await expect
+            .poll(
+                async () => {
+                    const response = await fetch(`${URLS.indexer}/v1/positions/${position}`);
+                    const body = (await response.json()) as { position?: { status?: string } };
+                    return body.position?.status;
+                },
+                { timeout: 30_000 },
+            )
+            .toBe('closed');
+        // Reload the real indexed result so the success hold does not retain the pre-close
+        // query cache beside the already-closed chain account.
+        await app.goto(`/positions/${position}`, 'position');
+        await expect(app.id(T.positionDetail).getByText('closed', { exact: true }).first()).toBeVisible();
+        cue('Short closed · the position account is settled on the local validator');
+        await page.waitForTimeout(3_000);
 
         // The create and close pages navigate away from their review dialogs on confirmation;
         // capture those signatures from the real indexer's event log for the evidence manifest.
-        const indexedSignature = async (kind: string): Promise<string> => {
-            for (let attempt = 0; attempt < 30; attempt++) {
-                const response = await fetch(`${URLS.indexer}/v1/markets/${coin.mint}/events`);
-                if (response.ok) {
-                    const body = (await response.json()) as { data?: { kind?: string; signature?: string }[] };
-                    const signature = body.data?.find((event) => event.kind === kind)?.signature;
-                    if (signature) return signature;
-                }
-                await page.waitForTimeout(1_000);
-            }
-            throw new Error(`indexer did not report ${kind}`);
-        };
         signatures.create = await indexedSignature('MarketCreated');
-        signatures.close = await indexedSignature('Close');
 
         mark('scripted-liquidation');
+        cue('Switch to a separate mock market to demonstrate a keeper liquidation');
         const move = state.markets.move;
         const toLiquidate = state.positions.closer;
         await app.goto(`/m/${move.mint}?tab=positions`, 'market');
         await card(
             page,
             '05 · Scripted liquidation',
-            'A local price rise lowers collateral; a keeper closes the at-risk short.',
+            'A price rise lowers the collateral ratio; a keeper closes the at-risk short.',
         );
-        await note(page, 'Scripted local price rise · the keeper checks each price bucket before liquidation.');
+        cue('Scripted price rise · the keeper waits for the position to become liquidatable');
+        const liquidationStart = elapsed();
         const liquidation = await liquidateSeededPosition(move, toLiquidate);
+        await waitForIndexedExit(move.mint, liquidation.signature);
+        waits.push({ kind: 'liquidation', start: liquidationStart, end: elapsed(), speed: 8 });
         signatures.liquidation = liquidation.signature;
-        await note(page, null);
+        cue('Liquidation confirmed · open the market’s liquidation history');
         await app.goto(`/m/${move.mint}?tab=liquidations`, 'market');
         await expect(app.id(T.marketLiquidationRow(liquidation.signature))).toHaveAttribute(
             'data-kind',
@@ -280,9 +334,14 @@ async function main(): Promise<void> {
                 timeout: 45_000,
             },
         );
+        await guide.move(
+            app.id(T.marketLiquidationRow(liquidation.signature)),
+            'Liquidation recorded · the keeper closed the at-risk position',
+        );
         await page.waitForTimeout(4_000);
 
         mark('s1-settlement');
+        cue('Switch to another mock market to demonstrate settlement when token buyback fails');
         const wipe = state.markets.wipe;
         await app.goto(`/m/${wipe.mint}?tab=positions`, 'market');
         await card(
@@ -290,18 +349,26 @@ async function main(): Promise<void> {
             '06 · S1 SOL settlement',
             'A larger price gap makes token buyback impossible; lenders receive the remaining SOL.',
         );
-        await note(page, 'Scripted price gap · the keeper runs crank_price + sol_settle until S1 lands.');
+        cue('Scripted price gap · the keeper settles the position in SOL');
+        const settlementStart = elapsed();
         const settlement = await fullWipe(wipe, 'wiped', state.tokenAccounts.wipe.lender, state.positions.wipe);
+        await waitForIndexedExit(wipe.mint, settlement.signature);
+        waits.push({ kind: 'settlement', start: settlementStart, end: elapsed(), speed: 8 });
         if (settlement.settle.condition !== 1) throw new Error('settlement was not S1');
         signatures.s1 = settlement.signature;
-        await note(page, null);
+        cue('S1 settlement confirmed · inspect the exit record');
         await app.goto(`/m/${wipe.mint}?tab=liquidations`, 'market');
         await expect(app.id(T.marketLiquidationRow(settlement.signature))).toHaveAttribute('data-condition', 'S1', {
             timeout: 45_000,
         });
+        await guide.move(
+            app.id(T.marketLiquidationRow(settlement.signature)),
+            'S1 settlement recorded · lenders receive the remaining SOL',
+        );
         await page.waitForTimeout(4_000);
 
         mark('outro');
+        cue('Six confirmed actions · create, deposit, open, close, liquidation and S1 settlement');
         await card(
             page,
             'Six local-validator actions',
@@ -319,7 +386,7 @@ async function main(): Promise<void> {
         await browser.close();
         writeFileSync(
             MANIFEST,
-            `${JSON.stringify({ version, started: new Date(started).toISOString(), marks, signatures, raw: RAW, failure: failure ? String(failure) : null, pageErrors }, null, 2)}\n`,
+            `${JSON.stringify({ version, started: new Date(started).toISOString(), pointer: true, marks, cues, waits, signatures, raw: RAW, failure: failure ? String(failure) : null, pageErrors }, null, 2)}\n`,
         );
         console.log(`[demo] raw recording: ${RAW}`);
     }
