@@ -65,22 +65,9 @@
 //! instruction); the keeper then migrates and transitions the market in the same tick, and the
 //! market's other positions exit on the pool at the post-change warm-up's gate.
 //!
-//! **The curve TradeExtras format** (pump-final §7, §15 "Release coordination"): for one release
-//! the keeper builds both a curve exit's v3 list (10 keys) and shortwin 1.0.0's (20,
-//! [`crate::venue::CurveExtrasFormat`]), and uses the one the deployed short.win parses, known per
-//! short.win's ProgramData deploy slot (its header, read once a tick when a curve exit is due).
-//! At start-up and at each new deploy slot the first curve exit is simulated with V3; if that
-//! fails on account parsing (`BadRemainingAccounts`, `VenueAccountMismatch`) it is simulated
-//! with V2. The format that gets past account parsing is kept until the deploy slot changes (or
-//! an exit with it fails on account parsing, which tries the other at once). Neither, on a deploy
-//! slot no exit found the format of, alerts once per position ([`Alert::CurveExtrasFormatUnknown`]);
-//! on one whose format an exit found, the refusal is the exit's own — its market's ReadSet or
-//! VenueExtras raise the same codes — and the known format's is paged as any refusal. Every send
-//! is simulated first, on a bank at or past the deploy slot read (a node of an RPC pool behind
-//! that read answers for the build before: not sent, tried again the next tick), so a Governance
-//! upgrade landing between two ticks costs no failed send. On 1.0.0 a curve exit past `rT` is
-//! refused `CurveStraddle` (1.0.0's exits never buy past `rT`): the position goes to `sol_settle`
-//! instead, unpaged, and waits for the upgrade (pump-final §15 step 1).
+//! **Curve exits** carry the current pump v3 TradeExtras list. Every send is simulated first,
+//! on a bank at or past short.win's ProgramData deploy slot read this tick. A simulation from a
+//! bank behind that slot is not sent and is retried next tick.
 //!
 //! **The trader side** (duties 6 and 13, [`crate::sweep`]): right after a full wipe, the venue
 //! cashback claims the trader needs and `sweep_trader` (a deposit, and hence an open, waits for
@@ -136,7 +123,7 @@ use crate::monitor::{self, FeeCaps, LatchAction, PoolWatch};
 use crate::pda;
 use crate::pool_monitor::{self, Action, PoolPlan, PoolTrack, Seen};
 use crate::sweep::{self, SweepFacts, SweepKind, SweepRecord};
-use crate::venue::{self, CurveExtrasFormat, FormatEvidence, PammAccount};
+use crate::venue::{self, PammAccount};
 use crate::view::{self, ChainView, MarketView, PositionView};
 
 /// M7-SEC-8: a cold market's poll phase in `[0, every)` (from its key), so the cold markets'
@@ -213,32 +200,6 @@ impl ExitResult {
             _ => None,
         }
     }
-
-    /// What this attempt says about the curve TradeExtras format it carried (pump-final §7;
-    /// [`venue::format_evidence`]): a send follows a simulation that got past account parsing,
-    /// unless the transaction then failed on it — a Governance upgrade between the simulation and
-    /// the landing.
-    pub fn format_evidence(&self) -> FormatEvidence {
-        match self {
-            Self::Landed { .. } | Self::DryRun { .. } | Self::Deferred { .. } => {
-                FormatEvidence::Parsed
-            }
-            Self::Refused { outcome, .. } | Self::Failed { outcome } => {
-                venue::format_evidence(outcome)
-            }
-            Self::NoOp | Self::NotDeployed { .. } | Self::Error(_) => FormatEvidence::Unknown,
-        }
-    }
-
-    /// The custom error of a refusal or an on-chain failure.
-    fn code(&self) -> Option<u32> {
-        match self {
-            Self::Refused { outcome, .. } | Self::Failed { outcome } => {
-                outcome.err.as_ref().and_then(TxError::custom_code)
-            }
-            _ => None,
-        }
-    }
 }
 
 /// One exit attempt.
@@ -249,24 +210,7 @@ pub struct ExitRecord {
     pub kind: ExitKind,
     /// The plan that led to it.
     pub plan: Plan,
-    /// A `PumpCurve` liquidation or expiry: the TradeExtras format it carried (pump-final §7).
-    pub curve_format: Option<CurveExtrasFormat>,
     pub result: ExitResult,
-}
-
-/// pump-final §7, the upgrade window: one curve exit whose TradeExtras format the keeper had to
-/// find — none known for short.win's deploy slot, or the known one refused on account parsing.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CurveFormatRecord {
-    pub market: Pubkey,
-    pub position: Pubkey,
-    /// short.win's ProgramData deploy slot as read this tick (`None`: unreadable).
-    pub deploy_slot: Option<u64>,
-    /// The formats refused on account parsing, in the order tried, with the custom error.
-    pub refused: Vec<(CurveExtrasFormat, Option<u32>)>,
-    /// The format that got past account parsing (now the known one), or `None`: neither did, or
-    /// the attempt said nothing (a refusal before account parsing, a transport error, AIR-18).
-    pub chosen: Option<CurveExtrasFormat>,
 }
 
 /// One crank batch sent.
@@ -408,8 +352,6 @@ pub struct TickReport {
     pub pamm_accounts: Vec<(Pubkey, ExitResult)>,
     /// Duty 6 (M6): the keeper's `→ PumpSwap` transitions.
     pub transitions: Vec<TransitionRecord>,
-    /// pump-final §7: the curve exits whose TradeExtras format the keeper had to find.
-    pub curve_formats: Vec<CurveFormatRecord>,
     /// Duties 6 and 13: the keeper's sweeps (post-wipe, trader side, cashback claims).
     pub sweeps: Vec<SweepRecord>,
     /// O17: the keeper's `set_coverage_pause` attempts (the designated pauser only).
@@ -630,18 +572,8 @@ fn benign(code: u32) -> bool {
     .any(|e| u32::from(e) == code)
 }
 
-/// pump-final §15 step 1, the upgrade window: shortwin 1.0.0 — a curve exit carrying its list
-/// (`format` V2) — refuses a liquidation or expiry whose `Q` exceeds the live curve's `rT` with
-/// `CurveStraddle` (its exits never buy past `rT`; the bundle that did is retired). Not alerted:
-/// the position goes to `sol_settle` — S2 when its legs hold, else a no-op crank, as 1.0.0's keeper
-/// sent it while its bundle did not go out — and waits for the upgrade, whose v3 exit buys past
-/// `rT`. The v3 build refuses `CurveStraddle` only on a borrower's close.
-fn waits_for_upgrade(code: Option<u32>, format: Option<CurveExtrasFormat>) -> bool {
-    format == Some(CurveExtrasFormat::V2) && is(code, ShortwinError::CurveStraddle)
-}
-
-/// An exit's refusal or on-chain failure as an alert's detail (`ExitRefused`,
-/// [`Alert::CurveExtrasFormatUnknown`]): its error and the program's own error line
+/// An exit's refusal or on-chain failure as an `ExitRefused` alert's detail:
+/// its error and the program's own error line
 /// (`AnchorError thrown in <source>:<line>. Error Code: …`), if any. On a curve exit's
 /// account-parsing refusal the source line tells the TradeExtras parser from the ReadSet's
 /// (`check_read`) or the VenueExtras' (`parse_extras`), which raise the same codes.
@@ -665,15 +597,6 @@ fn refusal_brief(r: &ExitResult) -> String {
         other => format!("{other:?}"),
     }
 }
-
-/// pump-final §7: the key of a raised [`Alert::CurveExtrasFormatUnknown`] — market, position,
-/// short.win's deploy slot, and each list's refusal code.
-type FormatAlertKey = (
-    Pubkey,
-    Pubkey,
-    Option<u64>,
-    Vec<(CurveExtrasFormat, Option<u32>)>,
-);
 
 /// U28: `⌊B̂_live · 10⁴ / B̂_ref⌋` of an evaluation, when both are defined.
 fn b_ratio_bps(e: &PositionEval) -> Option<u64> {
@@ -727,14 +650,8 @@ pub struct Keeper<C: Chain> {
     discovery: Option<C>,
     /// Duty 6: the second of the last `migrate_v2` attempt per market (one a second).
     migrate_tried: BTreeMap<Pubkey, i64>,
-    /// pump-final §7: the curve TradeExtras format the deployed short.win parses, with the
-    /// ProgramData deploy slot it was found at (`None`: unreadable then).
-    curve_format: Option<(Option<u64>, CurveExtrasFormat)>,
     /// short.win's ProgramData deploy slot as read in a tick: (the tick's slot, the deploy slot).
     shortwin_deploy: Option<(u64, Option<u64>)>,
-    /// pump-final §7: the [`Alert::CurveExtrasFormatUnknown`] already raised ([`FormatAlertKey`]);
-    /// a market's entries are cleared once a curve exit on it gets past account parsing.
-    format_alerted: HashSet<FormatAlertKey>,
     /// Duty 10 (pump-final §7): the curve findings already alerted, per (market, finding).
     curve_alerted: HashSet<(Pubkey, CurveFinding)>,
     /// Duty 6: graduation alerts already raised, per (market or position, detail).
@@ -839,9 +756,7 @@ impl<C: Chain> Keeper<C> {
             pool_tracks: BTreeMap::new(),
             discovery: None,
             migrate_tried: BTreeMap::new(),
-            curve_format: None,
             shortwin_deploy: None,
-            format_alerted: HashSet::new(),
             curve_alerted: HashSet::new(),
             graduation_alerted: HashSet::new(),
             curve_ready: HashSet::new(),
@@ -941,12 +856,6 @@ impl<C: Chain> Keeper<C> {
     /// A market's coverage state.
     pub fn track(&self, market: &Pubkey) -> Option<&MarketTrack> {
         self.tracks.get(market)
-    }
-
-    /// pump-final §7: the curve TradeExtras format the keeper knows the deployed short.win
-    /// parses, and short.win's ProgramData deploy slot it was found at (`None`: none known yet).
-    pub fn curve_format(&self) -> Option<(Option<u64>, CurveExtrasFormat)> {
-        self.curve_format
     }
 
     /// The global keeper budget (decision A of 2026-10-01; [`crate::budget`]).
@@ -1970,7 +1879,7 @@ impl<C: Chain> Keeper<C> {
                     probed_before = Some(track.s3_probe.insert(pv.key, now));
                 }
             }
-            let (result, format) = self.attempt(&mv, &pv, kind, ev.plan, now, report).await;
+            let result = self.attempt(&mv, &pv, kind, ev.plan, now).await;
             // AIR-18: a refusal in this slot is no probe: the next tick (slot) probes again.
             if matches!(result, ExitResult::NotDeployed { .. })
                 && let Some(before) = probed_before
@@ -1985,12 +1894,12 @@ impl<C: Chain> Keeper<C> {
                 // T-CASCADE: the market's exit budget for this slot is spent; the rest (most
                 // under-collateralised first: `evaluate_all`'s order) goes out next slot.
                 self.metrics.market(key).exits_deferred += 1;
-                self.account_exit(&mv, &pv, kind, ev.plan, format, result, now, slot, report);
+                self.account_exit(&mv, &pv, kind, ev.plan, result, now, slot, report);
                 break;
             }
             let mut chained: Option<ExitKind> = None;
             if let ExitResult::Refused { code, .. } = &result {
-                if is(*code, ShortwinError::UseSolSettle) || waits_for_upgrade(*code, format) {
+                if is(*code, ShortwinError::UseSolSettle) {
                     chained = Some(ExitKind::SolSettle);
                 } else if is(*code, ShortwinError::UseExpire) {
                     chained = Some(ExitKind::Expire);
@@ -2008,26 +1917,21 @@ impl<C: Chain> Keeper<C> {
             let exit_landed =
                 result.landed().is_some() && matches!(kind, ExitKind::Liquidate | ExitKind::Expire);
             let completes = exit_landed && result.landed().is_some_and(completes_curve);
-            let mut landed =
-                self.account_exit(&mv, &pv, kind, ev.plan, format, result, now, slot, report);
+            let mut landed = self.account_exit(&mv, &pv, kind, ev.plan, result, now, slot, report);
             // U28: `B̂_live/B̂_ref` at the keeper's decision of a landed liquidation or expiry.
             if exit_landed && let Some(bps) = b_ratio_bps(&ev) {
                 self.metrics.b_ratio_landed.record(bps);
             }
-            // The program redirected the exit (`UseSolSettle`, `UseExpire`; on shortwin 1.0.0 a
-            // curve exit past `rT`, [`waits_for_upgrade`]): follow it once.
+            // The program redirected the exit (`UseSolSettle`, `UseExpire`): follow it once.
             let mut chained_completes = false;
             if !landed
                 && let Some(next_kind) = chained
                 && attempted.insert((pv.key, next_kind))
             {
-                let (r, format) = self
-                    .attempt(&mv, &pv, next_kind, ev.plan, now, report)
-                    .await;
+                let r = self.attempt(&mv, &pv, next_kind, ev.plan, now).await;
                 chained_completes =
                     next_kind == ExitKind::Expire && r.landed().is_some_and(completes_curve);
-                landed =
-                    self.account_exit(&mv, &pv, next_kind, ev.plan, format, r, now, slot, report);
+                landed = self.account_exit(&mv, &pv, next_kind, ev.plan, r, now, slot, report);
             }
             // pump-final §7: an exit that completed the curve — past the live curve's `rT`, by
             // pump's synthetic migration, when the position's `Q` exceeded it.
@@ -2537,7 +2441,6 @@ impl<C: Chain> Keeper<C> {
         pv: &PositionView,
         kind: ExitKind,
         plan: Plan,
-        curve_format: Option<CurveExtrasFormat>,
         result: ExitResult,
         now: i64,
         slot: u64,
@@ -2575,7 +2478,7 @@ impl<C: Chain> Keeper<C> {
                 }
             }
             ExitResult::Refused { code, .. } => {
-                if !code.is_some_and(benign) && !waits_for_upgrade(*code, curve_format) {
+                if !code.is_some_and(benign) {
                     self.alerts.push(Alert::ExitRefused {
                         market: key,
                         position: pv.key,
@@ -2604,7 +2507,6 @@ impl<C: Chain> Keeper<C> {
             position: pv.key,
             kind,
             plan,
-            curve_format,
             result,
         });
         landed
@@ -2648,10 +2550,8 @@ impl<C: Chain> Keeper<C> {
         }
     }
 
-    /// Simulates and sends one exit (module docs); trading exits try the extras sets in order, and
-    /// on a `PumpCurve` market in the TradeExtras format the deployed short.win parses
-    /// ([`Self::attempt_curve`]). Returns the result and, for a curve trading exit, the format it
-    /// carried.
+    /// Simulates and sends an exit, trying governed extras sets in order. Curve exits use the
+    /// current v3 list and require a simulation at or after the observed program deploy slot.
     async fn attempt(
         &mut self,
         mv: &MarketView,
@@ -2659,136 +2559,21 @@ impl<C: Chain> Keeper<C> {
         kind: ExitKind,
         plan: Plan,
         now: i64,
-        report: &mut TickReport,
-    ) -> (ExitResult, Option<CurveExtrasFormat>) {
-        match kind {
-            ExitKind::SolSettle => (self.attempt_settle(mv, pv, plan, now).await, None),
-            ExitKind::Liquidate | ExitKind::Expire if mv.kind == VenueKind::PumpCurve => {
-                let (r, f) = self.attempt_curve(mv, pv, kind, now, report).await;
-                (r, Some(f))
-            }
-            ExitKind::Liquidate | ExitKind::Expire => (
-                self.attempt_trading(mv, pv, kind, CurveExtrasFormat::V3, now, None)
-                    .await,
-                None,
-            ),
-        }
-    }
-
-    /// pump-final §7, the upgrade window (module docs): a `PumpCurve` liquidation or expiry in
-    /// the TradeExtras format known for short.win's current ProgramData deploy slot, else V3
-    /// first; a refusal on account parsing ([`ExitResult::format_evidence`]) tries the other
-    /// format at once. The format that gets past account parsing becomes the known one for that
-    /// deploy slot. When neither does:
-    ///
-    /// - on a deploy slot whose format an earlier exit found (the header read now), the format is
-    ///   not in doubt — the same binary parsed it — and stays known: the refusals are this exit's
-    ///   own (its market's ReadSet or VenueExtras, which raise the same codes, or a list's
-    ///   content). The known format's refusal is the one returned, booked and paged as any refusal
-    ///   (`ExitRefused`, its detail the program's error line): the other list's is only the
-    ///   deployed parser refusing a list it does not take;
-    /// - otherwise none is known any more, and [`Alert::CurveExtrasFormatUnknown`] is raised once
-    ///   per position, deploy slot and pair of refusal codes ([`FormatAlertKey`]), its detail the
-    ///   program's error lines ([`refusal_brief`]); the last attempt is returned.
-    ///
-    /// Every simulation must come from a bank at or past the deploy slot read
-    /// ([`Self::send_exit_floored`]): one a node of an RPC pool behind that read answers is the
-    /// build before's, so the exit is not sent, says nothing about the format and is tried again
-    /// the next tick (an error of the tick).
-    ///
-    /// Returns the result and the format it carried.
-    async fn attempt_curve(
-        &mut self,
-        mv: &MarketView,
-        pv: &PositionView,
-        kind: ExitKind,
-        now: i64,
-        report: &mut TickReport,
-    ) -> (ExitResult, CurveExtrasFormat) {
-        let deploy = self.shortwin_deploy_slot().await;
-        // An unreadable deploy slot keeps whatever format is known.
-        let known = self
-            .curve_format
-            .filter(|(at, _)| deploy.is_none() || *at == deploy)
-            .map(|(_, f)| f);
-        let first = known.unwrap_or(CurveExtrasFormat::V3);
-        let mut refused: Vec<(CurveExtrasFormat, Option<u32>)> = Vec::new();
-        let mut details: Vec<String> = Vec::new();
-        let mut attempts: Vec<(ExitResult, CurveExtrasFormat)> = Vec::new();
-        for format in [first, first.other()] {
-            let r = self
-                .attempt_trading(mv, pv, kind, format, now, deploy)
-                .await;
-            match r.format_evidence() {
-                FormatEvidence::ParseFailed => {
-                    refused.push((format, r.code()));
-                    details.push(format!("{format:?}: {}", refusal_brief(&r)));
-                    attempts.push((r, format));
-                }
-                evidence => {
-                    let parsed = evidence == FormatEvidence::Parsed;
-                    if parsed {
-                        self.curve_format = Some((deploy, format));
-                        // The market parses again: a later failure is alerted anew.
-                        self.format_alerted.retain(|k| k.0 != mv.key);
-                    }
-                    if known.is_none() || !refused.is_empty() {
-                        self.metrics.curve_format_probes += 1;
-                        report.curve_formats.push(CurveFormatRecord {
-                            market: mv.key,
-                            position: pv.key,
-                            deploy_slot: deploy,
-                            refused,
-                            chosen: parsed.then_some(format),
-                        });
-                    }
-                    return (r, format);
-                }
-            }
-        }
-        // Neither list got past account parsing.
-        self.metrics.curve_format_probes += 1;
-        self.metrics.curve_format_failures += 1;
-        report.curve_formats.push(CurveFormatRecord {
-            market: mv.key,
-            position: pv.key,
-            deploy_slot: deploy,
-            refused: refused.clone(),
-            chosen: None,
-        });
-        // A format found on this very deploy slot (`known` holds only such a one when the header
-        // was read) stays: the binary that parsed it runs still.
-        let confirmed = deploy.is_some() && known.is_some();
-        if !confirmed {
-            self.curve_format = None;
-            if self
-                .format_alerted
-                .insert((mv.key, pv.key, deploy, refused))
-            {
-                self.alerts.push(Alert::CurveExtrasFormatUnknown {
-                    market: mv.key,
-                    position: pv.key,
-                    deploy_slot: deploy,
-                    detail: details.join("; "),
-                });
-            }
-        }
-        // Confirmed: the known format's refusal (tried first) is this exit's own.
-        let pick = if confirmed {
-            attempts.into_iter().next()
+    ) -> ExitResult {
+        if kind == ExitKind::SolSettle {
+            self.attempt_settle(mv, pv, plan, now).await
         } else {
-            attempts.pop()
-        };
-        pick.unwrap_or_else(|| {
-            (
-                ExitResult::Error("no TradeExtras format tried".into()),
-                first,
-            )
-        })
+            let floor = if mv.kind == VenueKind::PumpCurve {
+                self.shortwin_deploy_slot().await
+            } else {
+                None
+            };
+            self.attempt_trading(mv, pv, kind, now, floor).await
+        }
     }
 
-    /// short.win's ProgramData deploy slot (pump-final §7: the key of the known curve TradeExtras
-    /// format), its header read at most once a tick; `None` when unreadable.
+    /// short.win's ProgramData deploy slot, read at most once a tick; `None` when unreadable.
+    /// A curve exit's simulation may not predate this observed program deployment.
     async fn shortwin_deploy_slot(&mut self) -> Option<u64> {
         if let Some((at, deploy)) = self.shortwin_deploy
             && at == self.tick_slot
@@ -2799,7 +2584,7 @@ impl<C: Chain> Keeper<C> {
         let deploy = match self.chain.account_headers(&[pd], monitor::HEADER_LEN).await {
             Ok(v) => monitor::deploy_slot(v.first().and_then(Option::as_ref)),
             Err(e) => {
-                tracing::warn!("short.win ProgramData header (curve TradeExtras format): {e:#}");
+                tracing::warn!("short.win ProgramData header (curve exit): {e:#}");
                 None
             }
         };
@@ -2845,15 +2630,14 @@ impl<C: Chain> Keeper<C> {
         self.send_exit(&[ix], mv.key, ExtrasSel::NONE, now).await
     }
 
-    /// A trading exit (`liquidate`, `expire`) of `pv`, a curve market's TradeExtras in `format`,
-    /// with each extras set in turn until one gets past the set's own refusals; with `floor`,
+    /// A trading exit (`liquidate`, `expire`) of `pv`, with each extras set in turn until one
+    /// gets past the set's own refusals; with `floor`,
     /// simulated on a bank at that slot or later ([`Self::send_exit_floored`]).
     async fn attempt_trading(
         &mut self,
         mv: &MarketView,
         pv: &PositionView,
         kind: ExitKind,
-        format: CurveExtrasFormat,
         now: i64,
         floor: Option<u64>,
     ) -> ExitResult {
@@ -2866,8 +2650,8 @@ impl<C: Chain> Keeper<C> {
         let prep = venue::pamm_creator_vault_prep(&keeper, &mv.market, mv.kind, &mv.read_accounts);
         for c in choices {
             let built = match kind {
-                ExitKind::Liquidate => ixs::liquidate_as(&keeper, mv, pv, &c, format),
-                _ => ixs::expire_as(&keeper, mv, pv, &c, format),
+                ExitKind::Liquidate => ixs::liquidate(&keeper, mv, pv, &c),
+                _ => ixs::expire(&keeper, mv, pv, &c),
             };
             let ix = match built {
                 Ok(ix) => ix,
@@ -5044,103 +4828,11 @@ impl<C: Chain> Keeper<C> {
 mod tests {
     use super::*;
 
-    /// pump-final §7: what an exit attempt says about its curve TradeExtras format. A landed,
-    /// dry-run or deferred exit simulated past account parsing; a refusal or an on-chain failure
-    /// is judged by its outcome — so an exit simulated on 1.0.0 that fails on chain on the account
-    /// parser of a build upgraded in between tries the other format; a transport error, a no-op
-    /// probe or a program not deployed in the slot say nothing.
-    #[test]
-    fn exit_results_tell_the_curve_format() {
-        let failed = |code: u32| TxOutcome {
-            err: Some(TxError::Custom { index: 2, code }),
-            logs: vec![format!(
-                "Program {} failed: custom program error",
-                shortwin::ID
-            )],
-            ..TxOutcome::default()
-        };
-        let mismatch = u32::from(ShortwinError::VenueAccountMismatch);
-        let landed = ExitResult::Landed {
-            outcome: TxOutcome::default(),
-            format: TxFormat::V1,
-            extras: ExtrasSel::NONE,
-            unit_limit: 1,
-            bytes: 1,
-        };
-        for (r, want) in [
-            (landed, FormatEvidence::Parsed),
-            (
-                ExitResult::DryRun {
-                    outcome: TxOutcome::default(),
-                },
-                FormatEvidence::Parsed,
-            ),
-            (
-                ExitResult::Deferred { unit_limit: 1 },
-                FormatEvidence::Parsed,
-            ),
-            (
-                ExitResult::Failed {
-                    outcome: failed(mismatch),
-                },
-                FormatEvidence::ParseFailed,
-            ),
-            (
-                ExitResult::Refused {
-                    code: Some(mismatch),
-                    outcome: failed(mismatch),
-                },
-                FormatEvidence::ParseFailed,
-            ),
-            (
-                ExitResult::Failed {
-                    outcome: failed(u32::from(ShortwinError::ExitBoundNotMet)),
-                },
-                FormatEvidence::Parsed,
-            ),
-            (
-                ExitResult::Failed {
-                    outcome: failed(u32::from(ShortwinError::VenueMigrating)),
-                },
-                FormatEvidence::Unknown,
-            ),
-            (ExitResult::NoOp, FormatEvidence::Unknown),
-            (ExitResult::Error("rpc".into()), FormatEvidence::Unknown),
-            (
-                ExitResult::NotDeployed {
-                    program: shortwin::ID,
-                    outcome: TxOutcome::default(),
-                },
-                FormatEvidence::Unknown,
-            ),
-        ] {
-            assert_eq!(r.format_evidence(), want, "{r:?}");
-        }
-    }
-
-    /// pump-final §15 step 1: only 1.0.0's `CurveStraddle` on a V2 curve exit waits for the
-    /// upgrade (`sol_settle`, unpaged); the same code on a v3 exit, another code on a V2 exit, or
-    /// a refusal without a code is an ordinary refusal.
-    #[test]
-    fn only_a_v2_exits_curve_straddle_waits_for_the_upgrade() {
-        let straddle = Some(u32::from(ShortwinError::CurveStraddle));
-        assert!(waits_for_upgrade(straddle, Some(CurveExtrasFormat::V2)));
-        assert!(!waits_for_upgrade(straddle, Some(CurveExtrasFormat::V3)));
-        assert!(!waits_for_upgrade(straddle, None));
-        for code in [
-            Some(u32::from(ShortwinError::VenueAccountMismatch)),
-            Some(u32::from(ShortwinError::ExitBoundNotMet)),
-            None,
-        ] {
-            assert!(!waits_for_upgrade(code, Some(CurveExtrasFormat::V2)));
-        }
-    }
-
-    /// `CurveExtrasFormatUnknown`'s detail: a refusal's error and the program's own error line
+    /// An `ExitRefused` alert's detail: a refusal's error and the program's own error line
     /// (its source line tells which parser refused), never the whole outcome — no slot, no logs,
     /// so the alert's key and size stay put however long the failure lasts.
     #[test]
-    fn a_format_refusal_reads_as_its_error_and_the_programs_error_line() {
+    fn a_refusal_reads_as_its_error_and_the_programs_error_line() {
         let code = u32::from(ShortwinError::BadRemainingAccounts);
         let anchor = format!(
             "AnchorError thrown in programs/shortwin/src/venues/mod.rs:162. Error Code: \

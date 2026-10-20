@@ -58,7 +58,6 @@ use shortwin::state::{ShortPosition, VenueKind};
 use shortwin_keeper::config::GraduationConfig;
 use shortwin_keeper::decide::Plan;
 use shortwin_keeper::graduation;
-use shortwin_keeper::venue::CurveExtrasFormat;
 use shortwin_litesvm_tests::engine::{Borrower, VenueMarket};
 use shortwin_litesvm_tests::fork::{self, PumpCoin, PumpCurve};
 use shortwin_litesvm_tests::pamm::{PammMarket, PammUser};
@@ -311,7 +310,7 @@ fn forge_position(h: &Harness, key: &Pubkey, f: impl FnOnce(&mut ShortPosition))
 }
 
 /// The checks of a keeper exit that completed the curve by pump's synthetic migration (pump-final
-/// §5.2, §6.1.7): the v3 list (found by simulation at the first curve exit), pump's pool part of
+/// §5.2, §6.1.7): the current v3 list, pump's pool part of
 /// `q − rT` tokens, the market `PumpCurve → PumpMigrating` in the same instruction, `q` into the
 /// lending vault; then, in the same tick, the keeper's `migrate_v2` and transition.
 #[allow(clippy::too_many_arguments)]
@@ -334,7 +333,6 @@ fn check_completing_exit(
     assert_eq!(exits.len(), 1, "one buyback: {:?}", r.exits);
     let e = exits[0];
     assert_eq!((e.position, e.kind), (position, kind));
-    assert_eq!(e.curve_format, Some(CurveExtrasFormat::V3), "the v3 list");
     let out = e.result.landed().expect("landed");
     assert_eq!(
         venue_changes(out),
@@ -361,10 +359,6 @@ fn check_completing_exit(
         tokens(h, &pm.keys.pool_vault) >= vault0 + q,
         "q back to the lenders"
     );
-    // pump-final §7: the first curve exit found its TradeExtras format by simulation (V3 first).
-    assert_eq!(r.curve_formats.len(), 1, "{:?}", r.curve_formats);
-    assert_eq!(r.curve_formats[0].chosen, Some(CurveExtrasFormat::V3));
-    assert!(r.curve_formats[0].refused.is_empty());
     // The keeper graduated the market in the same tick.
     assert_eq!(r.migrations.len(), 1, "{:?}", r.migrations);
     assert!(r.migrations[0].result.landed().is_some());
@@ -710,12 +704,6 @@ fn a_completing_liquidation_graduates_the_market_and_the_rest_exits_on_the_pool(
         if r.exits.iter().any(|e| {
             e.position == other && e.kind == ExitKind::Liquidate && e.result.landed().is_some()
         }) {
-            assert!(
-                r.exits
-                    .iter()
-                    .all(|e| e.curve_format.is_none() || e.position != other),
-                "a PumpSwap exit carries no curve format"
-            );
             at = Some(h.now() - t);
             break;
         }
@@ -939,7 +927,6 @@ fn a_third_party_synthetic_completion_races_the_keepers_expiry() {
         .iter()
         .find(|e| e.position == p && e.kind == ExitKind::Expire)
         .unwrap_or_else(|| panic!("{:?}", r.exits));
-    assert_eq!(e.curve_format, Some(CurveExtrasFormat::V3));
     let ExitResult::Failed { outcome } = &e.result else {
         panic!("{:?}", e.result);
     };
@@ -1005,10 +992,9 @@ fn below_rt_the_keeper_expires_on_the_curve() {
         let r = h.second().clone();
         assert!(r.errors.is_empty(), "{:?}", r.errors);
         assert!(r.migrations.is_empty());
-        if let Some(e) = r.exits.iter().find(|e| {
+        if r.exits.iter().any(|e| {
             e.position == position && e.kind == ExitKind::Expire && e.result.landed().is_some()
         }) {
-            assert_eq!(e.curve_format, Some(CurveExtrasFormat::V3), "the v3 list");
             expired = true;
             break;
         }
@@ -1016,10 +1002,6 @@ fn below_rt_the_keeper_expires_on_the_curve() {
     assert!(expired, "expired on the curve");
     assert!(!open(&h, &position));
     assert!(!curve(&h, &pm).complete);
-    assert_eq!(
-        h.keeper.curve_format().map(|(_, f)| f),
-        Some(CurveExtrasFormat::V3)
-    );
 }
 
 /// Duty 5 on a list-only market (M5, M2-SEC-5): a covered curve market's curve completes and pump

@@ -269,24 +269,6 @@ pub enum Alert {
     /// on chain (retried every second while the curve stays unmigrated); alerted once per
     /// market and detail. Positions pause (`VenueMigrating`) until someone migrates.
     MigrateFailed { market: Pubkey, detail: String },
-    /// pump-final §7, the upgrade window: a curve exit of `position` on `market` got past
-    /// short.win's account parsing with neither TradeExtras list — the v3 list (10 keys) nor
-    /// shortwin 1.0.0's (20) — on the short.win deployed at ProgramData deploy slot `deploy_slot`
-    /// (`None`: unreadable), at which no exit had found the format; `detail` holds both
-    /// refusals with the program's error lines. Once per position, deploy slot and pair of
-    /// refusal codes, again after an exit on the market parses; the refusals themselves are
-    /// `ExitRefused` at each attempt. The keeper's curve exits fail until one parses (it tries
-    /// both again at the next exit): check which short.win is deployed, and the live `Global`'s
-    /// buyback list (T7) and the trader's pump UVA (T6) the v3 list names. The same codes come
-    /// from the market's ReadSet (`check_read`) or VenueExtras (`parse_extras`): the source line
-    /// in each error line tells which, and if other curve markets' exits parse
-    /// (`TickReport::curve_formats`), the cause is this market's.
-    CurveExtrasFormatUnknown {
-        market: Pubkey,
-        position: Pubkey,
-        deploy_slot: Option<u64>,
-        detail: String,
-    },
     /// Duty 10 (pump-final §7): a covered live curve breaks pump's own invariant `vQ − rQ =
     /// initial_virtual_quote_reserves` (`BondingCurve::quote_offset_consistent`). Nothing
     /// short.win prices assumes it while the curve is live; on completion the post-complete
@@ -365,8 +347,7 @@ impl Alert {
             Self::MigrateFailed { .. } | Self::TransitionFailed { .. } => {
                 tracing::error!(alert = ?self, "graduation alert");
             }
-            Self::CurveExtrasFormatUnknown { .. }
-            | Self::CurveQuoteOffsetInconsistent { .. }
+            Self::CurveQuoteOffsetInconsistent { .. }
             | Self::LiveCurvePostComplete { .. }
             | Self::MigratingFvUndefined { .. } => {
                 tracing::error!(alert = ?self, "pump curve alert");

@@ -16,9 +16,8 @@
 //! a completing liquidation and a synthetic expiry past `rT` — pump v3's synthetic migration in
 //! the keeper's own exit, the market graduated in the same tick, the other positions exiting on
 //! the pool at the warm-up's gate —, σ above `σ_max` going to `sol_settle`, a race with a third
-//! party's synthetic completion, duty 10 on pump's post-complete fields), `upgrade_window`
-//! (pump-final §7, §15: the keeper liquidates with shortwin 1.0.0's curve list before the
-//! Governance upgrade and with the v3 list on the first tick after it, no failed send), `pamm`
+//! party's synthetic completion, duty 10 on pump's post-complete fields), `curve_exits`
+//! (current curve exits refuse stale-bank simulations and report parse failures), `pamm`
 //! (M6: the keeper on PumpSwap — a listing warmed up and a pump liquidated
 //! with the keeper's PumpSwap lists, `disable_flags` reported, the existence requirement's accounts
 //! created), `pamm_lp` (M6R-1, the owner's decision of 2026-09-30: duty 2's per-second
@@ -54,8 +53,8 @@
 //! `SHORTWIN_TEST_VENUE_SO`) and the mock venue (`target/deploy/mock_cpamm.so`, or
 //! `MOCK_CPAMM_SO`) for the mock scenarios, and the **release** build
 //! (`target/deploy/shortwin.so`, or `SHORTWIN_SO`) with the committed mainnet fixtures for the
-//! Raydium and pump ones, as the program tests do; `upgrade_window` starts from shortwin 1.0.0
-//! (`tests/fixtures/shortwin/shortwin_1_0_0.so`) and upgrades it to the release build.
+//! Raydium and pump ones, as the program tests do. `curve_exits` also re-deploys the current
+//! binary through the loader to check the simulation-bank deployment floor.
 
 #![allow(clippy::result_large_err)]
 
@@ -66,6 +65,7 @@ mod cadence;
 mod cascade;
 mod common;
 mod coverage_pause;
+mod curve_exits;
 mod degraded;
 mod expire;
 mod extras;
@@ -89,5 +89,4 @@ mod s3;
 mod selection;
 mod settle;
 mod smoke;
-mod upgrade_window;
 mod wipe;

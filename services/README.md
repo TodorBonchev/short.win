@@ -8,7 +8,7 @@ workspace's lockfile.
 |---|---|
 | `common/` (`shortwin-services-common`) | The chain-client abstraction (`Chain`: clock, accounts, account headers, program accounts — also by exact size, a `dataSize` filter on JSON-RPC —, blockhash, simulate, send, recent priority fees, Jito bundles: send and pre-flight), its JSON-RPC backend (`RpcChain`; bundles through a Jito block engine's `sendBundle`, **UNVERIFIED** against a live engine), transaction building: v1 (SIMD-0385) with a v0 fallback (ComputeBudget instructions, optional lookup tables), `⌈simulated × 1.1⌉` compute units, sizes, decompilation |
 | `keeper/` (`shortwin-keeper`) | Keeper v1 (ARCH §7.1 duties 1–14 on every venue, with duty 5's Raydium fast path and M7's O17 degraded mode through the `coverage_authority`) and its binary; `shortwin-build-alt`, the protocol address lookup table of A28 (`scripts/build-alt.sh`) and M7's per-market tables |
-| `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks, and across short.win's own upgrade from 1.0.0 (`upgrade_window`) |
+| `keeper-litesvm/` (`shortwin-keeper-litesvm`) | TEST-ONLY: the in-process LiteSVM backend (the program-test harness's invariant hooks after every instruction of every keeper transaction) and the keeper's scenario tests on the mock venue and on the Raydium and pump mainnet forks, with current-version curve exits and simulation-bank upgrade-lag guards (`curve_exits`) |
 | `indexer/` (`shortwin-indexer`) | The indexer and API (ARCH §7.2, M8; contract [`docs/design/INDEXER.md`](../docs/design/INDEXER.md)): RPC backfill and live ingest of short.win and venue events into Postgres (`migrations/`), projections and analytics, axum REST + WebSocket (`openapi.yaml`), one binary `shortwin-indexer` (`migrate`, `backfill`, `live`, `serve`, `rollups`, `run`, `replay`, `rebuild`); its TEST-ONLY `embedded-pg` feature runs PostgreSQL 17 from the user cache (no Docker, no root); the reference deployment is `indexer/deploy/` |
 | `ops/` (`shortwin-ops`) | `shortwin-gov`, the Squads v4 governance tool (M10 WP-7; [below](#governance-shortwin-gov-m10)): creates the Governance and Emergency multisigs, initializes the config with their vaults, stages / approves / executes / cancels vault transactions (the checked upgrade-authority transfer, `Authorities` changes, upgrades, every admin instruction; the transaction-buffer path for large messages), applies timelocked changes, verifies the whole layout |
 | `indexer-litesvm/` (`shortwin-indexer-litesvm`) | TEST-ONLY: records LiteSVM sessions (the program-test harness, the keeper scenarios) in the indexer's session format and replays them into an embedded Postgres, asserting the indexed state against the chain (INDEXER.md §11.3, §11.4) |
@@ -182,29 +182,16 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
     `send_without_exit`, `complete_slippage_bps`, `max_complete_lamports`, `tip_lamports`,
     `tip_accounts`, `block_engine` and the binary's `--block-engine` are refused ("removed: pump
     v3 exits need no bundle (design pump-final)").
-  - **The TradeExtras format across short.win's upgrade** (pump-final §7, §15 "Release
-    coordination"; for one release): the keeper builds both a curve exit's v3 list (10 keys) and
-    shortwin 1.0.0's (20, `venue::pump_trade_extras_v2`), and uses the one the deployed short.win
-    parses, known per short.win's ProgramData deploy slot (its header, read once a tick when a curve
-    exit is due). At start-up and at each new deploy slot the first curve exit is simulated with V3,
-    then with V2 when V3 fails on account parsing (`BadRemainingAccounts`, `VenueAccountMismatch`);
-    the format that gets past account parsing is kept until the deploy slot changes (an exit with
-    it failing on account parsing tries the other at once). Neither, on a deploy slot no exit has
-    found the format of: `Alert::CurveExtrasFormatUnknown`, once per position, deploy slot and pair
-    of refusal codes, with the program's error lines (metrics `curve_format_probes`,
-    `curve_format_failures`; `TickReport::curve_formats`). The same two codes come from a market's
-    own ReadSet (`check_read`) or VenueExtras (`parse_extras`): the error lines' source lines tell
-    which, and if other curve markets' exits parse, the cause is that market's. Neither on a deploy
-    slot whose format an exit already found is that exit's own refusal: the known format's is
-    paged (`ExitRefused`, its detail the program's error line), and the format stays. Every send is
-    simulated first, on a bank at or past the deploy slot read — a node of an RPC pool behind that
-    read answers for the build before, so the exit is not sent and is tried again the next tick
-    (an error of the tick) —, so the Governance upgrade costs no failed send (keeper-litesvm
-    `upgrade_window`). On 1.0.0 a curve exit past `rT` is refused `CurveStraddle` (its exits
-    never buy past `rT`, and the bundle is retired): the keeper sends the position's `sol_settle`
-    instead — S2 when its legs hold, else a no-op crank, at most once a second — pages nothing, and
-    exits it past `rT` on the first tick after the upgrade (§15 step 1). The next release deletes
-    V2.
+  - **Current-version curve exits:** build the supported v3 list (10 keys) only.
+    The owner confirmed short.win has never been deployed, so the 1.0.0 20-key builder,
+    format probing/cache and legacy `CurveStraddle` suppression are retired before 1.0.3.
+    Program parsing errors and `CurveStraddle` are ordinary actionable `ExitRefused` alerts.
+    Governed current/previous/stable VenueExtras retries and one-step `UseSolSettle` /
+    `UseExpire` redirection remain. Read short.win's ProgramData deploy slot once per tick
+    when a curve exit is due, and simulate every exit on a bank at or beyond that slot.
+    A lagging RPC simulation sends nothing and retries on a later tick; a real same-schema
+    loader upgrade is covered by `curve_exits`. This bank floor remains useful for future
+    upgrades and does not negotiate an old account format.
   - **`migrate_v2` as soon as a curve completes** (ADOPTED Q16; on by default again in M6): a
     covered market whose curve is complete with `vT > 0` and whose canonical PumpSwap pool does
     not exist gets pump's `migrate_v2` — top-level, alone with its compute budget (A15), its 27
@@ -424,7 +411,7 @@ What it does, per tick (one every `--tick-ms`, 400 ms by default, about a slot;
   synthetic exits, transitions, sweeps, cashback claims, exits deferred, coverage pauses and
   unpauses, budget degradations, the `paused_coverage` flag, degraded; on a migrating curve the
   gauges `synthetic_completion_delta_bps` (ρ − 1) and `curve_base_ata_donation`) and
-  `venue_flags`, `synthetic_exits`, `curve_format_{probes,failures}`,
+  `venue_flags`, `synthetic_exits`,
   `venue_extensions` (a venue's or Token-2022's ProgramData extended, not upgraded: AIR-01),
   `not_deployed` (refusals of a program deployed in the refused slot: AIR-18),
   `pool_discoveries`, `coverage_pause_failures`, `oracle_{cranks,reads,refusals,lamports}` in the
@@ -860,9 +847,10 @@ short.win's test-venue build (`scripts/build-test-venue.sh`, or `SHORTWIN_TEST_V
 mock venue (`anchor build --tools-version v1.57 --arch v3` → `target/deploy/mock_cpamm.so`, or
 `MOCK_CPAMM_SO`) for the mock scenarios, and the release build (`target/deploy/shortwin.so`, or
 `SHORTWIN_SO`) with the committed mainnet fixtures (`tests/fixtures`) for the Raydium and pump
-ones; `upgrade_window` starts from shortwin 1.0.0 (`tests/fixtures/shortwin/shortwin_1_0_0.so`,
-checked against AUDIT §0's hashes) and upgrades it to the release build by the loader. Every
-keeper transaction runs the harness's invariant hooks after every instruction.
+ones. `curve_exits` exercises the current program's refusal/recovery path and a real
+same-schema loader upgrade with lagging simulation banks; it does not bootstrap old 1.0.0
+accounts. The historical 1.0.0 ELF stays retained for separately named program regressions.
+Every keeper transaction runs the harness's invariant hooks after every instruction.
 
 M7 scenarios: `coverage_pause` (the T-COVERAGE drill — an outage and an exhausted budget pause
 opens through `set_coverage_pause` in the same tick, exits and lender flows land under the pause,

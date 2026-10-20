@@ -205,11 +205,6 @@ pub struct Metrics {
     /// pump-final §7: the keeper's landed synthetic curve exits, all markets
     /// (`MarketMetrics::synthetic_exits`).
     pub synthetic_exits: u64,
-    /// pump-final §7, the upgrade window: curve exits whose TradeExtras format had to be found
-    /// (no format known for the deployed short.win's deploy slot, or the known one refused on
-    /// account parsing), and those where neither format got past account parsing.
-    pub curve_format_probes: u64,
-    pub curve_format_failures: u64,
 }
 
 impl Metrics {
@@ -346,19 +341,6 @@ impl Metrics {
             "Liquidations and expiries that bought past a live curve's rT by pump's synthetic \
              migration and completed it (pump-final §7).",
             self.synthetic_exits,
-        );
-        g(
-            &mut s,
-            "shortwin_keeper_curve_format_probes_total",
-            "Curve exits whose TradeExtras format (v3, or shortwin 1.0.0's v2) was found by \
-             simulation (pump-final §7's upgrade window).",
-            self.curve_format_probes,
-        );
-        g(
-            &mut s,
-            "shortwin_keeper_curve_format_failures_total",
-            "Curve exits that got past account parsing with neither TradeExtras format.",
-            self.curve_format_failures,
         );
         g(
             &mut s,

@@ -34,9 +34,8 @@
 //!    post-change warm-up's gate (`T + 8`). A liquidatable position whose `Q` exceeds its live
 //!    curve's `rT` is liquidated or expired like any other: pump v3's synthetic migration buys past
 //!    `rT` inside the exit, priced `B̂_v3` (the straddle bundle and the `complete-curve` helper
-//!    are retired, owner D2); for one release the curve exits carry the TradeExtras list the
-//!    deployed short.win parses (v3, or 1.0.0's: [`venue::CurveExtrasFormat`]). **Right after a
-//!    full wipe** the venue cashback claims and `sweep_trader` ([`sweep`]), so the market takes
+//!    are retired, owner D2); curve exits carry the current pump v3 TradeExtras list.
+//!    **Right after a full wipe** the venue cashback claims and `sweep_trader` ([`sweep`]), so the market takes
 //!    deposits and opens again.
 //! 8. **The global budget** ([`budget`]; owner decision A of 2026-10-01): one daily budget `G`
 //!    funding markets in order of their lenders' value at risk `V = ΣB_Q·P_ema`; covered markets
@@ -131,6 +130,5 @@ pub mod view;
 pub use alerts::{Alert, DegradedReason, PauseUnavailable};
 pub use config::KeeperConfig;
 pub use keeper::{
-    CurveFormatRecord, ExitKind, ExitRecord, ExitResult, Keeper, PoolActionRecord, PoolResult,
-    TickReport, V1Support,
+    ExitKind, ExitRecord, ExitResult, Keeper, PoolActionRecord, PoolResult, TickReport, V1Support,
 };
