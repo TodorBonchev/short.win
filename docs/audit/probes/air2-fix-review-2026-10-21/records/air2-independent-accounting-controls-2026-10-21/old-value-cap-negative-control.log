@@ -1,0 +1,25 @@
+$ cargo test --offline --manifest-path /root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml --test ai2_accounting l39_one_token_deposit_cannot_unlock_a_fully_locked_position -- --exact --nocapture
+   Compiling shortwin-math v0.1.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/math)
+   Compiling air2-independent-controls v0.0.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.80s
+     Running tests/ai2_accounting.rs (/root/short.win/target/debug/deps/ai2_accounting-2d22114fe5556b5c)
+
+running 1 test
+
+thread 'l39_one_token_deposit_cannot_unlock_a_fully_locked_position' (157036) panicked at tests/ai2_accounting.rs:220:5:
+assertion `left == right` failed
+  left: Ok(670224)
+ right: Ok(0)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test l39_one_token_deposit_cannot_unlock_a_fully_locked_position ... FAILED
+
+failures:
+
+failures:
+    l39_one_token_deposit_cannot_unlock_a_fully_locked_position
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test ai2_accounting`
+
+EXIT 101

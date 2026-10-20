@@ -1,0 +1,200 @@
+{
+  "reason": "Preserve original log EOF blank lines without Git whitespace diagnostics; original reports and raw source files remain unchanged.",
+  "logs": [
+    {
+      "original_retained": "records/air2-independent-extra-native-2026-10-21.log",
+      "retained": "records/air2-independent-extra-native-2026-10-21.log.gz",
+      "uncompressed_bytes": 767,
+      "uncompressed_sha256": "07e8e1d0c9ba4f141af7b3a1ad909158a1073f0f51204405cc7a6998e519e700",
+      "compressed_bytes": 400,
+      "compressed_sha256": "a05ca30eace1a1a0bb5d52e106c44b893d5e5d48b6e44adf74549bb671a38a51",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-pumpswap-2026-10-21.log",
+      "retained": "records/air2-independent-pumpswap-2026-10-21.log.gz",
+      "uncompressed_bytes": 898,
+      "uncompressed_sha256": "06213a17e7e5edcbbeb5078e7028a6781ef72a1890fdaf8761dc3bf094fe6587",
+      "compressed_bytes": 540,
+      "compressed_sha256": "2bf8f31982b54ea1d1e48088e37ada80a96d09e66cc0a5b6b0d657c078d64cc8",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-settle-2026-10-21.log",
+      "retained": "records/air2-independent-settle-2026-10-21.log.gz",
+      "uncompressed_bytes": 378,
+      "uncompressed_sha256": "a6281795657d99a977b11010e471bb029cf6641c8910d943b909bfb154fc0baf",
+      "compressed_bytes": 274,
+      "compressed_sha256": "11ea68a0b2a79340f11556a7d1cda1948e1ffcb42594a0705149127fe2442488",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-stale-2026-10-21.log",
+      "retained": "records/air2-independent-stale-2026-10-21.log.gz",
+      "uncompressed_bytes": 1105,
+      "uncompressed_sha256": "d75c7f4aeabaa048e33e3d3d953fb86de4f564aa0ca0ce37a937aaf3314f20d2",
+      "compressed_bytes": 662,
+      "compressed_sha256": "aed7764f96ac7ff5be524fda5a1157ead977db16bcb643f876c0daed87e383a9",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-switch-2026-10-21.log",
+      "retained": "records/air2-independent-switch-2026-10-21.log.gz",
+      "uncompressed_bytes": 515,
+      "uncompressed_sha256": "98749ec77e83c6e6cf394be827e9cedc2fda46aab40a5e97a0876b0cba3b1256",
+      "compressed_bytes": 344,
+      "compressed_sha256": "42f83187ba99ea1f18f82433fa2db9e84e161797e78ea447a69375d275e34fe2",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/math-air2-05.log",
+      "retained": "records/air2-independent-vesting-depth/math-air2-05.log.gz",
+      "uncompressed_bytes": 539,
+      "uncompressed_sha256": "cd6becc3bc91c53aea2e29095c07bad398d2fc5d8476a36a5c57828e8a0808ea",
+      "compressed_bytes": 343,
+      "compressed_sha256": "dd756b80a6aebf06f45ad83ab3842b359701101488779c30ee5f37b321b979ab",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/math-air2-09.log",
+      "retained": "records/air2-independent-vesting-depth/math-air2-09.log.gz",
+      "uncompressed_bytes": 450,
+      "uncompressed_sha256": "c7148abe94c6035dee09b808ba2605a885f8d36940e7b53070704b685c0764ed",
+      "compressed_bytes": 297,
+      "compressed_sha256": "aae319d12af5324e428ec73a930cd6ec1aaf75d6ef5ea77724979f838c06505a",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/math-depth-cap.log",
+      "retained": "records/air2-independent-vesting-depth/math-depth-cap.log.gz",
+      "uncompressed_bytes": 424,
+      "uncompressed_sha256": "1f8d8610d15b89a6d80a4bed9a5f408d696fac52c8ef6eab90b1276cf3abcd39",
+      "compressed_bytes": 289,
+      "compressed_sha256": "4e5f19d6f4fa2171f569202852f967bdde60ebb33fea8c6be2792ae6e429e742",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/math-depth-properties.log",
+      "retained": "records/air2-independent-vesting-depth/math-depth-properties.log.gz",
+      "uncompressed_bytes": 409,
+      "uncompressed_sha256": "41c1cb5dcfb8c861a5959f44627fa6f20424bdf5dbbd8760e9334d03041895e0",
+      "compressed_bytes": 278,
+      "compressed_sha256": "e45c40875abea518440fdbf7a255b8a591240ef97ed5c53ab9d6d2a76911ce95",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/math-split-settle.log",
+      "retained": "records/air2-independent-vesting-depth/math-split-settle.log.gz",
+      "uncompressed_bytes": 359,
+      "uncompressed_sha256": "234de5b5ba00c9d896d2b43199a38ac1d89fcca2fa8d8cf95891c47149d76600",
+      "compressed_bytes": 257,
+      "compressed_sha256": "c4ddded2084883d7a2148e1954c7145190c19ba6f6ca3cca5ced8b4fe4ebd613",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/math-vest-hold.log",
+      "retained": "records/air2-independent-vesting-depth/math-vest-hold.log.gz",
+      "uncompressed_bytes": 461,
+      "uncompressed_sha256": "0fda7ef3204f0379b63530e3a9f9621b1633cf25865e348e65c3e151ce2e96a9",
+      "compressed_bytes": 314,
+      "compressed_sha256": "c2da5cfd4c5d9c83e0c3af7e6cb18311397e7a31203a5f10683c0985def63cf2",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/svm-cpmm-lp.log",
+      "retained": "records/air2-independent-vesting-depth/svm-cpmm-lp.log.gz",
+      "uncompressed_bytes": 440,
+      "uncompressed_sha256": "17567491d2a7cb2360055d929e7b281b216fb252040fffb0fd42c2ab6bba35f4",
+      "compressed_bytes": 301,
+      "compressed_sha256": "eabc8feac2ed32bef277d68f2016a1c780ddb7ea5b4055ce482c920a666a6c7c",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/svm-dust-split.log",
+      "retained": "records/air2-independent-vesting-depth/svm-dust-split.log.gz",
+      "uncompressed_bytes": 549,
+      "uncompressed_sha256": "86a3293bb2bbd61472efee5df7e2fe1a3ad93dd0030b521785daefd620a9b112",
+      "compressed_bytes": 355,
+      "compressed_sha256": "22cb13c79cfa2f41cfb6595a560e14e6a0ed7b431181cdc2ea577c928243f85a",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/svm-halted-s3.log",
+      "retained": "records/air2-independent-vesting-depth/svm-halted-s3.log.gz",
+      "uncompressed_bytes": 1036,
+      "uncompressed_sha256": "a8437f35079cbafb34457cb34b7fc1fbbcd993438f0055d9ade2d093a67779f9",
+      "compressed_bytes": 585,
+      "compressed_sha256": "e9cd34325d067ddd4a7419cbba131d57190dce5535436965e8a77aba6cbc5441",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    },
+    {
+      "original_retained": "records/air2-independent-vesting-depth/svm-pamm-lp.log",
+      "retained": "records/air2-independent-vesting-depth/svm-pamm-lp.log.gz",
+      "uncompressed_bytes": 509,
+      "uncompressed_sha256": "e9e2f27a64eb87d54ffa3f396b7cdb93fd720bed677463446a44c01e472e74e2",
+      "compressed_bytes": 360,
+      "compressed_sha256": "b1fa6eb651ffba9d59b4488645dc9f8986d8d3e73d3d219c83ea6e90210d0992",
+      "gzip": {
+        "mtime": 0,
+        "filename": "",
+        "level": 9
+      }
+    }
+  ]
+}

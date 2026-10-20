@@ -1,0 +1,427 @@
+{
+  "scope": [
+    "AIR2-01",
+    "AIR2-02",
+    "AIR2-03",
+    "AIR2-04",
+    "AIR2-05",
+    "AIR2-08",
+    "AIR2-09",
+    "AIR2-P2-01"
+  ],
+  "production_commit": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "preservation": "Original reports are byte-for-byte copies. Every source file is retained either identically or as deterministic lossless gzip; source_sha256 is the original/decompressed digest, retained_sha256 is the stored digest.",
+  "files": [
+    {
+      "source": "target/air2-independent-accounting-2026-10-21.md",
+      "retained": "records/air2-independent-accounting-2026-10-21.md",
+      "kind": "original report, byte-for-byte",
+      "source_bytes": 9602,
+      "source_sha256": "6fda298949ebbe281631ba4405052a1a032dcc5f0963506e8296503e8e1e2aa1",
+      "encoding": "identity",
+      "retained_bytes": 9602,
+      "retained_sha256": "6fda298949ebbe281631ba4405052a1a032dcc5f0963506e8296503e8e1e2aa1"
+    },
+    {
+      "source": "target/air2-independent-observation-2026-10-21.md",
+      "retained": "records/air2-independent-observation-2026-10-21.md",
+      "kind": "original report, byte-for-byte",
+      "source_bytes": 16125,
+      "source_sha256": "2ad68e23ab5c53c05c66c4a8f92d4a1bd998a2baf0cee6d3f0cd089bc37d3d37",
+      "encoding": "identity",
+      "retained_bytes": 16125,
+      "retained_sha256": "2ad68e23ab5c53c05c66c4a8f92d4a1bd998a2baf0cee6d3f0cd089bc37d3d37"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth-2026-10-21.md",
+      "retained": "records/air2-independent-vesting-depth-2026-10-21.md",
+      "kind": "original report, byte-for-byte",
+      "source_bytes": 12830,
+      "source_sha256": "9a271060fba6eff3f214e793c43efe9ce3f8ec179d9ff376feb9574f720fade3",
+      "encoding": "identity",
+      "retained_bytes": 12830,
+      "retained_sha256": "9a271060fba6eff3f214e793c43efe9ce3f8ec179d9ff376feb9574f720fade3"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/cached-copy-diagnostic.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/cached-copy-diagnostic.log",
+      "kind": "accounting execution record",
+      "source_bytes": 1386,
+      "source_sha256": "1126efce88f4c704177816c01e65e9018396b6f05362be3ec0946de33d7d4e3a",
+      "encoding": "identity",
+      "retained_bytes": 1386,
+      "retained_sha256": "1126efce88f4c704177816c01e65e9018396b6f05362be3ec0946de33d7d4e3a"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/candidate-air2-01.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/candidate-air2-01.log",
+      "kind": "accounting execution record",
+      "source_bytes": 627,
+      "source_sha256": "6c6758a4d233dfc45961dee6d6179b9d30c9513bf4f08f7884e92284ee070672",
+      "encoding": "identity",
+      "retained_bytes": 627,
+      "retained_sha256": "6c6758a4d233dfc45961dee6d6179b9d30c9513bf4f08f7884e92284ee070672"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/candidate-conversion-units.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/candidate-conversion-units.log",
+      "kind": "accounting execution record",
+      "source_bytes": 437,
+      "source_sha256": "89b0eb3574475cc1fc517a8f36568910c47353670ad01f7defde6c070966b5e7",
+      "encoding": "identity",
+      "retained_bytes": 437,
+      "retained_sha256": "89b0eb3574475cc1fc517a8f36568910c47353670ad01f7defde6c070966b5e7"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/candidate-idle_lenders_expired_lock_stops_counting_at_lock_until.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/candidate-idle_lenders_expired_lock_stops_counting_at_lock_until.log",
+      "kind": "accounting execution record",
+      "source_bytes": 490,
+      "source_sha256": "55a59d00d8e0860446e0459e6604eb97acb85718a6c33d6487a7014d1cedf5d5",
+      "encoding": "identity",
+      "retained_bytes": 490,
+      "retained_sha256": "55a59d00d8e0860446e0459e6604eb97acb85718a6c33d6487a7014d1cedf5d5"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/candidate-l39.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/candidate-l39.log",
+      "kind": "accounting execution record",
+      "source_bytes": 515,
+      "source_sha256": "c3760b2582d9bf44c82ad28a84b435198366b7b6173078edc1a6c66b1cd86322",
+      "encoding": "identity",
+      "retained_bytes": 515,
+      "retained_sha256": "c3760b2582d9bf44c82ad28a84b435198366b7b6173078edc1a6c66b1cd86322"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/candidate-lock_decay_restarts_with_every_lock_era.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/candidate-lock_decay_restarts_with_every_lock_era.log",
+      "kind": "accounting execution record",
+      "source_bytes": 460,
+      "source_sha256": "14bcc634caf4debe0463a3c94e79aa87665638fc4377c786b7904dbdbb22c289",
+      "encoding": "identity",
+      "retained_bytes": 460,
+      "retained_sha256": "14bcc634caf4debe0463a3c94e79aa87665638fc4377c786b7904dbdbb22c289"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/candidate-reviewer-edges.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/candidate-reviewer-edges.log",
+      "kind": "accounting execution record",
+      "source_bytes": 1071,
+      "source_sha256": "5ef320eb210c31e480bdf900af4fa272eb7965b514011f6a0d5469b3c5446571",
+      "encoding": "identity",
+      "retained_bytes": 1071,
+      "retained_sha256": "5ef320eb210c31e480bdf900af4fa272eb7965b514011f6a0d5469b3c5446571"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/candidate-stuck_lock_clears_at_lock_until.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/candidate-stuck_lock_clears_at_lock_until.log",
+      "kind": "accounting execution record",
+      "source_bytes": 444,
+      "source_sha256": "ce75f76a106cacfe5f6232ec28282e73e503061a74c3f67c876789eaf7d38d82",
+      "encoding": "identity",
+      "retained_bytes": 444,
+      "retained_sha256": "ce75f76a106cacfe5f6232ec28282e73e503061a74c3f67c876789eaf7d38d82"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/checks.json",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/checks.json",
+      "kind": "accounting execution record",
+      "source_bytes": 6643,
+      "source_sha256": "710082e7220a87f39838a73ed60cdc891f97b5ea55cc0209b948e473b3b0e0ef",
+      "encoding": "identity",
+      "retained_bytes": 6643,
+      "retained_sha256": "710082e7220a87f39838a73ed60cdc891f97b5ea55cc0209b948e473b3b0e0ef"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/floor-lock-existing-regression-masked.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/floor-lock-existing-regression-masked.log",
+      "kind": "accounting execution record",
+      "source_bytes": 911,
+      "source_sha256": "2fff128a0cc87fce68b3380f3436e8611939c47688875967ce755f8857dcb928",
+      "encoding": "identity",
+      "retained_bytes": 911,
+      "retained_sha256": "2fff128a0cc87fce68b3380f3436e8611939c47688875967ce755f8857dcb928"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/floor-lock-reviewer-negative-control.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/floor-lock-reviewer-negative-control.log",
+      "kind": "accounting execution record",
+      "source_bytes": 1199,
+      "source_sha256": "15d9f097bb40a009bb25188ecf2c3823fd86d5beaa8d0c826b9baf11f7232667",
+      "encoding": "identity",
+      "retained_bytes": 1199,
+      "retained_sha256": "15d9f097bb40a009bb25188ecf2c3823fd86d5beaa8d0c826b9baf11f7232667"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/floor-lock-strengthened-regression-negative-control.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/floor-lock-strengthened-regression-negative-control.log",
+      "kind": "accounting execution record",
+      "source_bytes": 1388,
+      "source_sha256": "e94a2ae0102992106c04762e655d6aaa5f1ce86fd4aa3233b942add6f334f63b",
+      "encoding": "identity",
+      "retained_bytes": 1388,
+      "retained_sha256": "e94a2ae0102992106c04762e655d6aaa5f1ce86fd4aa3233b942add6f334f63b"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/old-value-cap-actual-loss-replay.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/old-value-cap-actual-loss-replay.log",
+      "kind": "accounting execution record",
+      "source_bytes": 757,
+      "source_sha256": "e8448326a97ef57bf36277b7be8d7f9f5beb44683e876059a5e910a6667affb7",
+      "encoding": "identity",
+      "retained_bytes": 757,
+      "retained_sha256": "e8448326a97ef57bf36277b7be8d7f9f5beb44683e876059a5e910a6667affb7"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/old-value-cap-negative-control.log",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/old-value-cap-negative-control.log",
+      "kind": "accounting execution record",
+      "source_bytes": 1305,
+      "source_sha256": "02f7043524759691a64410b9153eb557ff8c05de856a05028f5455e9822b2073",
+      "encoding": "identity",
+      "retained_bytes": 1305,
+      "retained_sha256": "02f7043524759691a64410b9153eb557ff8c05de856a05028f5455e9822b2073"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml",
+      "kind": "accounting probe source or minimal manifest",
+      "source_bytes": 132,
+      "source_sha256": "544539da877185d199ceb1f4cbd4a8de9fb5bf10ea216bc0b5eb70e63541a352",
+      "encoding": "identity",
+      "retained_bytes": 132,
+      "retained_sha256": "544539da877185d199ceb1f4cbd4a8de9fb5bf10ea216bc0b5eb70e63541a352"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.lock",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/controls/Cargo.lock",
+      "kind": "accounting probe source or minimal manifest",
+      "source_bytes": 260,
+      "source_sha256": "825900961a9ae87b69aa553d11c74df5cfe09fe154a3e4506622c24b06807f10",
+      "encoding": "identity",
+      "retained_bytes": 260,
+      "retained_sha256": "825900961a9ae87b69aa553d11c74df5cfe09fe154a3e4506622c24b06807f10"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/controls/tests/reviewer_edges.rs",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/controls/tests/reviewer_edges.rs",
+      "kind": "accounting probe source or minimal manifest",
+      "source_bytes": 2774,
+      "source_sha256": "284a2afd7455e86c21703a3f49d1ef0ce710a529e67f39be218f4e38a6da8a7a",
+      "encoding": "identity",
+      "retained_bytes": 2774,
+      "retained_sha256": "284a2afd7455e86c21703a3f49d1ef0ce710a529e67f39be218f4e38a6da8a7a"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21/controls/tests/pre_fix_loss.rs",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21/controls/tests/pre_fix_loss.rs",
+      "kind": "accounting probe source or minimal manifest",
+      "source_bytes": 1177,
+      "source_sha256": "6dd2b2b5b79b73c1ceb7800ae62d8b07c5a3455ba380321e9ea72b65d580b01f",
+      "encoding": "identity",
+      "retained_bytes": 1177,
+      "retained_sha256": "6dd2b2b5b79b73c1ceb7800ae62d8b07c5a3455ba380321e9ea72b65d580b01f"
+    },
+    {
+      "source": "target/air2-independent-accounting-controls-2026-10-21.py",
+      "retained": "records/air2-independent-accounting-controls-2026-10-21.py",
+      "kind": "accounting control driver",
+      "source_bytes": 8762,
+      "source_sha256": "61485b4a8e88c5c8d5c252e2efd6598618d2883ff6d7323d23fdd2f3421e9647",
+      "encoding": "identity",
+      "retained_bytes": 8762,
+      "retained_sha256": "61485b4a8e88c5c8d5c252e2efd6598618d2883ff6d7323d23fdd2f3421e9647"
+    },
+    {
+      "source": "target/air2-independent-stale-2026-10-21.log",
+      "retained": "records/air2-independent-stale-2026-10-21.log.gz",
+      "kind": "observation/settlement execution record",
+      "source_bytes": 1105,
+      "source_sha256": "d75c7f4aeabaa048e33e3d3d953fb86de4f564aa0ca0ce37a937aaf3314f20d2",
+      "encoding": "gzip",
+      "retained_bytes": 662,
+      "retained_sha256": "aed7764f96ac7ff5be524fda5a1157ead977db16bcb643f876c0daed87e383a9"
+    },
+    {
+      "source": "target/air2-independent-pumpswap-2026-10-21.log",
+      "retained": "records/air2-independent-pumpswap-2026-10-21.log.gz",
+      "kind": "observation/settlement execution record",
+      "source_bytes": 898,
+      "source_sha256": "06213a17e7e5edcbbeb5078e7028a6781ef72a1890fdaf8761dc3bf094fe6587",
+      "encoding": "gzip",
+      "retained_bytes": 540,
+      "retained_sha256": "2bf8f31982b54ea1d1e48088e37ada80a96d09e66cc0a5b6b0d657c078d64cc8"
+    },
+    {
+      "source": "target/air2-independent-settle-2026-10-21.log",
+      "retained": "records/air2-independent-settle-2026-10-21.log.gz",
+      "kind": "observation/settlement execution record",
+      "source_bytes": 378,
+      "source_sha256": "a6281795657d99a977b11010e471bb029cf6641c8910d943b909bfb154fc0baf",
+      "encoding": "gzip",
+      "retained_bytes": 274,
+      "retained_sha256": "11ea68a0b2a79340f11556a7d1cda1948e1ffcb42594a0705149127fe2442488"
+    },
+    {
+      "source": "target/air2-independent-switch-2026-10-21.log",
+      "retained": "records/air2-independent-switch-2026-10-21.log.gz",
+      "kind": "observation/settlement execution record",
+      "source_bytes": 515,
+      "source_sha256": "98749ec77e83c6e6cf394be827e9cedc2fda46aab40a5e97a0876b0cba3b1256",
+      "encoding": "gzip",
+      "retained_bytes": 344,
+      "retained_sha256": "42f83187ba99ea1f18f82433fa2db9e84e161797e78ea447a69375d275e34fe2"
+    },
+    {
+      "source": "target/air2-independent-extra-native-2026-10-21.log",
+      "retained": "records/air2-independent-extra-native-2026-10-21.log.gz",
+      "kind": "observation/settlement execution record",
+      "source_bytes": 767,
+      "source_sha256": "07e8e1d0c9ba4f141af7b3a1ad909158a1073f0f51204405cc7a6998e519e700",
+      "encoding": "gzip",
+      "retained_bytes": 400,
+      "retained_sha256": "a05ca30eace1a1a0bb5d52e106c44b893d5e5d48b6e44adf74549bb671a38a51"
+    },
+    {
+      "source": "target/air2-independent-native-probe/Cargo.toml",
+      "retained": "records/air2-independent-native-probe/Cargo.toml",
+      "kind": "observation/settlement probe source or minimal manifest",
+      "source_bytes": 189,
+      "source_sha256": "6f24e5c380e981d774afef614e46ee7c08c3dc32449b4a594efa5f1a88a95757",
+      "encoding": "identity",
+      "retained_bytes": 189,
+      "retained_sha256": "6f24e5c380e981d774afef614e46ee7c08c3dc32449b4a594efa5f1a88a95757"
+    },
+    {
+      "source": "target/air2-independent-native-probe/Cargo.lock",
+      "retained": "records/air2-independent-native-probe/Cargo.lock",
+      "kind": "observation/settlement probe source or minimal manifest",
+      "source_bytes": 264,
+      "source_sha256": "00f0d07a68d17f2219641bda214cb96a6664e587860adc852b0d0cd9e75f2e7a",
+      "encoding": "identity",
+      "retained_bytes": 264,
+      "retained_sha256": "00f0d07a68d17f2219641bda214cb96a6664e587860adc852b0d0cd9e75f2e7a"
+    },
+    {
+      "source": "target/air2-independent-native-probe/src/lib.rs",
+      "retained": "records/air2-independent-native-probe/src/lib.rs",
+      "kind": "observation/settlement probe source or minimal manifest",
+      "source_bytes": 3472,
+      "source_sha256": "cc715380e4b7be3a003436a3a7ec352c92961a3f5613afc4289a1f1688183e1c",
+      "encoding": "identity",
+      "retained_bytes": 3472,
+      "retained_sha256": "cc715380e4b7be3a003436a3a7ec352c92961a3f5613afc4289a1f1688183e1c"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/math-air2-05.log",
+      "retained": "records/air2-independent-vesting-depth/math-air2-05.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 539,
+      "source_sha256": "cd6becc3bc91c53aea2e29095c07bad398d2fc5d8476a36a5c57828e8a0808ea",
+      "encoding": "gzip",
+      "retained_bytes": 343,
+      "retained_sha256": "dd756b80a6aebf06f45ad83ab3842b359701101488779c30ee5f37b321b979ab"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/math-air2-09.log",
+      "retained": "records/air2-independent-vesting-depth/math-air2-09.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 450,
+      "source_sha256": "c7148abe94c6035dee09b808ba2605a885f8d36940e7b53070704b685c0764ed",
+      "encoding": "gzip",
+      "retained_bytes": 297,
+      "retained_sha256": "aae319d12af5324e428ec73a930cd6ec1aaf75d6ef5ea77724979f838c06505a"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/math-depth-cap.log",
+      "retained": "records/air2-independent-vesting-depth/math-depth-cap.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 424,
+      "source_sha256": "1f8d8610d15b89a6d80a4bed9a5f408d696fac52c8ef6eab90b1276cf3abcd39",
+      "encoding": "gzip",
+      "retained_bytes": 289,
+      "retained_sha256": "4e5f19d6f4fa2171f569202852f967bdde60ebb33fea8c6be2792ae6e429e742"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/math-depth-properties.log",
+      "retained": "records/air2-independent-vesting-depth/math-depth-properties.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 409,
+      "source_sha256": "41c1cb5dcfb8c861a5959f44627fa6f20424bdf5dbbd8760e9334d03041895e0",
+      "encoding": "gzip",
+      "retained_bytes": 278,
+      "retained_sha256": "e45c40875abea518440fdbf7a255b8a591240ef97ed5c53ab9d6d2a76911ce95"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/math-split-settle.log",
+      "retained": "records/air2-independent-vesting-depth/math-split-settle.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 359,
+      "source_sha256": "234de5b5ba00c9d896d2b43199a38ac1d89fcca2fa8d8cf95891c47149d76600",
+      "encoding": "gzip",
+      "retained_bytes": 257,
+      "retained_sha256": "c4ddded2084883d7a2148e1954c7145190c19ba6f6ca3cca5ced8b4fe4ebd613"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/math-vest-hold.log",
+      "retained": "records/air2-independent-vesting-depth/math-vest-hold.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 461,
+      "source_sha256": "0fda7ef3204f0379b63530e3a9f9621b1633cf25865e348e65c3e151ce2e96a9",
+      "encoding": "gzip",
+      "retained_bytes": 314,
+      "retained_sha256": "c2da5cfd4c5d9c83e0c3af7e6cb18311397e7a31203a5f10683c0985def63cf2"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/results.json",
+      "retained": "records/air2-independent-vesting-depth/results.json",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 5752,
+      "source_sha256": "15b4707b6f6655a0d0005e6fac1475b2fe6976ec9a51318c82fd9d4a2cce1587",
+      "encoding": "identity",
+      "retained_bytes": 5752,
+      "retained_sha256": "15b4707b6f6655a0d0005e6fac1475b2fe6976ec9a51318c82fd9d4a2cce1587"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/svm-cpmm-lp.log",
+      "retained": "records/air2-independent-vesting-depth/svm-cpmm-lp.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 440,
+      "source_sha256": "17567491d2a7cb2360055d929e7b281b216fb252040fffb0fd42c2ab6bba35f4",
+      "encoding": "gzip",
+      "retained_bytes": 301,
+      "retained_sha256": "eabc8feac2ed32bef277d68f2016a1c780ddb7ea5b4055ce482c920a666a6c7c"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/svm-dust-split.log",
+      "retained": "records/air2-independent-vesting-depth/svm-dust-split.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 549,
+      "source_sha256": "86a3293bb2bbd61472efee5df7e2fe1a3ad93dd0030b521785daefd620a9b112",
+      "encoding": "gzip",
+      "retained_bytes": 355,
+      "retained_sha256": "22cb13c79cfa2f41cfb6595a560e14e6a0ed7b431181cdc2ea577c928243f85a"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/svm-halted-s3.log",
+      "retained": "records/air2-independent-vesting-depth/svm-halted-s3.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 1036,
+      "source_sha256": "a8437f35079cbafb34457cb34b7fc1fbbcd993438f0055d9ade2d093a67779f9",
+      "encoding": "gzip",
+      "retained_bytes": 585,
+      "retained_sha256": "e9cd34325d067ddd4a7419cbba131d57190dce5535436965e8a77aba6cbc5441"
+    },
+    {
+      "source": "target/air2-independent-vesting-depth/svm-pamm-lp.log",
+      "retained": "records/air2-independent-vesting-depth/svm-pamm-lp.log.gz",
+      "kind": "vesting/depth execution record",
+      "source_bytes": 509,
+      "source_sha256": "e9e2f27a64eb87d54ffa3f396b7cdb93fd720bed677463446a44c01e472e74e2",
+      "encoding": "gzip",
+      "retained_bytes": 360,
+      "retained_sha256": "b1fa6eb651ffba9d59b4488645dc9f8986d8d3e73d3d219c83ea6e90210d0992"
+    }
+  ],
+  "compression_map": "COMPRESSION_MAP.json"
+}

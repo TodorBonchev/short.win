@@ -1,6 +1,8 @@
 # Draft 1.0.3 live-venue preflight (2026-10-21)
 
-**New venue review in progress. This record does not approve deployment.**
+**Scoped supported-path review accepted; final CI/fuzz and deployment checks remain.**
+This records observed upstream bytes and fixture compatibility, not a full upstream
+implementation audit, verified source build or deployment approval.
 
 A read-only `python3 scripts/dump-fixtures.py check --live` at mainnet slot
 459,385,700 returned exit 1. The [retained log](probes/live-venue-2026-10-21/pre-update-live.log)
@@ -57,3 +59,41 @@ mint path therefore needs signed execution on the new ELFs; the newly visible up
 Token-2022 quote-fee error string alone establishes neither compatibility nor a break.
 This check covers four global/configuration accounts, not every current coin or pool,
 and does not guarantee that future venue configuration will remain unchanged.
+
+## Scoped compatibility outcome
+
+Candidate `e04a6776f1c2f5e02e581d76dd1255c416270275` adds four new program/ProgramData
+entries without changing earlier account entries or snapshots. All **344 managed venue
+entries** pass offline checks. A separate reviewer reconstructed both 10 MiB ProgramData
+accounts and verified their whole-account and complete trimmed-ELF hashes. The current
+loader/baseline and browser validator now select the new observed builds; no new quote
+asset or transfer-fee base-mint support is enabled.
+
+| Execution | Actual result and boundary |
+|---|---|
+| New curve differential | 180 signed transactions, including 79 matching refusals; all prior economic fields/accounts match. Executable-account starting lamports are equalized to isolate code from unrelated snapshot donations. Source-line origins are normalized; the original Oct08/Oct13 differential stays strict and passes separately. |
+| New pump TradeEvent | Captured 382→390-byte payload: exact old prefix plus eight observed zero bytes, deliberately uninterpreted. Indexer already accepts trailing fields; the actual-byte regression, malformed-prefix and non-SOL controls pass (13 venue decoder cases). |
+| New PumpSwap T-PFEE-CPI and modern-clock control | Signed Mature/Legacy261 opens/closes issue one read-only fee query per leg. Supported SOL buy/sell control passes after the actual deployment time; no `withdraw` in the fee-query path. |
+| Promoted-default program scenarios | 45 passed across graduation7, pump latch13, PumpSwap latch7, curve E2E5 and synthetic exits13. |
+| Independent promoted keeper scenarios | Reviewer executed two current curve guards and 12 graduation cases; all passed. |
+| Compute/trace/depth/size | M5 seven and M6 three passed with unchanged budgets/results files. Cargo rebuilt the review harness/bench; Mollusk receives the same new executable ELF as LiteSVM. The reused SBF depth wrapper contains no fixture-profile selection. |
+| Build/profile and fixture readers | Each control passed; instruction behavior profiles are explicitly distinguished from exact ELF identity. |
+| Strict lint | All-target LiteSVM Clippy, browser typecheck and genesis Biome passed. |
+
+Executions overlap; these are not unique-test totals. The fixture implementer executed
+the main compatibility/performance cases; agent `keeper_fix_review` independently
+verified provenance, inspected the source and ran the attributed keeper cases. Agent
+`remote_scope_check` independently traced SOL/WSOL restrictions and current configuration
+readers and added the captured-event regression. None claims an exhaustive upstream audit.
+
+A subsequent read-only `check --live` returned **exit 0 at slot 459,391,399**: every pinned
+program/account matched. [Retained log](probes/live-venue-2026-10-21/live-after-pin.log)
+SHA-256: `e9ad473a31ef8dd1103154b3bb8afcf9ed35535d425a42de73db079a0a5dc152`.
+This is a dated observation; recheck before actual deployment/revalidation. Pump-fees'
+unchanged R-PFEE analysis remains byte-identity evidence. The new profile requires the
+[fresh final fuzz run](fuzz-1.0.3-fullsha.md); prior-profile duration is not reused.
+
+The [retained execution bundle](probes/live-venue-2026-10-21/validation/README.md)
+includes the original metadata and byte-preserving compressed logs, including the
+initial event-tail discovery and successful final comparisons. Metadata SHA-256:
+`4aa845e771a063c4955daa7bba6ad359a242ac754063dc598abb2c32364ddfb0`.

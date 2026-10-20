@@ -1,0 +1,22 @@
+check --live at slot 459,391,399 (https://api.mainnet-beta.solana.com); VenueGuard baseline VENUE_GUARD_SLOTS_2026_10_21 (programs/shortwin/src/constants.rs)
+  pump                     unchanged
+                           (deploy 458,921,440, baseline 458,921,440, fixture pump_programs_2026_10_21 458,921,440, kept: pump_programs_2026_10_13b 456,494,698, pump_programs_2026_10_13 454,596,459, pump_programs_2026_10 452,654,932, pump_programs 449,734,335, ELF = fixture (756c04ab…))
+  pump_amm                 unchanged
+                           (deploy 458,921,517, baseline 458,921,517, fixture pump_programs_2026_10_21 458,921,517, kept: pump_programs_2026_10_13 454,596,406, pump_programs_2026_10 452,654,882, pump_programs 446,462,733, ELF = fixture (4d5fc419…))
+  pump_fees                unchanged
+                           (deploy 456,132,171, baseline 456,132,171, fixture pump_programs_2026_10_13 456,132,171, kept: pump_programs_2026_10 452,655,002, pump_programs 446,465,969, ELF = fixture (8ad2ca93…))
+  raydium_v4               unchanged
+                           (deploy 445,763,204, baseline 445,763,204, fixture raydium_programs 445,763,204, ELF = fixture (d4cee0cd…))
+  raydium_cpmm             unchanged
+                           (deploy 452,376,460, baseline 452,376,460, fixture raydium_cpmm_2026_10 452,376,460, kept: raydium_programs 445,763,504, ELF = fixture (93cad245…))
+  jupiter                  unchanged
+                           (deploy 454,465,850, baseline 454,465,850, no fixture)
+  token_2022               unchanged
+                           (deploy 427,147,035, fixture spl_programs 427,147,035, ELF = fixture (7ea94a02…))
+  squads_v4                unchanged
+                           (deploy 302,582,236, fixture squads_programs 302,582,236, ELF = fixture (d4866083…))
+  spl_memo_v3              unchanged
+                           (account sha256 = fixture f520eaf0…, owner BPFLoader2111111111111111111111111111111111)
+  squads_program_config    unchanged
+                           (account sha256 = fixture ba8e7712…, owner SQDS4ep65T869zMMBKyuUq6aD6EgTu8psMjkvj52pCf)
+ok: every pinned program and account matches mainnet

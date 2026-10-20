@@ -1,0 +1,11 @@
+$ cargo test --locked -p shortwin-math --test ai2_accounting l39_one_token_deposit_cannot_unlock_a_fully_locked_position -- --exact --nocapture
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
+     Running tests/ai2_accounting.rs (/root/short.win/target/debug/deps/ai2_accounting-264fe11e77e4feeb)
+
+running 1 test
+test l39_one_token_deposit_cannot_unlock_a_fully_locked_position ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+
+EXIT 0

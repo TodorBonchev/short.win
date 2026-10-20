@@ -1,0 +1,186 @@
+{
+  "review_kind": "independent read-only Git source equivalence and frozen-artifact identity check",
+  "created_utc": "2026-10-20T22:42:14.409533+00:00",
+  "base_source_commit": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "candidate_source_commit": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+  "source_commits_identical": false,
+  "tracked_entry_counts": {
+    "base": 2065,
+    "candidate": 2065,
+    "identical": 2064
+  },
+  "changed_files": [
+    {
+      "path": "crates/shortwin-math/tests/ai2_accounting.rs",
+      "base": {
+        "mode": "100644",
+        "type": "blob",
+        "oid": "3791b3ee1475de4e4ef291702f4f27e38ffbfe98"
+      },
+      "candidate": {
+        "mode": "100644",
+        "type": "blob",
+        "oid": "42aac5263aab34ca2d516c95782fabfd877af9f2"
+      }
+    }
+  ],
+  "change_summary": "Only standalone shortwin-math integration-test assertions are strengthened. No production, fuzzer, shared harness, manifest, lockfile or fixture change.",
+  "production_fuzzer_fixture_git_scopes": [
+    {
+      "path": "Cargo.toml",
+      "base_git_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "candidate_git_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "equal": true
+    },
+    {
+      "path": "Cargo.lock",
+      "base_git_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "candidate_git_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "equal": true
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "base_git_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "candidate_git_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "equal": true
+    },
+    {
+      "path": ".cargo",
+      "base_git_object": null,
+      "candidate_git_object": null,
+      "equal": true
+    },
+    {
+      "path": "programs",
+      "base_git_object": "46ccef0d904c2827a1dbd4a6e853fa990ea9da06",
+      "candidate_git_object": "46ccef0d904c2827a1dbd4a6e853fa990ea9da06",
+      "equal": true
+    },
+    {
+      "path": "crates/shortwin-math/src",
+      "base_git_object": "a97d7e3ff3c4366cfd8447519068a7edb07aeece",
+      "candidate_git_object": "a97d7e3ff3c4366cfd8447519068a7edb07aeece",
+      "equal": true
+    },
+    {
+      "path": "crates/shortwin-math/Cargo.toml",
+      "base_git_object": "6176c976293d8d234319e20a70f133ecc12ffdf6",
+      "candidate_git_object": "6176c976293d8d234319e20a70f133ecc12ffdf6",
+      "equal": true
+    },
+    {
+      "path": "crates/shortwin-venue-state",
+      "base_git_object": "df7c1e1757f5f49a79077df4a042bef711e9c96a",
+      "candidate_git_object": "df7c1e1757f5f49a79077df4a042bef711e9c96a",
+      "equal": true
+    },
+    {
+      "path": "crates/squads-v4-ix",
+      "base_git_object": "6705140875177c8ce33f45d61829cc4535bd31d7",
+      "candidate_git_object": "6705140875177c8ce33f45d61829cc4535bd31d7",
+      "equal": true
+    },
+    {
+      "path": "tests/fuzz",
+      "base_git_object": "52e5234a90796f51a27818348c9f880562546d8a",
+      "candidate_git_object": "52e5234a90796f51a27818348c9f880562546d8a",
+      "equal": true
+    },
+    {
+      "path": "tests/litesvm/src",
+      "base_git_object": "6797f33de04f3b38b238f195711a25d1a8aa5519",
+      "candidate_git_object": "6797f33de04f3b38b238f195711a25d1a8aa5519",
+      "equal": true
+    },
+    {
+      "path": "tests/litesvm/Cargo.toml",
+      "base_git_object": "191111c43716024706473e9cc2d22ab7827eb56f",
+      "candidate_git_object": "191111c43716024706473e9cc2d22ab7827eb56f",
+      "equal": true
+    },
+    {
+      "path": "tests/mock_cpamm",
+      "base_git_object": "aee182b9e33fac372addd98febb01f64e2e8d252",
+      "candidate_git_object": "aee182b9e33fac372addd98febb01f64e2e8d252",
+      "equal": true
+    },
+    {
+      "path": "tests/fixtures",
+      "base_git_object": "027605ff93d0897c04ab143fda17492df4e15816",
+      "candidate_git_object": "027605ff93d0897c04ab143fda17492df4e15816",
+      "equal": true
+    }
+  ],
+  "changed_test_references_in_runtime_scopes": [],
+  "recorded_frozen_build_inputs": [
+    {
+      "path": "Cargo.toml",
+      "sha256": "1563eaebd9b000fc45ec74840517399256fbb71870a38c1c6f72504a92c0a9c0",
+      "both_commits_and_frozen_metadata_match": true
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "0732c477fe1e6b38fd74d558e23b8e3ebda8790705a6ddff1de6fdaca72b316b",
+      "both_commits_and_frozen_metadata_match": true
+    },
+    {
+      "path": "programs/shortwin/src/constants.rs",
+      "sha256": "c52ff0f7bac08cdfabd40594b8cfd5e2e0b52ea0685fc4110d10b6d1c8951e35",
+      "both_commits_and_frozen_metadata_match": true
+    },
+    {
+      "path": "tests/litesvm/src/fork.rs",
+      "sha256": "91322ce5abefbd89198db53ba1372d3cb5e3320035dae0ab87bcbb89fb16c7fb",
+      "both_commits_and_frozen_metadata_match": true
+    },
+    {
+      "path": "tests/fixtures/manifest.json",
+      "sha256": "f0d87f1c201b2df8016eb31648c533dc50f1832243ba84f16fdfe400166ddc4b",
+      "both_commits_and_frozen_metadata_match": true
+    },
+    {
+      "path": "tests/fixtures/SHA256SUMS",
+      "sha256": "b17a50e1e1e7e91cf16f84ac8d810cb1af82bbaa064ef96f90b47f32ca2f9dfc",
+      "both_commits_and_frozen_metadata_match": true
+    }
+  ],
+  "frozen_run_directory": "/root/fuzz/ready-103-20261021-e04a6776",
+  "frozen_metadata_source_commit": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "frozen_artifacts_checked": [
+    {
+      "label": "release",
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "metadata_match": true,
+      "bytes": 1644024
+    },
+    {
+      "label": "test_venue",
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "metadata_match": true,
+      "bytes": 1675056
+    },
+    {
+      "label": "mock",
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so",
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "metadata_match": true,
+      "bytes": 281240
+    },
+    {
+      "label": "runner",
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-fuzz",
+      "sha256": "5b6971e3fd11f8c8d3166d010631b40e0dd57b797f311ba97a348a35e1036b48",
+      "metadata_match": true,
+      "bytes": 11686272
+    }
+  ],
+  "runtime_and_fixture_inputs_equivalent": true,
+  "limits": [
+    "This is source/input equivalence, not a new fuzzer rebuild or CI result.",
+    "The active run remains identified by e04a6776 and its frozen bytes; ff85a1b0 adds only the separately tested integration assertions.",
+    "Completion, >=24-hour duration, coverage, exit status and zero failures/anomalies remain separate requirements.",
+    "Full exact-ref CI on ff85a1b0 remains separately required."
+  ]
+}

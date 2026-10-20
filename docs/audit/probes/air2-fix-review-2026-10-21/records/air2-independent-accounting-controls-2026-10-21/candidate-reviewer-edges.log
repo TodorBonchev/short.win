@@ -1,0 +1,17 @@
+$ cargo test --offline --manifest-path /root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml --test reviewer_edges -- --nocapture
+   Compiling shortwin-math v0.1.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/math)
+   Compiling air2-independent-controls v0.0.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.61s
+     Running tests/reviewer_edges.rs (/root/short.win/target/debug/deps/reviewer_edges-a365bdf48a58c2f8)
+
+running 4 tests
+test allowance_only_exposes_new_unlocked_value_and_expiry_releases_old_value ... ok
+FULL_LOCK_CASES=53
+test fully_locked_conversion_keeps_every_awarded_share_locked ... ok
+test partial_lock_rounding_is_conservative_and_full_wipe_clears_lock ... ok
+test zero_lock_stays_zero_even_when_cumulative_rounding_awards_a_share ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+EXIT 0

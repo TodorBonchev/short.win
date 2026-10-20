@@ -1,0 +1,7 @@
+[package]
+name="air2-independent-controls"
+version="0.0.0"
+edition="2024"
+[workspace]
+[dependencies]
+shortwin-math={path="../math"}

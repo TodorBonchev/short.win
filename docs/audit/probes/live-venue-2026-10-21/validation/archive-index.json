@@ -1,0 +1,68 @@
+[
+  {
+    "file": "current-paths.log.gz",
+    "sha256": "4216d12b8ff51d32d741cc06601399dec21458fe9d207c9ac98e177c6e879975",
+    "uncompressed_bytes": 10381,
+    "uncompressed_sha256": "1816179be6dd3f6f03a18d77bc64c0ce27bee7419d6e79b49fbb8e12cb07a454"
+  },
+  {
+    "file": "build-profiles.log.gz",
+    "sha256": "b569216aaecff8c7b6805c3eb2562b6b6a4de290ce9f9ed33128527d043828d4",
+    "uncompressed_bytes": 446,
+    "uncompressed_sha256": "5eb39b98099c0fc009e8820bfead60494074eae1bcabf34d023b5b31ebf2b4fb"
+  },
+  {
+    "file": "fixture-readers.log.gz",
+    "sha256": "fb4c106cb89724ba5c1e8b2a5bad455bafb515a2abaed0cecb63ec8308a1ed7a",
+    "uncompressed_bytes": 628,
+    "uncompressed_sha256": "5f5fa4e847cf770b5695cffa5100fcec4e7293c99bda66b586a19cf21f58b641"
+  },
+  {
+    "file": "historical-differential.log.gz",
+    "sha256": "abdfcdc0a972078bfd5df2203cc2da1b03b416a547d789428f0c1eddf282d21c",
+    "uncompressed_bytes": 1228,
+    "uncompressed_sha256": "394e1dedaed9a0fbbc83ecd0b4cf874726722faa9d4806a9e8a9849d1ef43ead"
+  },
+  {
+    "file": "observed-controls.log.gz",
+    "sha256": "7050d5e06d0e7ec597085668f3e630243c9c29302f3e6cd8fb8ed835a438eb30",
+    "uncompressed_bytes": 11080,
+    "uncompressed_sha256": "1c25bb925aad63cffb6431e33083c5d2d858ce695798ad7c129d4b386277a83c"
+  },
+  {
+    "file": "curve-compat.log.gz",
+    "sha256": "9b90cfba731eaef4e33e626b0ebae442a43c51155a7e3a01644e1d382b1791ff",
+    "uncompressed_bytes": 10354,
+    "uncompressed_sha256": "ef9b326825d8a44e35cdb2f83ed083f02e5f8068e37609aed566be09dd506841"
+  },
+  {
+    "file": "curve-event-tail-discovery.log.gz",
+    "sha256": "8bcb6e7e3f1bb02e3dcb6eb5d0feeaef311669287e5229c5a3afaea5bdeacfb0",
+    "uncompressed_bytes": 4628,
+    "uncompressed_sha256": "eb11b15f8326eef6e6bb2260aff7b80f8a1e7e535d3ac335c99dc7257762cb77"
+  },
+  {
+    "file": "clippy.log.gz",
+    "sha256": "be87629324b27987176d556750c4ab9627e815ecb74b1a2240738fb3f8eef349",
+    "uncompressed_bytes": 161,
+    "uncompressed_sha256": "ec007883ae78b794fd44c5621e51c4f8c7ff28bf262c8f6e531798027c4b9cde"
+  },
+  {
+    "file": "live-after-pin.log.gz",
+    "sha256": "f741ede45b95370bc6ec92ca78c98446fa83e8adb52c89c964c346bb18c475e1",
+    "uncompressed_bytes": 2190,
+    "uncompressed_sha256": "e9ad473a31ef8dd1103154b3bb8afcf9ed35535d425a42de73db079a0a5dc152"
+  },
+  {
+    "file": "m5-gates.log.gz",
+    "sha256": "3639c2868443647f9e6038ba8822ec52a4d86961cfbd280fc64d02c7047fb51b",
+    "uncompressed_bytes": 3847603,
+    "uncompressed_sha256": "695992af7273848809a3681fba119676e55fb7a8f0ec92f56808898dfee279e1"
+  },
+  {
+    "file": "m6-gates.log.gz",
+    "sha256": "932a45e876e3ff4f237de2c344de386e4eb5a25094c903940653a204c7a18e4a",
+    "uncompressed_bytes": 3450126,
+    "uncompressed_sha256": "b25d9858beddb519b0ba712a6672670718dc8bd1d6eece2c5c6cf8109688ffc2"
+  }
+]

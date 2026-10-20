@@ -269,7 +269,7 @@ the prior open findings and remaining leads with evidence limits and completion 
 This is not external firm acceptance or new owner sign-off. The ≥24 h zero-failure fuzz
 and release gates remain required; the merge does not tag or deploy 1.0.3.
 
-**Current unreleased 1.0.3 follow-up (2026-10-19): AI3-FR01.**
+**Historical 1.0.3 follow-up (2026-10-19): AI3-FR01.**
 [The fix record](audit/ai-review-3/ai3-fr01-fix-1.0.3.md) adds a deposit quarantine:
 `S=0` with either current pool carry nonzero refuses appended error 6110
 `LegacyPoolCarry`, preserving historical balances and old allocated claims. The affected
@@ -330,14 +330,30 @@ overlap disclosed. No official external-firm report is claimed.
 | Release `shortwin.so` | `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc` | `f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250` | 1,644,024 |
 | Test-venue `shortwin.so` | `0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01` | `e016b8712080ef08d0b9dc1546eeda8bc62fada891623ad9f52fb90b19de042a` | 1,675,056 |
 
-[CI 39501064777](https://github.com/TodorBonchev/short.win/actions/runs/39501064777)
+[Initial CI 39501064777](https://github.com/TodorBonchev/short.win/actions/runs/39501064777)
 on `a130fd98` reproduced the release byte-for-byte in its verifier and Anchor builds;
-its downloaded test-venue artifact also matches the frozen local fuzz input.
-The services dependency gate found two new upstream TLS advisories and requires a
-lockfile correction and fresh full CI. Reproducible program bytes alone do not make
-that failed CI gate green. The [new final-byte all-profile fuzz run](audit/fuzz-1.0.3-fullsha.md)
-is active and must complete ≥24 hours with zero failures/anomalies. Earlier durations
-cannot be credited to the new bytes. No 1.0.3 tag or deployment is authorized by this record.
+the downloaded test-venue artifact matches too. It ended cancelled when the new source
+was dispatched: 21 successful jobs, two failures (new services TLS advisories and old
+224-byte replay recordings), two cancelled jobs and one scheduled fuzz skip. Those
+failures are corrected by `b54c4384` / `1cee0c16`; partial successes are not a green gate.
+
+The production/fixture source is **`e04a6776`**, including the reviewed supported SOL/WSOL
+paths on newly observed pump/PumpSwap ELFs, current-schema upgrade regression and new
+signed browser vectors. [Scoped live review](audit/live-preflight-1.0.3-2026-10-21.md)
+retains exact code identities, actual October 19 deployment times, unchanged budgets,
+a passing dated live-pin check and its limits. Canonical rebuilds on the new unused
+test/tool baseline reproduce the same program hashes above. The
+[independent integration AI review](audit/independent-integration-review-1.0.3-2026-10-21.md)
+discloses implementation overlap, separate peer review and actual executions.
+[Full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
+is checking `ff85a1b0`, whose only code delta is the direct AIR2-01 lock/zero-lock
+regression strengthening. The [focused AIR2 review](audit/independent-air2-fix-review-1.0.3-2026-10-21.md)
+accepts eight technical corrections. Production/fuzzer/fixture inputs match `e04a6776`;
+completed required jobs and verifier equality remain required. The
+[final current-profile fuzz run](audit/fuzz-1.0.3-fullsha.md) started
+2026-10-20 22:21:09 UTC with a new runner and copied, hash-checked fixtures. It must
+complete ≥24 hours with zero failures/anomalies. Previous-program and previous-profile
+durations are historical; no 1.0.3 tag/deployment is approved by this record.
 
 ## 1. The protocol on one page
 

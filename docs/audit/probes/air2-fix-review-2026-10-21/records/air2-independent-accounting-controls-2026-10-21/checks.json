@@ -1,0 +1,226 @@
+{
+  "head": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "source_sha256": {
+    "crates/shortwin-math/src/pool.rs": "3d270b521f777b314a3e86048bb5c4396bc78129d4f47eb5898942e30ad55312",
+    "crates/shortwin-math/tests/ai2_accounting.rs": "1638c8b9ba4a058c283545f0d8e6588fd384369b44dee711b01d8d9bc5e2eaa4",
+    "crates/shortwin-math/tests/pool_harness.rs": "07ad6a4cb25150a848a1d5ba525421cec22169e30bc5122f48d2fefe09d77f93"
+  },
+  "checks": [
+    {
+      "label": "candidate-air2-01",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "ai2_accounting",
+        "air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "6c6758a4d233dfc45961dee6d6179b9d30c9513bf4f08f7884e92284ee070672"
+    },
+    {
+      "label": "candidate-l39",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "ai2_accounting",
+        "l39_one_token_deposit_cannot_unlock_a_fully_locked_position",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "c3760b2582d9bf44c82ad28a84b435198366b7b6173078edc1a6c66b1cd86322"
+    },
+    {
+      "label": "candidate-conversion-units",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "shortwin-math",
+        "--lib",
+        "pool::tests::convert",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "89b0eb3574475cc1fc517a8f36568910c47353670ad01f7defde6c070966b5e7"
+    },
+    {
+      "label": "candidate-idle_lenders_expired_lock_stops_counting_at_lock_until",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "pool_econ",
+        "idle_lenders_expired_lock_stops_counting_at_lock_until",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "55a59d00d8e0860446e0459e6604eb97acb85718a6c33d6487a7014d1cedf5d5"
+    },
+    {
+      "label": "candidate-stuck_lock_clears_at_lock_until",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "pool_econ",
+        "stuck_lock_clears_at_lock_until",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "ce75f76a106cacfe5f6232ec28282e73e503061a74c3f67c876789eaf7d38d82"
+    },
+    {
+      "label": "candidate-lock_decay_restarts_with_every_lock_era",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "pool_econ",
+        "lock_decay_restarts_with_every_lock_era",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "14bcc634caf4debe0463a3c94e79aa87665638fc4377c786b7904dbdbb22c289"
+    },
+    {
+      "label": "candidate-reviewer-edges",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml",
+        "--test",
+        "reviewer_edges",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "5ef320eb210c31e480bdf900af4fa272eb7965b514011f6a0d5469b3c5446571"
+    },
+    {
+      "label": "floor-lock-strengthened-regression-negative-control",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml",
+        "--test",
+        "ai2_accounting",
+        "air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 101,
+      "expected": 101,
+      "log_sha256": "e94a2ae0102992106c04762e655d6aaa5f1ce86fd4aa3233b942add6f334f63b"
+    },
+    {
+      "label": "floor-lock-reviewer-negative-control",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml",
+        "--test",
+        "reviewer_edges",
+        "fully_locked_conversion_keeps_every_awarded_share_locked",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 101,
+      "expected": 101,
+      "log_sha256": "15d9f097bb40a009bb25188ecf2c3823fd86d5beaa8d0c826b9baf11f7232667"
+    },
+    {
+      "label": "old-value-cap-negative-control",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml",
+        "--test",
+        "ai2_accounting",
+        "l39_one_token_deposit_cannot_unlock_a_fully_locked_position",
+        "--",
+        "--exact",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 101,
+      "expected": 101,
+      "log_sha256": "02f7043524759691a64410b9153eb557ff8c05de856a05028f5455e9822b2073"
+    },
+    {
+      "label": "old-value-cap-actual-loss-replay",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--manifest-path",
+        "/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml",
+        "--test",
+        "pre_fix_loss",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "/root/short.win-audit-review",
+      "exit": 0,
+      "expected": 0,
+      "log_sha256": "e8448326a97ef57bf36277b7be8d7f9f5beb44683e876059a5e910a6667affb7"
+    }
+  ],
+  "reviewer_edges_sha256": "284a2afd7455e86c21703a3f49d1ef0ce710a529e67f39be218f4e38a6da8a7a",
+  "runner_sha256": "61485b4a8e88c5c8d5c252e2efd6598618d2883ff6d7323d23fdd2f3421e9647"
+}

@@ -1,0 +1,24 @@
+$ cargo test --offline --manifest-path /root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml --test reviewer_edges fully_locked_conversion_keeps_every_awarded_share_locked -- --exact --nocapture
+   Compiling air2-independent-controls v0.0.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/reviewer_edges.rs (/root/short.win/target/debug/deps/reviewer_edges-a365bdf48a58c2f8)
+
+running 1 test
+
+thread 'fully_locked_conversion_keeps_every_awarded_share_locked' (156831) panicked at tests/reviewer_edges.rs:23:17:
+assertion `left == right` failed: old shares=1 denominator=1000 remainder=999
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test fully_locked_conversion_keeps_every_awarded_share_locked ... FAILED
+
+failures:
+
+failures:
+    fully_locked_conversion_keeps_every_awarded_share_locked
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test reviewer_edges`
+
+EXIT 101

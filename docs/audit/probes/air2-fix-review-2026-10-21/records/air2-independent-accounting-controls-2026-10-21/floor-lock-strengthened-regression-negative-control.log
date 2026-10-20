@@ -1,0 +1,25 @@
+$ cargo test --offline --manifest-path /root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml --test ai2_accounting air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit -- --exact --nocapture
+   Compiling shortwin-math v0.1.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/math)
+   Compiling air2-independent-controls v0.0.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.89s
+     Running tests/ai2_accounting.rs (/root/short.win/target/debug/deps/ai2_accounting-2d22114fe5556b5c)
+
+running 1 test
+
+thread 'air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit' (156761) panicked at tests/ai2_accounting.rs:174:5:
+assertion `left == right` failed: the awarded share must remain locked
+  left: 2500
+ right: 2501
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit ... FAILED
+
+failures:
+
+failures:
+    air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--test ai2_accounting`
+
+EXIT 101

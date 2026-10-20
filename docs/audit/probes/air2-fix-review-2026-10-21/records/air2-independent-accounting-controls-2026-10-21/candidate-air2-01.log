@@ -1,0 +1,12 @@
+$ cargo test --locked -p shortwin-math --test ai2_accounting air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit -- --exact --nocapture
+   Compiling shortwin-math v0.1.0 (/root/short.win-audit-review/crates/shortwin-math)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+     Running tests/ai2_accounting.rs (/root/short.win/target/debug/deps/ai2_accounting-264fe11e77e4feeb)
+
+running 1 test
+test air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+
+EXIT 0

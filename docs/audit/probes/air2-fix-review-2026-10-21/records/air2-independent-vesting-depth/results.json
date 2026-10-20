@@ -1,0 +1,193 @@
+{
+  "env": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/root/short.win/target",
+    "PROPTEST_CASES": "2000",
+    "SHORTWIN_SO": "/root/short.win-audit-review/target/deploy/shortwin.so",
+    "SHORTWIN_TEST_VENUE_SO": "/root/short.win-audit-review/target/test-venue/deploy/shortwin.so",
+    "MOCK_CPAMM_SO": "/root/short.win-audit-review/target/deploy/mock_cpamm.so"
+  },
+  "results": [
+    {
+      "name": "math-air2-05",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "ai2_accounting",
+        "air2_05",
+        "--locked"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/math-air2-05.log",
+      "log_sha256": "cd6becc3bc91c53aea2e29095c07bad398d2fc5d8476a36a5c57828e8a0808ea"
+    },
+    {
+      "name": "math-air2-09",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "ai2_accounting",
+        "air2_09",
+        "--locked"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/math-air2-09.log",
+      "log_sha256": "c7148abe94c6035dee09b808ba2605a885f8d36940e7b53070704b685c0764ed"
+    },
+    {
+      "name": "math-split-settle",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "ai2_accounting",
+        "pass2_split_settlements_cannot_avoid_the_live_vest_hold",
+        "--locked"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/math-split-settle.log",
+      "log_sha256": "234de5b5ba00c9d896d2b43199a38ac1d89fcca2fa8d8cf95891c47149d76600"
+    },
+    {
+      "name": "math-vest-hold",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-math",
+        "--lib",
+        "a_settlement_marks_any_remaining_live_vest_for_a_deposit_hold",
+        "--locked"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/math-vest-hold.log",
+      "log_sha256": "0fda7ef3204f0379b63530e3a9f9621b1633cf25865e348e65c3e151ce2e96a9"
+    },
+    {
+      "name": "math-depth-properties",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "quotes_props",
+        "locked_depth_properties",
+        "--locked"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/math-depth-properties.log",
+      "log_sha256": "41c1cb5dcfb8c861a5959f44627fa6f20424bdf5dbbd8760e9334d03041895e0"
+    },
+    {
+      "name": "math-depth-cap",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-math",
+        "--test",
+        "oracle_props",
+        "the_depth_cap_bounds_deposit_inflation",
+        "--locked"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/math-depth-cap.log",
+      "log_sha256": "1f8d8610d15b89a6d80a4bed9a5f408d696fac52c8ef6eab90b1276cf3abcd39"
+    },
+    {
+      "name": "svm-halted-s3",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-litesvm-tests",
+        "--test",
+        "ai2_halted_s3_vest_it",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/svm-halted-s3.log",
+      "log_sha256": "a8437f35079cbafb34457cb34b7fc1fbbcd993438f0055d9ade2d093a67779f9"
+    },
+    {
+      "name": "svm-dust-split",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-litesvm-tests",
+        "--test",
+        "ai2_venue_review_it",
+        "air2_05",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/svm-dust-split.log",
+      "log_sha256": "86a3293bb2bbd61472efee5df7e2fe1a3ad93dd0030b521785daefd620a9b112"
+    },
+    {
+      "name": "svm-cpmm-lp",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-litesvm-tests",
+        "--test",
+        "pool_attacks_it",
+        "unlocked_liquidity_moves_lambda_not_d",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/svm-cpmm-lp.log",
+      "log_sha256": "17567491d2a7cb2360055d929e7b281b216fb252040fffb0fd42c2ab6bba35f4"
+    },
+    {
+      "name": "svm-pamm-lp",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-litesvm-tests",
+        "--test",
+        "pamm_it",
+        "a_deposit_and_its_withdrawal_move_neither_d_nor_the_bounds",
+        "--locked",
+        "--",
+        "--nocapture"
+      ],
+      "exit": 0,
+      "log": "/root/short.win-audit-review/target/air2-independent-vesting-depth/svm-pamm-lp.log",
+      "log_sha256": "e9e2f27a64eb87d54ffa3f396b7cdb93fd720bed677463446a44c01e472e74e2"
+    }
+  ],
+  "reviewed_source_commit": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "runtime_artifacts": {
+    "release": {
+      "path": "/root/short.win-audit-review/target/deploy/shortwin.so",
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc"
+    },
+    "test_venue": {
+      "path": "/root/short.win-audit-review/target/test-venue/deploy/shortwin.so",
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01"
+    },
+    "mock": {
+      "path": "/root/short.win-audit-review/target/deploy/mock_cpamm.so",
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9"
+    }
+  }
+}

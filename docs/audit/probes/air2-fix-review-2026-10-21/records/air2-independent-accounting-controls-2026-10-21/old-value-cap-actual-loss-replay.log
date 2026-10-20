@@ -1,0 +1,14 @@
+$ cargo test --offline --manifest-path /root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls/Cargo.toml --test pre_fix_loss -- --nocapture
+   Compiling air2-independent-controls v0.0.0 (/root/short.win-audit-review/target/air2-independent-accounting-controls-2026-10-21/controls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/pre_fix_loss.rs (/root/short.win/target/debug/deps/pre_fix_loss-3c0050e9f6c95148)
+
+running 2 tests
+PRE_FIX_NET_TOKENS=670223 CONTROL_TOKENS=336779
+test pool_harness::crc32_matches_zlib ... ok
+test old_cap_replays_the_actual_loss_shift ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+EXIT 0

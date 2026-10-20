@@ -1,0 +1,7 @@
+[package]
+name = "air2-independent-native-probe"
+version = "0.0.0"
+edition = "2024"
+[workspace]
+[dependencies]
+shortwin-math = { path = "/root/short.win-audit-review/crates/shortwin-math" }

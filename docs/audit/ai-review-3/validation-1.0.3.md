@@ -146,19 +146,28 @@ correction changes the program again; those older fuzz durations do not cover it
 
 The [current readiness record](../release-readiness-1.0.3-2026-10-21.md) gives the new
 32-byte/304-byte layout, local regression results, exact CI identity and artifact
-comparisons. CI 39501064777 reproduced the new release bytes but found new services
-TLS advisories; that dependency failure must be corrected and full CI rerun.
-The [final all-profile fuzz run](../fuzz-1.0.3-fullsha.md) must complete at least
-24 hours with zero failures/anomalies on the recorded final program/fuzzer bytes.
-The preceding 13h13m FR01 run is intentionally superseded partial evidence.
+comparisons. Initial CI 39501064777 reproduced the new release bytes but found services
+TLS advisories and old-layout replay recordings; fixes are committed. That run ended
+cancelled when the new source was dispatched, with 21 successful, two failed, two
+cancelled and one skipped job. Fresh
+[full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
+is checking exact source `e04a6776`, including the additive current-venue profile.
+The [scoped venue review](../live-preflight-1.0.3-2026-10-21.md) records supported-path
+checks and the passing dated live pins, not an exhaustive upstream audit. Canonical
+short.win ELFs remain byte-identical after the unused baseline-constant update.
+The [final all-profile fuzz run](../fuzz-1.0.3-fullsha.md), started 2026-10-20 22:21:09 UTC,
+must complete at least 24 hours with zero failures/anomalies on the recorded frozen
+program, runner and copied fixtures. The preceding 13h13m old-program and 47-minute
+old-profile runs are intentionally superseded partial evidence.
 
 The owner confirmed the program has never been deployed and explicitly delegated
 [the selected policy decisions](../owner-decisions-1.0.3-2026-10-21.md).
 Current-deployment migration is not required. Their economic consequences remain
 acknowledged, rather than being described as technically fixed. Under the explicit
 batch-specific authorization in AUDIT §12, the
-[independent AI-assisted fix review](../independent-ai-fix-review-1.0.3-2026-10-21.md)
-is the chosen review route. It discloses authorship overlap and separate peer review;
+[focused AI-assisted fix review](../independent-ai-fix-review-1.0.3-2026-10-21.md) and
+[independent integration addendum](../independent-integration-review-1.0.3-2026-10-21.md)
+are the chosen review route. It discloses authorship overlap and separate peer review;
 it is not an external security firm's certification. The CI and fuzz requirements
 are not waived.
 

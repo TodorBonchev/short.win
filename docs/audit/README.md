@@ -15,7 +15,9 @@ The audit package for short.win's external security review (M10). The entry poin
 | [`release-readiness-1.0.3-2026-10-21.md`](release-readiness-1.0.3-2026-10-21.md) | Current integrated source, complete SHA-256 correction, local validation and pending final CI/verifier/fuzz release gates | 2026-10-21 |
 | [`owner-decisions-1.0.3-2026-10-21.md`](owner-decisions-1.0.3-2026-10-21.md) | Delegated owner selections, accepted economic/availability consequences, never-deployed status and deployment requirements | 2026-10-21 |
 | [`independent-ai-fix-review-1.0.3-2026-10-21.md`](independent-ai-fix-review-1.0.3-2026-10-21.md) | Focused AI-assisted implementation review with authorship overlap and separate peer review disclosed; no external security firm certification | 2026-10-21 |
+| [`independent-integration-review-1.0.3-2026-10-21.md`](independent-integration-review-1.0.3-2026-10-21.md) | Exact `e04a6776` source, disclosed authorship/peer review and frozen-input verification; final gates pending | 2026-10-21 |
 | [`fuzz-1.0.3-fullsha.md`](fuzz-1.0.3-fullsha.md) | In-progress final full-digest all-profile ≥24-hour fuzz run, frozen inputs and completion requirements; launch does not satisfy the gate | 2026-10-21 |
+| [`live-preflight-1.0.3-2026-10-21.md`](live-preflight-1.0.3-2026-10-21.md) | Additive October 19 pump/PumpSwap bytes, passing dated live pins, scoped supported-path review and retained logs | 2026-10-21 |
 | [`fuzz-1.0.3.md`](fuzz-1.0.3.md) | Historical clean 24-hour run on `9b91060`, before AI3-FR01; frozen hashes and raw summary | 2026-10-19 |
 | [`fuzz-1.0.3-fr01.md`](fuzz-1.0.3-fr01.md) | Historical FR01 run intentionally stopped after 13h13m when the full-digest correction changed program bytes; partial evidence, not a completed final-byte gate | 2026-10-21 |
 | [`release-readiness-1.0.3-2026-10-20.md`](release-readiness-1.0.3-2026-10-20.md) | Historical October 20 readiness snapshot; superseded by the October 21 source/readiness record | 2026-10-20 |
@@ -23,3 +25,5 @@ The audit package for short.win's external security review (M10). The entry poin
 | [`handoff-1.0.3-2026-10-20.md`](handoff-1.0.3-2026-10-20.md) | Historical internal handoff: carry/keeper findings, technical dispositions and release work as of October 20 | 2026-10-20 |
 | [`ai-review-3/independent-fix-review-1.0.3.md`](ai-review-3/independent-fix-review-1.0.3.md) | Historical independent AI packet review: Q2/Q3/Q4 accepted and Q1 conditional on AI3-FR01; subsequent quarantine, never-deployed confirmation and review are in the October 21 records | 2026-10-19 |
 | `README.md` | This index | |
+
+- [Independent focused AIR2 fix review (2026-10-21)](independent-air2-fix-review-1.0.3-2026-10-21.md): eight technical corrections, reviewer disclosures, regression masking repair and retained local evidence.

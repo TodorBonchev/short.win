@@ -1,0 +1,23 @@
+[
+  {
+    "artifact_file": "deploy/shortwin.so",
+    "bytes": 1644024,
+    "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+    "executable_sha256": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250",
+    "frozen_fuzz_match": true
+  },
+  {
+    "artifact_file": "test-venue/deploy/shortwin.so",
+    "bytes": 1675056,
+    "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+    "executable_sha256": "e016b8712080ef08d0b9dc1546eeda8bc62fada891623ad9f52fb90b19de042a",
+    "frozen_fuzz_match": true
+  },
+  {
+    "artifact_file": "deploy/mock_cpamm.so",
+    "bytes": 281240,
+    "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+    "executable_sha256": "8116d1ed17242f99851ded711877a6b114a12134dfe7a043d77f4c762262fb83",
+    "frozen_fuzz_match": true
+  }
+]

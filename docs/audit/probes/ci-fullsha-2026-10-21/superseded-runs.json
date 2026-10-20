@@ -1,0 +1,462 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-20T22:45:01.902712+00:00",
+  "limit": "Superseded partial runs, never the completed final full-CI gate.",
+  "runs": [
+    {
+      "run": {
+        "id": 39501064777,
+        "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/39501064777",
+        "head_sha": "a130fd9836508e0f58bc94eb00bb1f5eae95405e",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "run_attempt": 1,
+        "created_at": "2026-10-20T21:31:32Z",
+        "updated_at": "2026-10-20T22:22:12Z"
+      },
+      "counts": {
+        "success": 21,
+        "cancelled": 2,
+        "failure": 2,
+        "skipped": 1
+      },
+      "jobs": [
+        {
+          "id": 118898396371,
+          "name": "anchor-build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:37:59Z"
+        },
+        {
+          "id": 118898396523,
+          "name": "web",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:33:49Z"
+        },
+        {
+          "id": 118898396586,
+          "name": "test",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:33:23Z"
+        },
+        {
+          "id": 118898396764,
+          "name": "wasm",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:32:05Z"
+        },
+        {
+          "id": 118898396829,
+          "name": "vectors",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:36:13Z"
+        },
+        {
+          "id": 118898396844,
+          "name": "clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:33:39Z"
+        },
+        {
+          "id": 118898396921,
+          "name": "deny",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:32:14Z"
+        },
+        {
+          "id": 118898396956,
+          "name": "cu-math",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:33:16Z"
+        },
+        {
+          "id": 118898397032,
+          "name": "fmt",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:31:38Z",
+          "completed_at": "2026-10-20T21:31:59Z"
+        },
+        {
+          "id": 118901302269,
+          "name": "program-tests",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T22:22:11Z"
+        },
+        {
+          "id": 118901302334,
+          "name": "codama",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:38:34Z"
+        },
+        {
+          "id": 118901302369,
+          "name": "m5-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:46:30Z"
+        },
+        {
+          "id": 118901302398,
+          "name": "verifiable-build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:42:20Z"
+        },
+        {
+          "id": 118901302429,
+          "name": "indexer",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:49:19Z"
+        },
+        {
+          "id": 118901302459,
+          "name": "t-size",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:39:24Z"
+        },
+        {
+          "id": 118901302471,
+          "name": "m3-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:42:07Z"
+        },
+        {
+          "id": 118901302474,
+          "name": "m1-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:40:19Z"
+        },
+        {
+          "id": 118901302522,
+          "name": "web-e2e",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T22:01:25Z"
+        },
+        {
+          "id": 118901302523,
+          "name": "m7-keeper-bench",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:42:08Z"
+        },
+        {
+          "id": 118901302560,
+          "name": "services",
+          "status": "completed",
+          "conclusion": "failure",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:39:17Z"
+        },
+        {
+          "id": 118901302576,
+          "name": "m6-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:43:37Z"
+        },
+        {
+          "id": 118901302580,
+          "name": "t-pot",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:44:07Z"
+        },
+        {
+          "id": 118901302720,
+          "name": "mutants",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T22:22:11Z"
+        },
+        {
+          "id": 118901302758,
+          "name": "fuzz-smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:40:05Z"
+        },
+        {
+          "id": 118901302927,
+          "name": "m2-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T21:38:03Z",
+          "completed_at": "2026-10-20T21:40:13Z"
+        },
+        {
+          "id": 118901305574,
+          "name": "fuzz-nightly",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-10-20T21:38:00Z",
+          "completed_at": "2026-10-20T21:38:00Z"
+        }
+      ]
+    },
+    {
+      "run": {
+        "id": 39507546399,
+        "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/39507546399",
+        "head_sha": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "run_attempt": 1,
+        "created_at": "2026-10-20T22:21:49Z",
+        "updated_at": "2026-10-20T22:41:34Z"
+      },
+      "counts": {
+        "success": 21,
+        "cancelled": 4,
+        "skipped": 1
+      },
+      "jobs": [
+        {
+          "id": 118920306681,
+          "name": "vectors",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:31:13Z"
+        },
+        {
+          "id": 118920306684,
+          "name": "web",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:24:07Z"
+        },
+        {
+          "id": 118920306739,
+          "name": "deny",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:22:49Z"
+        },
+        {
+          "id": 118920306786,
+          "name": "wasm",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:23:16Z"
+        },
+        {
+          "id": 118920306875,
+          "name": "fmt",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:22:36Z"
+        },
+        {
+          "id": 118920306893,
+          "name": "anchor-build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:28:41Z"
+        },
+        {
+          "id": 118920307065,
+          "name": "test",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:16Z",
+          "completed_at": "2026-10-20T22:23:27Z"
+        },
+        {
+          "id": 118920307180,
+          "name": "cu-math",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:24:24Z"
+        },
+        {
+          "id": 118920307299,
+          "name": "clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:22:15Z",
+          "completed_at": "2026-10-20T22:23:07Z"
+        },
+        {
+          "id": 118922998933,
+          "name": "m2-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:45Z",
+          "completed_at": "2026-10-20T22:30:16Z"
+        },
+        {
+          "id": 118922998961,
+          "name": "t-pot",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:33:46Z"
+        },
+        {
+          "id": 118922998995,
+          "name": "web-e2e",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:41:33Z"
+        },
+        {
+          "id": 118922999002,
+          "name": "m1-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:30:09Z"
+        },
+        {
+          "id": 118922999014,
+          "name": "program-tests",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:41:30Z"
+        },
+        {
+          "id": 118922999036,
+          "name": "m7-keeper-bench",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:33:41Z"
+        },
+        {
+          "id": 118922999048,
+          "name": "t-size",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:30:47Z"
+        },
+        {
+          "id": 118922999049,
+          "name": "m3-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:33:13Z"
+        },
+        {
+          "id": 118922999054,
+          "name": "verifiable-build",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:45Z",
+          "completed_at": "2026-10-20T22:33:04Z"
+        },
+        {
+          "id": 118922999065,
+          "name": "codama",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:29:09Z"
+        },
+        {
+          "id": 118922999069,
+          "name": "mutants",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:41:31Z"
+        },
+        {
+          "id": 118922999070,
+          "name": "indexer",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:38:52Z"
+        },
+        {
+          "id": 118922999081,
+          "name": "m6-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:33:42Z"
+        },
+        {
+          "id": 118922999120,
+          "name": "m5-cu",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:36:47Z"
+        },
+        {
+          "id": 118922999157,
+          "name": "services",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "started_at": "2026-10-20T22:28:44Z",
+          "completed_at": "2026-10-20T22:41:30Z"
+        },
+        {
+          "id": 118922999181,
+          "name": "fuzz-smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-10-20T22:28:45Z",
+          "completed_at": "2026-10-20T22:33:40Z"
+        },
+        {
+          "id": 118923001542,
+          "name": "fuzz-nightly",
+          "status": "completed",
+          "conclusion": "skipped",
+          "started_at": "2026-10-20T22:28:42Z",
+          "completed_at": "2026-10-20T22:28:41Z"
+        }
+      ]
+    }
+  ]
+}

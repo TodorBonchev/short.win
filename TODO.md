@@ -11,28 +11,26 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 ## 1.0.3 release blockers
 
-- [ ] Finish the new pump/PumpSwap fixture-baseline and signed compatibility review
-      described in the [live preflight](docs/audit/live-preflight-1.0.3-2026-10-21.md).
-      Retain exact observed bytes, supported SOL-quote behavior and slot-latch constraints.
-- [ ] Run fresh exact-ref full CI after the TLS fix (`b54c4384`), replay fixture repair
-      (`1cee0c16`), legacy keeper cleanup (`604154c3`) and venue integration. Verify all
-      required jobs and compare verifier/Anchor artifacts with final fuzz inputs.
-      [Initial full-digest CI 39501064777](https://github.com/TodorBonchev/short.win/actions/runs/39501064777)
-      found the TLS and replay failures; its successful verifier alone is not a green gate.
-- [ ] Complete the [final full-digest ≥24 h all-profile fuzz run](docs/audit/fuzz-1.0.3-fullsha.md)
-      on the recorded program and fuzzer bytes; retain zero-failure/anomaly results,
-      all-profile coverage, elapsed time, exit status and summary/log hashes.
-      The preceding 13h13m run was intentionally superseded by the full-digest change.
-      Moving the venue profile to new upstream ELFs also requires a fresh final runner/run.
+- [ ] Finish [exact-ref full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
+      on `ff85a1b0`, verify every required job/mutation outcome and compare downloaded
+      verifier/Anchor artifacts with final fuzz inputs. Initial CI's TLS/replay failures
+      are corrected; its cancelled partial run is not the final green gate.
+- [ ] Complete the [final current-profile ≥24 h all-profile fuzz run](docs/audit/fuzz-1.0.3-fullsha.md)
+      on the recorded frozen program, runner and venue fixtures. Retain zero failures/
+      anomalies, all-profile coverage, elapsed time, exit and summary/log hashes.
+      Superseded old-program/old-profile durations are not credited.
 - [ ] After both gates, record final finding statuses and release hashes, then present
-      the 1.0.3 tag/deployment plan for owner review. Verify funded/monitored keeper
-      operation, live venue pins/R-PFEE, indexer support for sweep destination `3`
-      before program deployment, and compatible 304-byte guard clients.
+      the 1.0.3 tag/deployment plan for owner review. Recheck live venue pins/R-PFEE,
+      funded/monitored keeper operation, indexer sweep destination `3` and compatible
+      304-byte guard clients before program deployment.
 
 The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) and
-[accurately labelled independent AI fix review](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md)
-are recorded. The program has never been deployed; no old-account migration is needed.
-The batch-specific AI review route does not waive the CI or final-byte fuzz gate.
+accurately labelled [focused](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md) /
+[integration](docs/audit/independent-integration-review-1.0.3-2026-10-21.md) /
+[AIR2](docs/audit/independent-air2-fix-review-1.0.3-2026-10-21.md) AI fix reviews
+are recorded. The program has never been deployed; old-account migration is not needed.
+The batch-specific review route does not waive CI or final-profile fuzz. The live venue
+refresh and legacy keeper cleanup are complete in the source candidate.
 
 ## Later or conditional follow-ups
 
