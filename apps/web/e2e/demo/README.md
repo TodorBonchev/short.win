@@ -100,6 +100,40 @@ The [phone capture record](../../../../docs/demo/local-validator-phone-v1.0.3-20
 contains its own transaction evidence, timing and media hashes. Replaying either edition
 changes validator state, so reseed and archive the indexer database between recordings.
 
+## Narrated editions
+
+`narrate.ts` adds English narration using ElevenLabs' premade **Bella** voice and
+`eleven_multilingual_v2`. Its thirteen short lines explain the actions, risks, 8× waits
+and separate mock markets. Each edition places the lines using its own rendered cue
+timeline. Speech stays at normal speed; an overlong line fails validation instead of
+being accelerated or cut.
+
+With the rendered MP4s already present, run from `apps/web`:
+
+```sh
+node e2e/demo/narrate.ts --all --dry-run
+node e2e/demo/narrate.ts --all
+```
+
+The script reads `ELEVENLABS_API_KEY` from the environment, or a key stored in `~/.11l`.
+It sends the narration text to the
+[ElevenLabs speech-with-timing API](https://elevenlabs.io/docs/api-reference/text-to-speech/convert-with-timestamps).
+The credential is never included in command arguments, logs or output metadata. New
+speech generation uses the account's credits. Shared audio and API responses are cached
+under `.e2e/demo/narration-cache/`, so both editions reuse the same thirteen voice clips.
+`--all --offline` rebuilds from that cache without reading credentials or making API calls.
+Omit `--all` for desktop only, or use `--phone` for phone only.
+
+Outputs beside each silent MP4 have the suffix `-narrated.mp4`, plus a WAV voice track,
+an SRT transcript and `narration.json` with exact speech timings and hashes. The MP4
+contains AAC audio; the narration subtitles are supplied separately as an optional SRT.
+Existing action captions remain visible. Two-pass loudness normalization targets −16 LUFS with
+−1.5 dB true-peak headroom. The original video is copied without re-encoding, and its
+compressed-stream hash must match before the narrated copy is published locally.
+
+The [narration record](../../../../docs/demo/narration-v1.0.3-2026-10-20.md) lists the final
+files, checks and speech timing. Silent MP4s and GIFs remain available.
+
 Suggested unlisted-video description (add the URL after upload):
 
 > short.win local-validator walkthrough — v1.0.3 candidate, not deployed; no external audit
