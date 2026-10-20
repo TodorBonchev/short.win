@@ -3241,12 +3241,27 @@ impl<C: Chain> Keeper<C> {
             if round == 0 && !t.rank_queue.is_empty() {
                 let batch = t.next_rank_batch(pcfg.rank_keys_per_tick);
                 let mut scored = Vec::with_capacity(batch.len());
+                let mut rank_error = None;
                 // RpcChain chunks at 100 keys. Keep each pool/vault/mint snapshot inside one
-                // request, and commit the queue only after all groups succeed.
+                // request. A failed group retains the whole queue, while the previous ranking
+                // can still be evaluated and keep a failing pool's observation chain alive.
                 for group in batch.chunks(33) {
                     let keys: Vec<Pubkey> = group.iter().flat_map(|c| c.rank_keys()).collect();
-                    let accs = self.chain.accounts(&keys).await?;
-                    anyhow::ensure!(accs.len() == keys.len(), "incomplete pool ranking read");
+                    let accs = match self.chain.accounts(&keys).await {
+                        Ok(accs) if accs.len() == keys.len() => accs,
+                        Ok(accs) => {
+                            rank_error = Some(format!(
+                                "incomplete pool ranking read: {} accounts for {} keys",
+                                accs.len(),
+                                keys.len()
+                            ));
+                            break;
+                        }
+                        Err(e) => {
+                            rank_error = Some(format!("{e:#}"));
+                            break;
+                        }
+                    };
                     scored.extend(
                         group
                             .iter()
@@ -3255,9 +3270,13 @@ impl<C: Chain> Keeper<C> {
                             .map(|(c, a)| (pool_monitor::score(&c, a), c)),
                     );
                 }
-                let t = self.pool_tracks.entry(key).or_default();
-                if t.finish_rank_batch(scored, pcfg.max_candidates) {
-                    t.last_eval = None;
+                if let Some(error) = rank_error {
+                    report.errors.push(format!("{key}: pool ranking: {error}"));
+                } else {
+                    let t = self.pool_tracks.entry(key).or_default();
+                    if t.finish_rank_batch(scored, pcfg.max_candidates) {
+                        t.last_eval = None;
+                    }
                 }
             }
 

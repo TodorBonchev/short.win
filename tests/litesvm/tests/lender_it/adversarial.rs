@@ -449,6 +449,53 @@ fn last_exit_pays_swept_carry_before_the_next_cohort() {
     }
 }
 
+/// Characterization only: historical ownership of a whole-lamport carry remains unresolved.
+/// B arrives after A's income has vested, then receives its carry on the final exit.
+#[test]
+fn late_depositor_captures_preexisting_carry_unresolved_residual() {
+    use anchor_lang::solana_program::system_instruction;
+    use shortwin_litesvm_tests::{engine::sweep_trader_ix, pda, tokens};
+
+    let mut lab = Lab::new(TokenProgram::Spl);
+    shortwin_litesvm_tests::invariants::positions::allow_injected_borrower_side(false);
+    shortwin_litesvm_tests::invariants::lender::allow_shareless_borrow(false);
+    let a_tokens = 2_000_000_000_000_000_000;
+    let ata = lab.user("A").ata;
+    let payer = lab.env.payer.insecure_clone();
+    tokens::mint_to(
+        &mut lab.env.svm,
+        &payer,
+        &lab.k.mint,
+        &ata,
+        &lab.mint_authority,
+        a_tokens - crate::common::USER_TOKENS,
+        TokenProgram::Spl,
+    );
+    let a = lab.deposit("A", a_tokens).unwrap();
+    let market = lab.k.market;
+    ok(lab.env.send(
+        &[
+            system_instruction::transfer(&payer.pubkey(), &pda::trader(&market).0, 1_001_000),
+            sweep_trader_ix(&market, None),
+        ],
+        &[],
+    ));
+    lab.env.warp(i64::from(lab.lump_vest_s));
+    ok(lab.env.send(&[sweep_trader_ix(&market, None)], &[]));
+    assert_eq!(lab.market().carry.get(), 1_000 * WAD as i128);
+
+    let b = lab.deposit("B", 1).unwrap();
+    assert_eq!(b, 1_000);
+    assert_eq!(lab.withdraw("A", a), Ok((a_tokens, 1_000_000)));
+    assert_eq!(lab.withdraw("B", b), Ok((1, 1_000)));
+    assert_eq!(
+        (lab.market().carry.get(), lab.market().carry_r.get()),
+        (0, 0)
+    );
+    assert_eq!(lab.vault().lender_sol, 0);
+    lab.env.assert_invariants();
+}
+
 /// Borrower accounting is injected through the math API in this lab case. All lender
 /// instructions are real; in particular the final claim event must report only its pot draw,
 /// and the earlier, shareless lender must retain its full rent claim.

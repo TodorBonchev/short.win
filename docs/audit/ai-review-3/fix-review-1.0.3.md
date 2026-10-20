@@ -12,6 +12,9 @@ hashes, tool image and verifier/Anchor byte comparison are in the
 [CI hash record](../ci-1.0.3-hashes.txt). The run passed 25 jobs with only the scheduled
 fuzz job skipped. The separate [24-hour all-profile fuzz run](../fuzz-1.0.3.md)
 completed cleanly on the same program bytes. Independent fix review remains open.
+The later [internal handoff](../handoff-1.0.3-2026-10-20.md) adds focused
+review evidence and a keeper retry correction. It does not supply the external
+auditor acceptance requested here; the keeper change needs a new exact-ref CI run.
 
 ## Questions for the reviewer
 

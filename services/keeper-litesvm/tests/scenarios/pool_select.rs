@@ -1280,15 +1280,16 @@ fn junk_pools_cost_a_bounded_ranking_after_the_cranks() {
     );
 }
 
-/// A transport failure in either the first request or a later group retains the entire
-/// ranking prefix. The retry uses coherent three-account snapshots, including pool 34 at
-/// the backend's 100-key boundary, and publishes candidates only after every group succeeds.
+/// A transport failure or incomplete response in either the first request or a later group
+/// retains the entire ranking prefix. The retry uses coherent three-account snapshots,
+/// including pool 34 at the backend's 100-key boundary, and publishes candidates only after
+/// every group succeeds.
 #[test]
 fn ranking_rpc_failure_retries_every_pool_with_coherent_groups() {
     use shortwin_keeper::pool_monitor;
     use shortwin_keeper_litesvm::{Rpc, block_on};
 
-    for junk in [0, 40] {
+    for (junk, incomplete) in [(0, false), (40, false), (0, true), (40, true)] {
         let (mut h, rm, _, _, best) = with_positions_and_siblings();
         h.with_env(|env| {
             for _ in 0..junk {
@@ -1309,10 +1310,18 @@ fn ranking_rpc_failure_retries_every_pool_with_coherent_groups() {
                 .unwrap()
                 .pool
         };
-        h.chain().fail_reads_of(failed, 1);
+        if incomplete {
+            h.chain().short_reads_of(failed, 1);
+        } else {
+            h.chain().fail_reads_of(failed, 1);
+        }
         let first = h.second().clone();
         assert!(
-            first.errors.iter().any(|e| e.contains("injected failure")),
+            first.errors.iter().any(|e| e.contains(if incomplete {
+                "incomplete pool ranking read"
+            } else {
+                "injected failure"
+            })),
             "{:?}",
             first.errors
         );
@@ -1352,6 +1361,85 @@ fn ranking_rpc_failure_retries_every_pool_with_coherent_groups() {
             );
         }
     }
+}
+
+/// A ranking endpoint that keeps failing must not hold up the previously ranked sibling or
+/// interrupt the zero-position `pool_fail` chain. The fast path still opens at its first armed
+/// second, even while every attempted ranking of a newly discovered pool fails.
+#[test]
+fn sustained_ranking_failure_keeps_cached_fast_path_and_chain() {
+    let (mut h, ms) = ray_setup(&[FART], KeeperConfig::default());
+    let (rm, _) = ms.into_iter().next().expect("market");
+    let key = rm.market();
+    let sibling = h.with_env(|env| {
+        let lam = lambda_of(env, &rm.pool);
+        plant(env, &rm.pool, Plant::V4, false, (50, 100), lam)
+    });
+    let sibling_key = ps::pool_key(&sibling);
+    h.seconds(3);
+    assert!(
+        h.keeper
+            .pool_track(&key)
+            .unwrap()
+            .candidates
+            .iter()
+            .any(|c| c.pool == sibling_key)
+    );
+    h.with_env(|env| halt(env, &rm.pool));
+    let first = h.second().clone();
+    assert!(first.errors.is_empty(), "{:?}", first.errors);
+    let since = market(&h, &key).pool_fail_since;
+    assert_ne!(since, 0);
+    assert!(h.keeper.pool_track(&key).unwrap().keep_chain);
+
+    let junk = h.with_env(|env| plant(env, &rm.pool, Plant::V4, false, (1, 100), 0));
+    let junk_key = ps::pool_key(&junk);
+    h.chain().fail_reads_of(junk_key, 200);
+    let fast_route = i64::from(h.with_env(|env| env.config().params.pool_fast_route_s));
+    let mut ranking_errors = 0;
+    let mut last_crank = since;
+    let mut proposed_at = None;
+    for _ in 0..fast_route + 20 {
+        let report = h.second().clone();
+        let now = h.now();
+        if report.cranked.contains(&key) {
+            assert!(now - last_crank <= 30, "crank gap {} s", now - last_crank);
+            last_crank = now;
+        }
+        assert!(
+            now - last_crank <= 30,
+            "no crank for {} s",
+            now - last_crank
+        );
+        assert_eq!(
+            market(&h, &key).pool_fail_since,
+            since,
+            "chain restarted at {now}"
+        );
+        if report
+            .errors
+            .iter()
+            .any(|e| e.contains("pool ranking: getMultipleAccounts: injected failure"))
+        {
+            ranking_errors += 1;
+            let track = h.keeper.pool_track(&key).unwrap();
+            assert!(track.rank_queue.iter().any(|c| c.pool == junk_key));
+            assert!(track.candidates.iter().any(|c| c.pool == sibling_key));
+            assert!(track.keep_chain || report.pool_plans.contains_key(&key));
+        } else {
+            assert!(report.errors.is_empty(), "{:?}", report.errors);
+        }
+        if let Some(proposal) = event(&report, PoolEventKind::Proposed) {
+            assert_eq!(proposal.candidate, sibling_key);
+            proposed_at = Some(now);
+            break;
+        }
+    }
+    assert!(
+        ranking_errors > 60,
+        "only {ranking_errors} failed ranking ticks"
+    );
+    assert_eq!(proposed_at, Some(since + fast_route));
 }
 
 /// The `getMultipleAccounts` calls the default ranking budget can add to a tick.

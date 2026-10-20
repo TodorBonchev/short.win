@@ -71,7 +71,7 @@ exploitable or that the remaining program is safe.
 | AI3-F08 | Existing hashless ProgramData extension latch | duplicate of KI-69(a) | AIR-01 residual; retain immediate hashed bootstrap and revalidation procedure |
 | AI3-L01 | Reject an ALT shorter than its complete metadata header | in progress | `tx::tests::lookup_tables_require_the_complete_metadata_header` fails before / passes after |
 | AI3-L03 | Reject unsupported versions at the keeper's typed account readers | in progress | Typed-reader regressions in `view` |
-| AI3-L04 | Preserve all pending rank candidates until every RPC group succeeds | in progress | First/second-group failure and successful retry without rediscovery |
+| AI3-L04 | Preserve all pending rank candidates until every RPC group succeeds | in progress | First/second-group failure and successful retry without rediscovery; [internal handoff](handoff-1.0.3-2026-10-20.md) adds sustained outage and short-response coverage while cached candidates continue |
 
 These rows describe draft implementations, not the tracker’s strict **fixed** state.
 Exact-ref full CI passed on `9b91060`, and the [24-hour all-profile fuzz run](fuzz-1.0.3.md)
@@ -103,6 +103,10 @@ the existing final-holder vest rule; it does not reconstruct historical pro-rata
 of unallocated carry among lenders who left earlier. Partial withdrawals,
 rebase records and the prohibition on removing all shares while tokens remain borrowed
 retain their existing behavior. This is not a redesign of the historical pot policy.
+The [internal review](handoff-1.0.3-2026-10-20.md) reproduced the residual with
+signed transactions: a lender who enters with one raw token after income has
+vested can receive 1,000 lamports of the earlier holder's carry on the final
+exit. Its bounded last-holder policy is unresolved; this row remains in progress.
 
 The regression against the previous release ELF completes two cohorts with signed
 deposits/withdrawals and actual System donations plus permissionless trader sweeps. It

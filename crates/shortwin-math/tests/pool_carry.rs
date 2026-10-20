@@ -39,6 +39,31 @@ fn last_exit_pays_whole_carry_before_a_new_cohort_enters() {
 }
 
 #[test]
+fn late_depositor_can_capture_preexisting_carry_unresolved_residual() {
+    // Characterization only: this historical ownership question remains unresolved.
+    // A's swept income has already vested before B buys one raw token of shares.
+    let mut m = Market::new();
+    let a_tokens = 2_000_000_000_000_000_000;
+    let a = m.deposit(0, a_tokens).unwrap();
+    m.sweep(1_001_000).unwrap();
+    m.now += i64::from(LUMP_VEST_S);
+    m.release().unwrap();
+    assert_eq!((m.pool.acc, m.pool.carry), (500, 1_000 * WAD as i128));
+
+    let b = m.deposit(1, 1).unwrap();
+    assert_eq!(b, 1_000);
+    assert_eq!(m.withdraw(0, a), Ok(a_tokens));
+    assert_eq!(m.claim(0), Ok(1_000_000));
+    assert_eq!(m.withdraw(1, b), Ok(1));
+    assert_eq!(m.claim(1), Ok(1_000));
+    assert_eq!(
+        (m.pool.carry, m.pool.carry_r, m.vault.lender_sol),
+        (0, 0, 0)
+    );
+    m.invariants().unwrap();
+}
+
+#[test]
 fn carry_mismatch_preserves_a_previous_lenders_pending_claim_and_the_pot() {
     // A earns rent before B enters; repayment allocates realised SOL at the new supply.
     // B exits last. For a small B, entitlement carry exceeds realised carry and B draws

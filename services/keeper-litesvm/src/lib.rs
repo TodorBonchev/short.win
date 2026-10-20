@@ -18,7 +18,8 @@
 //! A violation panics with the transaction's logs. Knobs for the scenarios: refuse v1
 //! transactions ([`LiteSvmChain::set_v1`], to exercise the v0 fallback), the recent
 //! priority fees the backend reports ([`LiteSvmChain::set_priority_fees`]), whole-account
-//! reads of a key that fail ([`LiteSvmChain::fail_reads_of`]), simulations that fail
+//! reads of a key that fail ([`LiteSvmChain::fail_reads_of`]) or return a short response
+//! ([`LiteSvmChain::short_reads_of`]), simulations that fail
 //! ([`LiteSvmChain::fail_simulations`]), exit simulations short.win refuses with a given error
 //! ([`LiteSvmChain::refuse_exit_simulations`], or only those its own account parsing passes:
 //! [`LiteSvmChain::refuse_parsed_exit_simulations`]), header reads of a node lagging the last
@@ -87,6 +88,8 @@ pub struct LiteSvmChain {
     /// Whole-account reads naming this key fail this many more times
     /// ([`LiteSvmChain::fail_reads_of`]).
     fail_reads: Cell<Option<(Pubkey, usize)>>,
+    /// Whole-account reads naming this key return one fewer account this many more times.
+    short_reads: Cell<Option<(Pubkey, usize)>>,
     /// The next this many simulations fail ([`LiteSvmChain::fail_simulations`]).
     fail_sims: Cell<usize>,
     /// Header reads naming no context slot answer this key with this deploy slot this many more
@@ -243,6 +246,7 @@ impl LiteSvmChain {
             before_send: RefCell::new(None),
             landing: RefCell::new(None),
             fail_reads: Cell::new(None),
+            short_reads: Cell::new(None),
             fail_sims: Cell::new(0),
             lag_headers: Cell::new(None),
             stale_sims: RefCell::new(None),
@@ -341,6 +345,11 @@ impl LiteSvmChain {
     /// whole ProgramData read failing while the latch's header read works.
     pub fn fail_reads_of(&self, key: Pubkey, times: usize) {
         self.fail_reads.set(Some((key, times)));
+    }
+
+    /// The next `times` whole-account reads naming `key` return an incomplete response.
+    pub fn short_reads_of(&self, key: Pubkey, times: usize) {
+        self.short_reads.set(Some((key, times)));
     }
 
     /// The accounts at `keys` as the VM holds them (one logged `getMultipleAccounts`).
@@ -676,7 +685,15 @@ impl Chain for LiteSvmChain {
             self.rpc.borrow_mut().push(Rpc::Accounts(keys.to_vec()));
             anyhow::bail!("getMultipleAccounts: injected failure reading {key}");
         }
-        Ok(self.read(keys))
+        let mut accounts = self.read(keys);
+        if let Some((key, times)) = self.short_reads.get()
+            && times > 0
+            && keys.contains(&key)
+        {
+            self.short_reads.set(Some((key, times - 1)));
+            accounts.pop();
+        }
+        Ok(accounts)
     }
 
     async fn account_headers(

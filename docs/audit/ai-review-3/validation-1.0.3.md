@@ -145,3 +145,6 @@ disposition of the open issues. The AIR-01 … AIR-24 fuzz waiver does not exten
 to this batch and was not used for its fuzz gate.
 The [fix-review packet](fix-review-1.0.3.md) records the questions and boundaries
 for an independent reviewer; it is not a substitute for that review.
+The later [internal handoff](../handoff-1.0.3-2026-10-20.md) changes keeper
+ranking recovery and adds characterization tests. Full CI above belongs to the
+earlier `9b91060` code commit; the follow-up requires its own exact-ref run.
