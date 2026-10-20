@@ -1,5 +1,12 @@
 # Unresolved findings: written treatment for draft 1.0.3
 
+**2026-10-21 dispositions:** [delegated owner selections](../owner-decisions-1.0.3-2026-10-21.md)
+now acknowledge the specified economic/availability residuals, select complete SHA-256
+before first deployment, and authorize an accurately labelled independent AI review
+for this batch. The program has never been deployed; old-state migration is not needed.
+The text below preserves the original evidence and pre-decision treatment. New final
+program bytes still require their full CI and ≥24-hour zero-failure fuzz gate.
+
 **Subsequent correction (2026-10-19):** the [AI3-FR01 guard](ai3-fr01-fix-1.0.3.md)
 now refuses deposits into an already-empty pool with either carry nonzero. The reproduced
 capture below describes the pre-guard candidate. The new guard preserves historical
@@ -11,6 +18,9 @@ passed with the verifier rebuild and mutations. The owner reports a separate-mac
 24-hour fuzz run at 20 hours with zero anomalies; completed final-byte ≥24 h zero-failure
 evidence and remaining release requirements stay open. See the
 [dated status and evidence limits](ai3-fr01-fix-1.0.3.md#deployment-and-fuzz-status-2026-10-19).
+**2026-10-20:** the completed earlier run identifies pre-FR01 bytes; the
+[new final-byte run](../fuzz-1.0.3-fr01.md) has started on frozen `b8183266` artifacts.
+Its ≥24-hour completion remains pending.
 
 Date: 2026-10-19. Reviewed code: `9b910602ed076a6d4359c496960b3ffc0e7c6af8`,
 integrated with `main` at `24f514c1` in `708746eb0085016c37f4d73e2aea02031bd6efc9`.

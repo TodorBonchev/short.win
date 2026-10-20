@@ -1,0 +1,19 @@
+{
+  "method": "getBlockTime (read-only)",
+  "rpc": "https://api.mainnet-beta.solana.com",
+  "observed_utc": "2026-10-20T22:01:44.949706+00:00",
+  "deploys": [
+    {
+      "program": "pump",
+      "deploy_slot": 458921440,
+      "block_time": 1792432022,
+      "block_time_utc": "2026-10-19T17:47:02+00:00"
+    },
+    {
+      "program": "pump_amm",
+      "deploy_slot": 458921517,
+      "block_time": 1792432040,
+      "block_time_utc": "2026-10-19T17:47:20+00:00"
+    }
+  ]
+}

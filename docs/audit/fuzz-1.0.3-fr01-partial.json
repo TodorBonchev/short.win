@@ -1,0 +1,16 @@
+{
+  "completion": {
+    "started_utc": "2026-10-20T08:03:17.035376+00:00",
+    "finished_utc": "2026-10-20T21:16:47.282629+00:00",
+    "elapsed_seconds": 47610.249916980014,
+    "exit_code": -2,
+    "log_sha256": "fcb0d01e09945e6e31a00cc44add7d28fe8c04f9f1e6d6db5ad2295199d05caa"
+  },
+  "superseded": {
+    "owner_decision_date": "2026-10-21",
+    "stopped_utc": "2026-10-20T21:16:47.120355+00:00",
+    "reason": "Superseded by the authorized full-SHA256 VenueGuard correction before first deployment; preserve partial evidence and rerun >=24h on final binaries.",
+    "last_checkpoint": "[ 47568s] runs 20935 actions 3997500 txs 47729011 failures 0 anomalies 0"
+  },
+  "qualifies_for_24h_gate": false
+}

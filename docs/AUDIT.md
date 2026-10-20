@@ -4,6 +4,12 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
+- **Current unreleased 1.0.3 (2026-10-21):** owner-selected policy decisions and an
+  accurately attributed AI-assisted fix review are recorded. The program has never
+  been deployed. Complete-digest VenueGuard artifacts supersede earlier program
+  hashes; full CI and final-byte ≥24 h fuzz remain separate release gates. See
+  [current readiness](audit/release-readiness-1.0.3-2026-10-21.md) and §0 below.
+  Earlier entries retain their original dates and evidence boundaries.
 - This is the M10 final package (WP-10 final), written on the merged M10 tree (`m1-core`,
   §0). Every M10 work package has landed: program code is final for the audit (batch 4, then
   the KI-65 program batch of 2026-10-07 — no rebase orphans, known-issues KI-65 — and its
@@ -298,6 +304,40 @@ completion and final-byte evidence remain pending in the
 [dated fix record](audit/ai-review-3/ai3-fr01-fix-1.0.3.md#deployment-and-fuzz-status-2026-10-19).
 The deployment statement is owner-confirmed; no independent chain inventory or deployment
 was performed for this documentation update.
+
+**2026-10-20 integration (historical):** the [dated readiness record](audit/release-readiness-1.0.3-2026-10-20.md)
+combines the audit branch, AI3-FR01 and the subsequent keeper/web recovery corrections.
+[Full CI 39391034225](https://github.com/TodorBonchev/short.win/actions/runs/39391034225)
+passed on `007915da`: 25 successful jobs, zero failures, one scheduled fuzz skip.
+Downloaded verifier and Anchor release artifacts were byte-identical and matched the
+FR01 hashes above. Its [13h13m fuzz run](audit/fuzz-1.0.3-fr01.md) was intentionally
+superseded when the complete-digest correction changed the program bytes; it is partial
+evidence, not a completed ≥24-hour gate.
+
+**Current 2026-10-21 candidate:** the [readiness record](audit/release-readiness-1.0.3-2026-10-21.md)
+records full 32-byte SHA-256 VenueGuard storage/comparison, regenerated 304-byte readers,
+keeper/browser recovery fixes, signed regressions and the integrated source identity.
+The owner confirmed the program has never been deployed and explicitly delegated the
+[documented policy choices](audit/owner-decisions-1.0.3-2026-10-21.md). Old-account migration
+is therefore not a first-deployment prerequisite. Economic acknowledgements retain their
+stated consequences; they are not findings proved harmless by tests.
+The [independent AI-assisted fix review](audit/independent-ai-fix-review-1.0.3-2026-10-21.md)
+is the owner-authorized batch-specific review route (§12), with provenance and authorship
+overlap disclosed. No official external-firm report is claimed.
+
+| Current full-digest artifact | File SHA-256 | Executable hash (trailing zeros trimmed) | bytes |
+|---|---|---|---|
+| Release `shortwin.so` | `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc` | `f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250` | 1,644,024 |
+| Test-venue `shortwin.so` | `0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01` | `e016b8712080ef08d0b9dc1546eeda8bc62fada891623ad9f52fb90b19de042a` | 1,675,056 |
+
+[CI 39501064777](https://github.com/TodorBonchev/short.win/actions/runs/39501064777)
+on `a130fd98` reproduced the release byte-for-byte in its verifier and Anchor builds;
+its downloaded test-venue artifact also matches the frozen local fuzz input.
+The services dependency gate found two new upstream TLS advisories and requires a
+lockfile correction and fresh full CI. Reproducible program bytes alone do not make
+that failed CI gate green. The [new final-byte all-profile fuzz run](audit/fuzz-1.0.3-fullsha.md)
+is active and must complete ≥24 hours with zero failures/anomalies. Earlier durations
+cannot be credited to the new bytes. No 1.0.3 tag or deployment is authorized by this record.
 
 ## 1. The protocol on one page
 
@@ -1594,6 +1634,15 @@ AIR-24; no such run was made on its program. The rule stands for the audit's fin
 
 A finding may instead be acknowledged with a written rationale; it then becomes a row in
 `known-issues.md`.
+
+**Owner-authorized review route (2026-10-21, this unreleased 1.0.3 batch only):** the
+owner requested an agent-created fix review for the AIR2/AI3/keeper changes. Use the
+[independent AI-assisted report](audit/independent-ai-fix-review-1.0.3-2026-10-21.md)
+with its authorship/peer-review limits disclosed, as recorded in the
+[owner decisions](audit/owner-decisions-1.0.3-2026-10-21.md). No external security firm,
+professional accreditation or official auditor report is asserted. This substitution
+does not waive regression, G-full, reproducible builds or ≥24 h zero-failure fuzz on
+final bytes, and does not change the default review policy for other engagements.
 
 **Venue-upgrade addendum.** The venues upgrade on their own schedule (KI-44); CPMM did so on
 2026-09-30 / 10-01. If a venue program changes between the tag and the end of the engagement:

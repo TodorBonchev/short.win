@@ -1,0 +1,4 @@
+pump_global parsed len=1088 migrate=true creator_configurable=true max_creator_bps=300 buyback_bps=5000 migration_fee=15000001
+pump_amm_global_config parsed len=949 disable_flags=0 boost=true creator_configurable=true max_creator_bps=300 buyback_bps=5000 fallback_fees=(20, 5, 5)
+pump_fee_config parsed len=4097 SOL_tiers=1 stable_tiers=1 SOL_first=Some(FeeTier { threshold: 0, fees: Fees { lp: 0, protocol: 95, creator: 30 } }) SOL_last=Some(FeeTier { threshold: 0, fees: Fees { lp: 0, protocol: 95, creator: 30 } }) flat=Fees { lp: 0, protocol: 95, creator: 30 } exotic=Fees { lp: 0, protocol: 95, creator: 30 }
+pump_amm_fee_config parsed len=4097 SOL_tiers=25 stable_tiers=25 SOL_first=Some(FeeTier { threshold: 0, fees: Fees { lp: 2, protocol: 93, creator: 30 } }) SOL_last=Some(FeeTier { threshold: 98240000000000, fees: Fees { lp: 20, protocol: 5, creator: 5 } }) flat=Fees { lp: 25, protocol: 5, creator: 0 } exotic=Fees { lp: 20, protocol: 5, creator: 5 }

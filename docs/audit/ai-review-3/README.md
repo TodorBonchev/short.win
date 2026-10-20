@@ -1,12 +1,12 @@
 # AI review 3: draft 1.0.2, two passes
 
-**Latest unreleased follow-up:** [AI3-FR01 guard and regression](ai3-fr01-fix-1.0.3.md)
-block legacy empty-carry deposits while preserving historical value. It introduces new
-program hashes; its exact-ref full CI, mutations and verified rebuild passed. On
-2026-10-19 the owner confirmed no affected deployed state, so current-deployment recovery
-is not applicable, and reported a separate-machine fuzz run at 20 hours with zero
-anomalies. Completed final-byte ≥24 h zero-failure evidence remains pending; the original
-archive remains unchanged.
+**Latest unreleased follow-up (2026-10-21):** the
+[current readiness record](../release-readiness-1.0.3-2026-10-21.md) includes AI3-FR01,
+complete SHA-256 VenueGuard storage, keeper/browser recovery, delegated owner policy
+acknowledgements and an accurately labelled independent AI fix review. The program
+has never been deployed; no account migration is needed. Final full CI and the
+[new final-byte ≥24 h run](../fuzz-1.0.3-fullsha.md) remain pending. The immutable
+original archive is unchanged.
 
 This folder archives the AI-assisted static review completed on 2026-10-18 against
 `b815269224ba0f5d946f49de7e113220c4067041` (draft 1.0.2), using

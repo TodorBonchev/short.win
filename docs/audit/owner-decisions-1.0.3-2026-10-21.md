@@ -39,8 +39,10 @@ because a source is temporarily unavailable.
 
 For AI3-L16, retain the current parser and defer new allocation limits until a supported
 maximum schedule is established. The two pinned 4,097-byte FeeConfig accounts fit at
-most 100 combined tiers, but the upstream ELF exposes `ExtendFeeConfig`; that fixed
-allocation is not an admin-supported global maximum or a proof of heap/CU safety.
+most 100 combined tiers. The pinned upstream ELF contains the interface-name string
+`Instruction: ExtendFeeConfig`; this alone does not establish its authority, successful
+extension behavior or supported maximum. Today's fixed allocation is not an
+admin-supported global maximum or a proof of heap/CU safety.
 No reachable maximal-config failure is established. Arbitrarily refusing more than
 today's tiers could itself make legitimate exits unavailable.
 
@@ -64,6 +66,15 @@ zero-failure fuzz requirement on final program/fuzzer bytes. It does not authori
 describing this release as independently audited by an external security firm.
 
 ## Deployment requirements
+
+The existing keeper already attempts every eligible projected liquidation, expiry or
+SOL settlement without comparing reward to transaction cost. A funded payer pays
+those transactions; exits are outside the daily observation spending cap, although
+CU-per-slot limits and RPC availability can defer them. No new profit-floor/subsidy
+flag is needed. Run the ordinary keeper with covered markets and `dry_run = false`;
+verify funding, top-ups and alerts before first deployment. See the
+[operator configuration](../../services/keeper/keeper.example.toml) and
+[keeper runbook](../../services/README.md). No funded service was verified in this work.
 
 No deployment or tag is approved by this record. After the final gates, verify the
 funded operator backstop and monitoring for zero-reward exits, the final program and

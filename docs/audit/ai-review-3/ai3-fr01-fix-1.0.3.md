@@ -1,5 +1,10 @@
 # AI3-FR01: quarantine legacy empty-pool carry
 
+**2026-10-21 superseding record:** [final-source readiness](../release-readiness-1.0.3-2026-10-21.md) includes the full
+SHA-256 first-deployment correction, selected owner policies and the current final-byte
+fuzz run. The program has never been deployed; no deployed-account migration is
+required. Earlier hashes, CI and progress snapshots below are historical evidence.
+
 Date: 2026-10-19. Base: `7c5ae42978a32cd7463c6cef991031485c39abb2`.
 Fix commit: **`e1d66caa64d076a43618f437c2de9ac9127166b4`**, pushed to `main`.
 This is a further **unreleased 1.0.3** fix, superseding the earlier candidate's deposit
@@ -26,6 +31,9 @@ details and final results have not yet been recorded here.
 identifies `9b91060` and release `b88aa520…`, preceding this guard's release `eb9cd3e6…`.
 It preserves a clean historical result but does not complete this fix's final-byte gate.
 The integrated branch retains the guard and the owner's no-affected-state confirmation.
+The [new final-byte all-profile run](../fuzz-1.0.3-fr01.md) started on 2026-10-20
+from `b8183266`, using frozen FR01 program and fuzzer binaries. Completion is pending;
+the 20-hour owner report above remains a historical checkpoint of the earlier run.
 
 ## Correction and availability boundary
 
@@ -144,8 +152,8 @@ These test counts are executions within each CI job, not deduplicated test names
 
 The ≥24 h zero-failure final-byte fuzz requirement remains **open**. Neither the skipped
 scheduled-fuzz job, fuzz smoke nor the mutation gate's three-minute runs satisfy it.
-The separate-machine run's reported 20 hours with zero anomalies is recorded in the
-[dated status](#deployment-and-fuzz-status-2026-10-19); completion evidence is pending.
+The separate-machine run's reported 20-hour checkpoint is historical; the
+[new final-byte run](../fuzz-1.0.3-fr01.md) is now active and completion evidence is pending.
 
 The separate accounting reviewer independently inspected the root-authored guard and
 error mapping, reran all nine carry cases and found no blocking issue with the narrow

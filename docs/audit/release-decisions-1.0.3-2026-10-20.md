@@ -1,5 +1,10 @@
 # Decisions required for draft 1.0.3
 
+**Historical options, superseded by the [2026-10-21 owner selections](owner-decisions-1.0.3-2026-10-21.md).**
+The owner delegated the recommended choices; the program has never been deployed.
+The later record also includes the now-executed L10 trace and the accurately labelled
+AI-review route. The original options and evidence below are preserved.
+
 Prepared on 2026-10-20 from the merge at `eae77d9abec811c2a6ebb4187b95feded3014190` and its retained audit evidence. Keeper and frontend follow-ups are still being integrated. This packet presents concrete options for the owner and reviewer; it records no new acceptance, waiver, signature or release approval.
 
 The owner confirmed on 2026-10-19 that no affected AI3-FR01 state is deployed. Recovery of that state is therefore not a prerequisite for this deployment. The implemented deposit quarantine remains necessary if an affected legacy pool is encountered later; ordinary sweeps do not reopen it. See [the correction and deployment record](ai-review-3/ai3-fr01-fix-1.0.3.md).

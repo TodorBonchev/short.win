@@ -2,50 +2,37 @@
 
 This file lists unfinished work only. Completed audit and release evidence is in
 [the 1.0.3 handoff](docs/audit/handoff-1.0.3-2026-10-20.md),
-[the current readiness record](docs/audit/release-readiness-1.0.3-2026-10-20.md),
+[the current readiness record](docs/audit/release-readiness-1.0.3-2026-10-21.md),
 [the findings tracker](docs/audit/findings.md), and
 [the validation record](docs/audit/ai-review-3/validation-1.0.3.md).
 The 1.0.3 candidate is unreleased; do not tag or deploy it from this checklist.
-The 2026-10-20 integration also includes `main`'s AI3-FR01 deposit quarantine.
-The completed fuzz record below covers the earlier `9b91060` program, not those
-new bytes. The owner's confirmation that no affected deployed state exists makes
-current-deployment FR01 recovery/migration not applicable.
+The final candidate also includes the AI3-FR01 quarantine and the owner-selected
+complete SHA-256 VenueGuard correction for first deployment.
 
 ## 1.0.3 release blockers
 
-- [ ] Run the full gate and exact-ref GitHub CI on the new handoff commit.
-      Reconfirm verifiable/Anchor ELF equality, keeper scenarios, browser E2E,
-      dependency policy and mutations. The prior [green CI run](https://github.com/TodorBonchev/short.win/actions/runs/39144291500)
-      covers `9b91060`, before this keeper change.
-- [ ] Run the ≥24 h all-profile fuzz gate on the final AI3-FR01 program and
-      fuzzer bytes. The [new frozen-binary run](docs/audit/fuzz-1.0.3-fr01.md) started
-      on 2026-10-20; completion remains pending. The [completed clean run](docs/audit/fuzz-1.0.3.md) identifies
-      the older `9b91060` program and does not cover the integrated quarantine.
-- [ ] Obtain an external auditor's fix review for the AIR2 and AI3 batches and
-      the keeper follow-up. The [internal review handoff](docs/audit/handoff-1.0.3-2026-10-20.md)
-      is reviewer input, not the sign-off required by
-      [AUDIT §12](docs/AUDIT.md#12-logistics-and-change-policy).
-- [ ] Resolve or get explicit owner-signed, bounded acknowledgements for
-      AIR2-07, AIR2-10/11, AIR2-12, AIR2-13 and AIR2-P2-02. AIR2-12 and
-      AIR2-P2-02 have confirmed fund-allocation traces; AIR2-05's canonical
-      sweep fix does not recover alternate-account cashback.
-- [ ] Decide the newly reproduced AI3-F06 carry-ownership residual: a lender
-      depositing one raw token after income vested can receive an earlier
-      lender's whole-lamport carry on the final exit. The math and signed
-      LiteSVM characterizations are in the handoff. Choose bounded
-      final-holder allocation or redesign before declaring the fix complete.
-- [ ] Disposition the remaining AI3 leads, especially L10's repeat-donation
-      deposit hold, L13/L19–L21 fee/supply crossings, L16 tier-allocation
-      bound and L22 cashback claim liveness. L23's original per-touch trace is
-      a scoped KI-68 duplicate; aggregate/design extensions remain open in the
-      [decision packet](docs/audit/release-decisions-1.0.3-2026-10-20.md).
-      Carry forward the substantive AI2 configuration/economic leads in the
-      [triage registers](docs/audit/ai-review-3/triage.md).
-- [ ] Only after the review and owner decisions, update
-      `docs/audit/findings.md` and `docs/audit/known-issues.md` to the
-      correct formal statuses and bounds. Confirm release hashes and
-      deployment order (indexer before program for sweep destination 3),
-      then have the owner review the 1.0.3 tag and deployment.
+- [ ] Finish the new pump/PumpSwap fixture-baseline and signed compatibility review
+      described in the [live preflight](docs/audit/live-preflight-1.0.3-2026-10-21.md).
+      Retain exact observed bytes, supported SOL-quote behavior and slot-latch constraints.
+- [ ] Run fresh exact-ref full CI after the TLS fix (`b54c4384`), replay fixture repair
+      (`1cee0c16`), legacy keeper cleanup (`604154c3`) and venue integration. Verify all
+      required jobs and compare verifier/Anchor artifacts with final fuzz inputs.
+      [Initial full-digest CI 39501064777](https://github.com/TodorBonchev/short.win/actions/runs/39501064777)
+      found the TLS and replay failures; its successful verifier alone is not a green gate.
+- [ ] Complete the [final full-digest ≥24 h all-profile fuzz run](docs/audit/fuzz-1.0.3-fullsha.md)
+      on the recorded program and fuzzer bytes; retain zero-failure/anomaly results,
+      all-profile coverage, elapsed time, exit status and summary/log hashes.
+      The preceding 13h13m run was intentionally superseded by the full-digest change.
+      Moving the venue profile to new upstream ELFs also requires a fresh final runner/run.
+- [ ] After both gates, record final finding statuses and release hashes, then present
+      the 1.0.3 tag/deployment plan for owner review. Verify funded/monitored keeper
+      operation, live venue pins/R-PFEE, indexer support for sweep destination `3`
+      before program deployment, and compatible 304-byte guard clients.
+
+The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) and
+[accurately labelled independent AI fix review](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md)
+are recorded. The program has never been deployed; no old-account migration is needed.
+The batch-specific AI review route does not waive the CI or final-byte fuzz gate.
 
 ## Later or conditional follow-ups
 
@@ -61,8 +48,6 @@ current-deployment FR01 recovery/migration not applicable.
       `pnpm install --frozen-lockfile`.
 - [ ] On any new pump-fees ELF, re-read `withdraw`'s accounts and authority
       (R-PFEE) before relying on the 2026-10-12 review.
-- [ ] Remove the keeper's legacy `pump_trade_extras_v2` builder when the
-      post-1.0.1 migration window is over.
 - [ ] Run the Surfpool synthetic-close fork case in
       `tests/litesvm/tests/graduation_surfpool.rs` when Surfpool is available.
 - [ ] Re-measure O19's real-venue held sandwich, FITX-1 fork figures,

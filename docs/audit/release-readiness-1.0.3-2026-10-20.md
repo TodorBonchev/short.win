@@ -1,5 +1,10 @@
 # Draft 1.0.3 readiness (2026-10-20)
 
+**2026-10-21 superseding record:** [final-source readiness](release-readiness-1.0.3-2026-10-21.md) includes the full
+SHA-256 first-deployment correction, selected owner policies and the current final-byte
+fuzz run. The program has never been deployed; no deployed-account migration is
+required. Earlier hashes, CI and progress snapshots below are historical evidence.
+
 Source candidate: **`b8183266655def0195ad18608f103d15ebc03ac6`**.
 This integrates `audit-1.0.3-gates` at `49293595` with `main` at `297c8f65`,
 including AI3-FR01's empty-pool deposit quarantine. The merge is `eae77d9a`;
@@ -48,8 +53,12 @@ remain open in the [decision packet](release-decisions-1.0.3-2026-10-20.md).
 The combined candidate requires an exact-ref full `ci.yml` dispatch, including
 mutations, dependency checks, keeper scenarios, browser E2E and the verified build.
 The previous green runs on `9b91060` and `e1d66caa` remain revision-specific evidence.
-The completed integrated result and downloaded artifact comparison will be recorded
-here when available.
+[CI 39391034225](https://github.com/TodorBonchev/short.win/actions/runs/39391034225)
+is running on **`007915da9d9c7a764783683f38bd3f4b961e6398`**, including the concurrent
+phone-demo commit `c5075c66`. Whole-web typecheck and lint passed after that merge
+(371 files checked). Its program/fuzzer input diff from frozen source `b8183266` is
+empty. Downloaded CI Anchor release, test-venue and mock binaries match the frozen
+fuzz inputs byte for byte. Full completion and verifier comparison remain pending.
 
 The [new all-profile fuzz run](fuzz-1.0.3-fr01.md) started on 2026-10-20 against frozen
 program and runner binaries from this source candidate. Its ≥24-hour completion is

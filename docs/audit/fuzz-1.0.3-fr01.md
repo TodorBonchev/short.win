@@ -1,9 +1,16 @@
-# Draft 1.0.3: final-byte fuzz run in progress
+# Draft 1.0.3: superseded partial FR01 fuzz run
 
-Started **2026-10-20 08:03:17 UTC** from source candidate
+**2026-10-21 disposition:** intentionally stopped after 47,610.25 seconds when the
+owner-selected full-SHA-256 correction changed program bytes. Its last checkpoint
+had 20,935 runs and 47,729,011 transactions, zero failures/anomalies. Exit `-2`
+records the requested interrupt, not an invariant failure. No final summary was
+produced. [Stop/completion record](fuzz-1.0.3-fr01-partial.json);
+[new final-byte run](fuzz-1.0.3-fullsha.md). This partial run does not close the gate.
+
+Original launch record: started **2026-10-20 08:03:17 UTC** from source candidate
 `b8183266655def0195ad18608f103d15ebc03ac6`, including the AI3-FR01 guard.
 The runner is configured for at least 24 hours with all six profiles, two workers,
-400 actions, seed `103200000`, and failure minimization. **Completion is pending**;
+400 actions, seed `103200000`, and failure minimization. **The run was superseded before completion**;
 this launch record does not close the fuzz gate.
 
 The frozen run directory is `/root/fuzz/fr01-20261020-b8183266` on the local WSL machine.

@@ -137,23 +137,35 @@ pnpm --filter web lint
 The pool generator rewrites its fixture directory; run it before concurrent vector
 compilation/replay. Historical attack-rule snapshots and outputs were preserved.
 
-## Remaining release gates
+## Current release gates (2026-10-21)
 
-This is an unreleased draft, not a released fix batch. The findings tracker therefore
-uses **in progress**, not **fixed**. Open economic/venue issues need resolution or explicit
-acceptance within their bounds. Exact-ref full CI, required browser E2E, opt-in
-responsive coverage, the verifiable build and local compute/size checks passed on
-the preceding candidate. The [24-hour fuzz run](../fuzz-1.0.3.md) passed on
-those program bytes; it does not cover the later AI3-FR01 guard. The final-byte
-≥24 h gate remains open. The 2026-10-19
-[independent AI review](independent-fix-review-1.0.3.md) accepts Q2/Q3/Q4 but makes
-Q1 conditional on addressing legacy empty-pool carry (AI3-FR01). The guard and
-owner-confirmed absence of affected deployed state are in the
-[FR01 record](ai3-fr01-fix-1.0.3.md). Its exact-ref full CI passed separately;
-external auditor acceptance remains required. The
-[written unresolved treatment](unresolved-1.0.3.md) supplies no new owner risk acceptance.
-The AIR-01 … AIR-24 fuzz waiver does not extend to this batch.
-The [fix-review packet](fix-review-1.0.3.md) records the original questions and boundaries.
-The later [internal handoff](../handoff-1.0.3-2026-10-20.md) changes keeper
-ranking recovery and adds characterization tests; the combined candidate requires
-its own exact-ref full CI run.
+This is an unreleased draft; implemented findings remain **in progress** until the
+required final gates pass. The tables above describe the preceding candidates and
+retain their original source/artifact identities. The complete-digest VenueGuard
+correction changes the program again; those older fuzz durations do not cover it.
+
+The [current readiness record](../release-readiness-1.0.3-2026-10-21.md) gives the new
+32-byte/304-byte layout, local regression results, exact CI identity and artifact
+comparisons. CI 39501064777 reproduced the new release bytes but found new services
+TLS advisories; that dependency failure must be corrected and full CI rerun.
+The [final all-profile fuzz run](../fuzz-1.0.3-fullsha.md) must complete at least
+24 hours with zero failures/anomalies on the recorded final program/fuzzer bytes.
+The preceding 13h13m FR01 run is intentionally superseded partial evidence.
+
+The owner confirmed the program has never been deployed and explicitly delegated
+[the selected policy decisions](../owner-decisions-1.0.3-2026-10-21.md).
+Current-deployment migration is not required. Their economic consequences remain
+acknowledged, rather than being described as technically fixed. Under the explicit
+batch-specific authorization in AUDIT §12, the
+[independent AI-assisted fix review](../independent-ai-fix-review-1.0.3-2026-10-21.md)
+is the chosen review route. It discloses authorship overlap and separate peer review;
+it is not an external security firm's certification. The CI and fuzz requirements
+are not waived.
+
+After both gates pass, record final statuses and release hashes and present the
+1.0.3 tag/deployment plan for owner review. First deployment still requires current
+venue-pin/R-PFEE checks, funded and monitored keeper operation, indexer support for
+sweep destination `3`, and compatible 304-byte guard readers. Source tests do not
+verify those live operating conditions. The
+[original fix-review packet](fix-review-1.0.3.md) and
+[written unresolved treatment](unresolved-1.0.3.md) retain the earlier review context.
