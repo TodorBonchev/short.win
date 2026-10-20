@@ -48,6 +48,10 @@ export function retryDelayIndexer(failureCount: number, error: unknown): number 
 
 const base = { retry: retryIndexer, retryDelay: retryDelayIndexer } as const;
 
+// WebSocket invalidation is immediate; polling also catches missed events and an invalidation
+// whose REST response was still cached before the exit arrived. Only mounted, visible queries poll.
+const EXIT_HISTORY_REFRESH_MS = 10_000;
+
 export const indexerQueries = {
     status: () =>
         queryOptions({
@@ -140,6 +144,7 @@ export const indexerQueries = {
             queryKey: qk.marketLiquidations(mint),
             queryFn: ({ signal }) =>
                 api.get<Page<ExitEvent>>(`/v1/markets/${keySegment(mint)}/liquidations`, { limit: 50 }, signal),
+            refetchInterval: EXIT_HISTORY_REFRESH_MS,
         }),
     marketEvents: (mint: string) =>
         queryOptions({
@@ -153,6 +158,12 @@ export const indexerQueries = {
             ...base,
             queryKey: qk.position(pubkey),
             queryFn: ({ signal }) => api.get<PositionDetail>(`/v1/positions/${keySegment(pubkey)}`, undefined, signal),
+            // The chain account can close before the indexer records its exit. Keep a slower
+            // REST fallback after an exit too: a missed WebSocket rollback can reopen it.
+            refetchInterval: (query) => {
+                const position = query.state.data?.data.position;
+                return position && position.status !== 'open' && position.exit ? 60_000 : EXIT_HISTORY_REFRESH_MS;
+            },
         }),
     borrowerPositions: (owner: string, status: PositionStatus | 'all' = 'open') =>
         queryOptions({
@@ -183,6 +194,7 @@ export const indexerQueries = {
             ...base,
             queryKey: qk.liquidations(),
             queryFn: ({ signal }) => api.get<Page<ExitEvent>>('/v1/liquidations', { limit: 50 }, signal),
+            refetchInterval: EXIT_HISTORY_REFRESH_MS,
         }),
     adminConfig: () =>
         queryOptions({

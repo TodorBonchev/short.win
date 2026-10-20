@@ -136,7 +136,10 @@ export function PositionDetailPage({ position }: { position: Address }) {
     const chain = usePositionAccount(position);
     const detail = useQuery({ ...indexerQueries.position(position), retry: false });
     const api = detail.data?.data.position ?? null;
-    const pos = chain.data ?? null;
+    // Confirmed history may arrive before this tab's next chain poll. Do not show cached
+    // pre-exit metrics or actions after the indexer has already recorded the exit.
+    const closed = api !== null && api.status !== 'open';
+    const pos = closed ? null : (chain.data ?? null);
     // An open position is priced on the chain's market only; the indexer's mint labels a closed one.
     const chainMint = useChainMintOf(pos?.market ?? null);
     const mint = pos ? chainMint : ((api?.mint as Address | undefined) ?? null);
@@ -155,7 +158,7 @@ export function PositionDetailPage({ position }: { position: Address }) {
     const decimals = s?.decimals ?? null;
     const tier = pos ? s?.config.tiers[pos.tier] : undefined;
     const open = !!pos;
-    const loading = chain.isLoading || (open && !s && !snap.error);
+    const loading = (chain.isLoading && !closed) || (open && !s && !snap.error);
     const ready = !!(pos && s && math && metrics);
 
     // Under 1024 px the Manage panel is a sheet (FRONTEND.md §7.6): the action bar opens it at a
@@ -202,8 +205,10 @@ export function PositionDetailPage({ position }: { position: Address }) {
                         <Badge tone="info" className="badge-status">
                             open
                         </Badge>
-                    ) : api ? (
+                    ) : closed && api ? (
                         <Badge className="badge-status">{api.status}</Badge>
+                    ) : api ? (
+                        <Badge className="badge-status">History updating</Badge>
                     ) : null}
                     {open && risk && <RiskBadge level={risk} />}
                     {open && <ReadAgeView age={age} />}
@@ -241,9 +246,15 @@ export function PositionDetailPage({ position }: { position: Address }) {
                         <Skeleton width={240} />
                     </Panel>
                 ) : !open ? (
-                    api ? (
+                    closed && api ? (
                         <Panel title="Closed">
                             <ClosedSummary p={api} decimals={decimals} symbol={symbol} />
+                        </Panel>
+                    ) : api ? (
+                        <Panel title="Updating position history">
+                            <p role="status">
+                                There is no open position on the chain. Waiting for the indexer to record its exit.
+                            </p>
                         </Panel>
                     ) : detail.isLoading ? (
                         <Panel>

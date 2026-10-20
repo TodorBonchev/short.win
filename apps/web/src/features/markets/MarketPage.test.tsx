@@ -225,6 +225,36 @@ describe('MarketPage', () => {
         queryClient.clear();
     });
 
+    it('refreshes an already-open Liquidations tab when an exit arrives without a WebSocket event', async () => {
+        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+        let exited = false;
+        const path = `/v1/markets/${MINT_A}/liquidations`;
+        const api = indexerFor({
+            [path]: () => ({ data: exited ? [exitEvent(SIG_A)] : [], next_cursor: null }),
+        });
+        const { queryClient, view } = await renderAt(`/m/${MINT_A}?tab=liquidations`);
+        try {
+            await screen.findByText('No liquidations, expiries or SOL settlements on this market yet.');
+            expect(api.callsTo(path)).toHaveLength(1);
+            // The harness's socket never opens. The mounted tab must recover through REST.
+            exited = true;
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(10_000);
+            });
+            expect(await screen.findByTestId(T.marketLiquidationRow(SIG_A))).toBeTruthy();
+            expect(api.callsTo(path)).toHaveLength(2);
+            view?.unmount();
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(30_000);
+            });
+            expect(api.callsTo(path)).toHaveLength(2);
+        } finally {
+            view?.unmount();
+            queryClient.clear();
+            vi.useRealTimers();
+        }
+    });
+
     it('marks creator wallets among the lenders and shows the coin creator’s share', async () => {
         indexerFor();
         const { queryClient } = await renderAt(`/m/${MINT_A}?tab=lenders`);
