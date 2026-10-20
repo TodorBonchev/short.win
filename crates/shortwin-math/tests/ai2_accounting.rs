@@ -163,13 +163,26 @@ fn air2_01_a_fully_locked_lender_stays_locked_when_conversion_awards_a_unit() {
         den_log1000: 1,
         _pad: [0; 10],
     }];
+    let mut unlocked = pool::Lender {
+        lock: 0,
+        lock_term: 0,
+        ..l
+    };
+    let mut unlocked_records = records;
     pool::convert(&p, &mut l, &mut records).unwrap();
     assert_eq!(l.shares, 2_501);
+    assert_eq!(l.lock, l.shares, "the awarded share must remain locked");
+    assert_eq!(pool::lock_of(&v, &l, 1), Ok(l.shares));
     assert_eq!(
         pool::allowance(&p, &v, &l, 1),
         Ok(0),
         "no unlocked share existed before the conversion"
     );
+
+    pool::convert(&p, &mut unlocked, &mut unlocked_records).unwrap();
+    assert_eq!(unlocked.shares, 2_501);
+    assert_eq!(unlocked.lock, 0, "conversion must not create a new lock");
+    assert_eq!(pool::lock_of(&v, &unlocked, 1), Ok(0));
 }
 
 #[test]
