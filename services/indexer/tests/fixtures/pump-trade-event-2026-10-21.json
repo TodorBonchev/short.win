@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "provenance": {
+    "kind": "signed LiteSVM differential on manifest-authenticated upstream ELFs",
+    "test": "the_2026_10_21_observed_build_preserves_supported_sol_curve_paths",
+    "coin": "Fresh",
+    "instruction": "buy_v2",
+    "emitting_program": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+    "capture_log": "target/venue-review-2026-10-21/curve-event-tail-discovery.log",
+    "capture_log_sha256": "eb11b15f8326eef6e6bb2260aff7b80f8a1e7e535d3ac335c99dc7257762cb77",
+    "older_profile": "Oct2026Chain",
+    "newer_profile": "Oct2026QuoteFees",
+    "programs": [
+      {
+        "name": "pump_2026_10_13_program_data",
+        "elf_sha256": "692b19d0242b906d73764c41d30f7b61816c1c6f30a0164e09a20adf9578c092",
+        "elf_trimmed_sha256": "e202096978d8f20935153a4271938fd9f0a421d64c1749986b4c5c20ca2a52be",
+        "deploy_slot_expected": 456494698
+      },
+      {
+        "name": "pump_2026_10_21_program_data",
+        "elf_sha256": "05249b60f8ddf02a53d0f8a43980fde40cce33f73526355b4ef08e292279819f",
+        "elf_trimmed_sha256": "756c04ab1ac76122dcdcf2eeb0073bb139087b23d58d3f0d6c895510ab59d582",
+        "deploy_slot_expected": 458921440
+      }
+    ],
+    "note": "Captured event payloads include the event discriminator. The appended bytes are retained without assigning field names or semantics. This is a local signed behavior probe, not a mainnet transaction or a verified upstream source build."
+  },
+  "event": "TradeEvent",
+  "event_discriminator_hex": "bddb7fd34ee661ee",
+  "older_payload_len": 382,
+  "newer_payload_len": 390,
+  "older_payload_base64": "vdt/007mYe438JlK41XDbJG0EtGOU+0s9Zg20YuJC/bjTLyDgpgGXwzankQAAAAAAEYw5hAkAAABgrqd+nLoHq1LhrlYbceld+FrVHb3QvJrcSG+AjrKUlwL0rtqAAAAAA2GwkAHAAAAAMqnYdKrAwAN2p5EAAAAAAAylRVBrQIAYIzMHfzpYbQ7d5wZFQWm4tO/RdWk20YYrXbILWF1RTVfAAAAAAAAAJbipgAAAAAAeFgvF3prnja+1RaMESLueV7KpXGcjFa4CWi/cpQ05NweAAAAAAAAAFizNAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAGJ1eQAAAAAAAAAAAAAAAAAAAAAAiBMAAAAAAABLcVMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzankQAAAAADYbCQAcAAAAN2p5EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+  "newer_payload_base64": "vdt/007mYe438JlK41XDbJG0EtGOU+0s9Zg20YuJC/bjTLyDgpgGXwzankQAAAAAAEYw5hAkAAABgrqd+nLoHq1LhrlYbceld+FrVHb3QvJrcSG+AjrKUlwL0rtqAAAAAA2GwkAHAAAAAMqnYdKrAwAN2p5EAAAAAAAylRVBrQIAYIzMHfzpYbQ7d5wZFQWm4tO/RdWk20YYrXbILWF1RTVfAAAAAAAAAJbipgAAAAAAeFgvF3prnja+1RaMESLueV7KpXGcjFa4CWi/cpQ05NweAAAAAAAAAFizNAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAGJ1eQAAAAAAAAAAAAAAAAAAAAAAiBMAAAAAAABLcVMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAzankQAAAAADYbCQAcAAAAN2p5EAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "appended_bytes_hex": "0000000000000000",
+  "expected_known_row": {
+    "side": "buy",
+    "token_amount": 39655000000000,
+    "sol_amount": 1165651962,
+    "fee_protocol": 10936982,
+    "fee_creator": 3453784,
+    "pool_token_reserve": 1033345000000000,
+    "pool_sol_reserve": 31151261197
+  }
+}

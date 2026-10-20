@@ -1531,6 +1531,53 @@ mod tests {
         }
     }
 
+    /// Actual old/new events captured from the signed Fresh buy_v2 differential on the
+    /// manifest-hashed October 13 and October 21 pump ELFs. The new event preserves the known
+    /// prefix and appends eight observed zero bytes; their field meaning is deliberately unknown.
+    #[test]
+    fn observed_2026_10_21_trade_event_tail_preserves_the_known_sol_row() {
+        use base64::Engine;
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/pump-trade-event-2026-10-21.json"
+        ))
+        .unwrap();
+        let decode = |field: &str| {
+            base64::engine::general_purpose::STANDARD
+                .decode(fixture[field].as_str().unwrap())
+                .unwrap()
+        };
+        let old = decode("older_payload_base64");
+        let new = decode("newer_payload_base64");
+        assert_eq!((old.len(), new.len()), (382, 390));
+        assert_eq!(&new[..old.len()], old);
+        assert_eq!(&new[old.len()..], [0; 8]);
+        assert_eq!(venue_event_name(&PUMP, &new), Some("TradeEvent"));
+
+        let old_row = pump_trade(&old[8..]).expect("the captured old SOL trade");
+        let row = pump_trade(&new[8..]).expect("the captured new SOL trade");
+        assert_eq!(row, old_row);
+        let expected = &fixture["expected_known_row"];
+        assert_eq!(row.side.as_str(), expected["side"].as_str().unwrap());
+        assert_eq!(row.token_amount, expected["token_amount"].as_u64().unwrap());
+        assert_eq!(row.sol_amount, expected["sol_amount"].as_u64().unwrap());
+        assert_eq!(row.fee_protocol, expected["fee_protocol"].as_u64());
+        assert_eq!(row.fee_creator, expected["fee_creator"].as_u64());
+        assert_eq!(
+            row.pool_token_reserve,
+            expected["pool_token_reserve"].as_u64()
+        );
+        assert_eq!(row.pool_sol_reserve, expected["pool_sol_reserve"].as_u64());
+
+        // A synthetic negative control preserves the observed tail but changes the known
+        // quote_mint field. Its token amounts must never become a lamport-denominated row.
+        let quote_at = 8 + trade_quote_mint_at(&new[8..]);
+        assert_eq!(&new[quote_at..quote_at + 32], [0; 32]);
+        let mut non_sol = new.clone();
+        non_sol[quote_at..quote_at + 32].fill(99);
+        assert!(pump_trade(&non_sol[8..]).is_none());
+        assert!(pump_trade(&new[8..8 + TRADE_PREFIX - 1]).is_none());
+    }
+
     /// A `TradeEvent` body's prefix up to `creator_fee`: what [`pump_trade`] needs to decode.
     const TRADE_PREFIX: usize = 32 + 8 + 8 + 1 + 32 + 8 + 4 * 8 + 32 + 8 + 8 + 32 + 8 + 8;
 
