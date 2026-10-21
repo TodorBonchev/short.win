@@ -6,6 +6,8 @@ before first deployment, and authorize an accurately labelled independent AI rev
 for this batch. The program has never been deployed; old-state migration is not needed.
 The text below preserves the original evidence and pre-decision treatment. New final
 program bytes still require their full CI and ≥24-hour zero-failure fuzz gate.
+The [current readiness record](../release-readiness-1.0.3-2026-10-21.md) and
+[final current-profile run](../fuzz-1.0.3-fullsha.md) supersede the dated checkpoints below.
 
 **Subsequent correction (2026-10-19):** the [AI3-FR01 guard](ai3-fr01-fix-1.0.3.md)
 now refuses deposits into an already-empty pool with either carry nonzero. The reproduced

@@ -151,7 +151,11 @@ TLS advisories and old-layout replay recordings; fixes are committed. That run e
 cancelled when the new source was dispatched, with 21 successful, two failed, two
 cancelled and one skipped job. Fresh
 [full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
-is checking exact source `e04a6776`, including the additive current-venue profile.
+completed success on exact test source `ff85a1b0`: 25 successful jobs, zero failures,
+one intentional scheduled-fuzz skip and all 19 selected mutants killed. It includes
+the additive current-venue
+profile from `e04a6776` and the direct AIR2-01 lock/zero-lock regression strengthening.
+Production/fuzzer/fixture inputs remain identical; the current fuzz run continues.
 The [scoped venue review](../live-preflight-1.0.3-2026-10-21.md) records supported-path
 checks and the passing dated live pins, not an exhaustive upstream audit. Canonical
 short.win ELFs remain byte-identical after the unused baseline-constant update.
@@ -167,7 +171,8 @@ acknowledged, rather than being described as technically fixed. Under the explic
 batch-specific authorization in AUDIT §12, the
 [focused AI-assisted fix review](../independent-ai-fix-review-1.0.3-2026-10-21.md) and
 [independent integration addendum](../independent-integration-review-1.0.3-2026-10-21.md)
-are the chosen review route. It discloses authorship overlap and separate peer review;
+and [eight-fix AIR2 review](../independent-air2-fix-review-1.0.3-2026-10-21.md)
+are the chosen review route. They disclose authorship overlap and separate peer review;
 it is not an external security firm's certification. The CI and fuzz requirements
 are not waived.
 

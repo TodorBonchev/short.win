@@ -1,5 +1,17 @@
 # Draft 1.0.3 fix-review packet
 
+**Current disposition (2026-10-21):** this packet's original review request and
+pre-decision boundaries are historical. The [owner-delegated decisions](../owner-decisions-1.0.3-2026-10-21.md)
+confirm no deployed old state and select the documented economic policies. Complete
+SHA-256 is implemented before first deployment. Accurately attributed
+[focused](../independent-ai-fix-review-1.0.3-2026-10-21.md),
+[integration](../independent-integration-review-1.0.3-2026-10-21.md) and
+[AIR2](../independent-air2-fix-review-1.0.3-2026-10-21.md) AI reviews provide this batch's
+owner-authorized review route, with implementation overlap disclosed; no external
+firm's acceptance is supplied or claimed. The [current readiness record](../release-readiness-1.0.3-2026-10-21.md)
+tracks final exact-ref CI and current-profile ≥24-hour fuzz. Neither the review route
+nor never-deployed status waives those execution gates.
+
 **Follow-up candidate:** [AI3-FR01's guard and regression](ai3-fr01-fix-1.0.3.md)
 refuse new deposits into legacy empty pools retaining carry. The hashes and CI below
 identify the preceding candidate; they do not cover the guard's new bytes. The owner

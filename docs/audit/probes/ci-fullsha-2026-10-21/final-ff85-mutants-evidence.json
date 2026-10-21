@@ -1,0 +1,234 @@
+{
+  "job_id": 118929926385,
+  "job_status": "completed",
+  "job_conclusion": "success",
+  "log": {
+    "path": "/root/short.win-audit-review/target/ci-39509811932/mutants-job.log",
+    "bytes": 41484,
+    "sha256": "fb6f4b65e74ceac7cce057f21ed86ec840c2e3ac90bed74da4ab5b995cbcb69e"
+  },
+  "final_summary_marker_present": true,
+  "expected_names_from_exact_ci_source": [
+    "d4-without-ema",
+    "fee-size-cap-doubled",
+    "wallet-cap-removed",
+    "tier-c-as-b",
+    "coverage-clear-immediate",
+    "curve-caps-live",
+    "pump-caps-live-fee",
+    "ki65-skip-store-records",
+    "ki65-rebase-without-owner",
+    "ki66-pot-skip-surplus",
+    "ki66full-walk-accrues-nothing",
+    "ki66full-open-full-accrual",
+    "ki66full-hold-accrues-again",
+    "ki66full-walk-per-touch-floor",
+    "ki66full-rehold",
+    "ki66full-jump-keeps-chain",
+    "ki66full-park-keeps-chain",
+    "ki67-close-with-pending",
+    "ki67-close-parked"
+  ],
+  "actual_final_summary_count": 19,
+  "actual_unique_names_count": 19,
+  "actual_names_match_expected": true,
+  "tests_killed": 19,
+  "fuzz_killed": 7,
+  "tests_only": 12,
+  "entries": [
+    {
+      "name": "d4-without-ema",
+      "tests": "killed",
+      "fuzz": "(mock, 3m) killed (10 failures)",
+      "evidence_line": "2026-10-20T23:37:21.6717487Z d4-without-ema: tests killed, fuzz (mock, 3m) killed (10 failures)",
+      "expected_fuzz_profile": "mock",
+      "observed_fuzz_profile": "mock",
+      "observed_fuzz_duration": "3m",
+      "fuzz_failure_count": 10
+    },
+    {
+      "name": "fee-size-cap-doubled",
+      "tests": "killed",
+      "fuzz": "(mock, 3m) killed (6 failures)",
+      "evidence_line": "2026-10-20T23:37:21.6717770Z fee-size-cap-doubled: tests killed, fuzz (mock, 3m) killed (6 failures)",
+      "expected_fuzz_profile": "mock",
+      "observed_fuzz_profile": "mock",
+      "observed_fuzz_duration": "3m",
+      "fuzz_failure_count": 6
+    },
+    {
+      "name": "wallet-cap-removed",
+      "tests": "killed",
+      "fuzz": "(mock, 3m) killed (10 failures)",
+      "evidence_line": "2026-10-20T23:37:21.6718038Z wallet-cap-removed: tests killed, fuzz (mock, 3m) killed (10 failures)",
+      "expected_fuzz_profile": "mock",
+      "observed_fuzz_profile": "mock",
+      "observed_fuzz_duration": "3m",
+      "fuzz_failure_count": 10
+    },
+    {
+      "name": "tier-c-as-b",
+      "tests": "killed",
+      "fuzz": "(mock, 3m) killed (124 failures)",
+      "evidence_line": "2026-10-20T23:37:21.6718308Z tier-c-as-b: tests killed, fuzz (mock, 3m) killed (124 failures)",
+      "expected_fuzz_profile": "mock",
+      "observed_fuzz_profile": "mock",
+      "observed_fuzz_duration": "3m",
+      "fuzz_failure_count": 124
+    },
+    {
+      "name": "coverage-clear-immediate",
+      "tests": "killed",
+      "fuzz": "(mock, 3m) killed (37 failures)",
+      "evidence_line": "2026-10-20T23:37:21.6718569Z coverage-clear-immediate: tests killed, fuzz (mock, 3m) killed (37 failures)",
+      "expected_fuzz_profile": "mock",
+      "observed_fuzz_profile": "mock",
+      "observed_fuzz_duration": "3m",
+      "fuzz_failure_count": 37
+    },
+    {
+      "name": "curve-caps-live",
+      "tests": "killed",
+      "fuzz": "(curve, 3m) killed (15 failures)",
+      "evidence_line": "2026-10-20T23:37:21.6718838Z curve-caps-live: tests killed, fuzz (curve, 3m) killed (15 failures)",
+      "expected_fuzz_profile": "curve",
+      "observed_fuzz_profile": "curve",
+      "observed_fuzz_duration": "3m",
+      "fuzz_failure_count": 15
+    },
+    {
+      "name": "pump-caps-live-fee",
+      "tests": "killed",
+      "fuzz": "(pumpswap, 3m) killed (4 failures)",
+      "evidence_line": "2026-10-20T23:37:21.6719105Z pump-caps-live-fee: tests killed, fuzz (pumpswap, 3m) killed (4 failures)",
+      "expected_fuzz_profile": "pumpswap",
+      "observed_fuzz_profile": "pumpswap",
+      "observed_fuzz_duration": "3m",
+      "fuzz_failure_count": 4
+    },
+    {
+      "name": "ki65-skip-store-records",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6719367Z ki65-skip-store-records: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki65-rebase-without-owner",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6719612Z ki65-rebase-without-owner: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66-pot-skip-surplus",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6719853Z ki66-pot-skip-surplus: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66full-walk-accrues-nothing",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6720456Z ki66full-walk-accrues-nothing: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66full-open-full-accrual",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6720715Z ki66full-open-full-accrual: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66full-hold-accrues-again",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6720970Z ki66full-hold-accrues-again: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66full-walk-per-touch-floor",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6721225Z ki66full-walk-per-touch-floor: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66full-rehold",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6721516Z ki66full-rehold: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66full-jump-keeps-chain",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6721901Z ki66full-jump-keeps-chain: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki66full-park-keeps-chain",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6722287Z ki66full-park-keeps-chain: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki67-close-with-pending",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6722662Z ki67-close-with-pending: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    },
+    {
+      "name": "ki67-close-parked",
+      "tests": "killed",
+      "fuzz": "not run (tests only)",
+      "evidence_line": "2026-10-20T23:37:21.6723002Z ki67-close-parked: tests killed, fuzz not run (tests only)",
+      "expected_fuzz_profile": "-",
+      "observed_fuzz_profile": null,
+      "observed_fuzz_duration": null,
+      "fuzz_failure_count": null
+    }
+  ],
+  "credit": "Only completed new-run job118929926385. No credit from cancelled predecessor39507546399.",
+  "survivor_count": 0,
+  "stale_or_build_failed_count": 0,
+  "all_selected_mutants_killed_as_required": true
+}

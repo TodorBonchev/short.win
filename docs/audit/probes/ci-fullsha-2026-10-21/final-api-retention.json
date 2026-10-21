@@ -1,0 +1,16 @@
+[
+  {
+    "source": "run-final-independent.json",
+    "stored": "run-final-independent.json.gz",
+    "uncompressed_sha256": "2387dd486cc2e9d98d78db4276ce04a360886fc8b53736f9ecc14c2e24b1815a",
+    "stored_sha256": "70af0523ce8fcd87cff7037e2c9ce8326b64832c88bf8f407c397b67407fa8c0",
+    "uncompressed_bytes": 12789
+  },
+  {
+    "source": "jobs-final-independent.json",
+    "stored": "jobs-final-independent.json.gz",
+    "uncompressed_sha256": "43a77926f050ea87e012c6dcb18e67702a4517dd5ba7e295a84075ec378bddd5",
+    "stored_sha256": "f220a0a62fb1985ba66afc6e7e6d88b4a29dee165d5fa4bbf49d220894a1e592",
+    "uncompressed_bytes": 87018
+  }
+]

@@ -1,0 +1,7 @@
+{
+  "source": "target/ci-39507546399/air2-01-independent-test.log",
+  "stored": "air2-01-test-peer-execution.log.gz",
+  "uncompressed_sha256": "16e0c573cfd545c96ac6e6a3d0d8791129b716d177afe2c03606debdbcffcb27",
+  "stored_sha256": "e0c15e6f279ec2f354473bb15765f5cbb35263e29c8eaf742ce8d3d9e38cdd11",
+  "reason": "Retain exact log bytes without whitespace diagnostics in the source diff."
+}

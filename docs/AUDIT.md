@@ -346,10 +346,13 @@ test/tool baseline reproduce the same program hashes above. The
 [independent integration AI review](audit/independent-integration-review-1.0.3-2026-10-21.md)
 discloses implementation overlap, separate peer review and actual executions.
 [Full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
-is checking `ff85a1b0`, whose only code delta is the direct AIR2-01 lock/zero-lock
-regression strengthening. The [focused AIR2 review](audit/independent-air2-fix-review-1.0.3-2026-10-21.md)
+completed **success** on `ff85a1b0`: 25 successful jobs, zero failures and one
+intentional scheduled-fuzz skip; all 19 selected mutants killed. Its only code delta
+from `e04a6776` is the direct AIR2-01 lock/zero-lock regression strengthening. The
+[focused AIR2 review](audit/independent-air2-fix-review-1.0.3-2026-10-21.md)
 accepts eight technical corrections. Production/fuzzer/fixture inputs match `e04a6776`;
-completed required jobs and verifier equality remain required. The
+the final verifier/Anchor artifacts match frozen bytes (both ZIP digests verified).
+The complete final CI gate is green. The
 [final current-profile fuzz run](audit/fuzz-1.0.3-fullsha.md) started
 2026-10-20 22:21:09 UTC with a new runner and copied, hash-checked fixtures. It must
 complete ≥24 hours with zero failures/anomalies. Previous-program and previous-profile

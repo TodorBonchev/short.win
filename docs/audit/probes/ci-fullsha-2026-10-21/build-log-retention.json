@@ -1,0 +1,23 @@
+[
+  {
+    "original": "anchor-job.log",
+    "stored": "final-anchor-job.log.gz",
+    "uncompressed_bytes": 93369,
+    "uncompressed_sha256": "c5fda9fe1cda4f673d23f2441c5c99d32efa043a41203716787a4fb9997597c3",
+    "stored_sha256": "ae19626258c0e480441aa783ef0e17bc1dec4e3315ce5924436b3d115214b2fc"
+  },
+  {
+    "original": "verifier/shortwin.build.log",
+    "stored": "final-verifier-build.log.gz",
+    "uncompressed_bytes": 6357,
+    "uncompressed_sha256": "5fd3312951f7df53dcc623f008e805ce7885539180d9556235e935c51481c5c2",
+    "stored_sha256": "248d0b31e3f8fc9477e7e5916b940e081f1cd89ad71b91c2f44005959b6c4b11"
+  },
+  {
+    "original": "verifier/verifiable-hashes.txt",
+    "stored": "final-verifiable-hashes.txt.gz",
+    "uncompressed_bytes": 491,
+    "uncompressed_sha256": "95fd47970cd7af64f03601583c7ada2528431a901990dc37bb2e34a1e4b60377",
+    "stored_sha256": "71d34fc084b5cf72dffab2bcc3dcb2f1fa693bb263c7f4ee0df60b60f764c8f1"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "kind": "partial local final-profile fuzz checkpoint; not CI mutation output",
+  "observed_utc": "2026-10-21T00:05:29.405967+00:00",
+  "completed": false,
+  "run_directory": "/root/fuzz/ready-103-20261021-e04a6776",
+  "source_revision": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "runtime_equivalence_to_ci_source": "source-equivalence-e04-ff85.json",
+  "process_pid": 150247,
+  "actual_command": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-fuzz run --profile all --duration 24h --jobs 2 --actions 400 --seed 103410000 --out /root/fuzz/ready-103-20261021-e04a6776/results --minimize",
+  "checkpoint_elapsed_s": 6245,
+  "runs": 2776,
+  "actions": 531463,
+  "transactions": 6310502,
+  "failures": 0,
+  "anomalies": 0,
+  "required_duration_s": 86400,
+  "all_profile_coverage": "await completed summary",
+  "raw_prefix_sha256": "1fa5ed25ad72faecb774e70e2cf17c0c40a85f8c441be35c4baa5e3e5785ec53",
+  "compressed_prefix": "local-fuzz-running-log-prefix.log.gz",
+  "compressed_prefix_sha256": "92d2a5af5515b3ab0162332f16a3997a376b0ad2a2baa88a7c55aeafe39996bf",
+  "raw_prefix_bytes": 7194,
+  "boundary": "This is an intermediate zero-count observation, not >=24h acceptance. The frozen run continues."
+}

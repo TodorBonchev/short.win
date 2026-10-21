@@ -1,0 +1,10 @@
+{
+  "original_bytes": 41484,
+  "uncompressed_sha256": "fb6f4b65e74ceac7cce057f21ed86ec840c2e3ac90bed74da4ab5b995cbcb69e",
+  "stored": "final-ff85-mutants-job.log.gz",
+  "stored_bytes": 8778,
+  "stored_sha256": "d12a2a89dfd3d6604d3385aaf2bc291110fde40d831b3d85387a60fca96a60cc",
+  "ci_run_id": 39509811932,
+  "job_id": 118929926385,
+  "head_sha": "ff85a1b0c8452cb9fad32767f7083d22377e90a3"
+}

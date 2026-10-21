@@ -20,6 +20,17 @@ The [evidence README](probes/air2-fix-review-2026-10-21/README.md), [source/rete
 
 The following sections preserve the source reports' substantive wording, measurements, commands, attribution and limitations. Only their first heading, heading levels and evidence-relative Markdown links are adapted for this consolidated location. Their unmodified originals remain separately checksummed. Fifteen logs are retained as deterministic lossless gzip to preserve their original EOF blank lines; adapted links below target those gzip files. The [compression map](probes/air2-fix-review-2026-10-21/COMPRESSION_MAP.json) maps historical raw-log references in the unchanged source reports to retained files and records both raw and compressed hashes.
 
+## Test-only integration and separate peer review
+
+The strengthened regression was integrated as `ff85a1b0c8452cb9fad32767f7083d22377e90a3`.
+A separate `keeper_fix_review` agent inspected its direct stored/effective lock checks,
+the pre-conversion cloned records and the zero-lock/zero-term control, then executed
+the exact strengthened case: one passed, 15 filtered out. The reviewer accepted the
+test's ability to expose the masked representation error; [raw execution log](probes/ci-fullsha-2026-10-21/air2-01-test-peer-execution.log.gz).
+The isolated old-floor negative control and reviewer-authored-test overlap remain as
+recorded below. This additional test review does not claim organizational independence
+or replace the complete final CI and current-profile fuzz gates.
+
 ## Accounting — AIR2-01 and AIR2-P2-01
 
 Attributed reviewer: `reader_fix_review`. [Unmodified source report](probes/air2-fix-review-2026-10-21/records/air2-independent-accounting-2026-10-21.md).

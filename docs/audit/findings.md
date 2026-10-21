@@ -49,20 +49,20 @@ Status is one of: open, in progress, fixed, acknowledged, duplicate of KI-n, inv
 
 | ID | Title | Firm severity | Our severity | Location | Status | Fix commit | Regression test | Fix review | Notes |
 |---|---|---|---|---|---|---|---|---|---|
-| AIR2-01 | Locked lender's rounding share after rebase | — | not assessed | `pool::convert_steps` | in progress | this batch | Direct converted lock/zero-lock control; isolated old-floor negative control | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Nonzero lock rounded up; review repaired a regression masked by L39. The original all-free-inventory magnitude remains unverified. |
-| AIR2-02 | Stale EMA accepted at open | — | not assessed | `open_short` | in progress | this batch | `ai2_stale_ema_it` | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Recent integration and completed observation required; includes a preceding crank and 40-second boundary. |
-| AIR2-03 | PumpSwap start sample contaminates warm-up | — | not assessed | `prologue::run` | in progress | this batch | `ai2_pumpswap_start_it` | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Skip recording the initial price as a warm-up bucket; KI-18/KI-22 do not cover this single-transaction start. |
-| AIR2-04 | Late deposit captures halted-S3 vest | — | not assessed | `sol_settle`, `deposit`, `pool::settle` | in progress | this batch | `ai2_halted_s3_vest_it`; pool hold unit test | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Related to AIR-07/AIR-09 and KI-71; extends beyond the drained-pool gate. |
-| AIR2-05 | Dust flush leaves unswept cashback exposed | — | not assessed | `pool::settle`, `sweep` | in progress | this batch | `ai2_accounting`; `ai2_venue_review_it`; keeper dust-flush scenario | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Dust flush gates deposits with surviving shares; pending-source income is credited immediately or held through split-claim vest release. Legacy source bits are rechecked, with keeper/web/indexer integration. |
+| AIR2-01 | Locked lender's rounding share after rebase | — | not assessed | `pool::convert_steps` | in progress | this batch | Direct converted lock/zero-lock control; isolated old-floor negative control | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Nonzero lock rounded up; review repaired a regression masked by L39. The original all-free-inventory magnitude remains unverified. |
+| AIR2-02 | Stale EMA accepted at open | — | not assessed | `open_short` | in progress | this batch | `ai2_stale_ema_it` | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Recent integration and completed observation required; includes a preceding crank and 40-second boundary. |
+| AIR2-03 | PumpSwap start sample contaminates warm-up | — | not assessed | `prologue::run` | in progress | this batch | `ai2_pumpswap_start_it` | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Skip recording the initial price as a warm-up bucket; KI-18/KI-22 do not cover this single-transaction start. |
+| AIR2-04 | Late deposit captures halted-S3 vest | — | not assessed | `sol_settle`, `deposit`, `pool::settle` | in progress | this batch | `ai2_halted_s3_vest_it`; pool hold unit test | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Related to AIR-07/AIR-09 and KI-71; extends beyond the drained-pool gate. |
+| AIR2-05 | Dust flush leaves unswept cashback exposed | — | not assessed | `pool::settle`, `sweep` | in progress | this batch | `ai2_accounting`; `ai2_venue_review_it`; keeper dust-flush scenario | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Dust flush gates deposits with surviving shares; pending-source income is credited immediately or held through split-claim vest release. Legacy source bits are rechecked, with keeper/web/indexer integration. |
 | AIR2-06 | New governance key need not sign | — | — | `apply_config` | duplicate of KI-70 | — | existing AIR-04 evidence | existing owner decision | Same unsigned-authority behavior accepted on 2026-10-12; no new bound asserted. |
-| AIR2-07 | Chosen-pair collision in truncated ELF fingerprint | — | not assessed | `flag_venue_upgraded` | in progress | `f5a8ccef` | Full-32 suffix matrix, signed flag/revalidation/extension, 304-byte layout and client roundtrip | Independent AI fix review accepted implementation; CI/fuzz pending | Full SHA-256 replaces the 12-byte fingerprint before first deployment; no old-layout migration needed. [Owner choice](owner-decisions-1.0.3-2026-10-21.md); [AI review](independent-ai-fix-review-1.0.3-2026-10-21.md). |
-| AIR2-08 | Settlement arm survives venue restart | — | not assessed | `settle::evaluate` | in progress | this batch | `settle::tests::air2_08_*`; I18; legacy marker regression | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Persistent restart count+1 invalidates pre-restart arms even with no warm-up call; legacy arms invalidated once at first prologue. |
-| AIR2-09 | Basis-point rounding lowers locked depth after LP deposit | — | not assessed | `pool_select::locked_depth` | in progress | this batch | raw-ratio unit/property tests | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Raw LP fraction replaces whole-bps depth; normative model and fixtures synchronized. Real AMM v4 PnL recognition remains separate. |
+| AIR2-07 | Chosen-pair collision in truncated ELF fingerprint | — | not assessed | `flag_venue_upgraded` | in progress | `f5a8ccef` | Full-32 suffix matrix, signed flag/revalidation/extension, 304-byte layout and client roundtrip | Independent AI fix review accepted implementation; CI green; final-profile fuzz pending | Full SHA-256 replaces the 12-byte fingerprint before first deployment; no old-layout migration needed. [Owner choice](owner-decisions-1.0.3-2026-10-21.md); [AI review](independent-ai-fix-review-1.0.3-2026-10-21.md). |
+| AIR2-08 | Settlement arm survives venue restart | — | not assessed | `settle::evaluate` | in progress | this batch | `settle::tests::air2_08_*`; I18; legacy marker regression | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Persistent restart count+1 invalidates pre-restart arms even with no warm-up call; legacy arms invalidated once at first prologue. |
+| AIR2-09 | Basis-point rounding lowers locked depth after LP deposit | — | not assessed | `pool_select::locked_depth` | in progress | this batch | raw-ratio unit/property tests | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Raw LP fraction replaces whole-bps depth; normative model and fixtures synchronized. Real AMM v4 PnL recognition remains separate. |
 | AIR2-10 | Setting coin creator raises risk fee | — | not assessed | `pump_amm::read_state` | acknowledged | — | needed | Owner-delegated rationale, 2026-10-21 | Retain current creator/live fees and capped risk policy. Owner-delegated acknowledgement on 2026-10-21 accepts fee-change risk decisions without a demonstrated worst-case magnitude; [decision record](owner-decisions-1.0.3-2026-10-21.md). |
 | AIR2-11 | Risk-fee cap creates an exit-budget gap | — | not assessed | `sol_settle`, `bounds` | acknowledged | — | needed | Owner-delegated rationale, 2026-10-21 | Retain risk/live quote distinction. Owner-delegated acknowledgement accepts possible exit-budget divergence with no universal exit deadline or loss cap established; [rationale](owner-decisions-1.0.3-2026-10-21.md). |
 | AIR2-12 | Cashback paid into a noncanonical trader WSOL account | — | not assessed | `sweep_trader` | acknowledged | — | `ai2_venue_review_it` characterization | Owner-delegated rationale, 2026-10-21 | Canonical authentication retained. Outsiders can strand unbooked cashback, potentially all repeatedly diverted rewards; 545,713 lamports is a fixture sample, not a cap. Recovery/completeness are not implemented. [Owner-delegated acknowledgement](owner-decisions-1.0.3-2026-10-21.md). |
 | AIR2-13 | Keeper receives zero after rent-first liquidation | — | not assessed | `waterfall::liquidate` | acknowledged | — | `ai2_accounting`: rent exhaustion | Owner-delegated rationale, 2026-10-21 | Rent-first priority retained; keeper payment can be zero despite a nominal floor. Existing keeper attempts eligible exits using its funded payer; a funded/monitored operator is a deployment prerequisite, not a verified service. [Owner decision](owner-decisions-1.0.3-2026-10-21.md). |
-| AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | — | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI/fuzz pending | Unlocked-value cap independently reviewed. Old formula replay withdraws 670,224 (net 670,223) versus 336,779 control; new candidate refuses it. KI-13 remains separate. |
+| AIR2-P2-01 | One-token top-up bypasses a fully locked allowance | — | not assessed | `pool::allowance` (L39) | in progress | this batch | `ai2_accounting`: L39 control comparison | [Independent AI review accepted implementation](independent-air2-fix-review-1.0.3-2026-10-21.md); CI green; final-profile fuzz pending | Unlocked-value cap independently reviewed. Old formula replay withdraws 670,224 (net 670,223) versus 336,779 control; new candidate refuses it. KI-13 remains separate. |
 | AIR2-P2-02 | Pot pays a first claimant against unpaid receivable | — | not assessed | `pool::claim` | acknowledged | — | `ai2_accounting`: receivable/pot allocation | Owner-delegated rationale, 2026-10-21 | First-claim shared-pot priority and current-share shortfall policy retained. Unequal realised payouts and later uncollectible claims are accepted if covers never arrive; no small absolute/lifetime cap. [Owner-delegated acknowledgement](owner-decisions-1.0.3-2026-10-21.md). |
 | AI3-FR01 | Already-empty legacy pool retains carry across upgrade | — | not assessed | `pool::deposit_in` | in progress | `e1d66caa` | Canonical predecessor witness, carry matrix, signed legacy deposit; old source/ELF negative controls fail | Narrow quarantine independently reviewed; ≥24 h fuzz/release requirements pending | New deposits refuse 6110 when S=0 and either carry is nonzero, preserving historical value/claims. Full exact-ref CI passed: 25 jobs, 19 mutants killed, verifier/Anchor ELFs byte-identical. On 2026-10-19 the owner confirmed no affected deployed state: current-deployment recovery is not applicable. The owner confirmed never-deployed status on 2026-10-21. The earlier separate-machine 20 h checkpoint is historical; [current final-profile fuzz](fuzz-1.0.3-fullsha.md) must complete ≥24 h with zero failures/anomalies before **fixed**. [Fix, status, hashes and CI](ai-review-3/ai3-fr01-fix-1.0.3.md). |
 
@@ -89,28 +89,29 @@ exploitable or that the remaining program is safe.
 | AI3-L03 | Reject unsupported versions at the keeper's typed account readers | in progress | Typed-reader regressions in `view` |
 | AI3-L04 | Preserve all pending rank candidates until every RPC group succeeds | in progress | First/second-group failure and successful retry without rediscovery; [internal handoff](handoff-1.0.3-2026-10-20.md) adds sustained outage and short-response coverage while cached candidates continue |
 
-These rows describe draft implementations, not the tracker’s strict **fixed** state.
-Exact-ref full CI passed on `9b91060`, and the [24-hour all-profile fuzz run](fuzz-1.0.3.md)
-completed with zero fuzzer failures and anomalies on those preceding bytes. It does
-not cover the later AI3-FR01 guard: final-byte ≥24 h evidence remains pending.
-The 2026-10-19 independent AI fix review accepts Q2/Q3/Q4 and conditionally accepts
-Q1; the guard and owner-confirmed absence of affected deployed state are recorded
-below. External auditor acceptance and open-issue decisions remain pending.
-There is no release tag or deployment. The earlier
-AIR-01 … AIR-24 fuzz waiver does not cover this batch. The package and its lock entries
-are 1.0.3; account layouts, instruction formats and program identity are unchanged.
+These implemented rows remain **in progress** until the current-profile ≥24-hour
+zero-failure fuzz and remaining release requirements pass. [Final full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
+passed on exact source `ff85a1b0`: 25 successful jobs, zero failures, one intentional
+scheduled-fuzz skip and all 19 selected mutants killed. Verifier, Anchor and frozen
+program bytes match. The earlier `9b91060` CI/fuzz evidence describes preceding bytes.
+The [current readiness record](release-readiness-1.0.3-2026-10-21.md) identifies the
+304-byte/full-digest guard and current frozen fuzzer/fixtures; no tag or deployment is
+approved by this record. The earlier AIR-01 … AIR-24 fuzz waiver does not cover this batch.
 
-The remaining 20 leads have explicit dispositions in the triage register. Existing
-canonical-key and creation constraints block the account-substitution hypotheses in
-L07/L11/L14/L17; their omitted defense-in-depth checks remain documented. L09 depends
-on a future writer persisting a non-open position. Economic and venue-fee leads remain
-open where their production trigger or bound is incomplete. In particular, no draft
-change relaxes the deposit hold (L10), changes pot entitlement (AIR2-P2-02), or treats
-the one-lamport sync truncation trace (L23) as a solved accounting problem. Full-digest
-guard migration (AIR2-07), creator/risk fees and exit budgets (AIR2-10/11), cashback
-recovery (AIR2-12), and keeper incentives (AIR2-13) remain open.
+All 20 unimplemented leads retain explicit dispositions. Current-writer/key constraints
+bound the hardening hypotheses in L07/L09/L11/L14/L17. Unverified production triggers,
+configuration maxima and aggregate L23 strategies are not silently declared safe or
+fixed. The owner-selected actual-vest hold, fee/risk distinction, canonical cashback,
+rent-first keeper payment, pot entitlement and final-holder carry retain the exact
+acknowledged consequences in the [decision record](owner-decisions-1.0.3-2026-10-21.md).
+Full SHA-256 is implemented before first deployment; no old-account migration is needed.
+Technical implementation review and economic acknowledgement remain separate.
 
 ### Independent fix review and unresolved treatment (2026-10-19)
+
+**Historical review snapshot:** this subsection preserves the 2026-10-19 review state.
+The 2026-10-21 owner decisions and attributed review reports linked above supersede
+its then-pending owner/review choices; the current-profile fuzz gate remains open.
 
 The [independent review](ai-review-3/independent-fix-review-1.0.3.md) identifies the
 candidate and verified CI artifacts, source comparisons, newly executed checks and each

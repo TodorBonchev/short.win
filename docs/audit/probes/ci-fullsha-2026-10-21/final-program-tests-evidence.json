@@ -1,0 +1,105 @@
+{
+  "source_commit": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+  "run_id": 39509811932,
+  "job_id": 118929925942,
+  "job_name": "program-tests",
+  "job_conclusion": "success",
+  "started_at": "2026-10-20T22:46:10Z",
+  "completed_at": "2026-10-21T00:03:12Z",
+  "job_duration_seconds": 4622.0,
+  "raw_log": {
+    "path": "/root/short.win-audit-review/target/ci-39509811932/program-tests-job.log",
+    "bytes": 286900,
+    "sha256": "d0067ea7eea954c7d6131cac1c0754683721ef5dbea08704441aead229b42c7d"
+  },
+  "reported_compile_windows": [
+    {
+      "line": "2026-10-20T22:47:07.2697844Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 35.29s",
+      "reported_seconds": 35.29
+    },
+    {
+      "line": "2026-10-20T22:47:36.9808062Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 29.57s",
+      "reported_seconds": 29.57
+    },
+    {
+      "line": "2026-10-20T22:49:13.2688378Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 34s",
+      "reported_seconds": 94.0
+    }
+  ],
+  "reported_compile_seconds_total": 158.86,
+  "main_command_start_line": "2026-10-20T22:47:38.5096524Z ##[group]Run cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked",
+  "first_main_binary_line": "2026-10-20T22:49:13.3391674Z      Running unittests src/lib.rs (target/debug/deps/shortwin-0b2c1eb2d3924708)",
+  "first_main_test_line": "2026-10-20T22:49:13.3407321Z running 84 tests",
+  "last_result_line": "2026-10-21T00:02:54.9617567Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+  "main_command_to_last_result_seconds": 4516.452,
+  "main_execution_from_first_binary_to_last_result_seconds": 4421.623,
+  "main_reported_test_runtime_seconds_sum": 4419.69,
+  "all_result_summary_lines": 86,
+  "all_result_summaries_ok": true,
+  "error_or_failed_exit_diagnostics": [],
+  "normal_postjob_cleanup_seen": true,
+  "longest_test_binaries": [
+    {
+      "binary_start": "2026-10-20T23:31:16.9770527Z      Running tests/pump_curve_scenarios.rs (target/debug/deps/pump_curve_scenarios-105a8b260d88e009)",
+      "result_line": "2026-10-20T23:39:09.4382733Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 472.46s",
+      "seconds": 472.46,
+      "result": "ok",
+      "failed": 0
+    },
+    {
+      "binary_start": "2026-10-20T23:05:21.4026472Z      Running tests/lender_it/main.rs (target/debug/deps/lender_it-502ddeec38228a4c)",
+      "result_line": "2026-10-20T23:12:25.6693432Z test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 424.26s",
+      "seconds": 424.26,
+      "result": "ok",
+      "failed": 0
+    },
+    {
+      "binary_start": "2026-10-20T22:50:18.6003364Z      Running tests/attacks_exit_it.rs (target/debug/deps/attacks_exit_it-ea6981e8bcd19ebf)",
+      "result_line": "2026-10-20T22:56:10.4091629Z test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 351.81s",
+      "seconds": 351.81,
+      "result": "ok",
+      "failed": 0
+    },
+    {
+      "binary_start": "2026-10-20T23:23:13.2259789Z      Running tests/pump_curve_attacks.rs (target/debug/deps/pump_curve_attacks-d4afac452e538a59)",
+      "result_line": "2026-10-20T23:28:41.9721302Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 328.74s",
+      "seconds": 328.74,
+      "result": "ok",
+      "failed": 0
+    },
+    {
+      "binary_start": "2026-10-20T23:40:45.9751086Z      Running tests/pump_math_it.rs (target/debug/deps/pump_math_it-81c4775dd5602171)",
+      "result_line": "2026-10-20T23:45:54.8162026Z test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 308.84s",
+      "seconds": 308.84,
+      "result": "ok",
+      "failed": 0
+    },
+    {
+      "binary_start": "2026-10-20T23:28:41.9819126Z      Running tests/pump_curve_e2e.rs (target/debug/deps/pump_curve_e2e-a09c1e0d5576eeb1)",
+      "result_line": "2026-10-20T23:31:16.9688811Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 154.98s",
+      "seconds": 154.98,
+      "result": "ok",
+      "failed": 0
+    },
+    {
+      "binary_start": "2026-10-20T23:45:54.8371081Z      Running tests/pumpswap_attacks.rs (target/debug/deps/pumpswap_attacks-92a4d73c5a4843f2)",
+      "result_line": "2026-10-20T23:48:27.7584200Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 152.92s",
+      "seconds": 152.92,
+      "result": "ok",
+      "failed": 0
+    },
+    {
+      "binary_start": "2026-10-20T23:13:30.3936571Z      Running tests/m4r_it.rs (target/debug/deps/m4r_it-742f48333a0f2e07)",
+      "result_line": "2026-10-20T23:16:03.0840754Z test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 152.69s",
+      "seconds": 152.69,
+      "result": "ok",
+      "failed": 0
+    }
+  ],
+  "assessment": "No anomaly identified in the completed log. Approximately2m39s reported compilation across all three commands; approximately73m42s was execution of the main suite, with repeated successful multi-minute scenario binaries and normal final doc-test/cleanup exits. The77m02s job was dominated by test execution, not waiting for a compiler or an artifact.",
+  "limits": [
+    "This is a read-only inspection of completed CI logs, not a test rerun.",
+    "Result summary lines include standalone and unified-feature runs and doc tests; they are not a unique test count.",
+    "No comparison of runner load, CPU throttling or individual test timings in the older run was performed; no claim of a regression-free performance delta is made."
+  ]
+}

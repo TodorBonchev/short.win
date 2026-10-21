@@ -43,10 +43,22 @@ two build jobs. All 12 harness self-tests and 21 release smoke/corpus tests pass
 the new source/profile before launch. Canonical platform-tools v1.57/SBPF-v3 rebuilds
 prove the new unused baseline constant leaves both short.win program ELFs unchanged.
 [Exact-ref full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
-is checking `ff85a1b0`, a test-only strengthening of AIR2-01. All 2,064 other tracked
+passed on `ff85a1b0` (25 successful jobs, zero failures, one intentional skip;
+all 19 selected mutants killed), a test-only strengthening of AIR2-01. All 2,064 other tracked
 entries match `e04a6776`; the standalone math test is not a runner input. Independent
 source and actual frozen-artifact comparison confirms the unchanged production/fuzzer/
-fixture inputs. The active 24-hour run continues; final CI and artifact equality remain required.
+fixture inputs. The active 24-hour run continues. Final CI is green, verifier/Anchor/frozen bytes
+match and both downloaded artifact ZIP digests are verified.
+
+## Dated intermediate checkpoint
+
+The [retained running checkpoint](probes/ci-fullsha-2026-10-21/local-fuzz-running-checkpoint.json)
+and exact compressed log prefix record 6245 seconds, 2,776 runs,
+531,463 actions and 6,310,502 transactions with **zero failures/anomalies**.
+The actual frozen runner process was alive and had no completion record at observation.
+This is partial evidence; all-profile coverage, ≥24-hour duration, zero exit and final
+summary/log hashes remain pending. The later test/documentation-only commits do not
+change the frozen inputs or restart the run.
 
 ## Superseded evidence
 

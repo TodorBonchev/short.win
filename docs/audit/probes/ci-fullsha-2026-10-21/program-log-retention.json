@@ -1,0 +1,9 @@
+{
+  "source": "target/ci-39509811932/program-tests-job.log",
+  "stored": "final-program-tests-job.log.gz",
+  "uncompressed_bytes": 286900,
+  "uncompressed_sha256": "d0067ea7eea954c7d6131cac1c0754683721ef5dbea08704441aead229b42c7d",
+  "stored_sha256": "57a3f43f56432b46208193c36c7432423f0766904ed514ce8f56a67b6b4184a8",
+  "job_id": 118929925942,
+  "conclusion": "success"
+}

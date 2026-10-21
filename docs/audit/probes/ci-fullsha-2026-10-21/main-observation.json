@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "observed_at": "2026-10-20T22:53:46.860471+00:00",
+  "remote_main_sha": "297c8f65ccceaf05474552777dfbdcdd03450e7f",
+  "limit": "New 1.0.3 candidate remains on audit-1.0.3-gates; main has not been advanced by this preparation work. Latest event-only skips are not a fresh integrated candidate full-CI result.",
+  "latest_main_push_ci": {
+    "id": 39166689873,
+    "head_sha": "7c5ae42978a32cd7463c6cef991031485c39abb2",
+    "conclusion": "success"
+  },
+  "latest_main_ci_entry": {
+    "id": 39377812001,
+    "head_sha": "297c8f65ccceaf05474552777dfbdcdd03450e7f",
+    "conclusion": "skipped"
+  },
+  "fr01_source_full_ci": {
+    "id": 39169016016,
+    "head_sha": "e1d66caa64d076a43618f437c2de9ac9127166b4",
+    "event": "workflow_dispatch",
+    "head_branch": "main",
+    "conclusion": "success"
+  },
+  "fr01_to_current_main_paths": [
+    "TODO.md",
+    "docs/AUDIT.md",
+    "docs/audit/ai-review-3/README.md",
+    "docs/audit/ai-review-3/ai3-fr01-fix-1.0.3.md",
+    "docs/audit/ai-review-3/fix-review-1.0.3.md",
+    "docs/audit/ai-review-3/unresolved-1.0.3.md",
+    "docs/audit/ci-1.0.3-fr01-hashes.txt",
+    "docs/audit/findings.md",
+    "docs/audit/known-issues.md"
+  ]
+}

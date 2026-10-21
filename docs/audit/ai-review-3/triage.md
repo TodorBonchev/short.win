@@ -9,7 +9,10 @@ All eight findings have confidence **75**, which is not severity. Leads are unsc
 **Draft 1.0.3 triage (2026-10-18).** The immutable archive records the scan of
 `b815269`; this register records subsequent decisions. Implementation and validation
 evidence is in [`../findings.md`](../findings.md#ai-review-3-draft-103-2026-10-18).
-“In progress” means a draft correction whose release and external review gates remain open.
+“In progress” means an implemented correction whose required release gates remain open.
+The [current readiness record](../release-readiness-1.0.3-2026-10-21.md) links the
+owner-authorized, accurately attributed AI review route and current CI/fuzz status;
+no external-firm acceptance is claimed.
 An audit patch passing `git apply --check` is not an implemented or tested fix.
 
 Relationships describe only the comparison with records predating this scan:

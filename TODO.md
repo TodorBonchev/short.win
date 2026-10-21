@@ -11,15 +11,11 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 ## 1.0.3 release blockers
 
-- [ ] Finish [exact-ref full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
-      on `ff85a1b0`, verify every required job/mutation outcome and compare downloaded
-      verifier/Anchor artifacts with final fuzz inputs. Initial CI's TLS/replay failures
-      are corrected; its cancelled partial run is not the final green gate.
 - [ ] Complete the [final current-profile ≥24 h all-profile fuzz run](docs/audit/fuzz-1.0.3-fullsha.md)
       on the recorded frozen program, runner and venue fixtures. Retain zero failures/
       anomalies, all-profile coverage, elapsed time, exit and summary/log hashes.
       Superseded old-program/old-profile durations are not credited.
-- [ ] After both gates, record final finding statuses and release hashes, then present
+- [ ] After final fuzz passes, record final finding statuses and release hashes, then present
       the 1.0.3 tag/deployment plan for owner review. Recheck live venue pins/R-PFEE,
       funded/monitored keeper operation, indexer sweep destination `3` and compatible
       304-byte guard clients before program deployment.

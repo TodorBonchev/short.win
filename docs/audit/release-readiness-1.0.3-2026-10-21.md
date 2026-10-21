@@ -1,7 +1,7 @@
 # Draft 1.0.3 release readiness (2026-10-21)
 
-**Engineering/test candidate:** `ff85a1b0c8452cb9fad32767f7083d22377e90a3`, pushed to
-`audit-1.0.3-gates`. **Release acceptance is pending full CI and final-profile ≥24 h fuzz.**
+**Tested code candidate:** `ff85a1b0c8452cb9fad32767f7083d22377e90a3`, pushed to
+`audit-1.0.3-gates`. **Full CI passed; final-profile ≥24 h fuzz and deployment preflight remain.**
 No 1.0.3 tag or deployment has been made by this work.
 
 The owner confirmed the program has **never been deployed** and expressly delegated
@@ -80,8 +80,11 @@ is claimed; CI, reproducible builds and final-profile fuzz remain required.
 [Retained job outcomes, byte comparisons and source-equivalence evidence](probes/ci-fullsha-2026-10-21/README.md).
 
 [Full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
-is running on exact candidate `ff85a1b0`. Record its completed conclusion, all required
-job outcomes, mutation result and downloaded verifier/Anchor comparison before crediting it.
+completed **success** on exact candidate `ff85a1b0`: **25 jobs passed, zero failed,
+one intentional scheduled-fuzz skip**. All 19 selected mutants were killed by tests;
+seven also had the required positive-failure fuzz kills and twelve were explicitly
+test-only. Actual verifier/Anchor/frozen bytes match and both ZIP digests are verified.
+[Retained completed job/step evidence](probes/ci-fullsha-2026-10-21/final-ci-summary.json).
 
 The prior [new-profile run 39507546399](https://github.com/TodorBonchev/short.win/actions/runs/39507546399)
 on `e04a6776` was superseded to include the strengthened regression. It ended
@@ -110,7 +113,10 @@ rebuilds on the new baseline reproduce all three bytes/hashes above. The new con
 is test/tool metadata unused by the program. Release trimmed executable hash:
 `f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250`;
 test-venue trimmed hash `e016b8712080ef08d0b9dc1546eeda8bc62fada891623ad9f52fb90b19de042a`.
-The final exact-ref CI verifier comparison is still pending.
+The final `ff85a1b0` verifier, Anchor release and frozen release are byte-identical;
+Anchor test-venue/mock match too. Both downloaded ZIP digests match GitHub metadata.
+[Independent actual-byte comparison](probes/ci-fullsha-2026-10-21/final-ff85-verifier-comparison.json).
+The complete final CI gate is green.
 
 ## Final fuzz and first-deployment gate
 
@@ -124,8 +130,8 @@ evidence; older completed runs do not satisfy this final-profile gate.
 
 The current live-pin check passes at slot 459,391,399; pump-fees bytes still match the
 retained R-PFEE analysis. Recheck before actual deployment/revalidation: this is a dated
-observation, not a promise of future mainnet state. After CI and fuzz pass, record final
-statuses/release hashes and present the tag/deployment plan for owner review. First
+observation, not a promise of future mainnet state. After final-profile fuzz passes,
+record final statuses/release hashes and present the tag/deployment plan for owner review. First
 deployment also requires a funded, monitored keeper for zero-reward eligible exits,
 indexer support for sweep destination `3` and compatible 304-byte guard readers. Tests do
 not establish funded service operation. Later/conditional tasks remain in
