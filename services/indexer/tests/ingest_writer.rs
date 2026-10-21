@@ -9,8 +9,8 @@ use anchor_lang::Discriminator;
 use ingest_common::pg;
 use shortwin_indexer::ingest::decode::idl;
 use shortwin_indexer::ingest::raw::{Commitment, RawIx, RawTopIx, RawTx};
-use shortwin_indexer::ingest::writer::{WriteOutcome, Writer};
-use shortwin_indexer::ingest::{ProgramIds, refresher};
+use shortwin_indexer::ingest::writer::{CursorAdvance, WriteOutcome, Writer};
+use shortwin_indexer::ingest::{ProgramIds, finality, refresher};
 use solana_pubkey::Pubkey;
 use solana_signature::Signature;
 use sqlx::PgPool;
@@ -85,6 +85,108 @@ fn mint_safety_tripped() -> Vec<u8> {
 
 async fn one(pool: &PgPool, sql: &'static str) -> i64 {
     sqlx::query_scalar(sql).fetch_one(pool).await.expect(sql)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_duplicate_transaction_still_checkpoints_a_new_stream() {
+    let pg = pg().await;
+    let pool = pg.fresh_db().await.expect("db");
+    let mut w = Writer::open(&pool, ProgramIds::default(), "rpc_backfill")
+        .await
+        .expect("writer");
+    let program_stream = CursorAdvance {
+        stream: format!("program:{}", shortwin::ID),
+        address: shortwin::ID,
+    };
+    let pool_address = k(91);
+    let pool_stream = CursorAdvance {
+        stream: format!("pool:{pool_address}"),
+        address: pool_address,
+    };
+    let t = tx(90, 345, 7, Commitment::Confirmed, vec![]);
+
+    assert_eq!(
+        w.write_with(&t, std::slice::from_ref(&program_stream))
+            .await
+            .expect("first stream"),
+        WriteOutcome::Written { events: 0 }
+    );
+    assert_eq!(
+        w.write_with(&t, std::slice::from_ref(&pool_stream))
+            .await
+            .expect("second stream"),
+        WriteOutcome::Duplicate
+    );
+
+    let cursor: (
+        String,
+        String,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+    ) = sqlx::query_as(
+        "SELECT stream, address::text, newest_signature::text, newest_slot, \
+               oldest_signature::text, oldest_slot FROM ingest_cursors WHERE stream = $1",
+    )
+    .bind(&pool_stream.stream)
+    .fetch_one(&pool)
+    .await
+    .expect("pool cursor");
+    assert_eq!(
+        cursor,
+        (
+            pool_stream.stream.clone(),
+            pool_address.to_string(),
+            Some(t.signature.to_string()),
+            Some(345),
+            Some(t.signature.to_string()),
+            Some(345),
+        )
+    );
+    let membership: (i64, i32) = sqlx::query_as(
+        "SELECT slot, tx_index FROM ingest_tx_streams WHERE signature = $1 AND stream = $2",
+    )
+    .bind(t.signature.to_string())
+    .bind(&pool_stream.stream)
+    .fetch_one(&pool)
+    .await
+    .expect("pool membership");
+    assert_eq!(membership, (345, 7));
+    assert_eq!(one(&pool, "SELECT count(*) FROM ingest_txs").await, 1);
+    let memberships: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM ingest_tx_streams WHERE signature = $1")
+            .bind(t.signature.to_string())
+            .fetch_one(&pool)
+            .await
+            .expect("stream memberships");
+    assert_eq!(
+        memberships, 2,
+        "the original and later-discovered streams both own the transaction"
+    );
+
+    let rolled_back = finality::rollback_signature(&pool, &t.signature.to_string(), "test fork")
+        .await
+        .expect("rollback");
+    assert_eq!(rolled_back.rolled_back, 1);
+    assert_eq!(one(&pool, "SELECT count(*) FROM ingest_cursors").await, 2);
+    assert_eq!(
+        one(
+            &pool,
+            "SELECT count(*) FROM ingest_cursors WHERE newest_signature IS NULL \
+             AND newest_slot IS NULL AND oldest_signature IS NULL AND oldest_slot IS NULL"
+        )
+        .await,
+        2,
+        "rollback must clear both streams' transaction bounds"
+    );
+    assert_eq!(
+        one(&pool, "SELECT count(*) FROM ingest_tx_streams").await,
+        0
+    );
+
+    w.close().await.expect("close");
+    pool.close().await;
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

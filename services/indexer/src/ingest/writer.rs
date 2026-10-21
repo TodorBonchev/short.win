@@ -1,7 +1,8 @@
 //! The writer (INDEXER.md §3.1, §3.3, §6.1). Owner: INGEST.
 //!
 //! One Postgres transaction per Solana transaction: `INSERT … ON CONFLICT (signature) DO NOTHING`
-//! on `ingest_txs` decides; if the row already existed nothing else is written (§3.1). Otherwise:
+//! on `ingest_txs` decides; if the row already existed only newly observed stream membership and
+//! cursors are written (§3.5). Otherwise:
 //! `invocations`, `events`, `ingest_quarantine`, `venue_trades` / `venue_events` /
 //! `venue_program_upgrades`, the projections ([`super::project::apply`]) — an event older than
 //! its market's watermark only marks the market `needs_rebuild`, and the writer rebuilds marked
@@ -198,6 +199,19 @@ impl Writer {
         let mut tx = self.pool.begin().await?;
         let inserted = insert_tx(&mut tx, raw, &decoded, self.source).await?;
         if !inserted {
+            // One transaction can be listed by more than one tracked address. A later-discovered
+            // pool stream can therefore first see a transaction that the program stream already
+            // wrote. Keep that stream's cursor and membership complete even though the decoded
+            // transaction rows themselves are idempotent.
+            let (slot, tx_index): (i64, i32) =
+                sqlx::query_as("SELECT slot, tx_index FROM ingest_txs WHERE signature = $1")
+                    .bind(&sig)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .context("duplicate ingest_txs position")?;
+            for c in cursors {
+                advance_cursor_at(&mut tx, c, &sig, slot, tx_index).await?;
+            }
             tx.commit().await?;
             self.report.txs_duplicate += 1;
             return Ok(WriteOutcome::Duplicate);
@@ -722,6 +736,23 @@ async fn advance_cursor(
     c: &CursorAdvance,
     raw: &RawTx,
 ) -> anyhow::Result<()> {
+    advance_cursor_at(
+        tx,
+        c,
+        &raw.signature.to_string(),
+        slot_i64(raw.slot),
+        i32::try_from(raw.tx_index).unwrap_or(i32::MAX),
+    )
+    .await
+}
+
+async fn advance_cursor_at(
+    tx: &mut PgConnection,
+    c: &CursorAdvance,
+    signature: &str,
+    slot: i64,
+    tx_index: i32,
+) -> anyhow::Result<()> {
     sqlx::query(
         "INSERT INTO ingest_cursors (stream, address, newest_signature, newest_slot, \
            oldest_signature, oldest_slot) VALUES ($1, $2, $3, $4, $3, $4) \
@@ -738,8 +769,8 @@ async fn advance_cursor(
     )
     .bind(&c.stream)
     .bind(c.address.to_string())
-    .bind(raw.signature.to_string())
-    .bind(slot_i64(raw.slot))
+    .bind(signature)
+    .bind(slot)
     .execute(&mut *tx)
     .await
     .context("ingest_cursors")?;
@@ -749,10 +780,10 @@ async fn advance_cursor(
         "INSERT INTO ingest_tx_streams (signature, stream, slot, tx_index) VALUES ($1, $2, $3, $4) \
          ON CONFLICT DO NOTHING",
     )
-    .bind(raw.signature.to_string())
+    .bind(signature)
     .bind(&c.stream)
-    .bind(slot_i64(raw.slot))
-    .bind(i32::try_from(raw.tx_index).unwrap_or(i32::MAX))
+    .bind(slot)
+    .bind(tx_index)
     .execute(&mut *tx)
     .await
     .context("ingest_tx_streams")?;

@@ -17,6 +17,8 @@ name: shortwin-indexer
 
 x-indexer: &indexer
   image: shortwin-indexer:latest
+  # `image` plus `build` pulls first by default; always build this repository's source instead.
+  pull_policy: build
   build:
     context: ../../..                       # the repository root (path dependencies)
     dockerfile: services/indexer/deploy/Dockerfile
@@ -34,7 +36,7 @@ x-indexer: &indexer
 
 services:
   postgres:
-    image: postgres:17.11
+    image: postgres:17.11@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
     restart: unless-stopped
     environment:
       POSTGRES_DB: shortwin

@@ -23,7 +23,7 @@ arch=${SBPF_ARCH:-v3}
 cd "$root"
 echo "test-venue build -> $target/deploy/shortwin.so (platform-tools $tools, SBPF $arch)"
 CARGO_TARGET_DIR="$target" anchor build --tools-version "$tools" --arch "$arch" \
-  --ignore-keys --no-idl -p shortwin -- --features test-venue
+  --ignore-keys --no-idl -p shortwin -- -- --locked --features test-venue
 
 so="$target/deploy/shortwin.so"
 flags=$(od -An -t x4 -j 48 -N 4 "$so" | tr -d ' ')

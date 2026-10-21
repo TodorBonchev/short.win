@@ -37,15 +37,61 @@ pub fn of<T: Event + Discriminator + AnchorDeserialize>(out: &TxOutcome) -> Vec<
         .collect()
 }
 
-/// Every `emit!` log event of type `T` in the transaction's logs.
+/// Every short.win `emit!` log event of type `T` in the transaction's logs.
 pub fn logged<T: Event + Discriminator + AnchorDeserialize>(out: &TxOutcome) -> Vec<T> {
     let engine = base64::engine::general_purpose::STANDARD;
-    out.logs
-        .iter()
-        .filter_map(|line| line.strip_prefix("Program data: "))
-        .filter_map(|b64| engine.decode(b64.trim()).ok())
-        .filter_map(|p| decode::<T>(&p))
-        .collect()
+    let mut stack = Vec::new();
+    let mut events = Vec::new();
+    for line in &out.logs {
+        if line == "Log truncated" {
+            break;
+        }
+        if let Some((program, depth)) = invoked_program(line) {
+            // A runtime-produced invocation increases the depth by exactly one. Treat malformed
+            // or incomplete log structure as unauthenticated rather than attributing later data
+            // to a stale program.
+            if depth == 0 || depth > stack.len().saturating_add(1) {
+                stack.clear();
+            } else {
+                stack.truncate(depth - 1);
+                stack.push(program);
+            }
+            continue;
+        }
+        if let Some(program) = finished_program(line) {
+            if stack.last() == Some(&program) {
+                stack.pop();
+            } else {
+                stack.clear();
+            }
+            continue;
+        }
+        if stack.last() != Some(&shortwin::ID) {
+            continue;
+        }
+        if let Some(event) = line
+            .strip_prefix("Program data: ")
+            .and_then(|b64| engine.decode(b64.trim()).ok())
+            .and_then(|payload| decode::<T>(&payload))
+        {
+            events.push(event);
+        }
+    }
+    events
+}
+
+fn invoked_program(line: &str) -> Option<(Pubkey, usize)> {
+    let rest = line.strip_prefix("Program ")?;
+    let (id, depth) = rest.split_once(" invoke [")?;
+    Some((id.parse().ok()?, depth.strip_suffix(']')?.parse().ok()?))
+}
+
+fn finished_program(line: &str) -> Option<Pubkey> {
+    let rest = line.strip_prefix("Program ")?;
+    let (id, tail) = rest.split_once(' ')?;
+    (tail == "success" || tail.starts_with("failed:"))
+        .then(|| id.parse().ok())
+        .flatten()
 }
 
 /// The program whose failure ended the transaction: the first `Program <id> failed` line
@@ -186,7 +232,7 @@ pub fn pool_kind_name(kind: u8) -> &'static str {
 mod tests {
     use super::*;
     use anchor_lang::{AnchorSerialize, Discriminator};
-    use shortwin::events::{POOL_KIND_FAST, PoolSwitched};
+    use shortwin::events::{CoverageGap, POOL_KIND_FAST, PoolSwitched};
     use shortwin_services_common::InnerIx;
 
     /// AIR-18: the loader's refusal of a program deployed in this slot — at the top level, or
@@ -315,5 +361,57 @@ mod tests {
             "only short.win's own inner instruction counts"
         );
         assert_eq!(pool_kind_name(POOL_KIND_FAST), "fast path");
+    }
+
+    /// A CPI dependency can print any `Program data:` bytes. Only data emitted while short.win is
+    /// the active runtime invocation is one of short.win's `emit!` events.
+    #[test]
+    fn logged_events_are_attributed_to_the_emitting_program() {
+        let foreign = Pubkey::new_unique();
+        let spoofed = CoverageGap {
+            market: Pubkey::new_unique(),
+            slot: 1,
+            ts: 2,
+            gap_s: 86_400,
+            open_positions: 99,
+        };
+        let genuine = CoverageGap {
+            market: Pubkey::new_unique(),
+            slot: 3,
+            ts: 4,
+            gap_s: 5,
+            open_positions: 6,
+        };
+        let event_log = |event: &CoverageGap| {
+            let mut payload = CoverageGap::DISCRIMINATOR.to_vec();
+            event.serialize(&mut payload).expect("borsh");
+            format!(
+                "Program data: {}",
+                base64::engine::general_purpose::STANDARD.encode(payload)
+            )
+        };
+        let out = TxOutcome {
+            logs: vec![
+                format!("Program {foreign} invoke [1]"),
+                event_log(&spoofed),
+                format!("Program {foreign} success"),
+                format!("Program {} invoke [1]", shortwin::ID),
+                format!("Program {foreign} invoke [2]"),
+                event_log(&spoofed),
+                format!("Program {foreign} success"),
+                event_log(&genuine),
+                format!("Program {} success", shortwin::ID),
+                event_log(&spoofed),
+            ],
+            ..TxOutcome::default()
+        };
+
+        let got = logged::<CoverageGap>(&out);
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].market, genuine.market);
+        assert_eq!(got[0].slot, genuine.slot);
+        assert_eq!(got[0].ts, genuine.ts);
+        assert_eq!(got[0].gap_s, genuine.gap_s);
+        assert_eq!(got[0].open_positions, genuine.open_positions);
     }
 }
