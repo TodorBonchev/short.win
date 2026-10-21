@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "scripts/audit_scope.py",
+    "check"
+  ],
+  "started_utc": "2026-10-21T22:45:04.134304+00:00",
+  "finished_utc": "2026-10-21T22:45:04.261588+00:00",
+  "exit_code": 0,
+  "output_sha256": "eddeb5c812f6d5c07a6aaf83648868a2f8d2aee6b52b6fc16fafd13d4d24f1dd"
+}

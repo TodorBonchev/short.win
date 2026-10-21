@@ -4,10 +4,11 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
-- **Current unreleased 1.0.3 (2026-10-21):** owner-selected policy decisions and an
+- **Current unreleased 1.0.3 (2026-10-22 local):** owner-selected policy decisions and an
   accurately attributed AI-assisted fix review are recorded. The program has never
   been deployed. Complete-digest VenueGuard artifacts supersede earlier program
-  hashes; full CI and final-byte ≥24 h fuzz remain separate release gates. See
+  hashes; exact-ref full CI and final-byte ≥24 h fuzz passed. Jupiter live-pin drift
+  and funded-service preflight remain pending. See
   [current readiness](audit/release-readiness-1.0.3-2026-10-21.md) and §0 below.
   Earlier entries retain their original dates and evidence boundaries.
 - This is the M10 final package (WP-10 final), written on the merged M10 tree (`m1-core`,
@@ -352,11 +353,22 @@ from `e04a6776` is the direct AIR2-01 lock/zero-lock regression strengthening. T
 [focused AIR2 review](audit/independent-air2-fix-review-1.0.3-2026-10-21.md)
 accepts eight technical corrections. Production/fuzzer/fixture inputs match `e04a6776`;
 the final verifier/Anchor artifacts match frozen bytes (both ZIP digests verified).
-The complete final CI gate is green. The
-[final current-profile fuzz run](audit/fuzz-1.0.3-fullsha.md) started
-2026-10-20 22:21:09 UTC with a new runner and copied, hash-checked fixtures. It must
-complete ≥24 hours with zero failures/anomalies. Previous-program and previous-profile
-durations are historical; no 1.0.3 tag/deployment is approved by this record.
+The `ff85a1b0` full CI gate is green. The later concurrent `56f660027` service/build
+update was integrated without changing program/fuzzer/fixtures; its
+[CI 39556305501](https://github.com/TodorBonchev/short.win/actions/runs/39556305501)
+passed 24 jobs, with scheduled fuzz and push-event mutants intentionally skipped.
+Prior 19-kill mutant evidence remains attributed to `ff85a1b0`, with incoming service
+review and actual artifact comparisons in the final release-check record below. The
+[final current-profile fuzz run](audit/fuzz-1.0.3-fullsha.md) completed naturally on
+2026-10-21 at 22:21:37 UTC: exit 0, supervisor 86,428.074 s, runner 86,426.898 s,
+38,563 runs, 87,632,843 transactions, zero invariant failures and zero anomalies.
+Independent checks matched final summary/log hashes, every frozen input and the
+source-pinned six-profile witness. [Final retained evidence](audit/probes/fuzz-final-1.0.3-2026-10-22/README.md).
+Previous-program/profile durations remain historical. The
+[October 22 release checks and plan](audit/release-checks-1.0.3-2026-10-22.md)
+record Jupiter live-pin drift and unavailable funded-service evidence; no tag or
+deployment is approved by this record. Technical finding closure preserves the
+owner's acknowledged economic risks and deferred broader review scope.
 
 ## 1. The protocol on one page
 

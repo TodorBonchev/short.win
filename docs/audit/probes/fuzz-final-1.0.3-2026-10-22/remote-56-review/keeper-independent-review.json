@@ -1,0 +1,58 @@
+{
+  "observed_utc": "2026-10-21T22:57:15.468382+00:00",
+  "reviewer": "keeper_fix_review AI subagent; independent of events.rs change author; no external-firm claim",
+  "reviewed_remote_commit": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+  "executed_worktree_head": "348116043331393c1d10430c6c3a11b11980368f",
+  "events_blob": "872a268fac6603769acd6e306977d6dee5e7320e",
+  "executed_events_blob_matches_reviewed": true,
+  "tests": [
+    {
+      "log": "keeper-lib.log",
+      "command": "cargo test --manifest-path services/Cargo.toml -p shortwin-keeper --lib --locked -- --test-threads=2",
+      "passed": 96,
+      "sha256": "b4ca198b379d1f04cc252dce7318ce93305d30532dcec2740514bff92f539a8e",
+      "exit_code": 0
+    },
+    {
+      "log": "genuine-coverage-gap.log",
+      "command": "cargo test --manifest-path services/Cargo.toml -p shortwin-keeper-litesvm --test scenarios --locked degraded::an_outage_is_reported_through_coverage_gap_and_recovers_after_ten_minutes -- --exact --test-threads=2",
+      "passed": 1,
+      "sha256": "ae5463d439e9e083bba7626a2f86481be05966f1525b1971141933b69ed7e6d2",
+      "exit_code": 0
+    },
+    {
+      "log": "genuine-gap-pause-recovery.log",
+      "command": "cargo test --manifest-path services/Cargo.toml -p shortwin-keeper-litesvm --test scenarios --locked coverage_pause::drill_an_outage_pauses_opens_exits_continue_and_recovery_resumes_them -- --exact --test-threads=2",
+      "passed": 1,
+      "sha256": "f99ae5d4f418a988b5d4a6a344fcb1ded11139f1ed4bc2c4e47db3dd733eee38",
+      "exit_code": 0
+    }
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/root/short.win/services/target",
+    "SHORTWIN_SO": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+    "SHORTWIN_TEST_VENUE_SO": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+    "MOCK_CPAMM_SO": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so"
+  },
+  "findings": [],
+  "conclusion": "No blocking issue in keeper event-authentication implementation. Foreign top-level/CPI and orphan payloads are excluded; normal shortwin runtime logs still drive coverage degradation/pause/recovery.",
+  "auth_boundary": "Runtime invocation/termination frames and raw RPC/LiteSVM log entries are trusted. Program-generated log text has a Program log prefix; arbitrary payload bytes cannot create a runtime frame. Malformed missing-stack/depth and Log truncated are conservative; arbitrary malicious RPC fabrication is outside this authentication claim.",
+  "frozen_source_comparison": {
+    "base": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+    "current": "348116043331393c1d10430c6c3a11b11980368f",
+    "paths": [
+      "programs/shortwin",
+      "crates",
+      "tests/fuzz",
+      "tests/litesvm",
+      "tests/fixtures",
+      "Cargo.toml",
+      "Cargo.lock",
+      "Anchor.toml"
+    ],
+    "diff": ""
+  },
+  "build_input_limit": "Remote changes CI installer/pinning/Anchor and SBF locked invocation scripts. Prior frozen runtime source and its 24h run remain valid; all-current-source and new-build equivalence require separate exact-56 CI/job/artifact evidence being gathered by the other reviewer. No claim that old ff85 CI tested new keeper/indexer/CI code.",
+  "test_limit": "No full suite rerun. Existing unit regression covers foreign top-level, nested CPI, genuine and orphan payloads. Malformed-depth/termination/truncation behavior was source-reviewed; no dedicated boundary-matrix test was executed. No tracked edits or runtime fixes made."
+}

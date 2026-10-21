@@ -1,0 +1,11 @@
+{
+  "command": [
+    "pnpm",
+    "install",
+    "--frozen-lockfile"
+  ],
+  "started_utc": "2026-10-21T22:45:59.998869+00:00",
+  "finished_utc": "2026-10-21T22:46:03.201067+00:00",
+  "exit_code": 0,
+  "output_sha256": "d7bcd7e81283938221299f5ff7f31fdbf077979a0d5a1a9fbcb6547df10a5de8"
+}

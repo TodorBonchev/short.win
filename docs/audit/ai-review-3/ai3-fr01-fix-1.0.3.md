@@ -1,6 +1,43 @@
 # AI3-FR01: quarantine legacy empty-pool carry
 
-**2026-10-21 superseding record:** [final-source readiness](../release-readiness-1.0.3-2026-10-21.md) includes the full
+## Final technical disposition (2026-10-22): fixed
+
+The narrow empty-pool quarantine is **fixed**: retained predecessor-state,
+carry-boundary and signed 6110 rollback/compatibility regressions, old-source/old-ELF
+negative controls, accurately attributed independent AI review, green exact-ref
+[CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
+on `ff85a1b0`, and the completed final-profile run support that disposition.
+Production/fuzzer/fixtures remain identical to frozen `e04a6776`.
+
+The run finished `2026-10-21T22:21:37.094749Z`, exit 0, after 86,428.073717718 s
+(summary 86,426.897880876 s), with 38,563 runs and empty failure/anomaly records.
+[Final evidence](../probes/fuzz-final-1.0.3-2026-10-22/README.md) and
+[release checks](../release-checks-1.0.3-2026-10-22.md) pin its input and output hashes.
+The clean-state fuzz run did **not** return `LegacyPoolCarry`; the targeted
+regressions and negative controls establish that legacy-state branch. Random error
+coverage is not substituted for those tests.
+
+The owner-confirmed never-deployed state removes present migration work. Future
+encountered carry-bearing empty state remains quarantined pending reviewed recovery;
+this fix does not reconstruct or pay historical ownership. F06's ownership policy,
+other economic acknowledgements and operating release gates remain separate.
+No tag/deployment or universal recovery availability is approved.
+
+**Concurrent publication update:** remote `56f660027` adds keeper/indexer and
+build-control fixes without changing the frozen on-chain program, fuzzer or fixtures.
+Its [CI 39556305501](https://github.com/TodorBonchev/short.win/actions/runs/39556305501)
+passed 24 jobs, with scheduled fuzz and push-event mutants intentionally skipped.
+The earlier manual `ff85a1b0` gate's 19 mutant kills are not attributed to this push.
+Incoming service review, build comparisons and the remaining operating prerequisites
+are in the [final release checks](../release-checks-1.0.3-2026-10-22.md#concurrent-servicebuild-integration).
+
+## Historical implementation and validation (2026-10-19–21)
+
+All earlier pending statements and program hashes below retain their dated provenance
+and are superseded for current technical status by the final record above.
+
+
+**2026-10-21 superseding record (historical):** [final-source readiness](../release-readiness-1.0.3-2026-10-21.md) includes the full
 SHA-256 first-deployment correction, selected owner policies and the current final-byte
 fuzz run. The program has never been deployed; no deployed-account migration is
 required. Earlier hashes, CI and progress snapshots below are historical evidence.

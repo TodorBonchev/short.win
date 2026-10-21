@@ -1,0 +1,11 @@
+{
+  "checked_utc": "2026-10-21T22:49:33.180130+00:00",
+  "id": 39509811932,
+  "head_sha": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+  "status": "completed",
+  "conclusion": "success",
+  "updated_at": "2026-10-21T00:03:13Z",
+  "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/39509811932",
+  "raw_api_sha256": "c9ef013217f484f67b9ee7728ad9f202d8391772347882b7f4b427aeb20c3268",
+  "raw_api_retained": "ci-recheck-api.json.gz"
+}

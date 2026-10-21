@@ -1,0 +1,8 @@
+Scope: all 4 workspace projects
+? Verifying lockfile against supply-chain policies (316 entries)...
+Update available! 12.7.0 → 12.14.0.
+Changelog: https://pnpm.io/v/12.14.0
+To update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -
+✓ Lockfile passes supply-chain policies (316 entries in 2.8s)
+Lockfile is up to date, resolution step is skipped
+Done in 3s using pnpm v12.7.0

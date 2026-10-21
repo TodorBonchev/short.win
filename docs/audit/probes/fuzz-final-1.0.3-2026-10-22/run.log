@@ -1,0 +1,1868 @@
+[    60s] runs 32 actions 5162 txs 57082 failures 0 anomalies 0
+[   120s] runs 61 actions 10649 txs 119887 failures 0 anomalies 0
+[   180s] runs 86 actions 15698 txs 184370 failures 0 anomalies 0
+[   240s] runs 119 actions 21349 txs 243784 failures 0 anomalies 0
+[   300s] runs 131 actions 23562 txs 277482 failures 0 anomalies 0
+[   360s] runs 163 actions 29360 txs 348355 failures 0 anomalies 0
+[   420s] runs 186 actions 33977 txs 406692 failures 0 anomalies 0
+[   480s] runs 213 actions 39400 txs 475592 failures 0 anomalies 0
+[   540s] runs 227 actions 42382 txs 511459 failures 0 anomalies 0
+[   600s] runs 243 actions 45519 txs 560614 failures 0 anomalies 0
+[   661s] runs 258 actions 49305 txs 605955 failures 0 anomalies 0
+[   721s] runs 275 actions 52815 txs 652099 failures 0 anomalies 0
+[   781s] runs 281 actions 54200 txs 674747 failures 0 anomalies 0
+[   841s] runs 301 actions 57990 txs 729712 failures 0 anomalies 0
+[   901s] runs 328 actions 62490 txs 789767 failures 0 anomalies 0
+[   961s] runs 356 actions 67896 txs 850543 failures 0 anomalies 0
+[  1021s] runs 382 actions 72926 txs 907743 failures 0 anomalies 0
+[  1081s] runs 409 actions 78251 txs 970032 failures 0 anomalies 0
+[  1141s] runs 434 actions 83236 txs 1028514 failures 0 anomalies 0
+[  1201s] runs 454 actions 87095 txs 1077974 failures 0 anomalies 0
+[  1261s] runs 477 actions 91022 txs 1130661 failures 0 anomalies 0
+[  1321s] runs 492 actions 94279 txs 1179728 failures 0 anomalies 0
+[  1381s] runs 538 actions 102118 txs 1261418 failures 0 anomalies 0
+[  1441s] runs 574 actions 108819 txs 1335828 failures 0 anomalies 0
+[  1501s] runs 592 actions 112203 txs 1378869 failures 0 anomalies 0
+[  1561s] runs 632 actions 119883 txs 1467656 failures 0 anomalies 0
+[  1621s] runs 663 actions 125704 txs 1538733 failures 0 anomalies 0
+[  1681s] runs 684 actions 129709 txs 1587121 failures 0 anomalies 0
+[  1741s] runs 715 actions 135204 txs 1651311 failures 0 anomalies 0
+[  1801s] runs 741 actions 139930 txs 1709941 failures 0 anomalies 0
+[  1861s] runs 759 actions 143590 txs 1755958 failures 0 anomalies 0
+[  1921s] runs 793 actions 149911 txs 1822295 failures 0 anomalies 0
+[  1982s] runs 821 actions 155532 txs 1883862 failures 0 anomalies 0
+[  2042s] runs 853 actions 161579 txs 1949348 failures 0 anomalies 0
+[  2102s] runs 862 actions 163848 txs 1982590 failures 0 anomalies 0
+[  2162s] runs 895 actions 169551 txs 2045482 failures 0 anomalies 0
+[  2222s] runs 921 actions 174056 txs 2105763 failures 0 anomalies 0
+[  2282s] runs 953 actions 179759 txs 2179332 failures 0 anomalies 0
+[  2342s] runs 969 actions 183192 txs 2216628 failures 0 anomalies 0
+[  2402s] runs 988 actions 187298 txs 2274726 failures 0 anomalies 0
+[  2462s] runs 998 actions 189809 txs 2303605 failures 0 anomalies 0
+[  2522s] runs 1020 actions 193927 txs 2358430 failures 0 anomalies 0
+[  2582s] runs 1042 actions 198305 txs 2412566 failures 0 anomalies 0
+[  2642s] runs 1067 actions 202542 txs 2465895 failures 0 anomalies 0
+[  2702s] runs 1091 actions 207313 txs 2526607 failures 0 anomalies 0
+[  2762s] runs 1125 actions 213546 txs 2599503 failures 0 anomalies 0
+[  2822s] runs 1151 actions 218464 txs 2657155 failures 0 anomalies 0
+[  2882s] runs 1190 actions 225722 txs 2737086 failures 0 anomalies 0
+[  2942s] runs 1217 actions 231045 txs 2797393 failures 0 anomalies 0
+[  3002s] runs 1241 actions 236048 txs 2853178 failures 0 anomalies 0
+[  3062s] runs 1278 actions 242340 txs 2921196 failures 0 anomalies 0
+[  3122s] runs 1308 actions 247557 txs 2985007 failures 0 anomalies 0
+[  3182s] runs 1328 actions 252173 txs 3040455 failures 0 anomalies 0
+[  3243s] runs 1354 actions 257236 txs 3099483 failures 0 anomalies 0
+[  3303s] runs 1384 actions 263089 txs 3168658 failures 0 anomalies 0
+[  3363s] runs 1419 actions 269729 txs 3241585 failures 0 anomalies 0
+[  3423s] runs 1450 actions 275764 txs 3316594 failures 0 anomalies 0
+[  3483s] runs 1483 actions 282201 txs 3393220 failures 0 anomalies 0
+[  3543s] runs 1507 actions 287099 txs 3448686 failures 0 anomalies 0
+[  3603s] runs 1532 actions 292467 txs 3515549 failures 0 anomalies 0
+[  3663s] runs 1556 actions 297283 txs 3575970 failures 0 anomalies 0
+[  3723s] runs 1584 actions 302520 txs 3635088 failures 0 anomalies 0
+[  3783s] runs 1612 actions 307758 txs 3699735 failures 0 anomalies 0
+[  3843s] runs 1625 actions 310553 txs 3731999 failures 0 anomalies 0
+[  3903s] runs 1660 actions 316618 txs 3804067 failures 0 anomalies 0
+[  3963s] runs 1691 actions 322400 txs 3869291 failures 0 anomalies 0
+[  4023s] runs 1727 actions 329093 txs 3940264 failures 0 anomalies 0
+[  4083s] runs 1750 actions 333913 txs 3996688 failures 0 anomalies 0
+[  4143s] runs 1783 actions 340415 txs 4067375 failures 0 anomalies 0
+[  4203s] runs 1815 actions 346045 txs 4130736 failures 0 anomalies 0
+[  4263s] runs 1830 actions 348809 txs 4165225 failures 0 anomalies 0
+[  4323s] runs 1851 actions 352717 txs 4218855 failures 0 anomalies 0
+[  4383s] runs 1892 actions 360335 txs 4296577 failures 0 anomalies 0
+[  4443s] runs 1937 actions 368001 txs 4381747 failures 0 anomalies 0
+[  4503s] runs 1975 actions 375234 txs 4463305 failures 0 anomalies 0
+[  4563s] runs 2012 actions 382734 txs 4540903 failures 0 anomalies 0
+[  4624s] runs 2043 actions 388270 txs 4610323 failures 0 anomalies 0
+[  4684s] runs 2072 actions 393832 txs 4675260 failures 0 anomalies 0
+[  4744s] runs 2105 actions 400589 txs 4748464 failures 0 anomalies 0
+[  4804s] runs 2138 actions 407051 txs 4820171 failures 0 anomalies 0
+[  4864s] runs 2162 actions 412261 txs 4885110 failures 0 anomalies 0
+[  4924s] runs 2186 actions 416813 txs 4943885 failures 0 anomalies 0
+[  4984s] runs 2212 actions 421799 txs 4999060 failures 0 anomalies 0
+[  5044s] runs 2240 actions 426994 txs 5060551 failures 0 anomalies 0
+[  5104s] runs 2266 actions 432001 txs 5125849 failures 0 anomalies 0
+[  5164s] runs 2274 actions 433735 txs 5144390 failures 0 anomalies 0
+[  5224s] runs 2304 actions 440124 txs 5224475 failures 0 anomalies 0
+[  5284s] runs 2325 actions 443802 txs 5275692 failures 0 anomalies 0
+[  5344s] runs 2364 actions 450644 txs 5352274 failures 0 anomalies 0
+[  5404s] runs 2396 actions 456502 txs 5423696 failures 0 anomalies 0
+[  5464s] runs 2413 actions 460333 txs 5462296 failures 0 anomalies 0
+[  5524s] runs 2442 actions 466379 txs 5531234 failures 0 anomalies 0
+[  5584s] runs 2472 actions 472087 txs 5598197 failures 0 anomalies 0
+[  5644s] runs 2502 actions 478080 txs 5663438 failures 0 anomalies 0
+[  5704s] runs 2542 actions 484617 txs 5742742 failures 0 anomalies 0
+[  5764s] runs 2568 actions 489978 txs 5807874 failures 0 anomalies 0
+[  5824s] runs 2606 actions 497014 txs 5884735 failures 0 anomalies 0
+[  5884s] runs 2630 actions 501563 txs 5946750 failures 0 anomalies 0
+[  5944s] runs 2658 actions 507657 txs 6022627 failures 0 anomalies 0
+[  6004s] runs 2686 actions 513883 txs 6090505 failures 0 anomalies 0
+[  6065s] runs 2703 actions 517309 txs 6139107 failures 0 anomalies 0
+[  6125s] runs 2728 actions 522622 txs 6199639 failures 0 anomalies 0
+[  6185s] runs 2746 actions 525983 txs 6244521 failures 0 anomalies 0
+[  6245s] runs 2776 actions 531463 txs 6310502 failures 0 anomalies 0
+[  6305s] runs 2808 actions 537151 txs 6379647 failures 0 anomalies 0
+[  6365s] runs 2844 actions 543231 txs 6442682 failures 0 anomalies 0
+[  6425s] runs 2871 actions 548604 txs 6504274 failures 0 anomalies 0
+[  6485s] runs 2887 actions 551403 txs 6545671 failures 0 anomalies 0
+[  6545s] runs 2909 actions 555406 txs 6590221 failures 0 anomalies 0
+[  6605s] runs 2933 actions 559674 txs 6644934 failures 0 anomalies 0
+[  6665s] runs 2952 actions 563495 txs 6704604 failures 0 anomalies 0
+[  6725s] runs 2975 actions 567972 txs 6760746 failures 0 anomalies 0
+[  6785s] runs 3005 actions 573397 txs 6824427 failures 0 anomalies 0
+[  6845s] runs 3024 actions 577113 txs 6876583 failures 0 anomalies 0
+[  6905s] runs 3050 actions 582344 txs 6938556 failures 0 anomalies 0
+[  6965s] runs 3081 actions 588304 txs 7006365 failures 0 anomalies 0
+[  7025s] runs 3095 actions 590770 txs 7039131 failures 0 anomalies 0
+[  7085s] runs 3121 actions 595505 txs 7095214 failures 0 anomalies 0
+[  7145s] runs 3143 actions 599679 txs 7149406 failures 0 anomalies 0
+[  7205s] runs 3160 actions 602985 txs 7194179 failures 0 anomalies 0
+[  7265s] runs 3185 actions 607756 txs 7254648 failures 0 anomalies 0
+[  7325s] runs 3208 actions 612438 txs 7305540 failures 0 anomalies 0
+[  7385s] runs 3237 actions 617753 txs 7372214 failures 0 anomalies 0
+[  7445s] runs 3256 actions 621096 txs 7423028 failures 0 anomalies 0
+[  7505s] runs 3289 actions 626799 txs 7493881 failures 0 anomalies 0
+[  7566s] runs 3310 actions 630581 txs 7553169 failures 0 anomalies 0
+[  7626s] runs 3333 actions 635089 txs 7604875 failures 0 anomalies 0
+[  7686s] runs 3350 actions 638659 txs 7647217 failures 0 anomalies 0
+[  7746s] runs 3377 actions 643273 txs 7697200 failures 0 anomalies 0
+[  7806s] runs 3398 actions 647170 txs 7747590 failures 0 anomalies 0
+[  7866s] runs 3417 actions 650967 txs 7797290 failures 0 anomalies 0
+[  7926s] runs 3461 actions 658805 txs 7885602 failures 0 anomalies 0
+[  7986s] runs 3496 actions 665464 txs 7963291 failures 0 anomalies 0
+[  8046s] runs 3525 actions 670895 txs 8026605 failures 0 anomalies 0
+[  8106s] runs 3542 actions 674198 txs 8073392 failures 0 anomalies 0
+[  8166s] runs 3578 actions 680891 txs 8150357 failures 0 anomalies 0
+[  8226s] runs 3606 actions 686592 txs 8219244 failures 0 anomalies 0
+[  8286s] runs 3639 actions 692897 txs 8291767 failures 0 anomalies 0
+[  8346s] runs 3672 actions 698817 txs 8358745 failures 0 anomalies 0
+[  8406s] runs 3692 actions 702653 txs 8407958 failures 0 anomalies 0
+[  8466s] runs 3711 actions 706392 txs 8454619 failures 0 anomalies 0
+[  8526s] runs 3736 actions 711448 txs 8517127 failures 0 anomalies 0
+[  8586s] runs 3752 actions 714554 txs 8556678 failures 0 anomalies 0
+[  8646s] runs 3779 actions 719773 txs 8618986 failures 0 anomalies 0
+[  8706s] runs 3815 actions 726462 txs 8697053 failures 0 anomalies 0
+[  8766s] runs 3840 actions 731009 txs 8750299 failures 0 anomalies 0
+[  8826s] runs 3855 actions 734009 txs 8793051 failures 0 anomalies 0
+[  8886s] runs 3885 actions 739362 txs 8855803 failures 0 anomalies 0
+[  8946s] runs 3919 actions 745731 txs 8933279 failures 0 anomalies 0
+[  9006s] runs 3952 actions 751515 txs 9003757 failures 0 anomalies 0
+[  9067s] runs 3986 actions 757938 txs 9074117 failures 0 anomalies 0
+[  9127s] runs 4027 actions 765958 txs 9165172 failures 0 anomalies 0
+[  9187s] runs 4048 actions 770546 txs 9224025 failures 0 anomalies 0
+[  9247s] runs 4087 actions 778154 txs 9306568 failures 0 anomalies 0
+[  9307s] runs 4124 actions 784547 txs 9383573 failures 0 anomalies 0
+[  9367s] runs 4151 actions 790245 txs 9454250 failures 0 anomalies 0
+[  9427s] runs 4169 actions 793545 txs 9498981 failures 0 anomalies 0
+[  9487s] runs 4207 actions 800625 txs 9570763 failures 0 anomalies 0
+[  9547s] runs 4248 actions 808297 txs 9657097 failures 0 anomalies 0
+[  9607s] runs 4280 actions 813998 txs 9720144 failures 0 anomalies 0
+[  9667s] runs 4300 actions 818128 txs 9773474 failures 0 anomalies 0
+[  9727s] runs 4330 actions 823964 txs 9841858 failures 0 anomalies 0
+[  9787s] runs 4346 actions 827575 txs 9891262 failures 0 anomalies 0
+[  9847s] runs 4371 actions 831691 txs 9945401 failures 0 anomalies 0
+[  9907s] runs 4403 actions 837874 txs 10015897 failures 0 anomalies 0
+[  9967s] runs 4443 actions 845345 txs 10098409 failures 0 anomalies 0
+[ 10027s] runs 4459 actions 848420 txs 10136390 failures 0 anomalies 0
+[ 10087s] runs 4477 actions 851978 txs 10192081 failures 0 anomalies 0
+[ 10147s] runs 4497 actions 855627 txs 10241779 failures 0 anomalies 0
+[ 10207s] runs 4529 actions 861797 txs 10317459 failures 0 anomalies 0
+[ 10267s] runs 4571 actions 869801 txs 10404038 failures 0 anomalies 0
+[ 10327s] runs 4596 actions 874478 txs 10463156 failures 0 anomalies 0
+[ 10387s] runs 4623 actions 880410 txs 10528711 failures 0 anomalies 0
+[ 10447s] runs 4651 actions 885349 txs 10587556 failures 0 anomalies 0
+[ 10507s] runs 4683 actions 891683 txs 10655883 failures 0 anomalies 0
+[ 10567s] runs 4710 actions 896157 txs 10717207 failures 0 anomalies 0
+[ 10628s] runs 4735 actions 901131 txs 10776724 failures 0 anomalies 0
+[ 10688s] runs 4768 actions 907606 txs 10854116 failures 0 anomalies 0
+[ 10748s] runs 4792 actions 911772 txs 10903082 failures 0 anomalies 0
+[ 10808s] runs 4813 actions 916006 txs 10955104 failures 0 anomalies 0
+[ 10868s] runs 4841 actions 920967 txs 11014827 failures 0 anomalies 0
+[ 10928s] runs 4870 actions 926539 txs 11077479 failures 0 anomalies 0
+[ 10988s] runs 4898 actions 931943 txs 11144067 failures 0 anomalies 0
+[ 11048s] runs 4925 actions 936977 txs 11202183 failures 0 anomalies 0
+[ 11108s] runs 4945 actions 940603 txs 11248884 failures 0 anomalies 0
+[ 11168s] runs 4974 actions 946357 txs 11321031 failures 0 anomalies 0
+[ 11228s] runs 5020 actions 954641 txs 11407291 failures 0 anomalies 0
+[ 11288s] runs 5055 actions 961228 txs 11487251 failures 0 anomalies 0
+[ 11348s] runs 5075 actions 964965 txs 11535877 failures 0 anomalies 0
+[ 11408s] runs 5111 actions 971750 txs 11613682 failures 0 anomalies 0
+[ 11468s] runs 5134 actions 976190 txs 11670994 failures 0 anomalies 0
+[ 11528s] runs 5153 actions 979827 txs 11712117 failures 0 anomalies 0
+[ 11588s] runs 5183 actions 985579 txs 11779525 failures 0 anomalies 0
+[ 11648s] runs 5224 actions 993056 txs 11862310 failures 0 anomalies 0
+[ 11708s] runs 5257 actions 998715 txs 11917378 failures 0 anomalies 0
+[ 11768s] runs 5278 actions 1002909 txs 11976990 failures 0 anomalies 0
+[ 11828s] runs 5304 actions 1007943 txs 12039343 failures 0 anomalies 0
+[ 11888s] runs 5338 actions 1013861 txs 12112217 failures 0 anomalies 0
+[ 11948s] runs 5354 actions 1017300 txs 12156207 failures 0 anomalies 0
+[ 12008s] runs 5380 actions 1021979 txs 12215095 failures 0 anomalies 0
+[ 12068s] runs 5412 actions 1028612 txs 12285487 failures 0 anomalies 0
+[ 12129s] runs 5441 actions 1033853 txs 12350616 failures 0 anomalies 0
+[ 12189s] runs 5460 actions 1037861 txs 12404436 failures 0 anomalies 0
+[ 12249s] runs 5486 actions 1042999 txs 12467278 failures 0 anomalies 0
+[ 12309s] runs 5520 actions 1049581 txs 12539134 failures 0 anomalies 0
+[ 12369s] runs 5527 actions 1051063 txs 12560871 failures 0 anomalies 0
+[ 12429s] runs 5543 actions 1053920 txs 12600106 failures 0 anomalies 0
+[ 12489s] runs 5549 actions 1054830 txs 12609001 failures 0 anomalies 0
+[ 12549s] runs 5563 actions 1057805 txs 12657553 failures 0 anomalies 0
+[ 12609s] runs 5586 actions 1061812 txs 12710091 failures 0 anomalies 0
+[ 12669s] runs 5604 actions 1065378 txs 12757632 failures 0 anomalies 0
+[ 12729s] runs 5628 actions 1070259 txs 12817536 failures 0 anomalies 0
+[ 12789s] runs 5651 actions 1074249 txs 12873591 failures 0 anomalies 0
+[ 12849s] runs 5671 actions 1078354 txs 12919985 failures 0 anomalies 0
+[ 12909s] runs 5687 actions 1081772 txs 12963883 failures 0 anomalies 0
+[ 12969s] runs 5697 actions 1083977 txs 12992612 failures 0 anomalies 0
+[ 13029s] runs 5717 actions 1087877 txs 13043999 failures 0 anomalies 0
+[ 13089s] runs 5734 actions 1091348 txs 13094207 failures 0 anomalies 0
+[ 13149s] runs 5759 actions 1096311 txs 13153566 failures 0 anomalies 0
+[ 13209s] runs 5783 actions 1100958 txs 13206193 failures 0 anomalies 0
+[ 13269s] runs 5827 actions 1109183 txs 13296802 failures 0 anomalies 0
+[ 13329s] runs 5854 actions 1114534 txs 13365045 failures 0 anomalies 0
+[ 13389s] runs 5888 actions 1120656 txs 13437378 failures 0 anomalies 0
+[ 13449s] runs 5920 actions 1126788 txs 13507134 failures 0 anomalies 0
+[ 13509s] runs 5939 actions 1130525 txs 13560238 failures 0 anomalies 0
+[ 13569s] runs 5970 actions 1136225 txs 13627253 failures 0 anomalies 0
+[ 13629s] runs 5999 actions 1141197 txs 13686949 failures 0 anomalies 0
+[ 13690s] runs 6021 actions 1145089 txs 13738406 failures 0 anomalies 0
+[ 13750s] runs 6060 actions 1152755 txs 13820898 failures 0 anomalies 0
+[ 13810s] runs 6083 actions 1157292 txs 13877304 failures 0 anomalies 0
+[ 13870s] runs 6112 actions 1162657 txs 13945777 failures 0 anomalies 0
+[ 13930s] runs 6124 actions 1165345 txs 13978372 failures 0 anomalies 0
+[ 13990s] runs 6139 actions 1168270 txs 14019943 failures 0 anomalies 0
+[ 14050s] runs 6168 actions 1173276 txs 14085828 failures 0 anomalies 0
+[ 14110s] runs 6180 actions 1175896 txs 14116520 failures 0 anomalies 0
+[ 14170s] runs 6213 actions 1181827 txs 14190628 failures 0 anomalies 0
+[ 14230s] runs 6228 actions 1184836 txs 14234617 failures 0 anomalies 0
+[ 14290s] runs 6261 actions 1190563 txs 14307450 failures 0 anomalies 0
+[ 14350s] runs 6283 actions 1194617 txs 14364185 failures 0 anomalies 0
+[ 14410s] runs 6302 actions 1198474 txs 14408443 failures 0 anomalies 0
+[ 14470s] runs 6318 actions 1201524 txs 14444410 failures 0 anomalies 0
+[ 14530s] runs 6332 actions 1204448 txs 14489702 failures 0 anomalies 0
+[ 14590s] runs 6375 actions 1212008 txs 14568148 failures 0 anomalies 0
+[ 14650s] runs 6407 actions 1218132 txs 14639334 failures 0 anomalies 0
+[ 14710s] runs 6428 actions 1222057 txs 14689475 failures 0 anomalies 0
+[ 14770s] runs 6454 actions 1226699 txs 14745873 failures 0 anomalies 0
+[ 14830s] runs 6469 actions 1229497 txs 14791718 failures 0 anomalies 0
+[ 14890s] runs 6493 actions 1233764 txs 14846280 failures 0 anomalies 0
+[ 14950s] runs 6520 actions 1238516 txs 14903574 failures 0 anomalies 0
+[ 15010s] runs 6534 actions 1241202 txs 14943087 failures 0 anomalies 0
+[ 15070s] runs 6559 actions 1245964 txs 14995385 failures 0 anomalies 0
+[ 15130s] runs 6581 actions 1249718 txs 15042413 failures 0 anomalies 0
+[ 15190s] runs 6611 actions 1255061 txs 15107211 failures 0 anomalies 0
+[ 15251s] runs 6639 actions 1260461 txs 15174558 failures 0 anomalies 0
+[ 15311s] runs 6663 actions 1265170 txs 15227756 failures 0 anomalies 0
+[ 15371s] runs 6687 actions 1270356 txs 15285771 failures 0 anomalies 0
+[ 15431s] runs 6712 actions 1275320 txs 15344862 failures 0 anomalies 0
+[ 15491s] runs 6730 actions 1278959 txs 15388011 failures 0 anomalies 0
+[ 15551s] runs 6757 actions 1284512 txs 15460327 failures 0 anomalies 0
+[ 15611s] runs 6801 actions 1291855 txs 15544726 failures 0 anomalies 0
+[ 15671s] runs 6827 actions 1296535 txs 15597262 failures 0 anomalies 0
+[ 15731s] runs 6837 actions 1298554 txs 15628783 failures 0 anomalies 0
+[ 15791s] runs 6852 actions 1301459 txs 15667231 failures 0 anomalies 0
+[ 15851s] runs 6878 actions 1306317 txs 15730987 failures 0 anomalies 0
+[ 15911s] runs 6916 actions 1313719 txs 15812669 failures 0 anomalies 0
+[ 15971s] runs 6944 actions 1318951 txs 15874755 failures 0 anomalies 0
+[ 16031s] runs 6964 actions 1323326 txs 15928218 failures 0 anomalies 0
+[ 16091s] runs 6987 actions 1327728 txs 15980347 failures 0 anomalies 0
+[ 16151s] runs 7004 actions 1331326 txs 16028421 failures 0 anomalies 0
+[ 16211s] runs 7042 actions 1339214 txs 16114942 failures 0 anomalies 0
+[ 16271s] runs 7065 actions 1343836 txs 16171812 failures 0 anomalies 0
+[ 16331s] runs 7085 actions 1347362 txs 16216724 failures 0 anomalies 0
+[ 16391s] runs 7104 actions 1350863 txs 16266613 failures 0 anomalies 0
+[ 16451s] runs 7130 actions 1356207 txs 16331010 failures 0 anomalies 0
+[ 16511s] runs 7166 actions 1362409 txs 16399661 failures 0 anomalies 0
+[ 16571s] runs 7180 actions 1365181 txs 16439576 failures 0 anomalies 0
+[ 16631s] runs 7207 actions 1370364 txs 16502746 failures 0 anomalies 0
+[ 16691s] runs 7218 actions 1372645 txs 16536589 failures 0 anomalies 0
+[ 16752s] runs 7243 actions 1376993 txs 16592059 failures 0 anomalies 0
+[ 16812s] runs 7274 actions 1382758 txs 16662558 failures 0 anomalies 0
+[ 16872s] runs 7297 actions 1387659 txs 16722928 failures 0 anomalies 0
+[ 16932s] runs 7322 actions 1392514 txs 16785129 failures 0 anomalies 0
+[ 16992s] runs 7364 actions 1400340 txs 16871086 failures 0 anomalies 0
+[ 17052s] runs 7397 actions 1405890 txs 16934225 failures 0 anomalies 0
+[ 17112s] runs 7418 actions 1409759 txs 16987497 failures 0 anomalies 0
+[ 17172s] runs 7450 actions 1415385 txs 17054507 failures 0 anomalies 0
+[ 17232s] runs 7468 actions 1419537 txs 17106422 failures 0 anomalies 0
+[ 17292s] runs 7496 actions 1424712 txs 17165391 failures 0 anomalies 0
+[ 17352s] runs 7527 actions 1430697 txs 17235683 failures 0 anomalies 0
+[ 17412s] runs 7552 actions 1435945 txs 17300979 failures 0 anomalies 0
+[ 17472s] runs 7569 actions 1438789 txs 17330722 failures 0 anomalies 0
+[ 17532s] runs 7587 actions 1442613 txs 17380430 failures 0 anomalies 0
+[ 17592s] runs 7610 actions 1447386 txs 17445547 failures 0 anomalies 0
+[ 17652s] runs 7637 actions 1452771 txs 17507443 failures 0 anomalies 0
+[ 17712s] runs 7676 actions 1459981 txs 17587819 failures 0 anomalies 0
+[ 17772s] runs 7703 actions 1465657 txs 17652375 failures 0 anomalies 0
+[ 17832s] runs 7728 actions 1470532 txs 17709680 failures 0 anomalies 0
+[ 17892s] runs 7753 actions 1475746 txs 17772272 failures 0 anomalies 0
+[ 17952s] runs 7771 actions 1479240 txs 17818685 failures 0 anomalies 0
+[ 18012s] runs 7802 actions 1485086 txs 17889090 failures 0 anomalies 0
+[ 18072s] runs 7826 actions 1489416 txs 17940569 failures 0 anomalies 0
+[ 18132s] runs 7845 actions 1493477 txs 17997234 failures 0 anomalies 0
+[ 18192s] runs 7879 actions 1500069 txs 18070541 failures 0 anomalies 0
+[ 18252s] runs 7919 actions 1507673 txs 18152743 failures 0 anomalies 0
+[ 18313s] runs 7931 actions 1510258 txs 18185736 failures 0 anomalies 0
+[ 18373s] runs 7977 actions 1518294 txs 18281724 failures 0 anomalies 0
+[ 18433s] runs 8005 actions 1523098 txs 18339539 failures 0 anomalies 0
+[ 18493s] runs 8022 actions 1527403 txs 18396181 failures 0 anomalies 0
+[ 18553s] runs 8044 actions 1531632 txs 18445856 failures 0 anomalies 0
+[ 18613s] runs 8069 actions 1536525 txs 18508845 failures 0 anomalies 0
+[ 18673s] runs 8094 actions 1541525 txs 18577759 failures 0 anomalies 0
+[ 18733s] runs 8121 actions 1546594 txs 18636065 failures 0 anomalies 0
+[ 18793s] runs 8143 actions 1550615 txs 18688235 failures 0 anomalies 0
+[ 18853s] runs 8177 actions 1557497 txs 18761448 failures 0 anomalies 0
+[ 18913s] runs 8200 actions 1561210 txs 18814631 failures 0 anomalies 0
+[ 18973s] runs 8235 actions 1568095 txs 18891461 failures 0 anomalies 0
+[ 19033s] runs 8265 actions 1573435 txs 18950086 failures 0 anomalies 0
+[ 19093s] runs 8277 actions 1576125 txs 18990145 failures 0 anomalies 0
+[ 19153s] runs 8299 actions 1579849 txs 19033799 failures 0 anomalies 0
+[ 19213s] runs 8330 actions 1586052 txs 19106882 failures 0 anomalies 0
+[ 19273s] runs 8358 actions 1591972 txs 19173013 failures 0 anomalies 0
+[ 19333s] runs 8407 actions 1601634 txs 19273185 failures 0 anomalies 0
+[ 19393s] runs 8436 actions 1607224 txs 19335368 failures 0 anomalies 0
+[ 19453s] runs 8466 actions 1613348 txs 19407437 failures 0 anomalies 0
+[ 19513s] runs 8501 actions 1619548 txs 19476176 failures 0 anomalies 0
+[ 19573s] runs 8525 actions 1624259 txs 19526682 failures 0 anomalies 0
+[ 19633s] runs 8570 actions 1632298 txs 19619555 failures 0 anomalies 0
+[ 19693s] runs 8605 actions 1638486 txs 19690937 failures 0 anomalies 0
+[ 19753s] runs 8639 actions 1645587 txs 19773774 failures 0 anomalies 0
+[ 19814s] runs 8672 actions 1651493 txs 19839037 failures 0 anomalies 0
+[ 19874s] runs 8691 actions 1655285 txs 19891527 failures 0 anomalies 0
+[ 19934s] runs 8720 actions 1660722 txs 19957624 failures 0 anomalies 0
+[ 19994s] runs 8742 actions 1665410 txs 20012515 failures 0 anomalies 0
+[ 20054s] runs 8756 actions 1668023 txs 20055926 failures 0 anomalies 0
+[ 20114s] runs 8786 actions 1673378 txs 20123327 failures 0 anomalies 0
+[ 20174s] runs 8823 actions 1679562 txs 20192834 failures 0 anomalies 0
+[ 20234s] runs 8856 actions 1685411 txs 20258534 failures 0 anomalies 0
+[ 20294s] runs 8876 actions 1688726 txs 20302620 failures 0 anomalies 0
+[ 20354s] runs 8892 actions 1691671 txs 20344550 failures 0 anomalies 0
+[ 20414s] runs 8925 actions 1698086 txs 20425487 failures 0 anomalies 0
+[ 20474s] runs 8961 actions 1704912 txs 20494773 failures 0 anomalies 0
+[ 20534s] runs 8994 actions 1711072 txs 20565606 failures 0 anomalies 0
+[ 20594s] runs 9020 actions 1716461 txs 20628166 failures 0 anomalies 0
+[ 20654s] runs 9039 actions 1720053 txs 20676598 failures 0 anomalies 0
+[ 20714s] runs 9056 actions 1723374 txs 20720450 failures 0 anomalies 0
+[ 20774s] runs 9091 actions 1730246 txs 20797018 failures 0 anomalies 0
+[ 20834s] runs 9110 actions 1734188 txs 20845213 failures 0 anomalies 0
+[ 20894s] runs 9140 actions 1739648 txs 20914366 failures 0 anomalies 0
+[ 20954s] runs 9179 actions 1746600 txs 20994967 failures 0 anomalies 0
+[ 21014s] runs 9201 actions 1751166 txs 21050476 failures 0 anomalies 0
+[ 21074s] runs 9239 actions 1758703 txs 21132562 failures 0 anomalies 0
+[ 21134s] runs 9275 actions 1764918 txs 21204304 failures 0 anomalies 0
+[ 21194s] runs 9300 actions 1769714 txs 21262487 failures 0 anomalies 0
+[ 21254s] runs 9323 actions 1774337 txs 21318714 failures 0 anomalies 0
+[ 21315s] runs 9346 actions 1778820 txs 21373458 failures 0 anomalies 0
+[ 21375s] runs 9378 actions 1784370 txs 21444740 failures 0 anomalies 0
+[ 21435s] runs 9414 actions 1790804 txs 21516068 failures 0 anomalies 0
+[ 21495s] runs 9443 actions 1796018 txs 21582284 failures 0 anomalies 0
+[ 21555s] runs 9476 actions 1802858 txs 21658537 failures 0 anomalies 0
+[ 21615s] runs 9513 actions 1809744 txs 21736457 failures 0 anomalies 0
+[ 21675s] runs 9542 actions 1815331 txs 21799228 failures 0 anomalies 0
+[ 21735s] runs 9564 actions 1819935 txs 21863239 failures 0 anomalies 0
+[ 21795s] runs 9580 actions 1823226 txs 21899567 failures 0 anomalies 0
+[ 21855s] runs 9618 actions 1830095 txs 21982194 failures 0 anomalies 0
+[ 21915s] runs 9652 actions 1836327 txs 22057760 failures 0 anomalies 0
+[ 21975s] runs 9683 actions 1841558 txs 22109712 failures 0 anomalies 0
+[ 22035s] runs 9710 actions 1846314 txs 22167637 failures 0 anomalies 0
+[ 22095s] runs 9728 actions 1850140 txs 22220392 failures 0 anomalies 0
+[ 22155s] runs 9751 actions 1855373 txs 22283080 failures 0 anomalies 0
+[ 22215s] runs 9790 actions 1862510 txs 22358535 failures 0 anomalies 0
+[ 22275s] runs 9808 actions 1865678 txs 22399903 failures 0 anomalies 0
+[ 22335s] runs 9852 actions 1873323 txs 22485511 failures 0 anomalies 0
+[ 22395s] runs 9877 actions 1878206 txs 22540834 failures 0 anomalies 0
+[ 22455s] runs 9884 actions 1879668 txs 22563019 failures 0 anomalies 0
+[ 22515s] runs 9916 actions 1886010 txs 22641472 failures 0 anomalies 0
+[ 22575s] runs 9964 actions 1895289 txs 22737366 failures 0 anomalies 0
+[ 22635s] runs 9996 actions 1901075 txs 22798669 failures 0 anomalies 0
+[ 22695s] runs 10029 actions 1907397 txs 22871605 failures 0 anomalies 0
+[ 22755s] runs 10061 actions 1913109 txs 22943215 failures 0 anomalies 0
+[ 22815s] runs 10085 actions 1917768 txs 23000718 failures 0 anomalies 0
+[ 22876s] runs 10109 actions 1922594 txs 23062458 failures 0 anomalies 0
+[ 22936s] runs 10128 actions 1925624 txs 23110704 failures 0 anomalies 0
+[ 22996s] runs 10169 actions 1933289 txs 23194775 failures 0 anomalies 0
+[ 23056s] runs 10178 actions 1935057 txs 23214129 failures 0 anomalies 0
+[ 23116s] runs 10194 actions 1938250 txs 23258380 failures 0 anomalies 0
+[ 23176s] runs 10213 actions 1942200 txs 23309159 failures 0 anomalies 0
+[ 23236s] runs 10245 actions 1948114 txs 23383268 failures 0 anomalies 0
+[ 23296s] runs 10279 actions 1954836 txs 23454079 failures 0 anomalies 0
+[ 23356s] runs 10314 actions 1961466 txs 23527080 failures 0 anomalies 0
+[ 23416s] runs 10336 actions 1966255 txs 23584318 failures 0 anomalies 0
+[ 23476s] runs 10354 actions 1970108 txs 23628529 failures 0 anomalies 0
+[ 23536s] runs 10362 actions 1971913 txs 23659713 failures 0 anomalies 0
+[ 23596s] runs 10385 actions 1976929 txs 23716541 failures 0 anomalies 0
+[ 23656s] runs 10433 actions 1985373 txs 23809337 failures 0 anomalies 0
+[ 23716s] runs 10471 actions 1992320 txs 23886163 failures 0 anomalies 0
+[ 23776s] runs 10502 actions 1997658 txs 23950847 failures 0 anomalies 0
+[ 23836s] runs 10537 actions 2004052 txs 24021610 failures 0 anomalies 0
+[ 23896s] runs 10560 actions 2008309 txs 24072941 failures 0 anomalies 0
+[ 23956s] runs 10594 actions 2014711 txs 24146702 failures 0 anomalies 0
+[ 24016s] runs 10639 actions 2022874 txs 24236981 failures 0 anomalies 0
+[ 24076s] runs 10669 actions 2028402 txs 24299504 failures 0 anomalies 0
+[ 24136s] runs 10688 actions 2031669 txs 24345589 failures 0 anomalies 0
+[ 24196s] runs 10712 actions 2036969 txs 24410961 failures 0 anomalies 0
+[ 24256s] runs 10748 actions 2044478 txs 24496612 failures 0 anomalies 0
+[ 24316s] runs 10765 actions 2047699 txs 24537469 failures 0 anomalies 0
+[ 24377s] runs 10790 actions 2052738 txs 24598401 failures 0 anomalies 0
+[ 24437s] runs 10803 actions 2055591 txs 24636695 failures 0 anomalies 0
+[ 24497s] runs 10805 actions 2056078 txs 24646947 failures 0 anomalies 0
+[ 24557s] runs 10830 actions 2060906 txs 24708922 failures 0 anomalies 0
+[ 24617s] runs 10855 actions 2066213 txs 24774068 failures 0 anomalies 0
+[ 24677s] runs 10893 actions 2072635 txs 24848632 failures 0 anomalies 0
+[ 24737s] runs 10926 actions 2078727 txs 24922775 failures 0 anomalies 0
+[ 24797s] runs 10954 actions 2084386 txs 24987101 failures 0 anomalies 0
+[ 24857s] runs 10981 actions 2090342 txs 25057365 failures 0 anomalies 0
+[ 24917s] runs 11001 actions 2094542 txs 25113847 failures 0 anomalies 0
+[ 24977s] runs 11019 actions 2097729 txs 25158955 failures 0 anomalies 0
+[ 25037s] runs 11043 actions 2101981 txs 25215075 failures 0 anomalies 0
+[ 25097s] runs 11057 actions 2104605 txs 25247852 failures 0 anomalies 0
+[ 25157s] runs 11074 actions 2108448 txs 25302342 failures 0 anomalies 0
+[ 25217s] runs 11109 actions 2114597 txs 25374056 failures 0 anomalies 0
+[ 25277s] runs 11141 actions 2120876 txs 25443022 failures 0 anomalies 0
+[ 25337s] runs 11171 actions 2126472 txs 25505677 failures 0 anomalies 0
+[ 25397s] runs 11205 actions 2133134 txs 25587254 failures 0 anomalies 0
+[ 25457s] runs 11225 actions 2137130 txs 25638120 failures 0 anomalies 0
+[ 25517s] runs 11250 actions 2142494 txs 25699099 failures 0 anomalies 0
+[ 25577s] runs 11278 actions 2147713 txs 25760333 failures 0 anomalies 0
+[ 25637s] runs 11302 actions 2152199 txs 25819266 failures 0 anomalies 0
+[ 25697s] runs 11329 actions 2157196 txs 25879605 failures 0 anomalies 0
+[ 25757s] runs 11351 actions 2160950 txs 25926195 failures 0 anomalies 0
+[ 25817s] runs 11376 actions 2165712 txs 25981538 failures 0 anomalies 0
+[ 25877s] runs 11407 actions 2171929 txs 26052663 failures 0 anomalies 0
+[ 25938s] runs 11433 actions 2176934 txs 26116833 failures 0 anomalies 0
+[ 25998s] runs 11445 actions 2179445 txs 26146917 failures 0 anomalies 0
+[ 26058s] runs 11461 actions 2182818 txs 26193573 failures 0 anomalies 0
+[ 26118s] runs 11498 actions 2190140 txs 26273658 failures 0 anomalies 0
+[ 26178s] runs 11522 actions 2194558 txs 26323977 failures 0 anomalies 0
+[ 26238s] runs 11552 actions 2200305 txs 26393556 failures 0 anomalies 0
+[ 26298s] runs 11587 actions 2206919 txs 26471347 failures 0 anomalies 0
+[ 26358s] runs 11619 actions 2213041 txs 26541464 failures 0 anomalies 0
+[ 26418s] runs 11659 actions 2221021 txs 26626907 failures 0 anomalies 0
+[ 26478s] runs 11687 actions 2226259 txs 26690109 failures 0 anomalies 0
+[ 26538s] runs 11713 actions 2230854 txs 26747150 failures 0 anomalies 0
+[ 26598s] runs 11743 actions 2236923 txs 26820111 failures 0 anomalies 0
+[ 26658s] runs 11769 actions 2241923 txs 26872555 failures 0 anomalies 0
+[ 26718s] runs 11803 actions 2248358 txs 26948057 failures 0 anomalies 0
+[ 26778s] runs 11818 actions 2251592 txs 26986807 failures 0 anomalies 0
+[ 26838s] runs 11830 actions 2253763 txs 27012877 failures 0 anomalies 0
+[ 26898s] runs 11858 actions 2259330 txs 27086586 failures 0 anomalies 0
+[ 26958s] runs 11896 actions 2266647 txs 27160338 failures 0 anomalies 0
+[ 27018s] runs 11939 actions 2274022 txs 27239765 failures 0 anomalies 0
+[ 27078s] runs 11964 actions 2279019 txs 27301714 failures 0 anomalies 0
+[ 27138s] runs 11997 actions 2285479 txs 27381683 failures 0 anomalies 0
+[ 27198s] runs 12031 actions 2292147 txs 27452794 failures 0 anomalies 0
+[ 27258s] runs 12053 actions 2296822 txs 27511121 failures 0 anomalies 0
+[ 27318s] runs 12082 actions 2302343 txs 27578120 failures 0 anomalies 0
+[ 27378s] runs 12111 actions 2307791 txs 27636447 failures 0 anomalies 0
+[ 27439s] runs 12145 actions 2314232 txs 27713407 failures 0 anomalies 0
+[ 27499s] runs 12171 actions 2319053 txs 27771978 failures 0 anomalies 0
+[ 27559s] runs 12204 actions 2324949 txs 27841516 failures 0 anomalies 0
+[ 27619s] runs 12231 actions 2329676 txs 27903856 failures 0 anomalies 0
+[ 27679s] runs 12264 actions 2335866 txs 27969567 failures 0 anomalies 0
+[ 27739s] runs 12284 actions 2339577 txs 28016415 failures 0 anomalies 0
+[ 27799s] runs 12313 actions 2345097 txs 28083038 failures 0 anomalies 0
+[ 27859s] runs 12332 actions 2348631 txs 28129480 failures 0 anomalies 0
+[ 27919s] runs 12371 actions 2356022 txs 28205920 failures 0 anomalies 0
+[ 27979s] runs 12396 actions 2360760 txs 28259381 failures 0 anomalies 0
+[ 28039s] runs 12417 actions 2364890 txs 28312942 failures 0 anomalies 0
+[ 28099s] runs 12438 actions 2368433 txs 28363884 failures 0 anomalies 0
+[ 28159s] runs 12468 actions 2373522 txs 28426667 failures 0 anomalies 0
+[ 28219s] runs 12493 actions 2378775 txs 28491638 failures 0 anomalies 0
+[ 28279s] runs 12520 actions 2383929 txs 28557385 failures 0 anomalies 0
+[ 28339s] runs 12549 actions 2389431 txs 28619577 failures 0 anomalies 0
+[ 28399s] runs 12588 actions 2396963 txs 28703322 failures 0 anomalies 0
+[ 28459s] runs 12617 actions 2402755 txs 28768189 failures 0 anomalies 0
+[ 28519s] runs 12644 actions 2407645 txs 28828123 failures 0 anomalies 0
+[ 28579s] runs 12680 actions 2414139 txs 28903517 failures 0 anomalies 0
+[ 28639s] runs 12719 actions 2421477 txs 28981223 failures 0 anomalies 0
+[ 28699s] runs 12752 actions 2427494 txs 29047946 failures 0 anomalies 0
+[ 28759s] runs 12783 actions 2433265 txs 29114899 failures 0 anomalies 0
+[ 28819s] runs 12804 actions 2437378 txs 29167500 failures 0 anomalies 0
+[ 28879s] runs 12845 actions 2445143 txs 29257228 failures 0 anomalies 0
+[ 28939s] runs 12871 actions 2449710 txs 29307780 failures 0 anomalies 0
+[ 29000s] runs 12901 actions 2455710 txs 29382280 failures 0 anomalies 0
+[ 29060s] runs 12928 actions 2460586 txs 29444786 failures 0 anomalies 0
+[ 29120s] runs 12959 actions 2466804 txs 29517237 failures 0 anomalies 0
+[ 29180s] runs 13004 actions 2474980 txs 29607139 failures 0 anomalies 0
+[ 29240s] runs 13024 actions 2479028 txs 29651875 failures 0 anomalies 0
+[ 29300s] runs 13043 actions 2483154 txs 29704745 failures 0 anomalies 0
+[ 29360s] runs 13066 actions 2487700 txs 29761160 failures 0 anomalies 0
+[ 29420s] runs 13084 actions 2492015 txs 29809707 failures 0 anomalies 0
+[ 29480s] runs 13098 actions 2494377 txs 29835414 failures 0 anomalies 0
+[ 29540s] runs 13125 actions 2498972 txs 29896410 failures 0 anomalies 0
+[ 29600s] runs 13159 actions 2505516 txs 29966601 failures 0 anomalies 0
+[ 29660s] runs 13183 actions 2509859 txs 30024410 failures 0 anomalies 0
+[ 29720s] runs 13209 actions 2514486 txs 30081956 failures 0 anomalies 0
+[ 29780s] runs 13240 actions 2520216 txs 30154123 failures 0 anomalies 0
+[ 29840s] runs 13263 actions 2525133 txs 30210178 failures 0 anomalies 0
+[ 29900s] runs 13282 actions 2529004 txs 30262306 failures 0 anomalies 0
+[ 29960s] runs 13304 actions 2533463 txs 30316302 failures 0 anomalies 0
+[ 30020s] runs 13328 actions 2538043 txs 30368363 failures 0 anomalies 0
+[ 30080s] runs 13336 actions 2540020 txs 30399541 failures 0 anomalies 0
+[ 30140s] runs 13344 actions 2541969 txs 30426673 failures 0 anomalies 0
+[ 30200s] runs 13369 actions 2546966 txs 30490119 failures 0 anomalies 0
+[ 30260s] runs 13397 actions 2552301 txs 30558455 failures 0 anomalies 0
+[ 30320s] runs 13428 actions 2557962 txs 30623820 failures 0 anomalies 0
+[ 30380s] runs 13455 actions 2563434 txs 30686599 failures 0 anomalies 0
+[ 30440s] runs 13479 actions 2568147 txs 30740138 failures 0 anomalies 0
+[ 30501s] runs 13497 actions 2572152 txs 30791069 failures 0 anomalies 0
+[ 30561s] runs 13536 actions 2579987 txs 30869693 failures 0 anomalies 0
+[ 30621s] runs 13561 actions 2584362 txs 30922432 failures 0 anomalies 0
+[ 30681s] runs 13599 actions 2591838 txs 31003380 failures 0 anomalies 0
+[ 30741s] runs 13627 actions 2597390 txs 31068456 failures 0 anomalies 0
+[ 30801s] runs 13661 actions 2603127 txs 31130665 failures 0 anomalies 0
+[ 30861s] runs 13682 actions 2607950 txs 31194521 failures 0 anomalies 0
+[ 30921s] runs 13728 actions 2616539 txs 31286214 failures 0 anomalies 0
+[ 30981s] runs 13755 actions 2621569 txs 31340787 failures 0 anomalies 0
+[ 31041s] runs 13782 actions 2625848 txs 31382945 failures 0 anomalies 0
+[ 31101s] runs 13818 actions 2632479 txs 31458494 failures 0 anomalies 0
+[ 31161s] runs 13858 actions 2639355 txs 31537435 failures 0 anomalies 0
+[ 31221s] runs 13891 actions 2644931 txs 31602778 failures 0 anomalies 0
+[ 31281s] runs 13914 actions 2649816 txs 31663489 failures 0 anomalies 0
+[ 31341s] runs 13944 actions 2655807 txs 31734448 failures 0 anomalies 0
+[ 31401s] runs 13980 actions 2662578 txs 31808083 failures 0 anomalies 0
+[ 31461s] runs 14009 actions 2667841 txs 31866592 failures 0 anomalies 0
+[ 31521s] runs 14029 actions 2671672 txs 31911577 failures 0 anomalies 0
+[ 31581s] runs 14047 actions 2675040 txs 31954125 failures 0 anomalies 0
+[ 31641s] runs 14085 actions 2682608 txs 32034201 failures 0 anomalies 0
+[ 31701s] runs 14103 actions 2686451 txs 32080878 failures 0 anomalies 0
+[ 31761s] runs 14126 actions 2690655 txs 32132935 failures 0 anomalies 0
+[ 31821s] runs 14166 actions 2699091 txs 32221954 failures 0 anomalies 0
+[ 31881s] runs 14195 actions 2704474 txs 32279815 failures 0 anomalies 0
+[ 31941s] runs 14215 actions 2708309 txs 32334019 failures 0 anomalies 0
+[ 32002s] runs 14235 actions 2712407 txs 32382519 failures 0 anomalies 0
+[ 32062s] runs 14279 actions 2720610 txs 32474858 failures 0 anomalies 0
+[ 32122s] runs 14314 actions 2726685 txs 32548927 failures 0 anomalies 0
+[ 32182s] runs 14343 actions 2732451 txs 32620932 failures 0 anomalies 0
+[ 32242s] runs 14376 actions 2738348 txs 32692993 failures 0 anomalies 0
+[ 32302s] runs 14399 actions 2742544 txs 32749802 failures 0 anomalies 0
+[ 32362s] runs 14408 actions 2744399 txs 32773623 failures 0 anomalies 0
+[ 32422s] runs 14417 actions 2746086 txs 32809156 failures 0 anomalies 0
+[ 32482s] runs 14447 actions 2751137 txs 32866869 failures 0 anomalies 0
+[ 32542s] runs 14482 actions 2757482 txs 32944027 failures 0 anomalies 0
+[ 32602s] runs 14509 actions 2762647 txs 33007864 failures 0 anomalies 0
+[ 32662s] runs 14542 actions 2768621 txs 33075105 failures 0 anomalies 0
+[ 32722s] runs 14576 actions 2775305 txs 33159932 failures 0 anomalies 0
+[ 32782s] runs 14595 actions 2779021 txs 33202545 failures 0 anomalies 0
+[ 32842s] runs 14631 actions 2786174 txs 33279271 failures 0 anomalies 0
+[ 32902s] runs 14659 actions 2791585 txs 33343839 failures 0 anomalies 0
+[ 32962s] runs 14682 actions 2796236 txs 33398495 failures 0 anomalies 0
+[ 33022s] runs 14713 actions 2802420 txs 33470551 failures 0 anomalies 0
+[ 33082s] runs 14734 actions 2806559 txs 33525531 failures 0 anomalies 0
+[ 33142s] runs 14760 actions 2811747 txs 33591284 failures 0 anomalies 0
+[ 33202s] runs 14795 actions 2818253 txs 33659920 failures 0 anomalies 0
+[ 33262s] runs 14827 actions 2824534 txs 33734419 failures 0 anomalies 0
+[ 33322s] runs 14839 actions 2826841 txs 33765238 failures 0 anomalies 0
+[ 33382s] runs 14864 actions 2831956 txs 33831405 failures 0 anomalies 0
+[ 33442s] runs 14901 actions 2838140 txs 33905848 failures 0 anomalies 0
+[ 33503s] runs 14917 actions 2841486 txs 33947979 failures 0 anomalies 0
+[ 33563s] runs 14947 actions 2847602 txs 34019284 failures 0 anomalies 0
+[ 33623s] runs 14969 actions 2851628 txs 34071285 failures 0 anomalies 0
+[ 33683s] runs 14991 actions 2855610 txs 34123279 failures 0 anomalies 0
+[ 33743s] runs 15008 actions 2859008 txs 34167472 failures 0 anomalies 0
+[ 33803s] runs 15020 actions 2861182 txs 34196115 failures 0 anomalies 0
+[ 33863s] runs 15032 actions 2863208 txs 34221845 failures 0 anomalies 0
+[ 33923s] runs 15074 actions 2870727 txs 34309950 failures 0 anomalies 0
+[ 33983s] runs 15093 actions 2874754 txs 34353049 failures 0 anomalies 0
+[ 34043s] runs 15103 actions 2876863 txs 34389154 failures 0 anomalies 0
+[ 34103s] runs 15143 actions 2883845 txs 34468298 failures 0 anomalies 0
+[ 34163s] runs 15161 actions 2887464 txs 34511548 failures 0 anomalies 0
+[ 34223s] runs 15189 actions 2892331 txs 34574773 failures 0 anomalies 0
+[ 34283s] runs 15222 actions 2898397 txs 34649424 failures 0 anomalies 0
+[ 34343s] runs 15246 actions 2903123 txs 34708372 failures 0 anomalies 0
+[ 34403s] runs 15274 actions 2908613 txs 34774038 failures 0 anomalies 0
+[ 34463s] runs 15300 actions 2913656 txs 34832195 failures 0 anomalies 0
+[ 34523s] runs 15335 actions 2919736 txs 34904194 failures 0 anomalies 0
+[ 34583s] runs 15364 actions 2925373 txs 34964387 failures 0 anomalies 0
+[ 34643s] runs 15400 actions 2932363 txs 35045358 failures 0 anomalies 0
+[ 34703s] runs 15440 actions 2939678 txs 35129842 failures 0 anomalies 0
+[ 34763s] runs 15466 actions 2944964 txs 35183604 failures 0 anomalies 0
+[ 34823s] runs 15484 actions 2948082 txs 35235678 failures 0 anomalies 0
+[ 34883s] runs 15507 actions 2952065 txs 35287132 failures 0 anomalies 0
+[ 34943s] runs 15531 actions 2956310 txs 35339693 failures 0 anomalies 0
+[ 35004s] runs 15552 actions 2960111 txs 35389220 failures 0 anomalies 0
+[ 35064s] runs 15570 actions 2963605 txs 35439054 failures 0 anomalies 0
+[ 35124s] runs 15597 actions 2968733 txs 35499811 failures 0 anomalies 0
+[ 35184s] runs 15635 actions 2975614 txs 35585477 failures 0 anomalies 0
+[ 35244s] runs 15668 actions 2981515 txs 35650303 failures 0 anomalies 0
+[ 35304s] runs 15695 actions 2986775 txs 35714730 failures 0 anomalies 0
+[ 35364s] runs 15723 actions 2991310 txs 35774006 failures 0 anomalies 0
+[ 35424s] runs 15744 actions 2995853 txs 35833402 failures 0 anomalies 0
+[ 35484s] runs 15767 actions 3000986 txs 35889551 failures 0 anomalies 0
+[ 35544s] runs 15797 actions 3007079 txs 35955070 failures 0 anomalies 0
+[ 35604s] runs 15835 actions 3014638 txs 36033515 failures 0 anomalies 0
+[ 35664s] runs 15875 actions 3021764 txs 36111816 failures 0 anomalies 0
+[ 35724s] runs 15903 actions 3027086 txs 36173061 failures 0 anomalies 0
+[ 35784s] runs 15925 actions 3031319 txs 36227557 failures 0 anomalies 0
+[ 35844s] runs 15943 actions 3035145 txs 36266104 failures 0 anomalies 0
+[ 35904s] runs 15977 actions 3041552 txs 36346935 failures 0 anomalies 0
+[ 35964s] runs 16007 actions 3047132 txs 36407864 failures 0 anomalies 0
+[ 36024s] runs 16037 actions 3053388 txs 36476477 failures 0 anomalies 0
+[ 36084s] runs 16074 actions 3060719 txs 36553811 failures 0 anomalies 0
+[ 36144s] runs 16099 actions 3066154 txs 36619109 failures 0 anomalies 0
+[ 36204s] runs 16135 actions 3072844 txs 36695794 failures 0 anomalies 0
+[ 36264s] runs 16173 actions 3080038 txs 36772660 failures 0 anomalies 0
+[ 36324s] runs 16195 actions 3083799 txs 36820110 failures 0 anomalies 0
+[ 36384s] runs 16231 actions 3091116 txs 36903949 failures 0 anomalies 0
+[ 36444s] runs 16264 actions 3097285 txs 36975396 failures 0 anomalies 0
+[ 36504s] runs 16282 actions 3100624 txs 37021213 failures 0 anomalies 0
+[ 36564s] runs 16292 actions 3102988 txs 37051347 failures 0 anomalies 0
+[ 36625s] runs 16306 actions 3106210 txs 37090365 failures 0 anomalies 0
+[ 36685s] runs 16331 actions 3111087 txs 37148899 failures 0 anomalies 0
+[ 36745s] runs 16364 actions 3116785 txs 37211898 failures 0 anomalies 0
+[ 36805s] runs 16390 actions 3122082 txs 37271947 failures 0 anomalies 0
+[ 36865s] runs 16419 actions 3127690 txs 37329042 failures 0 anomalies 0
+[ 36925s] runs 16436 actions 3130949 txs 37363412 failures 0 anomalies 0
+[ 36985s] runs 16458 actions 3134863 txs 37417570 failures 0 anomalies 0
+[ 37045s] runs 16491 actions 3141477 txs 37493001 failures 0 anomalies 0
+[ 37105s] runs 16532 actions 3148610 txs 37576151 failures 0 anomalies 0
+[ 37165s] runs 16561 actions 3154050 txs 37639926 failures 0 anomalies 0
+[ 37225s] runs 16590 actions 3159512 txs 37706870 failures 0 anomalies 0
+[ 37285s] runs 16620 actions 3165438 txs 37772481 failures 0 anomalies 0
+[ 37345s] runs 16657 actions 3171912 txs 37852750 failures 0 anomalies 0
+[ 37405s] runs 16692 actions 3178879 txs 37919838 failures 0 anomalies 0
+[ 37465s] runs 16702 actions 3180728 txs 37947041 failures 0 anomalies 0
+[ 37525s] runs 16721 actions 3184246 txs 37986255 failures 0 anomalies 0
+[ 37585s] runs 16763 actions 3192065 txs 38080387 failures 0 anomalies 0
+[ 37645s] runs 16788 actions 3196767 txs 38140545 failures 0 anomalies 0
+[ 37705s] runs 16818 actions 3202339 txs 38205626 failures 0 anomalies 0
+[ 37765s] runs 16835 actions 3205934 txs 38255745 failures 0 anomalies 0
+[ 37825s] runs 16861 actions 3210934 txs 38316146 failures 0 anomalies 0
+[ 37885s] runs 16874 actions 3213845 txs 38358249 failures 0 anomalies 0
+[ 37945s] runs 16900 actions 3218685 txs 38412957 failures 0 anomalies 0
+[ 38005s] runs 16924 actions 3222925 txs 38465307 failures 0 anomalies 0
+[ 38065s] runs 16955 actions 3228705 txs 38533720 failures 0 anomalies 0
+[ 38126s] runs 16987 actions 3234572 txs 38598166 failures 0 anomalies 0
+[ 38186s] runs 17018 actions 3240864 txs 38672982 failures 0 anomalies 0
+[ 38246s] runs 17029 actions 3242942 txs 38703639 failures 0 anomalies 0
+[ 38306s] runs 17043 actions 3245440 txs 38736792 failures 0 anomalies 0
+[ 38366s] runs 17065 actions 3249822 txs 38792178 failures 0 anomalies 0
+[ 38426s] runs 17085 actions 3254003 txs 38852607 failures 0 anomalies 0
+[ 38486s] runs 17111 actions 3259187 txs 38916536 failures 0 anomalies 0
+[ 38546s] runs 17137 actions 3264746 txs 38983334 failures 0 anomalies 0
+[ 38606s] runs 17162 actions 3270347 txs 39051514 failures 0 anomalies 0
+[ 38666s] runs 17186 actions 3274611 txs 39108840 failures 0 anomalies 0
+[ 38726s] runs 17217 actions 3280377 txs 39175899 failures 0 anomalies 0
+[ 38786s] runs 17229 actions 3282691 txs 39210180 failures 0 anomalies 0
+[ 38846s] runs 17258 actions 3288330 txs 39280497 failures 0 anomalies 0
+[ 38906s] runs 17281 actions 3293057 txs 39333769 failures 0 anomalies 0
+[ 38966s] runs 17313 actions 3298974 txs 39403659 failures 0 anomalies 0
+[ 39026s] runs 17336 actions 3303367 txs 39458034 failures 0 anomalies 0
+[ 39086s] runs 17368 actions 3309443 txs 39526302 failures 0 anomalies 0
+[ 39146s] runs 17386 actions 3313982 txs 39582692 failures 0 anomalies 0
+[ 39206s] runs 17402 actions 3317196 txs 39621957 failures 0 anomalies 0
+[ 39266s] runs 17431 actions 3322538 txs 39690394 failures 0 anomalies 0
+[ 39326s] runs 17469 actions 3329504 txs 39768618 failures 0 anomalies 0
+[ 39386s] runs 17496 actions 3334838 txs 39840086 failures 0 anomalies 0
+[ 39446s] runs 17529 actions 3341442 txs 39912506 failures 0 anomalies 0
+[ 39506s] runs 17561 actions 3347530 txs 39978003 failures 0 anomalies 0
+[ 39566s] runs 17608 actions 3356963 txs 40077918 failures 0 anomalies 0
+[ 39627s] runs 17631 actions 3361639 txs 40139637 failures 0 anomalies 0
+[ 39687s] runs 17673 actions 3369013 txs 40219737 failures 0 anomalies 0
+[ 39747s] runs 17694 actions 3372682 txs 40266350 failures 0 anomalies 0
+[ 39807s] runs 17717 actions 3377018 txs 40324747 failures 0 anomalies 0
+[ 39867s] runs 17746 actions 3382455 txs 40386435 failures 0 anomalies 0
+[ 39927s] runs 17760 actions 3385437 txs 40428345 failures 0 anomalies 0
+[ 39987s] runs 17811 actions 3394476 txs 40527003 failures 0 anomalies 0
+[ 40047s] runs 17833 actions 3398887 txs 40582397 failures 0 anomalies 0
+[ 40107s] runs 17864 actions 3405322 txs 40656701 failures 0 anomalies 0
+[ 40167s] runs 17886 actions 3409299 txs 40708975 failures 0 anomalies 0
+[ 40227s] runs 17911 actions 3413886 txs 40768104 failures 0 anomalies 0
+[ 40287s] runs 17932 actions 3418383 txs 40830343 failures 0 anomalies 0
+[ 40347s] runs 17969 actions 3424954 txs 40906536 failures 0 anomalies 0
+[ 40407s] runs 18008 actions 3432494 txs 40989536 failures 0 anomalies 0
+[ 40467s] runs 18032 actions 3437221 txs 41044126 failures 0 anomalies 0
+[ 40527s] runs 18066 actions 3444155 txs 41115418 failures 0 anomalies 0
+[ 40587s] runs 18089 actions 3448452 txs 41172004 failures 0 anomalies 0
+[ 40647s] runs 18123 actions 3455827 txs 41251753 failures 0 anomalies 0
+[ 40707s] runs 18158 actions 3462430 txs 41326584 failures 0 anomalies 0
+[ 40767s] runs 18187 actions 3468214 txs 41390024 failures 0 anomalies 0
+[ 40827s] runs 18217 actions 3474157 txs 41456017 failures 0 anomalies 0
+[ 40887s] runs 18231 actions 3477551 txs 41503739 failures 0 anomalies 0
+[ 40947s] runs 18258 actions 3482562 txs 41561281 failures 0 anomalies 0
+[ 41007s] runs 18285 actions 3487532 txs 41627455 failures 0 anomalies 0
+[ 41067s] runs 18319 actions 3494001 txs 41698300 failures 0 anomalies 0
+[ 41127s] runs 18346 actions 3498939 txs 41762308 failures 0 anomalies 0
+[ 41188s] runs 18377 actions 3504639 txs 41829462 failures 0 anomalies 0
+[ 41248s] runs 18412 actions 3510880 txs 41904762 failures 0 anomalies 0
+[ 41308s] runs 18441 actions 3516068 txs 41968202 failures 0 anomalies 0
+[ 41368s] runs 18463 actions 3520678 txs 42020723 failures 0 anomalies 0
+[ 41428s] runs 18474 actions 3523228 txs 42060563 failures 0 anomalies 0
+[ 41488s] runs 18510 actions 3530565 txs 42143864 failures 0 anomalies 0
+[ 41548s] runs 18543 actions 3536433 txs 42212531 failures 0 anomalies 0
+[ 41608s] runs 18563 actions 3540174 txs 42256739 failures 0 anomalies 0
+[ 41668s] runs 18575 actions 3542668 txs 42297429 failures 0 anomalies 0
+[ 41728s] runs 18593 actions 3546913 txs 42353304 failures 0 anomalies 0
+[ 41788s] runs 18619 actions 3551415 txs 42404858 failures 0 anomalies 0
+[ 41848s] runs 18650 actions 3557139 txs 42473325 failures 0 anomalies 0
+[ 41908s] runs 18684 actions 3563119 txs 42547500 failures 0 anomalies 0
+[ 41968s] runs 18707 actions 3567339 txs 42603143 failures 0 anomalies 0
+[ 42028s] runs 18724 actions 3570549 txs 42654521 failures 0 anomalies 0
+[ 42088s] runs 18766 actions 3578594 txs 42740640 failures 0 anomalies 0
+[ 42148s] runs 18788 actions 3582373 txs 42793744 failures 0 anomalies 0
+[ 42208s] runs 18827 actions 3589400 txs 42873519 failures 0 anomalies 0
+[ 42268s] runs 18852 actions 3593808 txs 42930854 failures 0 anomalies 0
+[ 42328s] runs 18869 actions 3596942 txs 42978055 failures 0 anomalies 0
+[ 42388s] runs 18906 actions 3603884 txs 43055674 failures 0 anomalies 0
+[ 42448s] runs 18939 actions 3609653 txs 43124747 failures 0 anomalies 0
+[ 42508s] runs 18967 actions 3615562 txs 43194933 failures 0 anomalies 0
+[ 42568s] runs 18993 actions 3620156 txs 43250651 failures 0 anomalies 0
+[ 42628s] runs 19038 actions 3627545 txs 43330848 failures 0 anomalies 0
+[ 42689s] runs 19067 actions 3632805 txs 43394885 failures 0 anomalies 0
+[ 42749s] runs 19099 actions 3638434 txs 43462232 failures 0 anomalies 0
+[ 42809s] runs 19133 actions 3644608 txs 43529503 failures 0 anomalies 0
+[ 42869s] runs 19162 actions 3650320 txs 43594179 failures 0 anomalies 0
+[ 42929s] runs 19182 actions 3653810 txs 43641395 failures 0 anomalies 0
+[ 42989s] runs 19213 actions 3659856 txs 43710795 failures 0 anomalies 0
+[ 43049s] runs 19245 actions 3666098 txs 43773301 failures 0 anomalies 0
+[ 43109s] runs 19273 actions 3671286 txs 43842036 failures 0 anomalies 0
+[ 43169s] runs 19292 actions 3674828 txs 43880384 failures 0 anomalies 0
+[ 43229s] runs 19299 actions 3676371 txs 43910283 failures 0 anomalies 0
+[ 43289s] runs 19328 actions 3681128 txs 43969556 failures 0 anomalies 0
+[ 43349s] runs 19354 actions 3685494 txs 44031740 failures 0 anomalies 0
+[ 43409s] runs 19378 actions 3690075 txs 44087166 failures 0 anomalies 0
+[ 43469s] runs 19408 actions 3695259 txs 44155388 failures 0 anomalies 0
+[ 43529s] runs 19443 actions 3701497 txs 44227941 failures 0 anomalies 0
+[ 43589s] runs 19465 actions 3705769 txs 44284624 failures 0 anomalies 0
+[ 43649s] runs 19487 actions 3709671 txs 44329483 failures 0 anomalies 0
+[ 43709s] runs 19512 actions 3714507 txs 44391299 failures 0 anomalies 0
+[ 43769s] runs 19543 actions 3720737 txs 44466891 failures 0 anomalies 0
+[ 43829s] runs 19565 actions 3724485 txs 44519870 failures 0 anomalies 0
+[ 43889s] runs 19589 actions 3729259 txs 44576727 failures 0 anomalies 0
+[ 43949s] runs 19624 actions 3736187 txs 44657128 failures 0 anomalies 0
+[ 44009s] runs 19645 actions 3740614 txs 44715728 failures 0 anomalies 0
+[ 44069s] runs 19676 actions 3746350 txs 44784423 failures 0 anomalies 0
+[ 44129s] runs 19695 actions 3750332 txs 44828881 failures 0 anomalies 0
+[ 44190s] runs 19715 actions 3754411 txs 44882589 failures 0 anomalies 0
+[ 44250s] runs 19737 actions 3758784 txs 44933713 failures 0 anomalies 0
+[ 44310s] runs 19758 actions 3762548 txs 44991218 failures 0 anomalies 0
+[ 44370s] runs 19785 actions 3767625 txs 45055644 failures 0 anomalies 0
+[ 44430s] runs 19802 actions 3770530 txs 45097387 failures 0 anomalies 0
+[ 44490s] runs 19824 actions 3775032 txs 45153703 failures 0 anomalies 0
+[ 44550s] runs 19849 actions 3780061 txs 45210806 failures 0 anomalies 0
+[ 44610s] runs 19871 actions 3783963 txs 45269604 failures 0 anomalies 0
+[ 44670s] runs 19908 actions 3791041 txs 45346237 failures 0 anomalies 0
+[ 44730s] runs 19926 actions 3794772 txs 45393647 failures 0 anomalies 0
+[ 44790s] runs 19961 actions 3801547 txs 45468219 failures 0 anomalies 0
+[ 44850s] runs 19991 actions 3806794 txs 45534631 failures 0 anomalies 0
+[ 44910s] runs 19998 actions 3808478 txs 45557323 failures 0 anomalies 0
+[ 44970s] runs 20022 actions 3813021 txs 45613679 failures 0 anomalies 0
+[ 45030s] runs 20039 actions 3815872 txs 45649449 failures 0 anomalies 0
+[ 45090s] runs 20064 actions 3820820 txs 45702910 failures 0 anomalies 0
+[ 45150s] runs 20089 actions 3825899 txs 45763232 failures 0 anomalies 0
+[ 45210s] runs 20110 actions 3830027 txs 45819680 failures 0 anomalies 0
+[ 45270s] runs 20134 actions 3834425 txs 45874425 failures 0 anomalies 0
+[ 45330s] runs 20162 actions 3839561 txs 45940198 failures 0 anomalies 0
+[ 45390s] runs 20193 actions 3844949 txs 46006253 failures 0 anomalies 0
+[ 45450s] runs 20205 actions 3847322 txs 46045016 failures 0 anomalies 0
+[ 45510s] runs 20227 actions 3850941 txs 46091807 failures 0 anomalies 0
+[ 45570s] runs 20252 actions 3855701 txs 46153619 failures 0 anomalies 0
+[ 45630s] runs 20278 actions 3861147 txs 46217706 failures 0 anomalies 0
+[ 45691s] runs 20305 actions 3866227 txs 46275488 failures 0 anomalies 0
+[ 45751s] runs 20338 actions 3872985 txs 46351922 failures 0 anomalies 0
+[ 45811s] runs 20360 actions 3877331 txs 46404169 failures 0 anomalies 0
+[ 45871s] runs 20383 actions 3881319 txs 46453056 failures 0 anomalies 0
+[ 45931s] runs 20411 actions 3887112 txs 46519023 failures 0 anomalies 0
+[ 45991s] runs 20440 actions 3892613 txs 46577381 failures 0 anomalies 0
+[ 46051s] runs 20481 actions 3899452 txs 46665424 failures 0 anomalies 0
+[ 46111s] runs 20512 actions 3905074 txs 46728451 failures 0 anomalies 0
+[ 46171s] runs 20550 actions 3911904 txs 46803196 failures 0 anomalies 0
+[ 46231s] runs 20581 actions 3917491 txs 46864354 failures 0 anomalies 0
+[ 46291s] runs 20603 actions 3921426 txs 46922105 failures 0 anomalies 0
+[ 46351s] runs 20634 actions 3926899 txs 46989207 failures 0 anomalies 0
+[ 46411s] runs 20651 actions 3930096 txs 47023773 failures 0 anomalies 0
+[ 46471s] runs 20679 actions 3935221 txs 47088967 failures 0 anomalies 0
+[ 46531s] runs 20715 actions 3941505 txs 47160307 failures 0 anomalies 0
+[ 46591s] runs 20735 actions 3945607 txs 47214567 failures 0 anomalies 0
+[ 46651s] runs 20759 actions 3949992 txs 47269721 failures 0 anomalies 0
+[ 46711s] runs 20789 actions 3955964 txs 47336329 failures 0 anomalies 0
+[ 46771s] runs 20806 actions 3959425 txs 47380846 failures 0 anomalies 0
+[ 46831s] runs 20833 actions 3965070 txs 47443604 failures 0 anomalies 0
+[ 46891s] runs 20870 actions 3972434 txs 47520788 failures 0 anomalies 0
+[ 46951s] runs 20891 actions 3976228 txs 47558266 failures 0 anomalies 0
+[ 47011s] runs 20919 actions 3981407 txs 47628436 failures 0 anomalies 0
+[ 47071s] runs 20947 actions 3986393 txs 47685288 failures 0 anomalies 0
+[ 47131s] runs 20961 actions 3989499 txs 47727029 failures 0 anomalies 0
+[ 47192s] runs 20972 actions 3991888 txs 47766459 failures 0 anomalies 0
+[ 47252s] runs 21002 actions 3998027 txs 47829309 failures 0 anomalies 0
+[ 47312s] runs 21018 actions 4001566 txs 47878496 failures 0 anomalies 0
+[ 47372s] runs 21033 actions 4004959 txs 47914513 failures 0 anomalies 0
+[ 47432s] runs 21060 actions 4010034 txs 47971575 failures 0 anomalies 0
+[ 47492s] runs 21081 actions 4013867 txs 48027432 failures 0 anomalies 0
+[ 47552s] runs 21098 actions 4017369 txs 48072509 failures 0 anomalies 0
+[ 47612s] runs 21118 actions 4021767 txs 48122655 failures 0 anomalies 0
+[ 47672s] runs 21158 actions 4028943 txs 48204319 failures 0 anomalies 0
+[ 47732s] runs 21193 actions 4035495 txs 48273122 failures 0 anomalies 0
+[ 47792s] runs 21212 actions 4039480 txs 48328297 failures 0 anomalies 0
+[ 47852s] runs 21236 actions 4044062 txs 48383963 failures 0 anomalies 0
+[ 47912s] runs 21260 actions 4048858 txs 48444664 failures 0 anomalies 0
+[ 47972s] runs 21284 actions 4053474 txs 48501935 failures 0 anomalies 0
+[ 48032s] runs 21318 actions 4059202 txs 48562332 failures 0 anomalies 0
+[ 48092s] runs 21341 actions 4063473 txs 48615663 failures 0 anomalies 0
+[ 48152s] runs 21360 actions 4067461 txs 48661126 failures 0 anomalies 0
+[ 48212s] runs 21390 actions 4072957 txs 48725727 failures 0 anomalies 0
+[ 48272s] runs 21422 actions 4079480 txs 48798270 failures 0 anomalies 0
+[ 48332s] runs 21443 actions 4083271 txs 48850487 failures 0 anomalies 0
+[ 48392s] runs 21477 actions 4089716 txs 48921622 failures 0 anomalies 0
+[ 48452s] runs 21511 actions 4096274 txs 48996437 failures 0 anomalies 0
+[ 48512s] runs 21541 actions 4102042 txs 49069428 failures 0 anomalies 0
+[ 48572s] runs 21573 actions 4107560 txs 49138193 failures 0 anomalies 0
+[ 48632s] runs 21614 actions 4115474 txs 49223981 failures 0 anomalies 0
+[ 48692s] runs 21646 actions 4121853 txs 49293875 failures 0 anomalies 0
+[ 48753s] runs 21668 actions 4125657 txs 49344339 failures 0 anomalies 0
+[ 48813s] runs 21693 actions 4131314 txs 49415255 failures 0 anomalies 0
+[ 48873s] runs 21719 actions 4136504 txs 49476226 failures 0 anomalies 0
+[ 48933s] runs 21750 actions 4142106 txs 49543662 failures 0 anomalies 0
+[ 48993s] runs 21779 actions 4147508 txs 49604665 failures 0 anomalies 0
+[ 49053s] runs 21796 actions 4151058 txs 49650790 failures 0 anomalies 0
+[ 49113s] runs 21810 actions 4153612 txs 49685645 failures 0 anomalies 0
+[ 49173s] runs 21841 actions 4159183 txs 49757242 failures 0 anomalies 0
+[ 49233s] runs 21865 actions 4163511 txs 49816162 failures 0 anomalies 0
+[ 49293s] runs 21880 actions 4166947 txs 49860739 failures 0 anomalies 0
+[ 49353s] runs 21906 actions 4172139 txs 49914508 failures 0 anomalies 0
+[ 49413s] runs 21932 actions 4176901 txs 49975334 failures 0 anomalies 0
+[ 49473s] runs 21953 actions 4181040 txs 50024284 failures 0 anomalies 0
+[ 49533s] runs 21963 actions 4182851 txs 50049654 failures 0 anomalies 0
+[ 49593s] runs 21965 actions 4183295 txs 50057843 failures 0 anomalies 0
+[ 49653s] runs 21983 actions 4187256 txs 50099134 failures 0 anomalies 0
+[ 49713s] runs 22005 actions 4191346 txs 50157702 failures 0 anomalies 0
+[ 49773s] runs 22028 actions 4196372 txs 50217380 failures 0 anomalies 0
+[ 49833s] runs 22059 actions 4202274 txs 50293492 failures 0 anomalies 0
+[ 49893s] runs 22092 actions 4207926 txs 50363008 failures 0 anomalies 0
+[ 49953s] runs 22121 actions 4213039 txs 50425894 failures 0 anomalies 0
+[ 50013s] runs 22140 actions 4216044 txs 50465023 failures 0 anomalies 0
+[ 50073s] runs 22151 actions 4218156 txs 50491640 failures 0 anomalies 0
+[ 50133s] runs 22176 actions 4223126 txs 50554264 failures 0 anomalies 0
+[ 50193s] runs 22207 actions 4228678 txs 50624851 failures 0 anomalies 0
+[ 50254s] runs 22233 actions 4233328 txs 50687865 failures 0 anomalies 0
+[ 50314s] runs 22259 actions 4238212 txs 50746264 failures 0 anomalies 0
+[ 50374s] runs 22280 actions 4241769 txs 50787564 failures 0 anomalies 0
+[ 50434s] runs 22303 actions 4246742 txs 50852193 failures 0 anomalies 0
+[ 50494s] runs 22339 actions 4253277 txs 50922211 failures 0 anomalies 0
+[ 50554s] runs 22365 actions 4258321 txs 50978664 failures 0 anomalies 0
+[ 50614s] runs 22415 actions 4267230 txs 51068645 failures 0 anomalies 0
+[ 50674s] runs 22429 actions 4269986 txs 51109767 failures 0 anomalies 0
+[ 50734s] runs 22452 actions 4274647 txs 51169875 failures 0 anomalies 0
+[ 50794s] runs 22484 actions 4280448 txs 51239511 failures 0 anomalies 0
+[ 50854s] runs 22507 actions 4285394 txs 51297853 failures 0 anomalies 0
+[ 50914s] runs 22527 actions 4289385 txs 51347353 failures 0 anomalies 0
+[ 50974s] runs 22534 actions 4290724 txs 51366917 failures 0 anomalies 0
+[ 51034s] runs 22560 actions 4295528 txs 51438208 failures 0 anomalies 0
+[ 51094s] runs 22582 actions 4299534 txs 51487462 failures 0 anomalies 0
+[ 51154s] runs 22617 actions 4306578 txs 51555959 failures 0 anomalies 0
+[ 51214s] runs 22645 actions 4311676 txs 51623742 failures 0 anomalies 0
+[ 51274s] runs 22664 actions 4315507 txs 51676035 failures 0 anomalies 0
+[ 51334s] runs 22702 actions 4323156 txs 51757682 failures 0 anomalies 0
+[ 51394s] runs 22724 actions 4327233 txs 51811024 failures 0 anomalies 0
+[ 51454s] runs 22741 actions 4330213 txs 51858062 failures 0 anomalies 0
+[ 51514s] runs 22753 actions 4332682 txs 51885610 failures 0 anomalies 0
+[ 51574s] runs 22760 actions 4333944 txs 51905035 failures 0 anomalies 0
+[ 51634s] runs 22802 actions 4341556 txs 51997421 failures 0 anomalies 0
+[ 51694s] runs 22833 actions 4347299 txs 52062693 failures 0 anomalies 0
+[ 51754s] runs 22866 actions 4353691 txs 52134812 failures 0 anomalies 0
+[ 51814s] runs 22879 actions 4356469 txs 52172982 failures 0 anomalies 0
+[ 51874s] runs 22900 actions 4360407 txs 52224119 failures 0 anomalies 0
+[ 51935s] runs 22920 actions 4364032 txs 52273361 failures 0 anomalies 0
+[ 51995s] runs 22922 actions 4364370 txs 52279411 failures 0 anomalies 0
+[ 52055s] runs 22941 actions 4367275 txs 52325495 failures 0 anomalies 0
+[ 52115s] runs 22954 actions 4369886 txs 52359391 failures 0 anomalies 0
+[ 52175s] runs 22973 actions 4373641 txs 52404065 failures 0 anomalies 0
+[ 52235s] runs 22996 actions 4377778 txs 52450842 failures 0 anomalies 0
+[ 52295s] runs 23010 actions 4380278 txs 52490674 failures 0 anomalies 0
+[ 52355s] runs 23038 actions 4385965 txs 52553380 failures 0 anomalies 0
+[ 52415s] runs 23072 actions 4392220 txs 52627614 failures 0 anomalies 0
+[ 52475s] runs 23098 actions 4397270 txs 52684181 failures 0 anomalies 0
+[ 52535s] runs 23116 actions 4400691 txs 52727033 failures 0 anomalies 0
+[ 52595s] runs 23150 actions 4406979 txs 52797634 failures 0 anomalies 0
+[ 52655s] runs 23190 actions 4413863 txs 52876238 failures 0 anomalies 0
+[ 52715s] runs 23217 actions 4419286 txs 52940551 failures 0 anomalies 0
+[ 52775s] runs 23250 actions 4425195 txs 53011055 failures 0 anomalies 0
+[ 52835s] runs 23280 actions 4431341 txs 53078211 failures 0 anomalies 0
+[ 52895s] runs 23301 actions 4435085 txs 53124455 failures 0 anomalies 0
+[ 52955s] runs 23334 actions 4442157 txs 53206790 failures 0 anomalies 0
+[ 53015s] runs 23354 actions 4446327 txs 53258213 failures 0 anomalies 0
+[ 53075s] runs 23382 actions 4451023 txs 53315224 failures 0 anomalies 0
+[ 53135s] runs 23400 actions 4454619 txs 53362938 failures 0 anomalies 0
+[ 53195s] runs 23414 actions 4457733 txs 53408417 failures 0 anomalies 0
+[ 53255s] runs 23445 actions 4463500 txs 53473150 failures 0 anomalies 0
+[ 53315s] runs 23474 actions 4467971 txs 53532922 failures 0 anomalies 0
+[ 53375s] runs 23500 actions 4472855 txs 53589964 failures 0 anomalies 0
+[ 53435s] runs 23522 actions 4477337 txs 53640178 failures 0 anomalies 0
+[ 53496s] runs 23566 actions 4485412 txs 53735194 failures 0 anomalies 0
+[ 53556s] runs 23591 actions 4490044 txs 53792386 failures 0 anomalies 0
+[ 53616s] runs 23614 actions 4494471 txs 53854409 failures 0 anomalies 0
+[ 53676s] runs 23642 actions 4499762 txs 53917237 failures 0 anomalies 0
+[ 53736s] runs 23681 actions 4506404 txs 53993357 failures 0 anomalies 0
+[ 53796s] runs 23715 actions 4512713 txs 54067037 failures 0 anomalies 0
+[ 53856s] runs 23743 actions 4518586 txs 54134251 failures 0 anomalies 0
+[ 53916s] runs 23785 actions 4526599 txs 54212299 failures 0 anomalies 0
+[ 53976s] runs 23817 actions 4532442 txs 54278750 failures 0 anomalies 0
+[ 54036s] runs 23850 actions 4538881 txs 54355865 failures 0 anomalies 0
+[ 54096s] runs 23885 actions 4545506 txs 54424380 failures 0 anomalies 0
+[ 54156s] runs 23921 actions 4551499 txs 54496275 failures 0 anomalies 0
+[ 54216s] runs 23953 actions 4557222 txs 54564412 failures 0 anomalies 0
+[ 54276s] runs 23987 actions 4563463 txs 54637816 failures 0 anomalies 0
+[ 54336s] runs 24014 actions 4568792 txs 54702712 failures 0 anomalies 0
+[ 54396s] runs 24036 actions 4572851 txs 54753548 failures 0 anomalies 0
+[ 54456s] runs 24061 actions 4577471 txs 54811286 failures 0 anomalies 0
+[ 54516s] runs 24093 actions 4583429 txs 54886138 failures 0 anomalies 0
+[ 54576s] runs 24140 actions 4592031 txs 54974382 failures 0 anomalies 0
+[ 54636s] runs 24163 actions 4596409 txs 55036654 failures 0 anomalies 0
+[ 54696s] runs 24196 actions 4602061 txs 55106073 failures 0 anomalies 0
+[ 54756s] runs 24223 actions 4607173 txs 55167942 failures 0 anomalies 0
+[ 54816s] runs 24248 actions 4612125 txs 55226179 failures 0 anomalies 0
+[ 54876s] runs 24275 actions 4617064 txs 55285042 failures 0 anomalies 0
+[ 54936s] runs 24301 actions 4622391 txs 55347321 failures 0 anomalies 0
+[ 54996s] runs 24333 actions 4628414 txs 55417655 failures 0 anomalies 0
+[ 55057s] runs 24359 actions 4633212 txs 55477624 failures 0 anomalies 0
+[ 55117s] runs 24387 actions 4638644 txs 55539856 failures 0 anomalies 0
+[ 55177s] runs 24410 actions 4642684 txs 55594261 failures 0 anomalies 0
+[ 55237s] runs 24438 actions 4647968 txs 55655548 failures 0 anomalies 0
+[ 55297s] runs 24474 actions 4654643 txs 55731466 failures 0 anomalies 0
+[ 55357s] runs 24493 actions 4658067 txs 55769147 failures 0 anomalies 0
+[ 55417s] runs 24522 actions 4663700 txs 55832550 failures 0 anomalies 0
+[ 55477s] runs 24539 actions 4667097 txs 55876832 failures 0 anomalies 0
+[ 55537s] runs 24568 actions 4673231 txs 55951273 failures 0 anomalies 0
+[ 55597s] runs 24604 actions 4679760 txs 56020624 failures 0 anomalies 0
+[ 55657s] runs 24623 actions 4683935 txs 56075265 failures 0 anomalies 0
+[ 55717s] runs 24640 actions 4686986 txs 56112698 failures 0 anomalies 0
+[ 55777s] runs 24665 actions 4691446 txs 56171534 failures 0 anomalies 0
+[ 55837s] runs 24706 actions 4698602 txs 56251850 failures 0 anomalies 0
+[ 55897s] runs 24719 actions 4701120 txs 56282798 failures 0 anomalies 0
+[ 55957s] runs 24751 actions 4706220 txs 56339889 failures 0 anomalies 0
+[ 56017s] runs 24772 actions 4710497 txs 56392786 failures 0 anomalies 0
+[ 56077s] runs 24795 actions 4715202 txs 56452916 failures 0 anomalies 0
+[ 56137s] runs 24821 actions 4719846 txs 56511281 failures 0 anomalies 0
+[ 56197s] runs 24849 actions 4724841 txs 56574267 failures 0 anomalies 0
+[ 56257s] runs 24888 actions 4731832 txs 56650347 failures 0 anomalies 0
+[ 56317s] runs 24923 actions 4739021 txs 56731408 failures 0 anomalies 0
+[ 56377s] runs 24952 actions 4744554 txs 56801654 failures 0 anomalies 0
+[ 56437s] runs 24982 actions 4749754 txs 56863845 failures 0 anomalies 0
+[ 56497s] runs 24996 actions 4752282 txs 56899235 failures 0 anomalies 0
+[ 56558s] runs 25012 actions 4755730 txs 56947128 failures 0 anomalies 0
+[ 56618s] runs 25034 actions 4760072 txs 56998354 failures 0 anomalies 0
+[ 56678s] runs 25063 actions 4765623 txs 57073550 failures 0 anomalies 0
+[ 56738s] runs 25097 actions 4771794 txs 57150292 failures 0 anomalies 0
+[ 56798s] runs 25122 actions 4776747 txs 57209339 failures 0 anomalies 0
+[ 56858s] runs 25155 actions 4783555 txs 57281104 failures 0 anomalies 0
+[ 56918s] runs 25186 actions 4789395 txs 57350983 failures 0 anomalies 0
+[ 56978s] runs 25211 actions 4793857 txs 57412941 failures 0 anomalies 0
+[ 57038s] runs 25232 actions 4797862 txs 57461399 failures 0 anomalies 0
+[ 57098s] runs 25258 actions 4803215 txs 57523135 failures 0 anomalies 0
+[ 57158s] runs 25287 actions 4808311 txs 57584348 failures 0 anomalies 0
+[ 57218s] runs 25317 actions 4813909 txs 57643617 failures 0 anomalies 0
+[ 57278s] runs 25336 actions 4817102 txs 57689706 failures 0 anomalies 0
+[ 57338s] runs 25376 actions 4824404 txs 57772135 failures 0 anomalies 0
+[ 57398s] runs 25421 actions 4832102 txs 57860960 failures 0 anomalies 0
+[ 57458s] runs 25433 actions 4834653 txs 57891791 failures 0 anomalies 0
+[ 57518s] runs 25466 actions 4840595 txs 57966173 failures 0 anomalies 0
+[ 57578s] runs 25491 actions 4845775 txs 58027935 failures 0 anomalies 0
+[ 57638s] runs 25513 actions 4850288 txs 58087530 failures 0 anomalies 0
+[ 57698s] runs 25541 actions 4855236 txs 58149115 failures 0 anomalies 0
+[ 57758s] runs 25579 actions 4862710 txs 58224581 failures 0 anomalies 0
+[ 57818s] runs 25605 actions 4867198 txs 58281458 failures 0 anomalies 0
+[ 57878s] runs 25636 actions 4873029 txs 58350124 failures 0 anomalies 0
+[ 57938s] runs 25659 actions 4877024 txs 58404443 failures 0 anomalies 0
+[ 57998s] runs 25683 actions 4881512 txs 58457983 failures 0 anomalies 0
+[ 58058s] runs 25704 actions 4885871 txs 58517739 failures 0 anomalies 0
+[ 58118s] runs 25738 actions 4891739 txs 58588307 failures 0 anomalies 0
+[ 58178s] runs 25767 actions 4897513 txs 58653824 failures 0 anomalies 0
+[ 58238s] runs 25799 actions 4903357 txs 58715966 failures 0 anomalies 0
+[ 58299s] runs 25817 actions 4906892 txs 58760438 failures 0 anomalies 0
+[ 58359s] runs 25851 actions 4913116 txs 58837452 failures 0 anomalies 0
+[ 58419s] runs 25877 actions 4918420 txs 58896735 failures 0 anomalies 0
+[ 58479s] runs 25907 actions 4924326 txs 58968479 failures 0 anomalies 0
+[ 58539s] runs 25930 actions 4928979 txs 59024529 failures 0 anomalies 0
+[ 58599s] runs 25957 actions 4934111 txs 59088216 failures 0 anomalies 0
+[ 58659s] runs 25986 actions 4939560 txs 59149692 failures 0 anomalies 0
+[ 58719s] runs 26013 actions 4945485 txs 59221624 failures 0 anomalies 0
+[ 58779s] runs 26040 actions 4950409 txs 59284744 failures 0 anomalies 0
+[ 58839s] runs 26079 actions 4957232 txs 59366924 failures 0 anomalies 0
+[ 58899s] runs 26116 actions 4963893 txs 59450869 failures 0 anomalies 0
+[ 58959s] runs 26146 actions 4969952 txs 59517536 failures 0 anomalies 0
+[ 59019s] runs 26166 actions 4973353 txs 59559264 failures 0 anomalies 0
+[ 59079s] runs 26195 actions 4978199 txs 59624820 failures 0 anomalies 0
+[ 59139s] runs 26222 actions 4983264 txs 59686951 failures 0 anomalies 0
+[ 59199s] runs 26261 actions 4990656 txs 59767053 failures 0 anomalies 0
+[ 59259s] runs 26288 actions 4995910 txs 59831906 failures 0 anomalies 0
+[ 59319s] runs 26316 actions 5000630 txs 59891315 failures 0 anomalies 0
+[ 59379s] runs 26349 actions 5006860 txs 59967850 failures 0 anomalies 0
+[ 59439s] runs 26381 actions 5013222 txs 60038836 failures 0 anomalies 0
+[ 59499s] runs 26407 actions 5017955 txs 60101353 failures 0 anomalies 0
+[ 59559s] runs 26439 actions 5024009 txs 60171043 failures 0 anomalies 0
+[ 59619s] runs 26475 actions 5030636 txs 60244289 failures 0 anomalies 0
+[ 59679s] runs 26497 actions 5034611 txs 60293690 failures 0 anomalies 0
+[ 59739s] runs 26515 actions 5038208 txs 60337151 failures 0 anomalies 0
+[ 59800s] runs 26536 actions 5042123 txs 60386201 failures 0 anomalies 0
+[ 59860s] runs 26570 actions 5048730 txs 60458686 failures 0 anomalies 0
+[ 59920s] runs 26590 actions 5052993 txs 60508987 failures 0 anomalies 0
+[ 59980s] runs 26610 actions 5057108 txs 60562160 failures 0 anomalies 0
+[ 60040s] runs 26637 actions 5062696 txs 60630652 failures 0 anomalies 0
+[ 60100s] runs 26656 actions 5066795 txs 60688077 failures 0 anomalies 0
+[ 60160s] runs 26696 actions 5074047 txs 60768957 failures 0 anomalies 0
+[ 60220s] runs 26724 actions 5079587 txs 60832785 failures 0 anomalies 0
+[ 60280s] runs 26739 actions 5082690 txs 60877311 failures 0 anomalies 0
+[ 60340s] runs 26776 actions 5089429 txs 60955758 failures 0 anomalies 0
+[ 60400s] runs 26801 actions 5094506 txs 61018235 failures 0 anomalies 0
+[ 60460s] runs 26825 actions 5099781 txs 61083725 failures 0 anomalies 0
+[ 60520s] runs 26842 actions 5103025 txs 61121635 failures 0 anomalies 0
+[ 60580s] runs 26864 actions 5107155 txs 61173910 failures 0 anomalies 0
+[ 60640s] runs 26887 actions 5111664 txs 61228917 failures 0 anomalies 0
+[ 60700s] runs 26916 actions 5117256 txs 61295611 failures 0 anomalies 0
+[ 60760s] runs 26952 actions 5123647 txs 61365127 failures 0 anomalies 0
+[ 60820s] runs 26991 actions 5130452 txs 61445295 failures 0 anomalies 0
+[ 60880s] runs 27011 actions 5134054 txs 61496730 failures 0 anomalies 0
+[ 60940s] runs 27039 actions 5139687 txs 61557144 failures 0 anomalies 0
+[ 61000s] runs 27047 actions 5141314 txs 61582123 failures 0 anomalies 0
+[ 61060s] runs 27062 actions 5144387 txs 61623258 failures 0 anomalies 0
+[ 61120s] runs 27089 actions 5149452 txs 61685975 failures 0 anomalies 0
+[ 61180s] runs 27113 actions 5154419 txs 61745718 failures 0 anomalies 0
+[ 61240s] runs 27147 actions 5161235 txs 61823365 failures 0 anomalies 0
+[ 61300s] runs 27176 actions 5167008 txs 61889061 failures 0 anomalies 0
+[ 61361s] runs 27201 actions 5171835 txs 61943252 failures 0 anomalies 0
+[ 61421s] runs 27227 actions 5176652 txs 62003936 failures 0 anomalies 0
+[ 61481s] runs 27247 actions 5180021 txs 62035191 failures 0 anomalies 0
+[ 61541s] runs 27273 actions 5184894 txs 62098909 failures 0 anomalies 0
+[ 61601s] runs 27305 actions 5191351 txs 62171047 failures 0 anomalies 0
+[ 61661s] runs 27324 actions 5194976 txs 62217627 failures 0 anomalies 0
+[ 61721s] runs 27344 actions 5198970 txs 62266803 failures 0 anomalies 0
+[ 61781s] runs 27373 actions 5204825 txs 62328828 failures 0 anomalies 0
+[ 61841s] runs 27403 actions 5210143 txs 62392313 failures 0 anomalies 0
+[ 61901s] runs 27447 actions 5218725 txs 62483163 failures 0 anomalies 0
+[ 61961s] runs 27473 actions 5223834 txs 62544051 failures 0 anomalies 0
+[ 62021s] runs 27498 actions 5228715 txs 62599158 failures 0 anomalies 0
+[ 62081s] runs 27526 actions 5233800 txs 62658993 failures 0 anomalies 0
+[ 62141s] runs 27560 actions 5240417 txs 62732038 failures 0 anomalies 0
+[ 62201s] runs 27592 actions 5246494 txs 62803178 failures 0 anomalies 0
+[ 62261s] runs 27615 actions 5251324 txs 62861866 failures 0 anomalies 0
+[ 62321s] runs 27636 actions 5255836 txs 62906312 failures 0 anomalies 0
+[ 62381s] runs 27659 actions 5260389 txs 62967090 failures 0 anomalies 0
+[ 62441s] runs 27685 actions 5265972 txs 63030738 failures 0 anomalies 0
+[ 62501s] runs 27707 actions 5269981 txs 63077331 failures 0 anomalies 0
+[ 62561s] runs 27731 actions 5274525 txs 63130963 failures 0 anomalies 0
+[ 62621s] runs 27764 actions 5279916 txs 63206555 failures 0 anomalies 0
+[ 62681s] runs 27793 actions 5284690 txs 63266859 failures 0 anomalies 0
+[ 62741s] runs 27816 actions 5289237 txs 63324603 failures 0 anomalies 0
+[ 62801s] runs 27843 actions 5294662 txs 63391085 failures 0 anomalies 0
+[ 62862s] runs 27877 actions 5301341 txs 63462557 failures 0 anomalies 0
+[ 62922s] runs 27903 actions 5306330 txs 63524969 failures 0 anomalies 0
+[ 62982s] runs 27929 actions 5311229 txs 63578493 failures 0 anomalies 0
+[ 63042s] runs 27953 actions 5315288 txs 63627629 failures 0 anomalies 0
+[ 63102s] runs 27974 actions 5319015 txs 63682506 failures 0 anomalies 0
+[ 63162s] runs 28009 actions 5325956 txs 63763129 failures 0 anomalies 0
+[ 63222s] runs 28022 actions 5328517 txs 63800739 failures 0 anomalies 0
+[ 63282s] runs 28043 actions 5332554 txs 63858912 failures 0 anomalies 0
+[ 63342s] runs 28075 actions 5339012 txs 63927693 failures 0 anomalies 0
+[ 63402s] runs 28102 actions 5344245 txs 63994339 failures 0 anomalies 0
+[ 63462s] runs 28130 actions 5350077 txs 64057397 failures 0 anomalies 0
+[ 63522s] runs 28151 actions 5354459 txs 64111165 failures 0 anomalies 0
+[ 63582s] runs 28192 actions 5361873 txs 64194469 failures 0 anomalies 0
+[ 63642s] runs 28224 actions 5367681 txs 64264053 failures 0 anomalies 0
+[ 63702s] runs 28246 actions 5372214 txs 64321930 failures 0 anomalies 0
+[ 63762s] runs 28270 actions 5376353 txs 64368634 failures 0 anomalies 0
+[ 63822s] runs 28285 actions 5379406 txs 64411151 failures 0 anomalies 0
+[ 63882s] runs 28311 actions 5384365 txs 64471781 failures 0 anomalies 0
+[ 63942s] runs 28340 actions 5389549 txs 64534074 failures 0 anomalies 0
+[ 64002s] runs 28378 actions 5395527 txs 64607037 failures 0 anomalies 0
+[ 64062s] runs 28398 actions 5399218 txs 64651716 failures 0 anomalies 0
+[ 64122s] runs 28422 actions 5403812 txs 64715832 failures 0 anomalies 0
+[ 64182s] runs 28439 actions 5407443 txs 64764955 failures 0 anomalies 0
+[ 64242s] runs 28464 actions 5412730 txs 64825164 failures 0 anomalies 0
+[ 64302s] runs 28491 actions 5418154 txs 64888165 failures 0 anomalies 0
+[ 64362s] runs 28517 actions 5422840 txs 64944727 failures 0 anomalies 0
+[ 64423s] runs 28546 actions 5428214 txs 65011605 failures 0 anomalies 0
+[ 64483s] runs 28569 actions 5432475 txs 65064882 failures 0 anomalies 0
+[ 64543s] runs 28597 actions 5438180 txs 65138768 failures 0 anomalies 0
+[ 64603s] runs 28630 actions 5444661 txs 65216706 failures 0 anomalies 0
+[ 64663s] runs 28654 actions 5449423 txs 65278496 failures 0 anomalies 0
+[ 64723s] runs 28675 actions 5453505 txs 65332107 failures 0 anomalies 0
+[ 64783s] runs 28701 actions 5458745 txs 65399402 failures 0 anomalies 0
+[ 64843s] runs 28738 actions 5466151 txs 65478008 failures 0 anomalies 0
+[ 64903s] runs 28769 actions 5471404 txs 65541977 failures 0 anomalies 0
+[ 64963s] runs 28789 actions 5475293 txs 65587577 failures 0 anomalies 0
+[ 65023s] runs 28821 actions 5481274 txs 65654260 failures 0 anomalies 0
+[ 65083s] runs 28840 actions 5484971 txs 65702442 failures 0 anomalies 0
+[ 65143s] runs 28885 actions 5494057 txs 65797518 failures 0 anomalies 0
+[ 65203s] runs 28910 actions 5499179 txs 65851325 failures 0 anomalies 0
+[ 65263s] runs 28938 actions 5505280 txs 65921305 failures 0 anomalies 0
+[ 65323s] runs 28957 actions 5508615 txs 65963281 failures 0 anomalies 0
+[ 65383s] runs 28991 actions 5514592 txs 66039696 failures 0 anomalies 0
+[ 65443s] runs 29033 actions 5521493 txs 66118861 failures 0 anomalies 0
+[ 65503s] runs 29043 actions 5523580 txs 66149875 failures 0 anomalies 0
+[ 65563s] runs 29083 actions 5530612 txs 66232900 failures 0 anomalies 0
+[ 65623s] runs 29122 actions 5537473 txs 66308732 failures 0 anomalies 0
+[ 65683s] runs 29158 actions 5543591 txs 66380181 failures 0 anomalies 0
+[ 65743s] runs 29194 actions 5550295 txs 66461206 failures 0 anomalies 0
+[ 65803s] runs 29228 actions 5556238 txs 66528088 failures 0 anomalies 0
+[ 65863s] runs 29248 actions 5560344 txs 66581461 failures 0 anomalies 0
+[ 65923s] runs 29276 actions 5565701 txs 66639254 failures 0 anomalies 0
+[ 65984s] runs 29307 actions 5571415 txs 66714120 failures 0 anomalies 0
+[ 66044s] runs 29339 actions 5577013 txs 66777960 failures 0 anomalies 0
+[ 66104s] runs 29362 actions 5582159 txs 66836425 failures 0 anomalies 0
+[ 66164s] runs 29384 actions 5586339 txs 66890317 failures 0 anomalies 0
+[ 66224s] runs 29418 actions 5592852 txs 66960042 failures 0 anomalies 0
+[ 66284s] runs 29448 actions 5599263 txs 67029879 failures 0 anomalies 0
+[ 66344s] runs 29473 actions 5603880 txs 67084738 failures 0 anomalies 0
+[ 66404s] runs 29507 actions 5609622 txs 67153434 failures 0 anomalies 0
+[ 66464s] runs 29511 actions 5610541 txs 67169167 failures 0 anomalies 0
+[ 66524s] runs 29554 actions 5618812 txs 67265109 failures 0 anomalies 0
+[ 66584s] runs 29587 actions 5624858 txs 67333175 failures 0 anomalies 0
+[ 66644s] runs 29618 actions 5630609 txs 67397063 failures 0 anomalies 0
+[ 66704s] runs 29647 actions 5636086 txs 67456600 failures 0 anomalies 0
+[ 66764s] runs 29677 actions 5641894 txs 67526542 failures 0 anomalies 0
+[ 66824s] runs 29708 actions 5647892 txs 67598776 failures 0 anomalies 0
+[ 66884s] runs 29740 actions 5654058 txs 67669957 failures 0 anomalies 0
+[ 66944s] runs 29763 actions 5658245 txs 67723803 failures 0 anomalies 0
+[ 67004s] runs 29799 actions 5664964 txs 67798785 failures 0 anomalies 0
+[ 67064s] runs 29821 actions 5669015 txs 67851655 failures 0 anomalies 0
+[ 67124s] runs 29846 actions 5673455 txs 67906113 failures 0 anomalies 0
+[ 67184s] runs 29875 actions 5679388 txs 67977525 failures 0 anomalies 0
+[ 67244s] runs 29901 actions 5684887 txs 68038255 failures 0 anomalies 0
+[ 67304s] runs 29941 actions 5691675 txs 68116699 failures 0 anomalies 0
+[ 67364s] runs 29959 actions 5695295 txs 68166378 failures 0 anomalies 0
+[ 67424s] runs 29998 actions 5702249 txs 68246033 failures 0 anomalies 0
+[ 67484s] runs 30035 actions 5709428 txs 68326511 failures 0 anomalies 0
+[ 67545s] runs 30074 actions 5716646 txs 68403761 failures 0 anomalies 0
+[ 67605s] runs 30102 actions 5722806 txs 68468408 failures 0 anomalies 0
+[ 67665s] runs 30128 actions 5728319 txs 68538542 failures 0 anomalies 0
+[ 67725s] runs 30150 actions 5732604 txs 68590401 failures 0 anomalies 0
+[ 67785s] runs 30182 actions 5738790 txs 68669271 failures 0 anomalies 0
+[ 67845s] runs 30213 actions 5744309 txs 68732058 failures 0 anomalies 0
+[ 67905s] runs 30239 actions 5749072 txs 68791420 failures 0 anomalies 0
+[ 67965s] runs 30273 actions 5755620 txs 68869482 failures 0 anomalies 0
+[ 68025s] runs 30304 actions 5761233 txs 68937283 failures 0 anomalies 0
+[ 68085s] runs 30336 actions 5767132 txs 69007427 failures 0 anomalies 0
+[ 68145s] runs 30360 actions 5772148 txs 69062162 failures 0 anomalies 0
+[ 68205s] runs 30375 actions 5775333 txs 69104177 failures 0 anomalies 0
+[ 68265s] runs 30406 actions 5780911 txs 69175445 failures 0 anomalies 0
+[ 68325s] runs 30431 actions 5785419 txs 69239560 failures 0 anomalies 0
+[ 68385s] runs 30473 actions 5793619 txs 69325077 failures 0 anomalies 0
+[ 68445s] runs 30495 actions 5797753 txs 69374779 failures 0 anomalies 0
+[ 68505s] runs 30510 actions 5801130 txs 69415339 failures 0 anomalies 0
+[ 68565s] runs 30547 actions 5808351 txs 69499128 failures 0 anomalies 0
+[ 68625s] runs 30581 actions 5814977 txs 69573783 failures 0 anomalies 0
+[ 68685s] runs 30604 actions 5819212 txs 69621667 failures 0 anomalies 0
+[ 68745s] runs 30629 actions 5823963 txs 69681947 failures 0 anomalies 0
+[ 68805s] runs 30655 actions 5828541 txs 69739779 failures 0 anomalies 0
+[ 68865s] runs 30696 actions 5836440 txs 69821577 failures 0 anomalies 0
+[ 68925s] runs 30736 actions 5843959 txs 69901182 failures 0 anomalies 0
+[ 68985s] runs 30776 actions 5851205 txs 69977876 failures 0 anomalies 0
+[ 69045s] runs 30801 actions 5855943 txs 70033408 failures 0 anomalies 0
+[ 69106s] runs 30840 actions 5864269 txs 70113425 failures 0 anomalies 0
+[ 69166s] runs 30859 actions 5867980 txs 70159522 failures 0 anomalies 0
+[ 69226s] runs 30879 actions 5872101 txs 70214864 failures 0 anomalies 0
+[ 69286s] runs 30907 actions 5877634 txs 70281428 failures 0 anomalies 0
+[ 69346s] runs 30947 actions 5884802 txs 70358937 failures 0 anomalies 0
+[ 69406s] runs 30977 actions 5890615 txs 70422529 failures 0 anomalies 0
+[ 69466s] runs 30995 actions 5893725 txs 70459066 failures 0 anomalies 0
+[ 69526s] runs 31025 actions 5898820 txs 70524012 failures 0 anomalies 0
+[ 69586s] runs 31052 actions 5903756 txs 70588376 failures 0 anomalies 0
+[ 69646s] runs 31083 actions 5909807 txs 70650429 failures 0 anomalies 0
+[ 69706s] runs 31103 actions 5913634 txs 70700257 failures 0 anomalies 0
+[ 69766s] runs 31137 actions 5919944 txs 70771508 failures 0 anomalies 0
+[ 69826s] runs 31145 actions 5921303 txs 70791954 failures 0 anomalies 0
+[ 69886s] runs 31145 actions 5921303 txs 70791954 failures 0 anomalies 0
+[ 69946s] runs 31147 actions 5921743 txs 70803470 failures 0 anomalies 0
+[ 70006s] runs 31167 actions 5925504 txs 70845862 failures 0 anomalies 0
+[ 70066s] runs 31176 actions 5927323 txs 70869126 failures 0 anomalies 0
+[ 70126s] runs 31191 actions 5930306 txs 70907043 failures 0 anomalies 0
+[ 70186s] runs 31224 actions 5936820 txs 70989308 failures 0 anomalies 0
+[ 70246s] runs 31247 actions 5941154 txs 71049992 failures 0 anomalies 0
+[ 70306s] runs 31285 actions 5948007 txs 71130471 failures 0 anomalies 0
+[ 70366s] runs 31325 actions 5955434 txs 71209751 failures 0 anomalies 0
+[ 70426s] runs 31352 actions 5960498 txs 71264580 failures 0 anomalies 0
+[ 70486s] runs 31383 actions 5966462 txs 71338018 failures 0 anomalies 0
+[ 70546s] runs 31412 actions 5971884 txs 71399999 failures 0 anomalies 0
+[ 70607s] runs 31445 actions 5978020 txs 71474468 failures 0 anomalies 0
+[ 70667s] runs 31471 actions 5983061 txs 71535206 failures 0 anomalies 0
+[ 70727s] runs 31494 actions 5987227 txs 71591708 failures 0 anomalies 0
+[ 70787s] runs 31522 actions 5992953 txs 71656151 failures 0 anomalies 0
+[ 70847s] runs 31550 actions 5998435 txs 71722467 failures 0 anomalies 0
+[ 70907s] runs 31587 actions 6005973 txs 71807171 failures 0 anomalies 0
+[ 70967s] runs 31608 actions 6010074 txs 71858501 failures 0 anomalies 0
+[ 71027s] runs 31653 actions 6017823 txs 71949040 failures 0 anomalies 0
+[ 71087s] runs 31683 actions 6023813 txs 72019250 failures 0 anomalies 0
+[ 71147s] runs 31706 actions 6028232 txs 72074511 failures 0 anomalies 0
+[ 71207s] runs 31738 actions 6034657 txs 72142754 failures 0 anomalies 0
+[ 71267s] runs 31763 actions 6039734 txs 72207281 failures 0 anomalies 0
+[ 71327s] runs 31785 actions 6044165 txs 72262657 failures 0 anomalies 0
+[ 71387s] runs 31804 actions 6047732 txs 72304098 failures 0 anomalies 0
+[ 71447s] runs 31827 actions 6052674 txs 72366534 failures 0 anomalies 0
+[ 71507s] runs 31865 actions 6059656 txs 72440197 failures 0 anomalies 0
+[ 71567s] runs 31902 actions 6066250 txs 72509384 failures 0 anomalies 0
+[ 71627s] runs 31926 actions 6070676 txs 72566816 failures 0 anomalies 0
+[ 71687s] runs 31957 actions 6076663 txs 72634550 failures 0 anomalies 0
+[ 71747s] runs 31984 actions 6081530 txs 72685705 failures 0 anomalies 0
+[ 71807s] runs 31996 actions 6084322 txs 72731271 failures 0 anomalies 0
+[ 71867s] runs 32018 actions 6088347 txs 72776017 failures 0 anomalies 0
+[ 71927s] runs 32044 actions 6093175 txs 72835445 failures 0 anomalies 0
+[ 71988s] runs 32070 actions 6098400 txs 72901099 failures 0 anomalies 0
+[ 72048s] runs 32093 actions 6102542 txs 72943545 failures 0 anomalies 0
+[ 72108s] runs 32126 actions 6109081 txs 73022527 failures 0 anomalies 0
+[ 72168s] runs 32150 actions 6113950 txs 73080563 failures 0 anomalies 0
+[ 72228s] runs 32189 actions 6121349 txs 73156730 failures 0 anomalies 0
+[ 72288s] runs 32216 actions 6126694 txs 73219481 failures 0 anomalies 0
+[ 72348s] runs 32254 actions 6133265 txs 73300270 failures 0 anomalies 0
+[ 72408s] runs 32285 actions 6138934 txs 73366032 failures 0 anomalies 0
+[ 72469s] runs 32316 actions 6145257 txs 73436635 failures 0 anomalies 0
+[ 72529s] runs 32343 actions 6150856 txs 73503687 failures 0 anomalies 0
+[ 72589s] runs 32380 actions 6158626 txs 73591193 failures 0 anomalies 0
+[ 72649s] runs 32420 actions 6165628 txs 73672502 failures 0 anomalies 0
+[ 72709s] runs 32443 actions 6169909 txs 73727538 failures 0 anomalies 0
+[ 72770s] runs 32470 actions 6175055 txs 73783963 failures 0 anomalies 0
+[ 72830s] runs 32508 actions 6181581 txs 73861380 failures 0 anomalies 0
+[ 72890s] runs 32540 actions 6187530 txs 73929723 failures 0 anomalies 0
+[ 72950s] runs 32569 actions 6193119 txs 73994471 failures 0 anomalies 0
+[ 73010s] runs 32593 actions 6197525 txs 74050254 failures 0 anomalies 0
+[ 73070s] runs 32620 actions 6202142 txs 74111050 failures 0 anomalies 0
+[ 73130s] runs 32648 actions 6207108 txs 74172498 failures 0 anomalies 0
+[ 73191s] runs 32669 actions 6210797 txs 74222067 failures 0 anomalies 0
+[ 73251s] runs 32705 actions 6217739 txs 74295947 failures 0 anomalies 0
+[ 73311s] runs 32728 actions 6221759 txs 74353327 failures 0 anomalies 0
+[ 73371s] runs 32745 actions 6224960 txs 74391467 failures 0 anomalies 0
+[ 73431s] runs 32772 actions 6230099 txs 74453569 failures 0 anomalies 0
+[ 73491s] runs 32800 actions 6234610 txs 74515882 failures 0 anomalies 0
+[ 73552s] runs 32830 actions 6240056 txs 74582926 failures 0 anomalies 0
+[ 73612s] runs 32861 actions 6246260 txs 74651833 failures 0 anomalies 0
+[ 73672s] runs 32879 actions 6249759 txs 74701157 failures 0 anomalies 0
+[ 73732s] runs 32913 actions 6256140 txs 74775244 failures 0 anomalies 0
+[ 73792s] runs 32946 actions 6261959 txs 74843662 failures 0 anomalies 0
+[ 73852s] runs 32989 actions 6269393 txs 74919964 failures 0 anomalies 0
+[ 73913s] runs 33005 actions 6272668 txs 74970050 failures 0 anomalies 0
+[ 73973s] runs 33029 actions 6277427 txs 75027869 failures 0 anomalies 0
+[ 74033s] runs 33051 actions 6281431 txs 75089045 failures 0 anomalies 0
+[ 74093s] runs 33091 actions 6288754 txs 75176156 failures 0 anomalies 0
+[ 74153s] runs 33116 actions 6293509 txs 75233891 failures 0 anomalies 0
+[ 74213s] runs 33134 actions 6297085 txs 75277505 failures 0 anomalies 0
+[ 74273s] runs 33172 actions 6304001 txs 75352513 failures 0 anomalies 0
+[ 74333s] runs 33199 actions 6309987 txs 75423033 failures 0 anomalies 0
+[ 74394s] runs 33223 actions 6314760 txs 75481547 failures 0 anomalies 0
+[ 74454s] runs 33263 actions 6322359 txs 75568508 failures 0 anomalies 0
+[ 74514s] runs 33286 actions 6326618 txs 75620129 failures 0 anomalies 0
+[ 74574s] runs 33315 actions 6331820 txs 75684137 failures 0 anomalies 0
+[ 74634s] runs 33346 actions 6338038 txs 75754272 failures 0 anomalies 0
+[ 74694s] runs 33374 actions 6344110 txs 75825185 failures 0 anomalies 0
+[ 74754s] runs 33390 actions 6347650 txs 75873912 failures 0 anomalies 0
+[ 74814s] runs 33433 actions 6355530 txs 75960680 failures 0 anomalies 0
+[ 74874s] runs 33462 actions 6360449 txs 76023839 failures 0 anomalies 0
+[ 74935s] runs 33488 actions 6365880 txs 76090239 failures 0 anomalies 0
+[ 74995s] runs 33506 actions 6369282 txs 76131120 failures 0 anomalies 0
+[ 75055s] runs 33506 actions 6369282 txs 76131120 failures 0 anomalies 0
+[ 75115s] runs 33527 actions 6373154 txs 76189980 failures 0 anomalies 0
+[ 75175s] runs 33553 actions 6377775 txs 76248827 failures 0 anomalies 0
+[ 75235s] runs 33571 actions 6381119 txs 76299700 failures 0 anomalies 0
+[ 75295s] runs 33607 actions 6387729 txs 76375116 failures 0 anomalies 0
+[ 75355s] runs 33637 actions 6393576 txs 76441597 failures 0 anomalies 0
+[ 75415s] runs 33666 actions 6398950 txs 76509067 failures 0 anomalies 0
+[ 75476s] runs 33688 actions 6403447 txs 76560140 failures 0 anomalies 0
+[ 75536s] runs 33711 actions 6408190 txs 76617550 failures 0 anomalies 0
+[ 75596s] runs 33738 actions 6413829 txs 76687987 failures 0 anomalies 0
+[ 75656s] runs 33763 actions 6418603 txs 76751968 failures 0 anomalies 0
+[ 75716s] runs 33788 actions 6423486 txs 76811363 failures 0 anomalies 0
+[ 75776s] runs 33815 actions 6429080 txs 76874056 failures 0 anomalies 0
+[ 75836s] runs 33842 actions 6434293 txs 76938202 failures 0 anomalies 0
+[ 75896s] runs 33861 actions 6438133 txs 76985007 failures 0 anomalies 0
+[ 75956s] runs 33886 actions 6443308 txs 77045534 failures 0 anomalies 0
+[ 76017s] runs 33927 actions 6451176 txs 77134233 failures 0 anomalies 0
+[ 76077s] runs 33951 actions 6455364 txs 77185335 failures 0 anomalies 0
+[ 76137s] runs 33980 actions 6460918 txs 77254180 failures 0 anomalies 0
+[ 76197s] runs 34000 actions 6464868 txs 77309032 failures 0 anomalies 0
+[ 76257s] runs 34027 actions 6470153 txs 77377752 failures 0 anomalies 0
+[ 76317s] runs 34048 actions 6474252 txs 77426999 failures 0 anomalies 0
+[ 76377s] runs 34068 actions 6478074 txs 77481439 failures 0 anomalies 0
+[ 76437s] runs 34103 actions 6484906 txs 77551274 failures 0 anomalies 0
+[ 76497s] runs 34123 actions 6488845 txs 77600511 failures 0 anomalies 0
+[ 76557s] runs 34165 actions 6496603 txs 77687149 failures 0 anomalies 0
+[ 76618s] runs 34196 actions 6502704 txs 77753296 failures 0 anomalies 0
+[ 76678s] runs 34229 actions 6508720 txs 77817258 failures 0 anomalies 0
+[ 76738s] runs 34264 actions 6515693 txs 77890894 failures 0 anomalies 0
+[ 76798s] runs 34295 actions 6521600 txs 77959780 failures 0 anomalies 0
+[ 76858s] runs 34320 actions 6526395 txs 78018297 failures 0 anomalies 0
+[ 76918s] runs 34338 actions 6529617 txs 78059025 failures 0 anomalies 0
+[ 76978s] runs 34360 actions 6533662 txs 78113955 failures 0 anomalies 0
+[ 77038s] runs 34375 actions 6536150 txs 78148110 failures 0 anomalies 0
+[ 77098s] runs 34418 actions 6543502 txs 78228088 failures 0 anomalies 0
+[ 77158s] runs 34445 actions 6548650 txs 78290521 failures 0 anomalies 0
+[ 77219s] runs 34470 actions 6553504 txs 78353146 failures 0 anomalies 0
+[ 77279s] runs 34507 actions 6561600 txs 78435081 failures 0 anomalies 0
+[ 77339s] runs 34533 actions 6566450 txs 78491153 failures 0 anomalies 0
+[ 77399s] runs 34557 actions 6570878 txs 78547126 failures 0 anomalies 0
+[ 77459s] runs 34574 actions 6574486 txs 78589608 failures 0 anomalies 0
+[ 77519s] runs 34605 actions 6580771 txs 78662950 failures 0 anomalies 0
+[ 77579s] runs 34638 actions 6587022 txs 78735418 failures 0 anomalies 0
+[ 77639s] runs 34670 actions 6592880 txs 78802300 failures 0 anomalies 0
+[ 77699s] runs 34687 actions 6596016 txs 78845485 failures 0 anomalies 0
+[ 77759s] runs 34706 actions 6599917 txs 78892700 failures 0 anomalies 0
+[ 77820s] runs 34726 actions 6604208 txs 78947428 failures 0 anomalies 0
+[ 77880s] runs 34759 actions 6610457 txs 79015514 failures 0 anomalies 0
+[ 77940s] runs 34767 actions 6612145 txs 79048441 failures 0 anomalies 0
+[ 78000s] runs 34775 actions 6614152 txs 79078967 failures 0 anomalies 0
+[ 78060s] runs 34808 actions 6620267 txs 79148195 failures 0 anomalies 0
+[ 78120s] runs 34840 actions 6625797 txs 79213710 failures 0 anomalies 0
+[ 78180s] runs 34862 actions 6630031 txs 79265973 failures 0 anomalies 0
+[ 78240s] runs 34898 actions 6636639 txs 79342914 failures 0 anomalies 0
+[ 78300s] runs 34935 actions 6643420 txs 79417781 failures 0 anomalies 0
+[ 78360s] runs 34962 actions 6648314 txs 79479173 failures 0 anomalies 0
+[ 78420s] runs 34979 actions 6651574 txs 79518974 failures 0 anomalies 0
+[ 78481s] runs 34998 actions 6655369 txs 79566561 failures 0 anomalies 0
+[ 78541s] runs 35018 actions 6659068 txs 79610483 failures 0 anomalies 0
+[ 78601s] runs 35051 actions 6665457 txs 79683987 failures 0 anomalies 0
+[ 78661s] runs 35065 actions 6667905 txs 79722571 failures 0 anomalies 0
+[ 78721s] runs 35092 actions 6672859 txs 79779736 failures 0 anomalies 0
+[ 78781s] runs 35130 actions 6680092 txs 79855860 failures 0 anomalies 0
+[ 78841s] runs 35169 actions 6686763 txs 79926802 failures 0 anomalies 0
+[ 78901s] runs 35188 actions 6690265 txs 79974705 failures 0 anomalies 0
+[ 78961s] runs 35220 actions 6696213 txs 80045830 failures 0 anomalies 0
+[ 79021s] runs 35233 actions 6698949 txs 80080783 failures 0 anomalies 0
+[ 79082s] runs 35250 actions 6702369 txs 80134051 failures 0 anomalies 0
+[ 79142s] runs 35272 actions 6706414 txs 80188342 failures 0 anomalies 0
+[ 79202s] runs 35296 actions 6710832 txs 80244821 failures 0 anomalies 0
+[ 79262s] runs 35339 actions 6718846 txs 80326394 failures 0 anomalies 0
+[ 79322s] runs 35374 actions 6725446 txs 80397754 failures 0 anomalies 0
+[ 79382s] runs 35408 actions 6731403 txs 80472095 failures 0 anomalies 0
+[ 79442s] runs 35452 actions 6739335 txs 80559487 failures 0 anomalies 0
+[ 79502s] runs 35469 actions 6742450 txs 80602746 failures 0 anomalies 0
+[ 79562s] runs 35504 actions 6749518 txs 80683856 failures 0 anomalies 0
+[ 79622s] runs 35530 actions 6754488 txs 80744108 failures 0 anomalies 0
+[ 79682s] runs 35565 actions 6761039 txs 80824363 failures 0 anomalies 0
+[ 79743s] runs 35596 actions 6767268 txs 80892663 failures 0 anomalies 0
+[ 79803s] runs 35624 actions 6772183 txs 80949796 failures 0 anomalies 0
+[ 79863s] runs 35657 actions 6778759 txs 81021988 failures 0 anomalies 0
+[ 79923s] runs 35671 actions 6782024 txs 81063902 failures 0 anomalies 0
+[ 79983s] runs 35692 actions 6786384 txs 81114032 failures 0 anomalies 0
+[ 80043s] runs 35702 actions 6788893 txs 81150616 failures 0 anomalies 0
+[ 80103s] runs 35742 actions 6796337 txs 81231626 failures 0 anomalies 0
+[ 80163s] runs 35769 actions 6801914 txs 81297937 failures 0 anomalies 0
+[ 80223s] runs 35796 actions 6807312 txs 81362857 failures 0 anomalies 0
+[ 80284s] runs 35820 actions 6811797 txs 81420637 failures 0 anomalies 0
+[ 80344s] runs 35841 actions 6815776 txs 81476629 failures 0 anomalies 0
+[ 80404s] runs 35871 actions 6821299 txs 81537203 failures 0 anomalies 0
+[ 80464s] runs 35910 actions 6828588 txs 81624470 failures 0 anomalies 0
+[ 80524s] runs 35948 actions 6835048 txs 81691945 failures 0 anomalies 0
+[ 80584s] runs 35959 actions 6837539 txs 81729711 failures 0 anomalies 0
+[ 80644s] runs 35970 actions 6839746 txs 81767325 failures 0 anomalies 0
+[ 80704s] runs 36001 actions 6846257 txs 81840781 failures 0 anomalies 0
+[ 80764s] runs 36030 actions 6851510 txs 81905788 failures 0 anomalies 0
+[ 80825s] runs 36057 actions 6856521 txs 81965676 failures 0 anomalies 0
+[ 80885s] runs 36078 actions 6860489 txs 82014866 failures 0 anomalies 0
+[ 80945s] runs 36104 actions 6865374 txs 82076536 failures 0 anomalies 0
+[ 81005s] runs 36126 actions 6869898 txs 82124985 failures 0 anomalies 0
+[ 81065s] runs 36150 actions 6874523 txs 82185154 failures 0 anomalies 0
+[ 81125s] runs 36170 actions 6878401 txs 82228278 failures 0 anomalies 0
+[ 81185s] runs 36201 actions 6884299 txs 82301267 failures 0 anomalies 0
+[ 81245s] runs 36232 actions 6890085 txs 82363678 failures 0 anomalies 0
+[ 81305s] runs 36268 actions 6896639 txs 82440926 failures 0 anomalies 0
+[ 81366s] runs 36296 actions 6902011 txs 82509277 failures 0 anomalies 0
+[ 81426s] runs 36333 actions 6909257 txs 82583227 failures 0 anomalies 0
+[ 81486s] runs 36359 actions 6913687 txs 82642411 failures 0 anomalies 0
+[ 81546s] runs 36388 actions 6919169 txs 82708528 failures 0 anomalies 0
+[ 81606s] runs 36415 actions 6923975 txs 82763495 failures 0 anomalies 0
+[ 81666s] runs 36439 actions 6928285 txs 82815925 failures 0 anomalies 0
+[ 81726s] runs 36466 actions 6933585 txs 82881905 failures 0 anomalies 0
+[ 81786s] runs 36479 actions 6936082 txs 82919445 failures 0 anomalies 0
+[ 81846s] runs 36501 actions 6939903 txs 82972167 failures 0 anomalies 0
+[ 81907s] runs 36533 actions 6945796 txs 83041793 failures 0 anomalies 0
+[ 81967s] runs 36555 actions 6950248 txs 83099401 failures 0 anomalies 0
+[ 82027s] runs 36589 actions 6956491 txs 83167855 failures 0 anomalies 0
+[ 82087s] runs 36627 actions 6963757 txs 83250657 failures 0 anomalies 0
+[ 82147s] runs 36670 actions 6971560 txs 83338447 failures 0 anomalies 0
+[ 82207s] runs 36705 actions 6978528 txs 83418133 failures 0 anomalies 0
+[ 82267s] runs 36736 actions 6984660 txs 83490820 failures 0 anomalies 0
+[ 82327s] runs 36779 actions 6992585 txs 83580240 failures 0 anomalies 0
+[ 82387s] runs 36813 actions 6999320 txs 83656988 failures 0 anomalies 0
+[ 82447s] runs 36846 actions 7005649 txs 83732228 failures 0 anomalies 0
+[ 82508s] runs 36881 actions 7011738 txs 83799727 failures 0 anomalies 0
+[ 82568s] runs 36909 actions 7016744 txs 83860409 failures 0 anomalies 0
+[ 82628s] runs 36937 actions 7021733 txs 83923720 failures 0 anomalies 0
+[ 82688s] runs 36949 actions 7024049 txs 83965205 failures 0 anomalies 0
+[ 82748s] runs 36980 actions 7030113 txs 84032212 failures 0 anomalies 0
+[ 82808s] runs 36996 actions 7033462 txs 84073218 failures 0 anomalies 0
+[ 82868s] runs 37038 actions 7040657 txs 84152408 failures 0 anomalies 0
+[ 82928s] runs 37072 actions 7047203 txs 84221656 failures 0 anomalies 0
+[ 82988s] runs 37109 actions 7054428 txs 84297346 failures 0 anomalies 0
+[ 83049s] runs 37140 actions 7059397 txs 84357489 failures 0 anomalies 0
+[ 83109s] runs 37166 actions 7064043 txs 84409293 failures 0 anomalies 0
+[ 83169s] runs 37188 actions 7068833 txs 84471987 failures 0 anomalies 0
+[ 83229s] runs 37212 actions 7073782 txs 84530543 failures 0 anomalies 0
+[ 83289s] runs 37226 actions 7076382 txs 84561842 failures 0 anomalies 0
+[ 83349s] runs 37267 actions 7083740 txs 84647480 failures 0 anomalies 0
+[ 83409s] runs 37297 actions 7088969 txs 84708953 failures 0 anomalies 0
+[ 83469s] runs 37300 actions 7089744 txs 84724672 failures 0 anomalies 0
+[ 83529s] runs 37330 actions 7096130 txs 84798077 failures 0 anomalies 0
+[ 83590s] runs 37358 actions 7101136 txs 84863484 failures 0 anomalies 0
+[ 83650s] runs 37374 actions 7103996 txs 84891467 failures 0 anomalies 0
+[ 83710s] runs 37387 actions 7106625 txs 84933278 failures 0 anomalies 0
+[ 83770s] runs 37422 actions 7112586 txs 85005753 failures 0 anomalies 0
+[ 83830s] runs 37440 actions 7116166 txs 85050157 failures 0 anomalies 0
+[ 83890s] runs 37453 actions 7118602 txs 85077105 failures 0 anomalies 0
+[ 83950s] runs 37472 actions 7121970 txs 85118210 failures 0 anomalies 0
+[ 84010s] runs 37489 actions 7124891 txs 85154487 failures 0 anomalies 0
+[ 84070s] runs 37513 actions 7129843 txs 85223583 failures 0 anomalies 0
+[ 84131s] runs 37533 actions 7134202 txs 85277017 failures 0 anomalies 0
+[ 84191s] runs 37554 actions 7138021 txs 85322532 failures 0 anomalies 0
+[ 84251s] runs 37574 actions 7142097 txs 85377162 failures 0 anomalies 0
+[ 84311s] runs 37611 actions 7148668 txs 85447766 failures 0 anomalies 0
+[ 84371s] runs 37636 actions 7153654 txs 85509006 failures 0 anomalies 0
+[ 84431s] runs 37679 actions 7161757 txs 85594252 failures 0 anomalies 0
+[ 84491s] runs 37701 actions 7166197 txs 85651589 failures 0 anomalies 0
+[ 84552s] runs 37724 actions 7170505 txs 85709266 failures 0 anomalies 0
+[ 84612s] runs 37751 actions 7176124 txs 85780342 failures 0 anomalies 0
+[ 84672s] runs 37783 actions 7182161 txs 85851972 failures 0 anomalies 0
+[ 84732s] runs 37815 actions 7188252 txs 85917029 failures 0 anomalies 0
+[ 84792s] runs 37825 actions 7190329 txs 85945782 failures 0 anomalies 0
+[ 84852s] runs 37844 actions 7194067 txs 85990939 failures 0 anomalies 0
+[ 84912s] runs 37859 actions 7197065 txs 86035891 failures 0 anomalies 0
+[ 84973s] runs 37882 actions 7201263 txs 86090567 failures 0 anomalies 0
+[ 85033s] runs 37909 actions 7206675 txs 86155895 failures 0 anomalies 0
+[ 85093s] runs 37931 actions 7210977 txs 86209198 failures 0 anomalies 0
+[ 85153s] runs 37962 actions 7217158 txs 86288819 failures 0 anomalies 0
+[ 85213s] runs 37996 actions 7223481 txs 86362300 failures 0 anomalies 0
+[ 85273s] runs 38029 actions 7229491 txs 86431927 failures 0 anomalies 0
+[ 85333s] runs 38057 actions 7234798 txs 86493714 failures 0 anomalies 0
+[ 85393s] runs 38078 actions 7238523 txs 86546002 failures 0 anomalies 0
+[ 85454s] runs 38118 actions 7245521 txs 86628833 failures 0 anomalies 0
+[ 85514s] runs 38153 actions 7252267 txs 86708502 failures 0 anomalies 0
+[ 85574s] runs 38177 actions 7256917 txs 86767411 failures 0 anomalies 0
+[ 85634s] runs 38214 actions 7263263 txs 86842772 failures 0 anomalies 0
+[ 85694s] runs 38251 actions 7270431 txs 86920637 failures 0 anomalies 0
+[ 85754s] runs 38286 actions 7277135 txs 86993689 failures 0 anomalies 0
+[ 85814s] runs 38313 actions 7282598 txs 87054336 failures 0 anomalies 0
+[ 85874s] runs 38338 actions 7287295 txs 87117953 failures 0 anomalies 0
+[ 85935s] runs 38351 actions 7290312 txs 87150895 failures 0 anomalies 0
+[ 85995s] runs 38373 actions 7294062 txs 87209590 failures 0 anomalies 0
+[ 86055s] runs 38391 actions 7297553 txs 87251729 failures 0 anomalies 0
+[ 86115s] runs 38416 actions 7302748 txs 87315112 failures 0 anomalies 0
+[ 86175s] runs 38449 actions 7308716 txs 87383773 failures 0 anomalies 0
+[ 86235s] runs 38480 actions 7314813 txs 87452644 failures 0 anomalies 0
+[ 86295s] runs 38522 actions 7322734 txs 87534204 failures 0 anomalies 0
+[ 86355s] runs 38538 actions 7325897 txs 87569956 failures 0 anomalies 0
+[ 86416s] runs 38561 actions 7330060 txs 87621813 failures 0 anomalies 0
+
+==== shortwin-fuzz summary ====
+runs 38563  actions 7330667 (84.8/s)  skipped 2298122  transactions 87632843 (9919675 failed)  hook checkpoints 158970339  wind-downs 38563  wall 86427s
+
+-- actions by kind --
+  open                        954207  (skipped 0)
+  keeper_seconds              683028  (skipped 0)
+  trade                       391720  (skipped 18438)
+  shock                       314384  (skipped 26006)
+  deposit                     272277  (skipped 0)
+  crank                       271886  (skipped 0)
+  warp                        205126  (skipped 0)
+  coverage_pause              204444  (skipped 0)
+  pump_crank_dump             193963  (skipped 10511)
+  wrapped_open                192037  (skipped 12311)
+  withdraw                    150889  (skipped 122182)
+  gates                       136853  (skipped 0)
+  ramp                        136528  (skipped 0)
+  attacker_seconds            136459  (skipped 0)
+  venue_halt                  136290  (skipped 0)
+  emergency_clear             136276  (skipped 0)
+  oracle_crank                136164  (skipped 0)
+  silence                     136129  (skipped 0)
+  contrary_low                122502  (skipped 13576)
+  close                       119620  (skipped 357310)
+  claim_sol                   112818  (skipped 91705)
+  donate                      106683  (skipped 29265)
+  keeper_exit                 102165  (skipped 306977)
+  liquidity                   101088  (skipped 66906)
+  fee_shock                    89956  (skipped 0)
+  replace_account              68607  (skipped 0)
+  omit_account                 68536  (skipped 0)
+  outage                       68371  (skipped 0)
+  route_broken_venue           68324  (skipped 0)
+  lenders_out                  68313  (skipped 0)
+  global_pause                 68233  (skipped 0)
+  mint_shock                   68171  (skipped 0)
+  disable_venue                68042  (skipped 0)
+  sweep_trader                 67992  (skipped 0)
+  sweep_protocol_fees          67768  (skipped 0)
+  dust_sweeps                  67661  (skipped 0)
+  lp_wrapped_crank             67123  (skipped 44771)
+  push_then_freeze             62890  (skipped 5210)
+  config_cancel                56183  (skipped 11725)
+  config_change                54217  (skipped 14112)
+  open_near_cap                52396  (skipped 185288)
+  coverage_bracket             51290  (skipped 16936)
+  add_margin                   50944  (skipped 153160)
+  sandwich_exit                48216  (skipped 156738)
+  extras_set                   45906  (skipped 0)
+  upgrade_shock                45422  (skipped 0)
+  fee_buckets                  38819  (skipped 5831)
+  cover_deficit                37765  (skipped 30477)
+  sync_lender                  37596  (skipped 30080)
+  warp_to_deadline             34283  (skipped 102161)
+  deposit_wrapped_open         34042  (skipped 22330)
+  propose_pool                 33758  (skipped 12392)
+  execute_switch               33684  (skipped 12534)
+  stale_receivable             26203  (skipped 42205)
+  dump_around_settle           24398  (skipped 112169)
+  over_delivery                23166  (skipped 0)
+  extras_shock                 23112  (skipped 0)
+  layout_shock                 23044  (skipped 0)
+  fast_path                    22874  (skipped 0)
+  plant_candidate              22822  (skipped 0)
+  graduation_halt              22066  (skipped 0)
+  jit_deposit                  16687  (skipped 51190)
+  held_sandwich                16005  (skipped 52266)
+  withdraw_then_settle         11626  (skipped 56544)
+  withdraw_wrapped_exit         8755  (skipped 47408)
+  migrate                       5727  (skipped 16440)
+  crowd_completes               5605  (skipped 16582)
+  revalidate                     533  (skipped 44386)
+
+-- short.win instructions [landed, refused] --
+  add_margin                 50944         0
+  apply_config              133907    112366
+  cancel_config              56183      5103
+  claim_sol                 364966       624
+  close_short               114577    176172
+  cover_deficit              38174         0
+  crank_price             50160631     85571
+  crank_sol_usd              52746     83418
+  deposit                   252403     56685
+  disable_venue              66775         0
+  execute_pool_switch         6678     49880
+  expire                     17698   3669614
+  flag_unsafe_mint            5956     17301
+  flag_venue_upgraded        22411       134
+  liquidate                   6208   3691177
+  open_short                211698   1166223
+  propose_config            190090         0
+  propose_pool               16071     40561
+  revalidate_venue           22354         0
+  set_coverage_pause        498889    128293
+  set_pause                 339911         0
+  set_route_broken          391676         0
+  set_venue_extras           61209         0
+  sol_settle              18830281      7337
+  sweep_protocol_fees        67768         0
+  sweep_trader              384939         7
+  sync_lender                53162         0
+  withdraw                  337566     58082
+
+-- refusals (instruction:error), top 60 --
+  expire:NotExpired                                             3058083
+  liquidate:NotLiquidatable                                     2565344
+  liquidate:UseSolSettle                                         497744
+  expire:VenueMigrating                                          303582
+  liquidate:VenueMigrating                                       303497
+  open_short:CoveragePaused                                      222601
+  open_short:PriceDeviatesFromEma                                220505
+  liquidate:ReferenceStale                                       153730
+  open_short:EmaWarmingUp                                        150810
+  close_short:InsufficientVault                                  140305
+  expire:UseLiquidate                                            130403
+  open_short:InsufficientInventory                               104775
+  open_short:MintUnsafeFlagged                                    82253
+  liquidate:NoRoute                                               81538
+  expire:NoRoute                                                  81460
+  open_short:CapPositionImpact                                    77386
+  liquidate:UseExpire                                             71220
+  crank_sol_usd:OracleStale                                       59702
+  apply_config:TimelockNotElapsed                                 56183
+  set_coverage_pause:CoverageAuthorityDisabled                    55145
+  expire:ExitBoundNotMet                                          54632
+  execute_pool_switch:NoPendingSwitch                             49869
+  set_coverage_pause:Unauthorized                                 49492
+  open_short:CapUtilization                                       45954
+  crank_price:VenueAccountMismatch                                42889
+  crank_price:BadRemainingAccounts                                42682
+  apply_config:NoPendingChange                                    42050
+  open_short:VenueMigrating                                       37548
+  withdraw:InsufficientFreeInventory                              29532
+  open_short:PoolListWindow                                       28366
+  close_short:VenueMigrating                                      23885
+  set_coverage_pause:InvalidParams                                23656
+  open_short:BelowMinNotional                                     23568
+  withdraw:AboveProRataAllowance                                  23568
+  deposit:MintUnsafeFlagged                                       22169
+  open_short:VenueDisabled                                        20637
+  propose_pool:PoolNotDominant                                    19014
+  deposit:PoolDrained                                             18952
+  expire:ReferenceStale                                           18490
+  flag_unsafe_mint:MintSafe                                       15442
+  open_short:BadRemainingAccounts                                 15233
+  open_short:CapWallet                                            15193
+  open_short:VenueFlagged                                         15122
+  apply_config:PendingChangeExpired                               14133
+  open_short:MintFreezeAuthority                                  13571
+  propose_pool:PoolIneligible                                     13557
+  open_short:MarketNotionalCap                                    13019
+  open_short:VenueAccountMismatch                                 12161
+  open_short:VenueFeeTooHigh                                      10962
+  deposit:WipeSweepPending                                         8727
+  crank_sol_usd:OracleOwner                                        8494
+  crank_sol_usd:OracleFutureDated                                  8415
+  liquidate:EmaWarmingUp                                           8120
+  expire:EmaWarmingUp                                              8087
+  open_short:OpensPaused                                           7914
+  propose_pool:PositionsOpen                                       7075
+  open_short:RouteBroken                                           6399
+  open_short:NoRoute                                               6284
+  open_short:BoostInProgress                                       6252
+  open_short:VenueUpgraded                                         5719
+
+-- events and oracle outcomes --
+  ClaimSol                                            364966
+  Close                                               114577
+  ConfigApplied                                       133907
+  ConfigCancelled                                      56183
+  ConfigProposed                                      190090
+  CoverageGap                                         261058
+  CoveragePauseSet                                    498889
+  DeficitCovered                                       38174
+  Deposit                                             252403
+  EpochRolled                                           2436
+  Expire                                               50609
+  LenderSynced                                         53162
+  Liquidate                                            19859
+  MarginAdded                                          50944
+  MintSafetyTripped                                     5956
+  Open                                                211698
+  PauseSet                                            339911
+  PoolProposed                                          6697
+  PoolSwitchCancelled                                     19
+  PoolSwitched                                         16033
+  PriceCranked                                      50160631
+  ProtocolFeesSwept                                    67768
+  RouteBrokenSet                                      391676
+  RouteChainChanged                                   217215
+  SettleArmed                                          66217
+  SettleDisarmed                                        3285
+  SolSettle(S1)                                        24012
+  SolSettle(S3)                                         2641
+  TraderSwept                                         393806
+  VenueDisabled                                        66775
+  VenueExtrasSet                                       61209
+  VenueRevalidated                                     22354
+  VenueStateChanged                                    10821
+  VenueUpgradeFlagged                                  22411
+  Withdraw                                            337566
+  claim-after-close-refused                              624
+  claim-bundle-closes                                    624
+  claim-bundle-landed                                  84170
+  claim-closes                                           818
+  coverage-bracket-refused                             27633
+  deposit-recreates                                    20954
+  donate-curve-base-ata                                  191
+  donate-curve-base-ata-after-completion                 200
+  donate-trader-base-ata                                3239
+  emergency-clear                                      23860
+  emergency-clear-noop                                 35544
+  emergency-clear-open-refused                         37577
+  expire:cpmm-differential-landed                       6841
+  expire:cpmm-differential-refused:EmaWarmingUp        11483
+  expire:cpmm-differential-refused:ExitBoundNotMet     20636
+  expire:cpmm-differential-refused:NoRoute             87026
+  expire:cpmm-differential-refused:NotExpired        1656892
+  expire:cpmm-differential-refused:ReferenceStale       9677
+  expire:cpmm-differential-refused:UseLiquidate        68850
+  expire:cpmm-differential-refused:UseSolSettle         2151
+  expire:curve-differential-completes-synthetic           95
+  expire:curve-differential-landed                      2101
+  expire:curve-differential-refused:ExitBoundNotMet      7447
+  expire:curve-differential-refused:NotExpired        363181
+  expire:curve-differential-refused:ReferenceStale      1949
+  expire:curve-differential-refused:UseLiquidate        4657
+  expire:curve-differential-refused:UseSolSettle         212
+  expire:differential-landed                           19396
+  expire:differential-refused:ExitBoundNotMet          58619
+  expire:differential-refused:NoRoute                 234236
+  expire:differential-refused:NotExpired             5357737
+  expire:differential-refused:ReferenceStale           26902
+  expire:differential-refused:UseLiquidate            140868
+  expire:differential-refused:UseSolSettle              5406
+  expire:pswap-differential-landed                     10577
+  expire:pswap-differential-refused:EmaWarmingUp        7960
+  expire:pswap-differential-refused:ExitBoundNotMet     46034
+  expire:pswap-differential-refused:NoRoute            79811
+  expire:pswap-differential-refused:NotExpired       2626324
+  expire:pswap-differential-refused:ReferenceStale     15919
+  expire:pswap-differential-refused:UseLiquidate      122677
+  expire:pswap-differential-refused:UseSolSettle        4586
+  expire:v4-differential-landed                         6674
+  expire:v4-differential-refused:EmaWarmingUp          12068
+  expire:v4-differential-refused:ExitBoundNotMet       20654
+  expire:v4-differential-refused:NoRoute               70250
+  expire:v4-differential-refused:NotExpired          1605172
+  expire:v4-differential-refused:ReferenceStale         8800
+  expire:v4-differential-refused:UseLiquidate          53400
+  expire:v4-differential-refused:UseSolSettle           2541
+  fuzz:crowd-buy_exact_quote_in_v3-landed               2614
+  fuzz:crowd-buy_exact_quote_in_v3-refused                11
+  fuzz:crowd-buy_v2-landed                             40837
+  fuzz:crowd-buy_v3-landed                             40231
+  fuzz:crowd-completes-v2-exact-landed                  2832
+  fuzz:crowd-completes-v3-overshoot-landed              2773
+  fuzz:crowd-sell_v2-landed                            36912
+  fuzz:crowd-sell_v2-refused                           14064
+  fuzz:crowd-sell_v3-landed                            38428
+  fuzz:crowd-sell_v3-refused                           14921
+  fuzz:exit-completes-curve-exact                         65
+  fuzz:exit-completes-curve-synthetic                    528
+  fuzz:fee_buckets-swept                                9884
+  fuzz:fee_buckets-v2-landed                           26194
+  fuzz:fee_buckets-v2-landed-empty                         1
+  fuzz:fee_buckets-v2-refused                           7682
+  fuzz:graduated                                        5116
+  fuzz:migrate-pool-checked:donated                      107
+  fuzz:migrate-pool-checked:pool-part                   2760
+  fuzz:migrate-pool-checked:standard                    2249
+  fuzz:migrating-fv-pool-part                            304
+  fuzz:migrating-fv-standard                             260
+  i14-omit-refused:close_short:BadRemainingAccounts      1101
+  i14-omit-refused:close_short:VenueAccountMismatch       570
+  i14-omit-refused:close_short:VenueMigrating             52
+  i14-omit-refused:crank_price:BadRemainingAccounts     42682
+  i14-omit-refused:expire:BadRemainingAccounts          2156
+  i14-omit-refused:expire:VenueAccountMismatch          1143
+  i14-omit-refused:expire:VenueMigrating                 104
+  i14-omit-refused:liquidate:BadRemainingAccounts       2233
+  i14-omit-refused:liquidate:VenueAccountMismatch       1205
+  i14-omit-refused:liquidate:VenueMigrating               90
+  i14-omit-refused:open_short:BadRemainingAccounts      5818
+  i14-omit-refused:open_short:CoveragePaused            1691
+  i14-omit-refused:open_short:InsufficientInventory      1130
+  i14-omit-refused:open_short:MintFreezeAuthority        123
+  i14-omit-refused:open_short:MintUnsafeFlagged          906
+  i14-omit-refused:open_short:OpensPaused                 81
+  i14-omit-refused:open_short:RouteBroken                 65
+  i14-omit-refused:open_short:VenueAccountMismatch      3200
+  i14-omit-refused:open_short:VenueDisabled              225
+  i14-omit-refused:open_short:VenueMigrating             463
+  i14-omit-refused:sol_settle:BadRemainingAccounts      3498
+  i14-replace-refused:close_short:VenueAccountMismatch      1672
+  i14-replace-refused:close_short:VenueMigrating          57
+  i14-replace-refused:crank_price:VenueAccountMismatch     42785
+  i14-replace-refused:expire:VenueAccountMismatch       3253
+  i14-replace-refused:expire:VenueMigrating              106
+  i14-replace-refused:liquidate:VenueAccountMismatch      3341
+  i14-replace-refused:liquidate:VenueMigrating            87
+  i14-replace-refused:open_short:CoveragePaused         1786
+  i14-replace-refused:open_short:InsufficientInventory      1139
+  i14-replace-refused:open_short:MintFreezeAuthority       162
+  i14-replace-refused:open_short:MintUnsafeFlagged       968
+  i14-replace-refused:open_short:OpensPaused              79
+  i14-replace-refused:open_short:RouteBroken              72
+  i14-replace-refused:open_short:VenueAccountMismatch      8923
+  i14-replace-refused:open_short:VenueDisabled           209
+  i14-replace-refused:open_short:VenueMigrating          471
+  i14-replace-refused:sol_settle:VenueAccountMismatch      3497
+  jit-behind-epoch                                        12
+  jit-bundle-refused                                      11
+  jit-capture-checked                                   4677
+  jit-capture-checked:settle                             283
+  jit-old-shape:probe-refused:0:Custom(6018)             150
+  jit-old-shape:probe-refused:0:Custom(6022)             136
+  jit-old-shape:probe-refused:0:Custom(6108)            1198
+  jit-old-shape:probe-refused:1:Custom(6011)               6
+  jit-old-shape:probe-refused:1:Custom(6018)              88
+  jit-old-shape:probe-refused:1:Custom(6022)              81
+  jit-old-shape:probe-refused:1:Custom(6029)              60
+  jit-old-shape:probe-refused:1:Custom(6068)            1293
+  jit-old-shape:probe-refused:1:Custom(6069)             353
+  jit-old-shape:probe-refused:1:Custom(6070)             370
+  jit-old-shape:probe-refused:1:Custom(6071)            1398
+  jit-old-shape:probe-refused:1:Custom(6073)             300
+  jit-old-shape:probe-refused:1:Custom(6099)             214
+  jit-old-shape:probe-refused:1:Custom(6101)              18
+  jit-old-shape:probe-refused:1:Custom(6108)             673
+  jit-old-shape:probe-refused:2:Custom(6028)             262
+  jit-old-shape:probe-refused:2:Custom(6029)              10
+  jit-old-shape:probe-refused:2:Custom(6068)             585
+  jit-old-shape:probe-refused:2:Custom(6069)             160
+  jit-old-shape:probe-refused:2:Custom(6070)             170
+  jit-old-shape:probe-refused:2:Custom(6071)             607
+  jit-old-shape:probe-refused:2:Custom(6073)             128
+  jit-old-shape:probe-refused:2:Custom(6099)             119
+  jit-old-shape:probe-refused:2:Custom(6101)              15
+  jit-settle-clock:none                                 7976
+  jit-settle-clock:settles                               413
+  jit-unchecked:last-lender                              503
+  jit-unchecked:no-exit                                 3102
+  liquidate:cpmm-differential-landed                    3185
+  liquidate:cpmm-differential-refused:EmaWarmingUp     11484
+  liquidate:cpmm-differential-refused:ExitBoundNotMet      1017
+  liquidate:cpmm-differential-refused:NoRoute          87038
+  liquidate:cpmm-differential-refused:NotLiquidatable   1331711
+  liquidate:cpmm-differential-refused:ReferenceStale     89502
+  liquidate:cpmm-differential-refused:UseExpire        27479
+  liquidate:cpmm-differential-refused:UseSolSettle    315275
+  liquidate:curve-differential-completes-synthetic        94
+  liquidate:curve-differential-landed                    660
+  liquidate:curve-differential-refused:ExitBoundNotMet       356
+  liquidate:curve-differential-refused:NotLiquidatable    325904
+  liquidate:curve-differential-refused:ReferenceStale     21749
+  liquidate:curve-differential-refused:UseExpire        9561
+  liquidate:curve-differential-refused:UseSolSettle     21990
+  liquidate:differential-landed                         7032
+  liquidate:differential-refused:ExitBoundNotMet        1852
+  liquidate:differential-refused:NoRoute              234236
+  liquidate:differential-refused:NotLiquidatable     4561682
+  liquidate:differential-refused:ReferenceStale       234191
+  liquidate:differential-refused:UseExpire             78036
+  liquidate:differential-refused:UseSolSettle         733109
+  liquidate:pswap-differential-landed                   5338
+  liquidate:pswap-differential-refused:EmaWarmingUp      7951
+  liquidate:pswap-differential-refused:ExitBoundNotMet      2330
+  liquidate:pswap-differential-refused:NoRoute         79812
+  liquidate:pswap-differential-refused:NotLiquidatable   2175649
+  liquidate:pswap-differential-refused:ReferenceStale    124044
+  liquidate:pswap-differential-refused:UseExpire       56644
+  liquidate:pswap-differential-refused:UseSolSettle    467449
+  liquidate:v4-differential-landed                      3434
+  liquidate:v4-differential-refused:EmaWarmingUp       12068
+  liquidate:v4-differential-refused:ExitBoundNotMet       776
+  liquidate:v4-differential-refused:NoRoute            70245
+  liquidate:v4-differential-refused:NotLiquidatable   1319304
+  liquidate:v4-differential-refused:ReferenceStale     80745
+  liquidate:v4-differential-refused:UseExpire          27319
+  liquidate:v4-differential-refused:UseSolSettle      269190
+  near-cap-refusal:CapCurveGamma                         141
+  near-cap-refusal:CapMarketOi                           414
+  near-cap-refusal:CapPositionImpact                   14034
+  near-cap-refusal:CapUtilization                       7100
+  near-cap-refusal:CapWallet                           29559
+  near-cap-refusal:MarketNotionalCap                    9975
+  near-cap-refusal:ProceedsBelowMin                      402
+  owner-settles-chain                                    680
+  pot-chain-hold                                         744
+  shortfall-credited-checked                          211698
+  shortfall-exits-measured                            209064
+  shortfall-exits-short                                 2634
+  shortfall-short-every-share                             98
+  stale-receivable-in-window                            1960
+  sync-lender-held                                      1394
+  sync-lender-held-to-pot                                397
+  venue-cpi-refusal:open_short:Custom(30)                964
+  wind-down-absent-deficit                                 1
+  wind-down-absent-market                                316
+  wind-down-absent-owner                                 618
+  wind-down-absent-present-owed                            1
+  wind-down-claim-parked                                 757
+  wind-down-deficit-covered                              409
+  wind-down-dust-lender                                  891
+  wind-down-second-claim-nothing                        2148
+  wind-down-second-claim-paid                           8087
+  withdraw-then-settle-landed                           8766
+  wrapped-open-landed                                  25902
+
+-- coverage proxies --
+  instructions landed 28/30  events 35+ (SolSettle by condition)  error codes returned 68/111
+  codes never returned: MathOverflow, AccountMismatch, DeniedAccount, ConfigVersion, EpochRecordMismatch, TimelockTooShort, VenueSlotMismatch, MintUnsupportedProgram, MintNative, MintDisallowedExtension, MintMalformed, NoSupportedVenue, PumpVenuePrecedence, CurveMayhemUnsupported, CurveQuoteNotSol, CurveNeedsExtend, CurveStraddle, VenueResultMismatch, VenueRentOnSell, TraderStateInvalid, DelegateNotCleared, AuthorityTampered, PoolLockTooLow, MarketWarmingUp, PriceAboveOpenMax, SettlementNotAllowed, S3TimerRunning, SharesBelowMin, TokensBelowMin, LenderBehindEpochs, OracleFeed, OracleVerification, SolBelowMin, LastSharesBorrowed, TimelockTooLong, MemoProgramRequired, CreationFeeAboveMax, ReservedScanOutOfOrder, AuthoritiesNotDistinct, EpochRecordReadOnly, RebaseNeedsOwner, CurveCashbackCoin, LegacyPoolCarry
+
+-- the deficit tripwire and the wind-down's claims (M10) --
+  deficits checked 409 in 401 runs; largest 167285959393 lamports (its bound 199519108181, over the whole run 199519108181), deficit/bound largest 1.0000 smallest 0.0042
+  after the second claim pass: largest unpaid pending 222 lamports, largest lender_sol 295 lamports
+  with absent owners held behind a rebase record (KI-66): 316 markets, 618 lenders, 1394 held third-party syncs; present lenders owed above dust 1 times, at most 524012267 lamports; absent lenders left owing a deficit 1 times
+  forward chain (KI-66 full): 744 started, 0 walked further by a third party, owners stopping inside one 0 and settling one 680
+  KI-67: 818 claims closed a position (624 claim bundles refused after the close), 20954 deposits re-created one
+
+-- anomalies (not invariant violations; for review) --
+  none
+
+-- failures --
+  none
+
+summary: /root/fuzz/ready-103-20261021-e04a6776/results/summary.json

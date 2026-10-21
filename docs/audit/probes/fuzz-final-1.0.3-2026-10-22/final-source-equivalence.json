@@ -1,0 +1,24 @@
+{
+  "checked_utc": "2026-10-21T22:50:36.349105+00:00",
+  "base_ci_source": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+  "worktree_base_commit": "f894b81098376e6083348ae56dc411e3099e0556",
+  "paths_compared_to_current_worktree": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "programs",
+    "tests/fuzz",
+    "tests/litesvm",
+    "tests/fixtures",
+    "crates",
+    "services/keeper/src",
+    "services/indexer/src",
+    "services/ops/src",
+    "clients/js/src",
+    "clients/js/idl",
+    "apps/web/src",
+    ".github/workflows/ci.yml",
+    "pnpm-lock.yaml"
+  ],
+  "exit_code": 0,
+  "result": "No production, runner/harness, fixture, generated reader, application, workflow or lockfile changes. Preparation changes outside these paths are documentation and pnpm age-exclusion policy only."
+}

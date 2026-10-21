@@ -14,11 +14,8 @@ overrides:
 
 # Supply chain: nothing published less than 14 days ago is resolved, repo-wide. pnpm 12 also
 # checks every entry already in the lockfile, a --frozen-lockfile install included: CI fetches
-# every entry's metadata and fails on any locked version under 14 days old. The exclusions are
-# exact versions: the two packages the owner chose to install now (published 2026-10-07), to be
-# removed after 2026-10-21. (The 21 versions locked before this gate existed, published
-# 2026-09-29/30, were excluded until they were 14 days old; removed on 2026-10-16.)
+# every entry's metadata and fails on any locked version under 14 days old.
+# The two Mobile Wallet Adapter packages published 2026-10-07 have now aged past this gate;
+# their temporary exact-version exclusions were removed on 2026-10-22 (Europe/Kyiv).
+# The 21 earlier exclusions for 2026-09-29/30 publications were removed on 2026-10-16.
 minimumReleaseAge: 20160
-minimumReleaseAgeExclude:
-  - "@solana-mobile/wallet-standard-mobile@0.7.0"
-  - "@solana-mobile/mobile-wallet-adapter-protocol@3.0.0"

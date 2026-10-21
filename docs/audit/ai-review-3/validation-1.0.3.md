@@ -1,5 +1,49 @@
 # Draft 1.0.3 implementation and validation
 
+## Final technical gates (2026-10-22)
+
+**Concurrent publication update:** remote `56f660027` adds keeper/indexer and
+build-control fixes without changing the frozen on-chain program, fuzzer or fixtures.
+Its [CI 39556305501](https://github.com/TodorBonchev/short.win/actions/runs/39556305501)
+passed 24 jobs, with scheduled fuzz and push-event mutants intentionally skipped.
+The earlier manual `ff85a1b0` gate's 19 mutant kills are not attributed to this push.
+Incoming service review, build comparisons and the remaining operating prerequisites
+are in the [final release checks](../release-checks-1.0.3-2026-10-22.md#concurrent-servicebuild-integration).
+
+[Full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
+passed on `ff85a1b0`: 25 successful jobs, zero failed, one intentional scheduled-fuzz
+skip and all 19 selected mutants killed. That revision strengthens only the AIR2-01
+regression; production, runner and fixture inputs remain those of `e04a6776`.
+
+The frozen `e04a6776` all-profile run finished at
+`2026-10-21T22:21:37.094749Z`: supervisor elapsed **86,428.073717718 s**
+(summary **86,426.897880876 s**), exit **0**, **38,563 runs**, **7,330,667 actions**,
+**87,632,843 transactions**, **158,970,339 hook checkpoints** and **38,563 wind-downs**.
+The final summary records `failures: []`, `failure_counts: {}` and `anomalies: {}`.
+Summary SHA-256: `09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e`;
+log SHA-256: `fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b`.
+
+The [final evidence](../probes/fuzz-final-1.0.3-2026-10-22/README.md) and
+[final release checks](../release-checks-1.0.3-2026-10-22.md) supersede the pending
+gate statements in this historical validation record. The nineteen implemented
+technical rows listed in [findings](../findings.md#final-technical-disposition-2026-10-22)
+are fixed under this batch's owner-authorized AI review route. Economic
+acknowledgements and deferred leads are unchanged.
+
+Coverage is **28/30 instruction names** and **68/111 error codes**, not exhaustive
+branch coverage. `initialize_config` and `create_market` run during setup before
+`Stats` is initialized, so they are absent from the action counters. `LegacyPoolCarry`
+was not returned by this clean-state fuzz run. Its protection is established separately
+by the persisted-predecessor/carry boundary matrix, signed 6110 rollback/compatibility
+regression and old-source/old-ELF negative controls, not by a claimed random legacy-state hit.
+
+No release tag/deployment is approved here. The Jupiter live-pin drift, funded and
+monitored keeper, indexer destination `3`, compatible 304-byte guard clients and
+owner review remain operating requirements in the final release record.
+
+## Historical candidate validation (2026-10-18–21)
+
+
 **Superseded program bytes:** the later [AI3-FR01 follow-up](ai3-fr01-fix-1.0.3.md)
 adds a legacy empty-carry deposit refusal and its regressions. This record remains
 historical validation for `9b910602`; its CI and fuzz scope do not cover the new guard.
@@ -137,7 +181,7 @@ pnpm --filter web lint
 The pool generator rewrites its fixture directory; run it before concurrent vector
 compilation/replay. Historical attack-rule snapshots and outputs were preserved.
 
-## Current release gates (2026-10-21)
+## Historical release gates (2026-10-21; superseded above)
 
 This is an unreleased draft; implemented findings remain **in progress** until the
 required final gates pass. The tables above describe the preceding candidates and

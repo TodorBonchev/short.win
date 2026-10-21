@@ -1,0 +1,29 @@
+{
+  "checked_utc": "2026-10-21T22:55:57.404929+00:00",
+  "incoming_commit": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+  "incoming_diff_from_previous_published_head": [
+    "M\t.github/workflows/ci.yml",
+    "A\t.github/workflows/scripts/install-agave.sh",
+    "M\tscripts/build-test-venue.sh",
+    "M\tservices/indexer/deploy/Dockerfile",
+    "M\tservices/indexer/deploy/docker-compose.yml",
+    "M\tservices/indexer/src/ingest/writer.rs",
+    "M\tservices/indexer/tests/ingest_writer.rs",
+    "M\tservices/keeper/src/events.rs"
+  ],
+  "current_commit": "348116043331393c1d10430c6c3a11b11980368f",
+  "frozen_source": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "frozen_paths_compared": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "programs",
+    "tests/fuzz",
+    "tests/litesvm",
+    "tests/fixtures",
+    "crates"
+  ],
+  "excluded_known_test_only_change": "crates/shortwin-math/tests/ai2_accounting.rs (ff85 AIR2-01 regression)",
+  "frozen_path_equivalence": true,
+  "new_ci_run": 39556305501,
+  "scope_limit": "Frozen program/fuzzer/harness/fixtures remain valid. Changed keeper/indexer/build scripts/workflow/deploy configuration are reviewed and verified separately; previous whole-service/workflow equivalence observations apply only before incoming integration."
+}

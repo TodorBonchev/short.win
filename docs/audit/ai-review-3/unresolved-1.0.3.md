@@ -1,5 +1,38 @@
 # Unresolved findings: written treatment for draft 1.0.3
 
+## Current disposition (2026-10-22)
+
+AIR2-07 / AI3-L12, AI3-F01–F06, AI3-L01/L03/L04 and AI3-FR01 are technically
+**fixed**, together with the other eight AIR2 corrections named in the
+[final tracker](../findings.md#final-technical-disposition-2026-10-22).
+The recorded regressions, accurately attributed owner-authorized AI reviews,
+[green exact-ref CI and completed final-profile ≥24-hour fuzz](../release-checks-1.0.3-2026-10-22.md)
+support that disposition; [final fuzz evidence](../probes/fuzz-final-1.0.3-2026-10-22/README.md)
+retains completion and hashes. The earlier open/pending technical statuses below
+are historical, not the current tracker.
+
+AIR2-10/11/12/13 and AIR2-P2-02 remain **acknowledged** under the exact
+[owner-delegated rationale](../owner-decisions-1.0.3-2026-10-21.md), including
+unrecoverable cashback, zero keeper reward and positive claims that may never be paid.
+AI3-F06's final-holder ownership residual, AI3-L10's renewable deposit denial,
+AI3-L13/L19–L22's fee/claim dependencies remain acknowledged with no new bound.
+L05/L06/L07/L09/L11/L14/L16/L17/L18 remain deferred; the scoped L02/L08/L15
+duplicates and L23's per-touch duplicate plus open aggregate extension remain.
+No broader raw AIR2 lead or real AMM-v4 PnL effect is closed by this update.
+
+Never-deployed status removes present old-account migration. The legacy quarantine
+still requires reviewed recovery if such state is encountered later. Technical
+closure does not establish funded keeper operation or approve deployment: current
+venue drift and the keeper/indexer/client operating requirements remain in the
+final release record.
+
+## Historical evidence and pre-decision treatment (2026-10-19–21)
+
+The original treatment below is retained, including its former open/pending language.
+The current tracker, owner decisions and final record above supersede those statuses;
+the historical economic traces and limits are unchanged.
+
+
 **2026-10-21 dispositions:** [delegated owner selections](../owner-decisions-1.0.3-2026-10-21.md)
 now acknowledge the specified economic/availability residuals, select complete SHA-256
 before first deployment, and authorize an accurately labelled independent AI review

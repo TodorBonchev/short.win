@@ -440,16 +440,17 @@ lookup tables automatically at a listing (`shortwin-build-alt market` builds one
 
 ### Run
 
-**1.0.2 rollout gate:** update the indexer before the program upgrade so sweep destination
-`3` is classified as lender income. The older indexer falls through to protocol income for
-that new value; the updated projection accepts both old destination `0` and new `3`.
-Deploy this keeper and the corresponding UI with or after the
-short.win 1.0.2 program. They treat a zero `deposit_hold_until` migration marker as pending
-source cleanup. An older program never initializes that marker, so this keeper can repeat
-cleanup against it and spend transaction fees; the new UI can continue displaying cleanup
-as required. The retained V2 trade-extras builder and upgrade-window tests cover trading
-format compatibility, not this migration duty. Keep that builder until the actual release
-gates pass; a draft package version is not evidence of deployment.
+**1.0.3 first-deployment gate:** install the current indexer before the program so sweep
+destination `3` is classified as lender income. The updated projection accepts both old
+destination `0` and new `3`. Use the current keeper and UI/client artifacts with the
+304-byte VenueGuard and four complete SHA-256 digests. Verify the keeper's covered markets,
+funded fee payer, top-ups and working monitoring/alerts, including zero-reward eligible exits.
+
+**Historical 1.0.2 rollout guidance (superseded):** the old upgrade plan retained a V2
+trade-extras builder and warned that older programs never initialized `deposit_hold_until`.
+The owner confirmed short.win was never deployed; the 1.0.3 cleanup (`604154c3`) removed
+that builder and format negotiation. No old-account migration or V2 compatibility rollout
+is required for first deployment. A draft package version is not evidence of deployment.
 
 ```sh
 cargo build --manifest-path services/Cargo.toml -p shortwin-keeper --release

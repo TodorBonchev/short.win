@@ -1,0 +1,581 @@
+{
+  "observed_utc": "2026-10-21T22:48:52.691544+00:00",
+  "head": "f894b81098376e6083348ae56dc411e3099e0556",
+  "reviewer": "remote_scope_check AI agent; local metadata/source/artifact review; prior full-digest Rust implementer",
+  "local_operating_state": {
+    "real_operator_config": "not supplied/found in targeted filename inventory",
+    "running_named_shortwin_services_wsl": 0,
+    "running_matching_windows_processes": 0,
+    "listening_default_metrics_api_ports_wsl": [],
+    "payer_public_key": "not supplied",
+    "balance_query": "not performed without real payer identity",
+    "topup_evidence": "unavailable",
+    "alert_delivery_evidence": "unavailable",
+    "deployed_indexer_client_identities": "unavailable",
+    "scope_limit": "Local process/config filename observations do not rule out other hosts, containers, renamed processes or nondefault ports; no command lines/environments/key files read."
+  },
+  "ci": {
+    "run_id": 39509811932,
+    "head_sha": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 118928174736,
+        "name": "web",
+        "run_id": 39509811932,
+        "head_sha": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-20T22:41:37Z",
+        "completed_at": "2026-10-20T22:44:42Z",
+        "runner_name": "GitHub Actions 1000000598",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/39509811932/job/118928174736",
+        "steps": [
+          [
+            1,
+            "Set up job",
+            "completed",
+            "success",
+            "2026-10-20T22:41:37Z",
+            "2026-10-20T22:41:39Z"
+          ],
+          [
+            2,
+            "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "completed",
+            "success",
+            "2026-10-20T22:41:39Z",
+            "2026-10-20T22:41:43Z"
+          ],
+          [
+            3,
+            "Rust toolchain from rust-toolchain.toml",
+            "completed",
+            "success",
+            "2026-10-20T22:41:43Z",
+            "2026-10-20T22:41:51Z"
+          ],
+          [
+            4,
+            "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+            "completed",
+            "success",
+            "2026-10-20T22:41:51Z",
+            "2026-10-20T22:41:52Z"
+          ],
+          [
+            5,
+            "wasm-bindgen CLI (the crate's exact pin)",
+            "completed",
+            "success",
+            "2026-10-20T22:41:52Z",
+            "2026-10-20T22:42:59Z"
+          ],
+          [
+            6,
+            "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+            "completed",
+            "success",
+            "2026-10-20T22:42:59Z",
+            "2026-10-20T22:43:01Z"
+          ],
+          [
+            7,
+            "Run pnpm install --frozen-lockfile",
+            "completed",
+            "success",
+            "2026-10-20T22:43:01Z",
+            "2026-10-20T22:43:07Z"
+          ],
+          [
+            8,
+            "Run pnpm --filter @shortwin/math-wasm build",
+            "completed",
+            "success",
+            "2026-10-20T22:43:07Z",
+            "2026-10-20T22:43:34Z"
+          ],
+          [
+            9,
+            "The WASM facade from Node (crates/shortwin-math-wasm/js/smoke.cjs)",
+            "completed",
+            "success",
+            "2026-10-20T22:43:34Z",
+            "2026-10-20T22:43:34Z"
+          ],
+          [
+            10,
+            "Run pnpm --filter web lint",
+            "completed",
+            "success",
+            "2026-10-20T22:43:34Z",
+            "2026-10-20T22:43:35Z"
+          ],
+          [
+            11,
+            "Run pnpm --filter web typecheck",
+            "completed",
+            "success",
+            "2026-10-20T22:43:35Z",
+            "2026-10-20T22:43:45Z"
+          ],
+          [
+            12,
+            "Run pnpm --filter web test",
+            "completed",
+            "success",
+            "2026-10-20T22:43:45Z",
+            "2026-10-20T22:44:25Z"
+          ],
+          [
+            13,
+            "Run pnpm --filter web build",
+            "completed",
+            "success",
+            "2026-10-20T22:44:25Z",
+            "2026-10-20T22:44:36Z"
+          ],
+          [
+            25,
+            "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+            "completed",
+            "success",
+            "2026-10-20T22:44:36Z",
+            "2026-10-20T22:44:40Z"
+          ],
+          [
+            26,
+            "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "completed",
+            "success",
+            "2026-10-20T22:44:40Z",
+            "2026-10-20T22:44:40Z"
+          ],
+          [
+            27,
+            "Complete job",
+            "completed",
+            "success",
+            "2026-10-20T22:44:40Z",
+            "2026-10-20T22:44:40Z"
+          ]
+        ]
+      },
+      {
+        "id": 118929925978,
+        "name": "codama",
+        "run_id": 39509811932,
+        "head_sha": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-20T22:46:10Z",
+        "completed_at": "2026-10-20T22:46:36Z",
+        "runner_name": "GitHub Actions 1000000604",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/39509811932/job/118929925978",
+        "steps": [
+          [
+            1,
+            "Set up job",
+            "completed",
+            "success",
+            "2026-10-20T22:46:11Z",
+            "2026-10-20T22:46:11Z"
+          ],
+          [
+            2,
+            "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "completed",
+            "success",
+            "2026-10-20T22:46:11Z",
+            "2026-10-20T22:46:13Z"
+          ],
+          [
+            3,
+            "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+            "completed",
+            "success",
+            "2026-10-20T22:46:13Z",
+            "2026-10-20T22:46:14Z"
+          ],
+          [
+            4,
+            "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+            "completed",
+            "success",
+            "2026-10-20T22:46:14Z",
+            "2026-10-20T22:46:16Z"
+          ],
+          [
+            5,
+            "Run pnpm install --frozen-lockfile",
+            "completed",
+            "success",
+            "2026-10-20T22:46:16Z",
+            "2026-10-20T22:46:26Z"
+          ],
+          [
+            6,
+            "IDL copy is current",
+            "completed",
+            "success",
+            "2026-10-20T22:46:26Z",
+            "2026-10-20T22:46:26Z"
+          ],
+          [
+            7,
+            "Generated client is current",
+            "completed",
+            "success",
+            "2026-10-20T22:46:26Z",
+            "2026-10-20T22:46:29Z"
+          ],
+          [
+            8,
+            "Run pnpm --filter @shortwin/client typecheck",
+            "completed",
+            "success",
+            "2026-10-20T22:46:29Z",
+            "2026-10-20T22:46:34Z"
+          ],
+          [
+            9,
+            "Run pnpm --filter @shortwin/client test",
+            "completed",
+            "success",
+            "2026-10-20T22:46:34Z",
+            "2026-10-20T22:46:35Z"
+          ],
+          [
+            18,
+            "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "completed",
+            "success",
+            "2026-10-20T22:46:35Z",
+            "2026-10-20T22:46:35Z"
+          ],
+          [
+            19,
+            "Complete job",
+            "completed",
+            "success",
+            "2026-10-20T22:46:35Z",
+            "2026-10-20T22:46:35Z"
+          ]
+        ]
+      },
+      {
+        "id": 118929926212,
+        "name": "indexer",
+        "run_id": 39509811932,
+        "head_sha": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-20T22:46:10Z",
+        "completed_at": "2026-10-20T23:01:58Z",
+        "runner_name": "GitHub Actions 1000000606",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/39509811932/job/118929926212",
+        "steps": [
+          [
+            1,
+            "Set up job",
+            "completed",
+            "success",
+            "2026-10-20T22:46:11Z",
+            "2026-10-20T22:46:12Z"
+          ],
+          [
+            2,
+            "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "completed",
+            "success",
+            "2026-10-20T22:46:12Z",
+            "2026-10-20T22:46:13Z"
+          ],
+          [
+            3,
+            "Free runner disk space",
+            "completed",
+            "success",
+            "2026-10-20T22:46:13Z",
+            "2026-10-20T22:48:04Z"
+          ],
+          [
+            4,
+            "Rust toolchain from rust-toolchain.toml",
+            "completed",
+            "success",
+            "2026-10-20T22:48:04Z",
+            "2026-10-20T22:48:14Z"
+          ],
+          [
+            5,
+            "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+            "completed",
+            "success",
+            "2026-10-20T22:48:14Z",
+            "2026-10-20T22:48:15Z"
+          ],
+          [
+            6,
+            "Cache the embedded PostgreSQL binaries (INDEXER.md \u00a711.1)",
+            "completed",
+            "success",
+            "2026-10-20T22:48:15Z",
+            "2026-10-20T22:48:16Z"
+          ],
+          [
+            7,
+            "Cache Agave (solana-test-validator)",
+            "completed",
+            "success",
+            "2026-10-20T22:48:16Z",
+            "2026-10-20T22:48:18Z"
+          ],
+          [
+            8,
+            "Install Agave 4.1.2",
+            "completed",
+            "skipped",
+            "2026-10-20T22:48:18Z",
+            "2026-10-20T22:48:18Z"
+          ],
+          [
+            9,
+            "Select Agave 4.1.2",
+            "completed",
+            "success",
+            "2026-10-20T22:48:18Z",
+            "2026-10-20T22:48:18Z"
+          ],
+          [
+            10,
+            "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+            "completed",
+            "success",
+            "2026-10-20T22:48:18Z",
+            "2026-10-20T22:48:18Z"
+          ],
+          [
+            11,
+            "The embedded-Postgres fixture (downloads the binaries on a cold cache)",
+            "completed",
+            "success",
+            "2026-10-20T22:48:18Z",
+            "2026-10-20T22:50:51Z"
+          ],
+          [
+            12,
+            "Indexer \u2014 unit and decoder tests, ingest, analytics, the API contract (seed and replayed sessions), the security review's regressions and its 30-day load test",
+            "completed",
+            "success",
+            "2026-10-20T22:50:51Z",
+            "2026-10-20T22:56:30Z"
+          ],
+          [
+            13,
+            "The replay harness \u2014 LiteSVM sessions through the real ingest into the chain state (M8 exit)",
+            "completed",
+            "success",
+            "2026-10-20T22:56:30Z",
+            "2026-10-20T23:00:37Z"
+          ],
+          [
+            14,
+            "RPC backfill, logsSubscribe live source and finality against solana-test-validator (history past the status cache, a rolled-back cursor)",
+            "completed",
+            "success",
+            "2026-10-20T23:00:37Z",
+            "2026-10-20T23:01:38Z"
+          ],
+          [
+            15,
+            "The production indexer links no embedded Postgres (TEST-ONLY `embedded-pg`)",
+            "completed",
+            "success",
+            "2026-10-20T23:01:38Z",
+            "2026-10-20T23:01:39Z"
+          ],
+          [
+            16,
+            "The reference deployment parses (services/indexer/deploy; not run)",
+            "completed",
+            "success",
+            "2026-10-20T23:01:39Z",
+            "2026-10-20T23:01:39Z"
+          ],
+          [
+            29,
+            "Post Cache Agave (solana-test-validator)",
+            "completed",
+            "success",
+            "2026-10-20T23:01:39Z",
+            "2026-10-20T23:01:39Z"
+          ],
+          [
+            30,
+            "Post Cache the embedded PostgreSQL binaries (INDEXER.md \u00a711.1)",
+            "completed",
+            "success",
+            "2026-10-20T23:01:39Z",
+            "2026-10-20T23:01:40Z"
+          ],
+          [
+            31,
+            "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+            "completed",
+            "success",
+            "2026-10-20T23:01:40Z",
+            "2026-10-20T23:01:56Z"
+          ],
+          [
+            32,
+            "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+            "completed",
+            "success",
+            "2026-10-20T23:01:56Z",
+            "2026-10-20T23:01:57Z"
+          ],
+          [
+            33,
+            "Complete job",
+            "completed",
+            "success",
+            "2026-10-20T23:01:57Z",
+            "2026-10-20T23:01:57Z"
+          ]
+        ]
+      }
+    ]
+  },
+  "idl": {
+    "raw_equal": true,
+    "sha256": "5b94b1e98f5b32cf6d3c501d1998965bbbab80d6e2853fa6eeb8f3ba5470a003",
+    "zip_sha256": "cc7fc5a495b923a5d03a281d4378bf4d0834e252da97789e65f336efae23e3bd",
+    "zip_matches_retained_github_digest": true,
+    "guard_elf_type": {
+      "array": [
+        {
+          "array": [
+            "u8",
+            32
+          ]
+        },
+        4
+      ]
+    }
+  },
+  "current_compatibility_scopes_compared_to_ff85": [
+    "clients/js",
+    "apps/web/src/features/short/venueGuard.test.ts",
+    "apps/web/src/features/short/snapshot.ts",
+    "services/indexer/src/ingest/project.rs",
+    "services/indexer/tests/security_ingest.rs",
+    "services/indexer/src/ingest/decode/tests.rs",
+    "programs/shortwin/src/state/market.rs",
+    "programs/shortwin/src/constants.rs",
+    "programs/shortwin/src/engine/guard.rs",
+    "services/ops/src/cli.rs",
+    ".github/workflows/ci.yml"
+  ],
+  "changed_compatibility_paths": [],
+  "inspected_files": [
+    {
+      "path": "docs/audit/probes/ci-fullsha-2026-10-21/final-ci-summary.json",
+      "bytes": 94308,
+      "sha256": "ca4477ec6cdd75a2f7d7ac78daa49361752eaa4769a23b0c400091e1443f2e44"
+    },
+    {
+      "path": "docs/audit/probes/ci-fullsha-2026-10-21/final-ff85-verifier-comparison.json",
+      "bytes": 12628,
+      "sha256": "113fa94c6bce25f403d6b1b7d646d4979782b4bb9016ddf3eb05fe080683fa92"
+    },
+    {
+      "path": "target/monitor-1.0.3-release/preflight/fixture-live.log",
+      "bytes": 2217,
+      "sha256": "eeaced5a8bdd0182872f4f6e07221ef85ca77cf60985ebf412b79ad0f5b910f6"
+    },
+    {
+      "path": "clients/js/idl/shortwin.json",
+      "bytes": 219091,
+      "sha256": "5b94b1e98f5b32cf6d3c501d1998965bbbab80d6e2853fa6eeb8f3ba5470a003"
+    },
+    {
+      "path": "clients/js/test/layout.test.ts",
+      "bytes": 6981,
+      "sha256": "b06b4270cfb391b127a5f793ed81e6d7e6aa8d2211b9e44203aea4b898f95291"
+    },
+    {
+      "path": "apps/web/src/features/short/venueGuard.test.ts",
+      "bytes": 2374,
+      "sha256": "36c7662f9f99304ff9eade557456fcd9a113a74e5f63b5f6e8713c8143e6ce35"
+    },
+    {
+      "path": "services/indexer/src/ingest/project.rs",
+      "bytes": 107970,
+      "sha256": "b3532ede91655156a5714b05943f0f846f1ec07805e103a1a654924fa32c81ff"
+    },
+    {
+      "path": "services/indexer/tests/security_ingest.rs",
+      "bytes": 48280,
+      "sha256": "0c3d33a8d2f932277482419fc6a4172b222f7af93731099b9bf3d48fcb874274"
+    },
+    {
+      "path": "services/indexer/src/ingest/decode/tests.rs",
+      "bytes": 15744,
+      "sha256": "0a7a40e5f26276280731eaffad30478cd433e94c3d0f935cc0700f91eb60c3ed"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "bytes": 71162,
+      "sha256": "407b17788c416f1c3738efd94217e20bb9559e7b88104e32dd70c165277a2b6d"
+    },
+    {
+      "path": "programs/shortwin/src/state/market.rs",
+      "bytes": 33202,
+      "sha256": "01744d327bd91143970f32d27f2d393542f78a665294e60a05a6001d7828b4ef"
+    },
+    {
+      "path": "programs/shortwin/src/constants.rs",
+      "bytes": 22068,
+      "sha256": "c52ff0f7bac08cdfabd40594b8cfd5e2e0b52ea0685fc4110d10b6d1c8951e35"
+    },
+    {
+      "path": "programs/shortwin/src/engine/guard.rs",
+      "bytes": 9727,
+      "sha256": "51dd080482b9fc009e32ab3eed294d9e56cd3ddcfb048becd81a9aaf049111e5"
+    },
+    {
+      "path": "services/ops/src/cli.rs",
+      "bytes": 39248,
+      "sha256": "14e0a81d798e586295938b74257481805ff38de863e802936bbcce9ca8d80703"
+    },
+    {
+      "path": "services/keeper/keeper.example.toml",
+      "bytes": 11882,
+      "sha256": "6578637479715dcbab8d17d6e2fd2fb1c2cf21e034320e5cc3585aeff8c24f6d"
+    },
+    {
+      "path": "services/indexer/deploy/indexer.toml",
+      "bytes": 2447,
+      "sha256": "e15c44b345b1463f4aa8cbeb7b8f37ab32716bb3f66e8aeabd4781bbac3c390d"
+    },
+    {
+      "path": "services/indexer/deploy/docker-compose.yml",
+      "bytes": 4338,
+      "sha256": "84443b5103301199afff372c2282e79cb34afcc1d90eb4a7d96a07cdab78bef9"
+    },
+    {
+      "path": "services/README.md",
+      "bytes": 102409,
+      "sha256": "684f4487f149009464297adf015acfc0a0259415879c65f004923e9715d26fb0"
+    }
+  ],
+  "actions": {
+    "tracked_edits": false,
+    "production_writes": false,
+    "service_started": false,
+    "transactions_sent": false,
+    "new_test_suite_run": false
+  },
+  "report_sha256": "42e0c462c7c2628d677445a7696132050c98aeea3ea048b27626ef784d348c7c"
+}

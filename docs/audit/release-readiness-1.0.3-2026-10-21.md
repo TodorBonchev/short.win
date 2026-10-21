@@ -1,7 +1,7 @@
 # Draft 1.0.3 release readiness (2026-10-21)
 
-**Tested code candidate:** `ff85a1b0c8452cb9fad32767f7083d22377e90a3`, pushed to
-`audit-1.0.3-gates`. **Full CI passed; final-profile ≥24 h fuzz and deployment preflight remain.**
+**Current tested code candidate:** `56f660027f88ee60a33b9d2b5da516daccc9c9b9`, integrated from
+`audit-1.0.3-gates`. **Full CI and final-profile ≥24 h fuzz passed; deployment preflight remains.**
 No 1.0.3 tag or deployment has been made by this work.
 
 The owner confirmed the program has **never been deployed** and expressly delegated
@@ -52,6 +52,18 @@ The test-only `ff85a1b0` adds direct stored/effective lock checks and a zero-loc
 control. Candidate passes; restoring the old floor fails. Production, fuzzer and
 fixture inputs remain identical to `e04a6776`; the active fuzz run is not restarted.
 
+## Concurrent service/build update (October 22 publication)
+
+Remote `56f660027` was preserved when publishing the final audit record. It changes
+keeper event authentication, duplicate-stream indexer checkpoints and locked/pinned
+build controls, with no program/fuzzer/fixture change. Its exact
+[CI 39556305501](https://github.com/TodorBonchev/short.win/actions/runs/39556305501)
+passed 24 jobs; scheduled fuzz and push-event mutants were intentionally skipped.
+The earlier `ff85a1b0` manual full gate's 19 mutant kills remain separate evidence
+for unchanged mutant/program inputs. New service review and actual build-byte
+comparisons are retained in the [final release record](release-checks-1.0.3-2026-10-22.md#concurrent-servicebuild-integration).
+The frozen 24-hour run covers unchanged on-chain inputs, not changed service behavior.
+
 ## Attributed verification
 
 | Check | Actual evidence |
@@ -75,9 +87,16 @@ records later source/evidence, author overlap and separate peer review. The owne
 this accurately labelled AI-assisted batch-specific route. No official external audit, accreditation or signature
 is claimed; CI, reproducible builds and final-profile fuzz remain required.
 
-## Exact-ref full CI and canonical artifacts
+## Exact-ref core gate and canonical artifacts
 
 [Retained job outcomes, byte comparisons and source-equivalence evidence](probes/ci-fullsha-2026-10-21/README.md).
+The later exact-`56f660027` [service/build CI](https://github.com/TodorBonchev/short.win/actions/runs/39556305501)
+passed 24 jobs with scheduled fuzz/push-event mutants skipped; its downloaded Anchor
+release/test/mock and verifier artifacts match the same canonical bytes below.
+Both new artifact ZIP digests and the actual unchanged IDL were independently checked.
+[New retained comparison](probes/fuzz-final-1.0.3-2026-10-22/remote-56-review/README.md).
+The earlier dispatch below supplies the separately attributed full mutation gate.
+
 
 [Full CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
 completed **success** on exact candidate `ff85a1b0`: **25 jobs passed, zero failed,
@@ -118,21 +137,25 @@ Anchor test-venue/mock match too. Both downloaded ZIP digests match GitHub metad
 [Independent actual-byte comparison](probes/ci-fullsha-2026-10-21/final-ff85-verifier-comparison.json).
 The complete final CI gate is green.
 
-## Final fuzz and first-deployment gate
+## Final fuzz and first-deployment gate (updated 2026-10-22 local)
 
-The [final all-profile run](fuzz-1.0.3-fullsha.md) started **2026-10-20 22:21:09 UTC**,
-using source `e04a6776`, frozen programs, runner `5b6971e3…636b48` and a separate copy of
-all 334 tracked fixture files. A separate reviewer matched every copy and the source
-archive to the commit. It must complete ≥24 h with zero failures/anomalies and retained
-coverage/exit/summary hashes before implemented findings become **fixed**. The 47-minute
-old-venue/full-digest run and 13h13m pre-digest run are explicitly superseded partial
-evidence; older completed runs do not satisfy this final-profile gate.
+The [final all-profile run](fuzz-1.0.3-fullsha.md) completed naturally on the frozen
+`e04a6776` runtime: exit 0, supervisor 86,428.074 seconds and runner 86,426.898 seconds;
+38,563 runs, 87,632,843 transactions, zero invariant failures/anomalies. Exact final
+summary/log hashes, all four binaries, source archive, 334 fixtures and the six-profile
+scheduling witness passed independent verification. [Retained evidence](probes/fuzz-final-1.0.3-2026-10-22/README.md).
+Earlier partial and different-program runs remain superseded. Technical finding
+closure does not remove acknowledged claim, carry, fee or keeper-payment risks.
 
-The current live-pin check passes at slot 459,391,399; pump-fees bytes still match the
-retained R-PFEE analysis. Recheck before actual deployment/revalidation: this is a dated
-observation, not a promise of future mainnet state. After final-profile fuzz passes,
-record final statuses/release hashes and present the tag/deployment plan for owner review. First
-deployment also requires a funded, monitored keeper for zero-reward eligible exits,
-indexer support for sweep destination `3` and compatible 304-byte guard readers. Tests do
-not establish funded service operation. Later/conditional tasks remain in
-[TODO](../../TODO.md); the mobile package-age follow-up is after October 21.
+The [October 22 preparation record and concrete tag/deployment plan](release-checks-1.0.3-2026-10-22.md)
+record passing scope, fixture-integrity, package-age install, client and web checks.
+The read-only live check at slot 459,802,698 **failed solely on Jupiter's new deploy
+459,479,624** versus baseline 454,465,850; all other monitored bytes, including
+pump-fees, match. Jupiter is outside current execution masks, but the keeper watches
+it and configured initialization slots must be reviewed. No automatic repin or
+upstream promotion was made. The aggregate check is not green.
+
+Actual funded/monitored keeper operation, covered markets/top-ups/alerts and running
+indexer/client identities remain unverified. Compatible source/tests do not supply
+operating evidence. These prerequisites and the owner's final review remain before
+any tag or first deployment; no tag, deployment or transaction was executed here.

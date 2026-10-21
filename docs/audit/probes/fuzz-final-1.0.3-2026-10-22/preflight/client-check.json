@@ -1,0 +1,12 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "@shortwin/client",
+    "check"
+  ],
+  "started_utc": "2026-10-21T22:46:03.201533+00:00",
+  "finished_utc": "2026-10-21T22:46:07.848400+00:00",
+  "exit_code": 0,
+  "output_sha256": "7a1a3781852c2cb4c709817278b3c545e28201b5810663f257bb9ef321f7dee8"
+}

@@ -1,0 +1,41 @@
+✔ program address is declare_id! (0.830376ms)
+✔ every #[program] instruction has builders and its Anchor discriminator (1.83577ms)
+✔ error codes follow errors.rs declaration order from 6000 (0.609625ms)
+✔ crank_sol_usd: PDA defaults, roles and data (12.097396ms)
+✔ sync_lender (KI65-REV-SEC1): the owner is an either-signer, the lender PDA defaults from it (9.170486ms)
+✔ set_coverage_pause (O17): the keeper key signs, the config PDA defaults, the market is writable (4.5677ms)
+✔ OracleCache (Borsh, 45 B): price @8, conf @16, expo @24, publish_time @28, updated_slot @36, bump @44 (0.52101ms)
+✔ account discriminators are Anchor’s (1.769546ms)
+✔ ShareEpoch: field order, size 143 and discriminator follow epoch.rs (3.837485ms)
+✔ findShareEpochPda and the remaining-account metas (20.785325ms)
+✔ PodU128 / PodI128 conversions round-trip (2.015539ms)
+✔ LenderPosition (Borsh, 241 B): the decoder follows lender.rs field by field (0.784264ms)
+✔ layout_asserts.rs parses (0.912152ms)
+✔ GlobalConfig: size 1448 and 20 field offsets (12.331961ms)
+✔ Params: size 264 and 58 field offsets (6.344404ms)
+✔ TierParams: size 48 and 12 field offsets (0.529447ms)
+✔ EmaConfig: size 32 and 8 field offsets (0.477568ms)
+✔ KinkConfig: size 8 and 2 field offsets (0.164124ms)
+✔ PendingChange: size 472 and 4 field offsets (0.340003ms)
+✔ VenueGuard: size 304 and 9 field offsets (1.04307ms)
+✔ VenueExtras: size 6512 and 6 field offsets (10.323549ms)
+✔ SeedPart: size 34 and 3 field offsets (0.301349ms)
+✔ ExtraEntry: size 176 and 6 field offsets (0.400359ms)
+✔ ExtrasSet: size 712 and 4 field offsets (0.588483ms)
+✔ IxExtras: size 2144 and 4 field offsets (1.696127ms)
+✔ Market: size 3104 and 107 field offsets (31.952677ms)
+✔ RingEntry: size 136 and 9 field offsets (0.404247ms)
+✔ MarketVault: size 2200 and 12 field offsets (1.178045ms)
+✔ every asserted account size matches the client (0.253977ms)
+✔ VenueGuard retains all four full SHA-256 digests through byte 303 (0.824038ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 436.163442
+$ pnpm run typecheck && pnpm run test
+$ tsc -p tsconfig.json
+$ node --test test/*.test.ts

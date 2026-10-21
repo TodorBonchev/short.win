@@ -11,14 +11,15 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 ## 1.0.3 release blockers
 
-- [ ] Complete the [final current-profile ≥24 h all-profile fuzz run](docs/audit/fuzz-1.0.3-fullsha.md)
-      on the recorded frozen program, runner and venue fixtures. Retain zero failures/
-      anomalies, all-profile coverage, elapsed time, exit and summary/log hashes.
-      Superseded old-program/old-profile durations are not credited.
-- [ ] After final fuzz passes, record final finding statuses and release hashes, then present
-      the 1.0.3 tag/deployment plan for owner review. Recheck live venue pins/R-PFEE,
-      funded/monitored keeper operation, indexer sweep destination `3` and compatible
-      304-byte guard clients before program deployment.
+- [ ] Resolve the [current Jupiter live-pin drift](docs/audit/release-checks-1.0.3-2026-10-22.md)
+      through explicit upstream/deployment configuration review before first deployment.
+      Keep the failed aggregate live check recorded; do not silently repin it.
+- [ ] Verify actual funded/monitored keeper operation, covered markets, payer top-ups and
+      alerts, plus running indexer destination `3` and 304-byte client artifact identities.
+      Tests establish compatibility; operating evidence is still pending.
+- [ ] Obtain owner review of the [concrete 1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
+      after the remaining preflight requirements are satisfied. Final CI, frozen ≥24 h
+      fuzz, technical finding closure and preparation checks are recorded there.
 
 The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) and
 accurately labelled [focused](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md) /
@@ -37,9 +38,6 @@ refresh and legacy keeper cleanup are complete in the source candidate.
       can regenerate them from a fresh validator seed.
 - [ ] Complete the original AI review 2 pass-2 judge run, pass 3 and an
       independent keeper-core review if that broader audit scope is resumed.
-- [ ] After 2026-10-21, remove the two remaining `@solana-mobile`
-      release-age exclusions in `pnpm-workspace.yaml` and rerun
-      `pnpm install --frozen-lockfile`.
 - [ ] On any new pump-fees ELF, re-read `withdraw`'s accounts and authority
       (R-PFEE) before relying on the 2026-10-12 review.
 - [ ] Run the Surfpool synthetic-close fork case in

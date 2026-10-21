@@ -1,0 +1,629 @@
+{
+  "checked_utc": "2026-10-21T22:46:36.064949+00:00",
+  "reviewer": "keeper_fix_review AI agent; independent final verification, not an external firm or release/deployment approval",
+  "frozen_source_commit": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "green_ci_source_commit": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+  "current_worktree_commit": "f894b81098376e6083348ae56dc411e3099e0556",
+  "run_base": "/root/fuzz/ready-103-20261021-e04a6776",
+  "gate_pass": true,
+  "checks": {
+    "pinned_monitor_notes": true,
+    "seven_fixed_identity_anchors": true,
+    "completion_exists": true,
+    "summary_exists": true,
+    "completion_start_identity": true,
+    "exit_zero": true,
+    "supervisor_elapsed_24h": true,
+    "runner_elapsed_24h": true,
+    "timestamps_24h": true,
+    "summary_hash_matches_completion": true,
+    "log_hash_matches_completion": true,
+    "empty_failures": true,
+    "empty_failure_counts": true,
+    "empty_anomalies": true,
+    "positive_work": true,
+    "all_four_frozen_binaries": true,
+    "source_archive_hash": true,
+    "source_archive_matches_git_source": true,
+    "fixture_record_hash": true,
+    "fixture_manifest_hash": true,
+    "fixture_checksums_hash": true,
+    "all_334_fixture_entries": true,
+    "no_crash_or_anomaly_artifacts": true,
+    "only_expected_result_file": true,
+    "final_text_reports_none": true,
+    "runtime_build_fuzzer_harness_fixture_source_equivalence": true,
+    "profile_witness_source_pinned": true,
+    "expected_launch_command": true,
+    "six_profile_selection_witness": true,
+    "green_ci_record_pinned": true,
+    "green_ci_exact_ref": true,
+    "ci_comparison_pinned": true,
+    "ci_comparison_identity_pass": true,
+    "ci_and_current_sbf_byte_identity": true
+  },
+  "completion": {
+    "started_utc": "2026-10-20T22:21:09.024380+00:00",
+    "finished_utc": "2026-10-21T22:21:37.094749+00:00",
+    "elapsed_seconds": 86428.07371771798,
+    "exit_code": 0,
+    "summary_sha256": "09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e",
+    "log_sha256": "fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b"
+  },
+  "wall_clock_elapsed_seconds": 86428.070369,
+  "final_files": {
+    "completion.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/completion.json",
+      "bytes": 340,
+      "sha256": "1846fcc8f9fc1ea7baf8b520dd5d8b5ebdd2cb80a1259f367829aff2ab3ac704"
+    },
+    "results/summary.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/results/summary.json",
+      "bytes": 22292,
+      "sha256": "09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e"
+    },
+    "run.log": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/run.log",
+      "bytes": 130462,
+      "sha256": "fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b"
+    },
+    "metadata.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/metadata.json",
+      "bytes": 3272,
+      "sha256": "3cb472ecc4a911394e4e6cbe40299ca6486a9f780c6790d87bf8ff57bc772e4c"
+    },
+    "running.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/running.json",
+      "bytes": 108,
+      "sha256": "85f3347ab8931f629d1cd2c14b6af461f0adb0f2c09638724ec7d5fb917e3aec"
+    },
+    "supervise.py": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/supervise.py",
+      "bytes": 1009,
+      "sha256": "e69c1f8f773c4400debe11dd6430369be0b8c927a264f81cbe81e156cb83a9d1"
+    },
+    "source.tar": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/source.tar",
+      "bytes": 100700160,
+      "sha256": "caf9ce12131db852fea0e21b179fb997e1a731ed89933957c31a3e2715770840"
+    },
+    "fixtures.sha256.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/fixtures.sha256.json",
+      "bytes": 56649,
+      "sha256": "d0205300e4fac878a45322814047da1c578d893d353ce75517a8ac3d56e5e6ef"
+    },
+    "fixtures/manifest.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/fixtures/manifest.json",
+      "bytes": 354651,
+      "sha256": "f0d87f1c201b2df8016eb31648c533dc50f1832243ba84f16fdfe400166ddc4b"
+    },
+    "fixtures/SHA256SUMS": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/fixtures/SHA256SUMS",
+      "bytes": 37414,
+      "sha256": "b17a50e1e1e7e91cf16f84ac8d810cb1af82bbaa064ef96f90b47f32ca2f9dfc"
+    }
+  },
+  "fixed_identity_anchors": {
+    "metadata.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/metadata.json",
+      "bytes": 3272,
+      "sha256": "3cb472ecc4a911394e4e6cbe40299ca6486a9f780c6790d87bf8ff57bc772e4c",
+      "expected_sha256": "3cb472ecc4a911394e4e6cbe40299ca6486a9f780c6790d87bf8ff57bc772e4c",
+      "matches": true
+    },
+    "running.json": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/running.json",
+      "bytes": 108,
+      "sha256": "85f3347ab8931f629d1cd2c14b6af461f0adb0f2c09638724ec7d5fb917e3aec",
+      "expected_sha256": "85f3347ab8931f629d1cd2c14b6af461f0adb0f2c09638724ec7d5fb917e3aec",
+      "matches": true
+    },
+    "supervise.py": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/supervise.py",
+      "bytes": 1009,
+      "sha256": "e69c1f8f773c4400debe11dd6430369be0b8c927a264f81cbe81e156cb83a9d1",
+      "expected_sha256": "e69c1f8f773c4400debe11dd6430369be0b8c927a264f81cbe81e156cb83a9d1",
+      "matches": true
+    },
+    "bin/shortwin-release.so": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+      "bytes": 1644024,
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "expected_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "matches": true
+    },
+    "bin/shortwin-test-venue.so": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+      "bytes": 1675056,
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "expected_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "matches": true
+    },
+    "bin/mock_cpamm.so": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so",
+      "bytes": 281240,
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "expected_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "matches": true
+    },
+    "bin/shortwin-fuzz": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-fuzz",
+      "bytes": 11686272,
+      "sha256": "5b6971e3fd11f8c8d3166d010631b40e0dd57b797f311ba97a348a35e1036b48",
+      "expected_sha256": "5b6971e3fd11f8c8d3166d010631b40e0dd57b797f311ba97a348a35e1036b48",
+      "matches": true
+    }
+  },
+  "frozen_artifacts": {
+    "release": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+      "bytes": 1644024,
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "expected_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "expected_bytes": 1644024,
+      "matches": true
+    },
+    "test_venue": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+      "bytes": 1675056,
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "expected_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "expected_bytes": 1675056,
+      "matches": true
+    },
+    "mock": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so",
+      "bytes": 281240,
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "expected_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "expected_bytes": 281240,
+      "matches": true
+    },
+    "runner": {
+      "path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-fuzz",
+      "bytes": 11686272,
+      "sha256": "5b6971e3fd11f8c8d3166d010631b40e0dd57b797f311ba97a348a35e1036b48",
+      "expected_sha256": "5b6971e3fd11f8c8d3166d010631b40e0dd57b797f311ba97a348a35e1036b48",
+      "expected_bytes": 11686272,
+      "matches": true
+    }
+  },
+  "fixture_entries_verified": 334,
+  "fixture_mismatches": [],
+  "results_files": [
+    "results/summary.json"
+  ],
+  "crash_or_anomaly_artifacts": [],
+  "former_processes_present": {
+    "supervisor_pid": false,
+    "runner_pid": false
+  },
+  "summary": {
+    "runs": 38563,
+    "actions": 7330667,
+    "skipped": 2298122,
+    "transactions": 87632843,
+    "transactions_failed": 9919675,
+    "hook_checkpoints": 158970339,
+    "wind_downs": 38563,
+    "wall_seconds": 86426.897880876,
+    "failures": [],
+    "failure_counts": {},
+    "anomalies": {},
+    "coverage_proxies": {
+      "error_codes_never_returned": [
+        "MathOverflow",
+        "AccountMismatch",
+        "DeniedAccount",
+        "ConfigVersion",
+        "EpochRecordMismatch",
+        "TimelockTooShort",
+        "VenueSlotMismatch",
+        "MintUnsupportedProgram",
+        "MintNative",
+        "MintDisallowedExtension",
+        "MintMalformed",
+        "NoSupportedVenue",
+        "PumpVenuePrecedence",
+        "CurveMayhemUnsupported",
+        "CurveQuoteNotSol",
+        "CurveNeedsExtend",
+        "CurveStraddle",
+        "VenueResultMismatch",
+        "VenueRentOnSell",
+        "TraderStateInvalid",
+        "DelegateNotCleared",
+        "AuthorityTampered",
+        "PoolLockTooLow",
+        "MarketWarmingUp",
+        "PriceAboveOpenMax",
+        "SettlementNotAllowed",
+        "S3TimerRunning",
+        "SharesBelowMin",
+        "TokensBelowMin",
+        "LenderBehindEpochs",
+        "OracleFeed",
+        "OracleVerification",
+        "SolBelowMin",
+        "LastSharesBorrowed",
+        "TimelockTooLong",
+        "MemoProgramRequired",
+        "CreationFeeAboveMax",
+        "ReservedScanOutOfOrder",
+        "AuthoritiesNotDistinct",
+        "EpochRecordReadOnly",
+        "RebaseNeedsOwner",
+        "CurveCashbackCoin",
+        "LegacyPoolCarry"
+      ],
+      "error_codes_returned": 68,
+      "error_codes_total": 111,
+      "instructions_landed": 28,
+      "instructions_total": 30
+    },
+    "wind_down_deficits": {
+      "checked": 409,
+      "dust_lamports": 1000000,
+      "largest_bound_lamports": "199519108181",
+      "largest_cumulative_bound_lamports": "199519108181",
+      "largest_lamports": 167285959393,
+      "largest_share_of_bound_ppm": 1000000,
+      "runs_with_deficit": 401,
+      "smallest_share_of_bound_ppm": 4151
+    },
+    "wind_down_claims": {
+      "absent_deficit_markets": 1,
+      "claim_dust_lamports": 1000,
+      "largest_absent_owed_lamports": 524012267,
+      "largest_lender_sol_lamports": 295,
+      "largest_unpaid_pending_lamports": 222
+    }
+  },
+  "source_equivalence": [
+    {
+      "path": "Cargo.toml",
+      "frozen_source_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "green_ci_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "current_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "all_equal": true
+    },
+    {
+      "path": "Cargo.lock",
+      "frozen_source_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "green_ci_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "current_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "all_equal": true
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "frozen_source_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "green_ci_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "current_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "all_equal": true
+    },
+    {
+      "path": "programs",
+      "frozen_source_object": "46ccef0d904c2827a1dbd4a6e853fa990ea9da06",
+      "green_ci_object": "46ccef0d904c2827a1dbd4a6e853fa990ea9da06",
+      "current_object": "46ccef0d904c2827a1dbd4a6e853fa990ea9da06",
+      "all_equal": true
+    },
+    {
+      "path": "crates/shortwin-math/src",
+      "frozen_source_object": "a97d7e3ff3c4366cfd8447519068a7edb07aeece",
+      "green_ci_object": "a97d7e3ff3c4366cfd8447519068a7edb07aeece",
+      "current_object": "a97d7e3ff3c4366cfd8447519068a7edb07aeece",
+      "all_equal": true
+    },
+    {
+      "path": "crates/shortwin-math/Cargo.toml",
+      "frozen_source_object": "6176c976293d8d234319e20a70f133ecc12ffdf6",
+      "green_ci_object": "6176c976293d8d234319e20a70f133ecc12ffdf6",
+      "current_object": "6176c976293d8d234319e20a70f133ecc12ffdf6",
+      "all_equal": true
+    },
+    {
+      "path": "crates/shortwin-venue-state",
+      "frozen_source_object": "df7c1e1757f5f49a79077df4a042bef711e9c96a",
+      "green_ci_object": "df7c1e1757f5f49a79077df4a042bef711e9c96a",
+      "current_object": "df7c1e1757f5f49a79077df4a042bef711e9c96a",
+      "all_equal": true
+    },
+    {
+      "path": "tests/fuzz",
+      "frozen_source_object": "52e5234a90796f51a27818348c9f880562546d8a",
+      "green_ci_object": "52e5234a90796f51a27818348c9f880562546d8a",
+      "current_object": "52e5234a90796f51a27818348c9f880562546d8a",
+      "all_equal": true
+    },
+    {
+      "path": "tests/litesvm/src",
+      "frozen_source_object": "6797f33de04f3b38b238f195711a25d1a8aa5519",
+      "green_ci_object": "6797f33de04f3b38b238f195711a25d1a8aa5519",
+      "current_object": "6797f33de04f3b38b238f195711a25d1a8aa5519",
+      "all_equal": true
+    },
+    {
+      "path": "tests/litesvm/Cargo.toml",
+      "frozen_source_object": "191111c43716024706473e9cc2d22ab7827eb56f",
+      "green_ci_object": "191111c43716024706473e9cc2d22ab7827eb56f",
+      "current_object": "191111c43716024706473e9cc2d22ab7827eb56f",
+      "all_equal": true
+    },
+    {
+      "path": "tests/fixtures",
+      "frozen_source_object": "027605ff93d0897c04ab143fda17492df4e15816",
+      "green_ci_object": "027605ff93d0897c04ab143fda17492df4e15816",
+      "current_object": "027605ff93d0897c04ab143fda17492df4e15816",
+      "all_equal": true
+    }
+  ],
+  "witness_source_blobs": [
+    {
+      "file": "tests/fuzz/src/main.rs",
+      "source_object": "5d1b6cea34c76de962ace64b14b6255feff4c5f2",
+      "current_object": "5d1b6cea34c76de962ace64b14b6255feff4c5f2",
+      "equal": true
+    },
+    {
+      "file": "tests/fuzz/src/action.rs",
+      "source_object": "19fbe545019c583e82ff401e79077c2bc8833263",
+      "current_object": "19fbe545019c583e82ff401e79077c2bc8833263",
+      "equal": true
+    },
+    {
+      "file": "tests/fuzz/src/rng.rs",
+      "source_object": "15f4730506386fcfa6fd734ba1c1b410bb6e669f",
+      "current_object": "15f4730506386fcfa6fd734ba1c1b410bb6e669f",
+      "equal": true
+    },
+    {
+      "file": "tests/fuzz/src/runner.rs",
+      "source_object": "c8f10bd8e52db359173185862a1555014dc97d3a",
+      "current_object": "c8f10bd8e52db359173185862a1555014dc97d3a",
+      "equal": true
+    },
+    {
+      "file": "tests/fuzz/src/stats.rs",
+      "source_object": "17f6252e44e1f26862d6bb54d7df59913a0476e4",
+      "current_object": "17f6252e44e1f26862d6bb54d7df59913a0476e4",
+      "equal": true
+    }
+  ],
+  "profile_selection_witness": {
+    "profiles": [
+      "mock",
+      "mixed",
+      "curve",
+      "pumpswap",
+      "amm-v4",
+      "cpmm"
+    ],
+    "first_worker_occurrences": {
+      "0": {
+        "amm-v4": {
+          "one_based_worker_run": 1,
+          "seed": 103410000
+        },
+        "pumpswap": {
+          "one_based_worker_run": 2,
+          "seed": 103410002
+        },
+        "cpmm": {
+          "one_based_worker_run": 3,
+          "seed": 103410004
+        },
+        "mock": {
+          "one_based_worker_run": 9,
+          "seed": 103410016
+        },
+        "mixed": {
+          "one_based_worker_run": 10,
+          "seed": 103410018
+        },
+        "curve": {
+          "one_based_worker_run": 17,
+          "seed": 103410032
+        }
+      },
+      "1": {
+        "amm-v4": {
+          "one_based_worker_run": 1,
+          "seed": 103410001
+        },
+        "mock": {
+          "one_based_worker_run": 2,
+          "seed": 103410003
+        },
+        "cpmm": {
+          "one_based_worker_run": 4,
+          "seed": 103410007
+        },
+        "curve": {
+          "one_based_worker_run": 5,
+          "seed": 103410009
+        },
+        "pumpswap": {
+          "one_based_worker_run": 17,
+          "seed": 103410033
+        },
+        "mixed": {
+          "one_based_worker_run": 20,
+          "seed": 103410039
+        }
+      }
+    },
+    "witnesses": [
+      {
+        "profile": "mock",
+        "worker_first_occurrences": [
+          {
+            "one_based_worker_run": 9,
+            "seed": 103410016
+          },
+          {
+            "one_based_worker_run": 2,
+            "seed": 103410003
+          }
+        ],
+        "max_completed_runs_if_absent": 9,
+        "required_completed_runs": 10
+      },
+      {
+        "profile": "mixed",
+        "worker_first_occurrences": [
+          {
+            "one_based_worker_run": 10,
+            "seed": 103410018
+          },
+          {
+            "one_based_worker_run": 20,
+            "seed": 103410039
+          }
+        ],
+        "max_completed_runs_if_absent": 28,
+        "required_completed_runs": 29
+      },
+      {
+        "profile": "curve",
+        "worker_first_occurrences": [
+          {
+            "one_based_worker_run": 17,
+            "seed": 103410032
+          },
+          {
+            "one_based_worker_run": 5,
+            "seed": 103410009
+          }
+        ],
+        "max_completed_runs_if_absent": 20,
+        "required_completed_runs": 21
+      },
+      {
+        "profile": "pumpswap",
+        "worker_first_occurrences": [
+          {
+            "one_based_worker_run": 2,
+            "seed": 103410002
+          },
+          {
+            "one_based_worker_run": 17,
+            "seed": 103410033
+          }
+        ],
+        "max_completed_runs_if_absent": 17,
+        "required_completed_runs": 18
+      },
+      {
+        "profile": "amm-v4",
+        "worker_first_occurrences": [
+          {
+            "one_based_worker_run": 1,
+            "seed": 103410000
+          },
+          {
+            "one_based_worker_run": 1,
+            "seed": 103410001
+          }
+        ],
+        "max_completed_runs_if_absent": 0,
+        "required_completed_runs": 1
+      },
+      {
+        "profile": "cpmm",
+        "worker_first_occurrences": [
+          {
+            "one_based_worker_run": 3,
+            "seed": 103410004
+          },
+          {
+            "one_based_worker_run": 4,
+            "seed": 103410007
+          }
+        ],
+        "max_completed_runs_if_absent": 5,
+        "required_completed_runs": 6
+      }
+    ],
+    "minimum_completed_runs_for_all_profiles": 29,
+    "observed_completed_runs": 38563,
+    "method": "Two contiguous worker seed prefixes. A missing profile bounds combined completed runs by sum(first occurrence minus one);38563 exceeds the all-profile threshold29. This is derived selection coverage, not measured per-profile counts or24h per profile."
+  },
+  "ci_evidence": {
+    "summary": {
+      "path": "/root/short.win-audit-review/docs/audit/probes/ci-fullsha-2026-10-21/final-ci-summary.json",
+      "bytes": 94308,
+      "sha256": "ca4477ec6cdd75a2f7d7ac78daa49361752eaa4769a23b0c400091e1443f2e44"
+    },
+    "comparison": {
+      "path": "/root/short.win-audit-review/docs/audit/probes/ci-fullsha-2026-10-21/final-ff85-verifier-comparison.json",
+      "bytes": 12628,
+      "sha256": "113fa94c6bce25f403d6b1b7d646d4979782b4bb9016ddf3eb05fe080683fa92"
+    },
+    "raw_sbf_byte_comparisons": [
+      {
+        "comparison": "CI release vs frozen",
+        "left": "/root/short.win-audit-review/target/ci-39509811932/anchor/deploy/shortwin.so",
+        "right": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+        "left_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+        "right_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+        "byte_equal": true
+      },
+      {
+        "comparison": "CI verifier vs frozen",
+        "left": "/root/short.win-audit-review/target/ci-39509811932/verifier/shortwin.so",
+        "right": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+        "left_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+        "right_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+        "byte_equal": true
+      },
+      {
+        "comparison": "CI test-venue vs frozen",
+        "left": "/root/short.win-audit-review/target/ci-39509811932/anchor/test-venue/deploy/shortwin.so",
+        "right": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+        "left_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+        "right_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+        "byte_equal": true
+      },
+      {
+        "comparison": "CI mock vs frozen",
+        "left": "/root/short.win-audit-review/target/ci-39509811932/anchor/deploy/mock_cpamm.so",
+        "right": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so",
+        "left_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+        "right_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+        "byte_equal": true
+      },
+      {
+        "comparison": "current release artifact vs frozen",
+        "left": "/root/short.win-audit-review/target/deploy/shortwin.so",
+        "right": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+        "left_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+        "right_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+        "byte_equal": true
+      },
+      {
+        "comparison": "current test-venue artifact vs frozen",
+        "left": "/root/short.win-audit-review/target/test-venue/deploy/shortwin.so",
+        "right": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+        "left_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+        "right_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+        "byte_equal": true
+      },
+      {
+        "comparison": "current mock artifact vs frozen",
+        "left": "/root/short.win-audit-review/target/deploy/mock_cpamm.so",
+        "right": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so",
+        "left_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+        "right_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+        "byte_equal": true
+      }
+    ]
+  },
+  "limits": [
+    "The gate is24h across all selected profiles, not24h each.",
+    "transactions_failed counts expected refusals and is not the invariant-failure count.",
+    "Coverage is proxy sampling, not exhaustive PC/branch/domain proof.",
+    "Existing absent-owner/first-claim economics and other accepted policy residuals are not removed by a clean fuzz result; actual residual counters are preserved.",
+    "No signals, restarts, tracked-document edits, release tags or deployments were performed."
+  ]
+}

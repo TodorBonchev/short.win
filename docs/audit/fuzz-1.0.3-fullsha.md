@@ -1,6 +1,6 @@
 # Draft 1.0.3: final full-digest and current-venue fuzz run
 
-**In progress; the ≥24-hour gate is not complete.** Source candidate
+**Completed clean; independently verified on 2026-10-22 (Europe/Kyiv).** Source candidate
 `e04a6776f1c2f5e02e581d76dd1255c416270275` includes the complete SHA-256 VenueGuard,
 AI3-FR01 quarantine, retained keeper/browser recovery fixes and the reviewed supported
 SOL/WSOL paths on the newly observed pump/PumpSwap builds.
@@ -47,10 +47,51 @@ passed on `ff85a1b0` (25 successful jobs, zero failures, one intentional skip;
 all 19 selected mutants killed), a test-only strengthening of AIR2-01. All 2,064 other tracked
 entries match `e04a6776`; the standalone math test is not a runner input. Independent
 source and actual frozen-artifact comparison confirms the unchanged production/fuzzer/
-fixture inputs. The active 24-hour run continues. Final CI is green, verifier/Anchor/frozen bytes
+fixture inputs. The completed run retains these exact frozen inputs. Final CI is green, verifier/Anchor/frozen bytes
 match and both downloaded artifact ZIP digests are verified.
 
-## Dated intermediate checkpoint
+## Verified final completion (2026-10-22 local)
+
+The run finished naturally **2026-10-21T22:21:37.094749Z**, exit **0**. Supervisor
+elapsed **86,428.073717718 s**, runner wall **86,426.897880876 s**. Final totals:
+**38,563 runs and wind-downs, 7,330,667 actions, 87,632,843 transactions,
+158,970,339 hook checkpoints; zero invariant failures, failure counts or anomalies**.
+No crash, minimized-failure or anomaly artifacts exist. Both final hashes agree
+with the supervisor record, and all frozen artifact/source/334 fixture hashes match.
+
+| Exact retained file | SHA-256 |
+|---|---|
+| completion.json | `1846fcc8f9fc1ea7baf8b520dd5d8b5ebdd2cb80a1259f367829aff2ab3ac704` |
+| summary.json | `09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e` |
+| run.log | `fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b` |
+
+[Exact final evidence, independent verification and checksum index](probes/fuzz-final-1.0.3-2026-10-22/README.md).
+The source-pinned two-worker scheduling witness establishes selection of all six
+profiles: each worker completes a contiguous prefix, and the combined threshold
+is 29 completed runs (36 is also a conservative sufficient bound). No explicit
+per-profile totals, equal allocation or 24 hours per profile are asserted.
+Coverage proxies: **28/30 instructions landed, 68/111 error codes returned**;
+full event/instruction/error maps remain in the summary. Setup instructions run
+before Stats collection. `LegacyPoolCarry` was not naturally hit; its direct
+regression and negative controls remain separate evidence.
+
+Economic residuals are preserved: the wind-down found up to 524,012,267 lamports
+owed against absent-owner coverage and one absent-deficit market. A clean run
+neither changes the acknowledged pot policy nor proves eventual payment or funded
+keeper operation. [Remaining release checks and concrete plan](release-checks-1.0.3-2026-10-22.md).
+
+## Publication source update
+
+Concurrent remote commit `56f660027` changes keeper/indexer services and build controls.
+It leaves the frozen on-chain program, runner/harness and fixtures identical; the
+current fuzz acceptance remains limited to those unchanged inputs. Its separate
+24-passing-job CI intentionally skips push-event mutants; the earlier manual
+`ff85a1b0` dispatch supplies the retained 19-kill evidence. The
+[final release record](release-checks-1.0.3-2026-10-22.md#concurrent-servicebuild-integration)
+records new service reviews and actual new-build comparisons. Dated pre-integration
+whole-service/workflow comparisons must not be extended to the incoming changes.
+
+## Historical intermediate checkpoint
 
 The [retained running checkpoint](probes/ci-fullsha-2026-10-21/local-fuzz-running-checkpoint.json)
 and exact compressed log prefix record 6245 seconds, 2,776 runs,
@@ -73,7 +114,7 @@ the full-digest correction changed program bytes. The still earlier
 [completed clean run](fuzz-1.0.3.md) also uses different program bytes. None satisfies
 the present final-profile ≥24-hour gate.
 
-Before crediting completion, verify actual elapsed duration ≥86,400 s, process exit
-zero, all-profile coverage, empty invariant failure/anomaly records, frozen input
+Completion was credited only after independently verifying actual elapsed duration ≥86,400 s, process exit
+zero, the all-profile scheduling witness, empty invariant failure/anomaly records, frozen input
 hashes and final summary/log hashes. A launch or intermediate zero count is not
 completion. The owner-authorized AI review route does not waive this requirement.

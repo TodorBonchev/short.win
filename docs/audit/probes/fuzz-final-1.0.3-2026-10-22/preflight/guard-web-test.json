@@ -1,0 +1,17 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "web",
+    "test",
+    "--",
+    "src/features/short/venueGuard.test.ts"
+  ],
+  "started_utc": "2026-10-21T22:46:07.849317+00:00",
+  "finished_utc": "2026-10-21T22:46:31.762018+00:00",
+  "exit_code": 0,
+  "output_sha256": "3fa788c2b620b4a17e34065ae651b06881715f74746be8cf88b3ae1ea75479cd",
+  "retained_output_file": "guard-web-test.log.gz",
+  "retained_output_sha256": "4f413653a8b774cdd5aa5e2aa9bc7cbb18acee4bbb815fea19dbc221f5d8395a",
+  "encoding": "gzip; exact original terminal bytes including trailing blank lines"
+}

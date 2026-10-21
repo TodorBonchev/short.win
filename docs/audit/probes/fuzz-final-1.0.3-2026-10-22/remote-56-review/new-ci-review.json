@@ -1,0 +1,2360 @@
+{
+  "recorded_at_utc": "2026-10-21T22:57:31.047785+00:00",
+  "reviewer": "remote_scope_check AI agent; independent metadata, raw-log and actual-artifact read-only check; no external firm",
+  "run": {
+    "id": 39556305501,
+    "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-21T06:35:00Z",
+    "run_started_at": "2026-10-21T06:35:00Z",
+    "updated_at": "2026-10-21T07:52:37Z",
+    "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/39556305501"
+  },
+  "job_counts": {
+    "success": 24,
+    "skipped": 2
+  },
+  "jobs": [
+    {
+      "id": 119076763871,
+      "name": "anchor-build",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Cache Agave, platform-tools and the Anchor CLI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Install Anchor CLI 1.2.0",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Versions",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Build release artifacts and IDL from the lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Artifacts are SBPF v3",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Release artifact has no mock venue (A49)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Test-venue build (scripts/build-test-venue.sh)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Release artifact has no test-venue code path (A49)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Release artifacts carry security.txt (SECTXT-1)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 30,
+          "name": "Post Cache Agave, platform-tools and the Anchor CLI",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 31,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764010,
+      "name": "clippy",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "shortwin-math keeps the ARCHITECTURE \u00a72.2 deny lints",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "shortwin-math has zero runtime dependencies",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run cargo clippy -p shortwin-math --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "shortwin without test-venue (the release feature set)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764034,
+      "name": "test",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix --locked",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764047,
+      "name": "web",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "wasm-bindgen CLI (the crate's exact pin)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @shortwin/math-wasm build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "The WASM facade from Node (crates/shortwin-math-wasm/js/smoke.cjs)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter web lint",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter web typecheck",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm --filter web test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm --filter web build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764056,
+      "name": "fmt",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run cargo fmt --all --check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "T-CU-MATH bench workspace (standalone, tests/bench/cu_math)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764066,
+      "name": "wasm",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run cargo build -p shortwin-math -p shortwin-math-wasm --target wasm32-unknown-unknown --release --locked",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764133,
+      "name": "deny",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "cargo deny (workspace and standalone bench lockfiles)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "cargo audit (workspace and the standalone bench lockfiles)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764159,
+      "name": "cu-math",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Build the bench program (platform-tools v1.57, SBPF v3)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run cargo clippy --manifest-path tests/bench/cu_math/Cargo.toml --release --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Budgets (fails above the \u00a76.1 value + 20 %)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "results.md is current (informational)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119076764204,
+      "name": "vectors",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Regenerate every tests/vectors/<track>/gen_*.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run git diff --exit-code -- crates/shortwin-math/tests/vectors",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "T-CONFIG default configuration passes config_check.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "T-CONFIG config gate (scripts/config-gate.sh)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Post Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926073,
+      "name": "m2-cu",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run cargo fmt --manifest-path tests/bench/m2_cu/Cargo.toml -p m2-cu-bench --check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run cargo clippy --manifest-path tests/bench/m2_cu/Cargo.toml --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Budgets and T-TRACE (fails above a budget, above 64 trace entries, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "results.md and trace.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926117,
+      "name": "m1-cu",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run cargo fmt --manifest-path tests/bench/m1_cu/Cargo.toml -p m1-cu-bench --check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run cargo clippy --manifest-path tests/bench/m1_cu/Cargo.toml --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Budgets (fails above a budget or on a failed case)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "results.md is current (informational)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926118,
+      "name": "verifiable-build",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml (to install solana-verify)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Cache solana-verify 0.5.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Install solana-verify 0.5.2",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Verifiable build of shortwin; byte-equal to the anchor-build artifact",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Only the pinned image was used",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Verifiable artifacts have no mock venue and no test-venue code path (A49)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Job summary",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Post Cache solana-verify 0.5.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926123,
+      "name": "m6-cu",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 7,
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run cargo fmt --manifest-path tests/bench/m6_cu/Cargo.toml --all --check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run cargo clippy --manifest-path tests/bench/m6_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Budgets, T-TRACE, sizes and depth (fails above a budget or CU limit, off the expected trace, peak or depth, above 64 entries or 1,232 B v0, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "results.md, trace.md and depth.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926137,
+      "name": "fuzz-smoke",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Fuzz smoke, corpus replays, harness self-tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 13,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926143,
+      "name": "program-tests",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Mainnet fixtures match their recorded checksums (tests/fixtures/manifest.json)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "T-LAYOUT wasm32 leg",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "shortwin unit tests without test-venue",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926191,
+      "name": "m3-cu",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 7,
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run cargo fmt --manifest-path tests/bench/m3_cu/Cargo.toml --all --check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run cargo clippy --manifest-path tests/bench/m3_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Budgets, T-TRACE and depth (fails above a budget, off the expected trace or depth, above 64 entries, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "results.md, trace.md and depth.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926208,
+      "name": "services",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm -p shortwin-ops --check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "The keeper on its release feature set (no test-venue)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "cargo deny (services/deny.toml)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "cargo audit (services lockfile; the root deny.toml's exceptions)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "The keeper binary has no mock venue (A49)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926232,
+      "name": "t-pot",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "T-POT, every trace (SHORTWIN_TRACES=full)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926237,
+      "name": "web-e2e",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "wasm-bindgen CLI (the crate's exact pin)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Cache Agave",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "The test-venue build (A49) and the mock venue are present",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm --filter @shortwin/math-wasm build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Playwright's Chromium (user cache, no --with-deps)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "E2E (profile chain)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "E2E, the Mobile Wallet Adapter built off (O-6; the Android project, a rebuilt app)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Screenshots of every page (e2e/specs/screens.spec.ts)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Report, traces and logs",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 34,
+          "name": "Post Cache Agave",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 35,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 36,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 37,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926249,
+      "name": "indexer",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Free runner disk space",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Cache the embedded PostgreSQL binaries (INDEXER.md \u00a711.1)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Cache Agave (solana-test-validator)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "The embedded-Postgres fixture (downloads the binaries on a cold cache)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Indexer \u2014 unit and decoder tests, ingest, analytics, the API contract (seed and replayed sessions), the security review's regressions and its 30-day load test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "The replay harness \u2014 LiteSVM sessions through the real ingest into the chain state (M8 exit)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "RPC backfill, logsSubscribe live source and finality against solana-test-validator (history past the status cache, a rolled-back cursor)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "The production indexer links no embedded Postgres (TEST-ONLY `embedded-pg`)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "The reference deployment parses (services/indexer/deploy; not run)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 29,
+          "name": "Post Cache Agave (solana-test-validator)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 30,
+          "name": "Post Cache the embedded PostgreSQL binaries (INDEXER.md \u00a711.1)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 31,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 32,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 33,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926312,
+      "name": "codama",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "IDL copy is current",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Generated client is current",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @shortwin/client typecheck",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @shortwin/client test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926320,
+      "name": "t-size",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "T-SIZE, Raydium (v0 through the protocol ALT, executed on the fork)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "T-SIZE, the pump curve (v0 through the protocol ALT, executed on the fork)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "T-SIZE, PumpSwap (v0 through the protocol ALT, executed on the fork)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "The protocol ALT's static part (scripts/build-alt.sh print)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926334,
+      "name": "m7-keeper-bench",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Keeper cost inputs, PumpSwap 4-extras T-SIZE, T-CASCADE (release)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "The committed figures are current (informational)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079926429,
+      "name": "m5-cu",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 7,
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run cargo fmt --manifest-path tests/bench/m5_cu/Cargo.toml --all --check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run cargo clippy --manifest-path tests/bench/m5_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Budgets, T-TRACE, sizes and depth (fails above a budget or CU limit, off the expected trace, peak or depth, above 64 entries or 1,232 B v0, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "results.md, trace.md and depth.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119079928329,
+      "name": "fuzz-nightly",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "steps": []
+    },
+    {
+      "id": 119079928354,
+      "name": "mutants",
+      "head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+      "status": "completed",
+      "conclusion": "skipped",
+      "steps": []
+    }
+  ],
+  "failed_steps": [],
+  "artifact_zip_checks": [
+    {
+      "name": "verifiable-build",
+      "artifact_id": 12326093111,
+      "downloaded_bytes": 437818,
+      "downloaded_sha256": "81c22a2bcc73fb69a6bbc633295c66de559aad42033b3af50f1fee11e39ed564",
+      "github_digest": "sha256:81c22a2bcc73fb69a6bbc633295c66de559aad42033b3af50f1fee11e39ed564",
+      "digest_matches": true,
+      "metadata_size_matches": true,
+      "github_head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9"
+    },
+    {
+      "name": "shortwin-program",
+      "artifact_id": 12325903181,
+      "downloaded_bytes": 1006982,
+      "downloaded_sha256": "e6738151dd75979c55b62c3bf7dfe83d628ce29a5b69d05f5f8e6c7812f869f8",
+      "github_digest": "sha256:e6738151dd75979c55b62c3bf7dfe83d628ce29a5b69d05f5f8e6c7812f869f8",
+      "digest_matches": true,
+      "metadata_size_matches": true,
+      "github_head_sha": "56f660027f88ee60a33b9d2b5da516daccc9c9b9"
+    }
+  ],
+  "actual_artifact_comparisons": [
+    {
+      "kind": "release",
+      "new_anchor_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "bytes": 1644024,
+      "frozen_path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+      "frozen_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "actual_bytes_equal": true
+    },
+    {
+      "kind": "test_venue",
+      "new_anchor_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "bytes": 1675056,
+      "frozen_path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+      "frozen_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "actual_bytes_equal": true
+    },
+    {
+      "kind": "mock",
+      "new_anchor_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "bytes": 281240,
+      "frozen_path": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so",
+      "frozen_sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "actual_bytes_equal": true
+    }
+  ],
+  "verifier": {
+    "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+    "bytes": 1644024,
+    "matches_new_anchor_release": true,
+    "matches_frozen_release": true,
+    "declaration": "commit 56f660027f88ee60a33b9d2b5da516daccc9c9b9\nsolana-verify 0.5.2; image solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f\nargs: --arch v3 --cargo-build-sbf-args=\"--tools-version v1.57\"\n# program  sha256(file)  executable-hash(trailing zeros trimmed; on-chain comparison)  bytes\nshortwin d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250 1644024\n",
+    "declared_source_matches_run": true
+  },
+  "current_idl": {
+    "artifact_sha256": "5b94b1e98f5b32cf6d3c501d1998965bbbab80d6e2853fa6eeb8f3ba5470a003",
+    "tracked_sha256": "5b94b1e98f5b32cf6d3c501d1998965bbbab80d6e2853fa6eeb8f3ba5470a003",
+    "actual_bytes_equal": true,
+    "guard_elf_field_type": {
+      "array": [
+        {
+          "array": [
+            "u8",
+            32
+          ]
+        },
+        4
+      ]
+    }
+  },
+  "focused_actual_log_evidence": [
+    {
+      "log": "indexer-job.log",
+      "marker": "a_duplicate_transaction_still_checkpoints_a_new_stream ... ok",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:50:24.4068461Z test a_duplicate_transaction_still_checkpoints_a_new_stream ... ok"
+      ]
+    },
+    {
+      "log": "indexer-job.log",
+      "marker": "a_dust_flush_sweep_credits_lenders_instead_of_protocol_fees ... ok",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:54:09.2841547Z test a_dust_flush_sweep_credits_lenders_instead_of_protocol_fees ... ok"
+      ]
+    },
+    {
+      "log": "indexer-job.log",
+      "marker": "the_committed_sessions_decode_with_the_current_layouts ... ok",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:49:12.6170460Z test ingest::decode::tests::the_committed_sessions_decode_with_the_current_layouts ... ok"
+      ]
+    },
+    {
+      "log": "indexer-job.log",
+      "marker": "the_committed_sessions_are_readable_and_consistent ... ok",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:56:32.6830158Z test the_committed_sessions_are_readable_and_consistent ... ok"
+      ]
+    },
+    {
+      "log": "codama-job.log",
+      "marker": "VenueGuard: size 304",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:44:49.5780012Z \u2714 VenueGuard: size 304 and 9 field offsets (1.868056ms)"
+      ]
+    },
+    {
+      "log": "codama-job.log",
+      "marker": "VenueGuard retains all four full SHA-256 digests through byte 303",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:44:49.5817039Z \u2714 VenueGuard retains all four full SHA-256 digests through byte 303 (1.63439ms)"
+      ]
+    },
+    {
+      "log": "web-job.log",
+      "marker": "src/features/short/venueGuard.test.ts",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:39:06.0898812Z  \u001b[32m\u2713\u001b[39m src/features/short/venueGuard.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 12\u001b[2mms\u001b[22m\u001b[39m"
+      ]
+    },
+    {
+      "log": "services-job.log",
+      "marker": "events::tests::logged_events_are_attributed_to_the_emitting_program ... ok",
+      "found": true,
+      "lines": [
+        "2026-10-21T06:49:23.4060889Z test events::tests::logged_events_are_attributed_to_the_emitting_program ... ok"
+      ]
+    }
+  ],
+  "root_program_math_test_harness_fuzzer_fixture_mutant_inputs": [
+    {
+      "path": "programs",
+      "ff85_git_object": "46ccef0d904c2827a1dbd4a6e853fa990ea9da06",
+      "new_56_git_object": "46ccef0d904c2827a1dbd4a6e853fa990ea9da06",
+      "equal": true
+    },
+    {
+      "path": "crates",
+      "ff85_git_object": "af2cae65c14f7773c0f9602c27de3b305e61c0f4",
+      "new_56_git_object": "af2cae65c14f7773c0f9602c27de3b305e61c0f4",
+      "equal": true
+    },
+    {
+      "path": "tests",
+      "ff85_git_object": "8d115bc64524cd6932f3f4f8f7bb95ed294e8ab5",
+      "new_56_git_object": "8d115bc64524cd6932f3f4f8f7bb95ed294e8ab5",
+      "equal": true
+    },
+    {
+      "path": "Cargo.toml",
+      "ff85_git_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "new_56_git_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "equal": true
+    },
+    {
+      "path": "Cargo.lock",
+      "ff85_git_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "new_56_git_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "equal": true
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "ff85_git_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "new_56_git_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "equal": true
+    },
+    {
+      "path": "scripts/mutants.sh",
+      "ff85_git_object": "3723df5a613b6279bf07e04dc22e72be34486747",
+      "new_56_git_object": "3723df5a613b6279bf07e04dc22e72be34486747",
+      "equal": true
+    }
+  ],
+  "mutants": {
+    "new_run_job_conclusion": "skipped",
+    "skip_reason": "Push event; workflow runs mutants only scheduled opt-in or workflow_dispatch.",
+    "fresh_mutant_kills_claimed": false,
+    "prior_evidence_run": 39509811932,
+    "prior_evidence_head": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+    "relevance": "Prior 19-kill result remains separately attributed; exact selected root source/test/mutant inputs match. No new mutant execution is inferred."
+  },
+  "local_rerun_performed": false,
+  "new_build_procedure": "New locked flags and verified tool installation were executed by CI; actual outputs were compared rather than assuming flags cannot affect bytes.",
+  "limits": [
+    "The new push run is success with 24 successful jobs and two skipped jobs, not the earlier 25/1 count.",
+    "No new scheduled 24-hour or mutant execution is claimed; completed frozen fuzz and prior mutation run remain separately sourced.",
+    "Code compatibility does not establish funded operator, alert delivery, deployed image/bundle identity or deployment approval.",
+    "Actual container execution/build reproducibility was not tested here; reference compose parsing succeeded in CI."
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "created_utc": "2026-10-21T22:58:41.393674+00:00",
+  "limits": "Raw bytes retained losslessly; compressed copies are portable. ZIPs and uncompressed logs remain in ignored target and are not part of the tracked evidence packet.",
+  "logs": [
+    {
+      "raw_name": "anchor-build-job.log",
+      "raw_bytes": 187082,
+      "raw_sha256": "eda4d550440bab21946ddd75a251a1e22b8dd94946222903477a8adb2102fd1d",
+      "stored": "anchor-build-job.log.gz",
+      "stored_bytes": 35700,
+      "stored_sha256": "1f028ea5809b5d0801ea8119e8363e256581ba638ad805acf208ee100566c227"
+    },
+    {
+      "raw_name": "codama-job.log",
+      "raw_bytes": 37101,
+      "raw_sha256": "a5fce893eb783abbd4577ee59a1e4e27a358bb06a0a6677429c8d107bd1a54e4",
+      "stored": "codama-job.log.gz",
+      "stored_bytes": 9150,
+      "stored_sha256": "08276fa4411069c748792c91475482d24986f952ed649f9e53b6f36b0e72c8a2"
+    },
+    {
+      "raw_name": "genuine-coverage-gap.log",
+      "raw_bytes": 741,
+      "raw_sha256": "ae5463d439e9e083bba7626a2f86481be05966f1525b1971141933b69ed7e6d2",
+      "stored": "genuine-coverage-gap.log.gz",
+      "stored_bytes": 367,
+      "stored_sha256": "ebf7ff0b958ad24c390e0aa3735ad5761354bb45ed9b26d85f04743caa61efcb"
+    },
+    {
+      "raw_name": "genuine-gap-pause-recovery.log",
+      "raw_bytes": 394,
+      "raw_sha256": "f99ae5d4f418a988b5d4a6a344fcb1ded11139f1ed4bc2c4e47db3dd733eee38",
+      "stored": "genuine-gap-pause-recovery.log.gz",
+      "stored_bytes": 280,
+      "stored_sha256": "50f12b29beb886d8b6596ec1624cbbc9e44529c59877507018ac7e8920b0bc97"
+    },
+    {
+      "raw_name": "indexer-job.log",
+      "raw_bytes": 194841,
+      "raw_sha256": "a5b6ddc2c4b37bbc119c29c491fac8d438b70ce86d440d85b297297c664a08fd",
+      "stored": "indexer-job.log.gz",
+      "stored_bytes": 40674,
+      "stored_sha256": "7603f0e8e9f2c82fcdaa9e2e0a77f1cf9ab398526b0fcc605be0325fddd63806"
+    },
+    {
+      "raw_name": "keeper-lib.log",
+      "raw_bytes": 7701,
+      "raw_sha256": "b4ca198b379d1f04cc252dce7318ce93305d30532dcec2740514bff92f539a8e",
+      "stored": "keeper-lib.log.gz",
+      "stored_bytes": 2529,
+      "stored_sha256": "59f52dae60650ad46c9a7a46bef47282b4c277385f25041845bda66698c52183"
+    },
+    {
+      "raw_name": "services-job.log",
+      "raw_bytes": 2783082,
+      "raw_sha256": "b8621d29996f90bdb65345ce938da16d702d282ebe5079ea0707f87017b5157d",
+      "stored": "services-job.log.gz",
+      "stored_bytes": 301029,
+      "stored_sha256": "5af858d36e2d0e805e1e0b6999a146897e3565eab0903c4b828a7821addc797d"
+    },
+    {
+      "raw_name": "verifiable-build-job.log",
+      "raw_bytes": 43570,
+      "raw_sha256": "2b233c6804937a61dc15a6d80514f71f918eda48e8eae0a72df80073f7312e23",
+      "stored": "verifiable-build-job.log.gz",
+      "stored_bytes": 10570,
+      "stored_sha256": "c0d13279870da973283402f6d16f26a5e2439999506ac0c44197bb874e052ddb"
+    },
+    {
+      "raw_name": "verifier-build.log",
+      "raw_bytes": 6357,
+      "raw_sha256": "efaab2d794478e70588ecb3688d81c13023537d347a8324804130a30dfcbc9d2",
+      "stored": "verifier-build.log.gz",
+      "stored_bytes": 1883,
+      "stored_sha256": "3347b2e399d925a6758abb73615efd786a0b253c26b96f73791533c403a99495"
+    },
+    {
+      "raw_name": "web-job.log",
+      "raw_bytes": 111219,
+      "raw_sha256": "b0ea8a1f27cf5da5f7ccaf25edaa9ee05beaddcc1397f26664a05f88d5ff15e9",
+      "stored": "web-job.log.gz",
+      "stored_bytes": 24207,
+      "stored_sha256": "3b5a501321130666216d1c12ea4166e76396c399e8f8dcaafcd1b4714d0a9958"
+    }
+  ]
+}

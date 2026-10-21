@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "scripts/dump-fixtures.py",
+    "check"
+  ],
+  "started_utc": "2026-10-21T22:45:04.267514+00:00",
+  "finished_utc": "2026-10-21T22:45:04.924543+00:00",
+  "exit_code": 0,
+  "output_sha256": "63d1fc8c9c0450c27899942a10ed0557bf735a6617b65dffacd6b7ec7bae6294"
+}

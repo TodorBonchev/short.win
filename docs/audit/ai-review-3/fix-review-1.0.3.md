@@ -1,5 +1,29 @@
 # Draft 1.0.3 fix-review packet
 
+**Final disposition (2026-10-22):** the packet's technical scopes F01–F06,
+L01/L03/L04 and the follow-up AI3-FR01 quarantine are now **fixed** on the
+recorded regressions, accurately attributed AI review, green exact-ref
+[CI 39509811932](https://github.com/TodorBonchev/short.win/actions/runs/39509811932)
+and [completed final-profile ≥24-hour fuzz](../probes/fuzz-final-1.0.3-2026-10-22/README.md).
+The separate AIR2-07/L12 full-digest correction is also fixed. Q1's historical
+deployed-state condition is satisfied by the owner's never-deployed confirmation,
+not by an independently asserted chain inventory or an implemented migration.
+
+The [final release checks](../release-checks-1.0.3-2026-10-22.md) and
+[findings tracker](../findings.md#final-technical-disposition-2026-10-22) give the
+source, coverage limits and remaining operating conditions. AI3-F06's final-holder
+ownership residual and the owner-selected economic/availability risks remain
+acknowledged. Deferred leads and scoped duplicates retain their bounds.
+This closes technical fix review under the batch-specific authorized AI route;
+it is not external-firm acceptance or tag/deployment approval.
+
+## Historical request and intermediate dispositions (2026-10-18–21)
+
+The questions, old candidate identities and pending gate statements below are retained
+as their original dated request/evidence. The final disposition above supersedes those
+status statements without changing their historical measurements.
+
+
 **Current disposition (2026-10-21):** this packet's original review request and
 pre-decision boundaries are historical. The [owner-delegated decisions](../owner-decisions-1.0.3-2026-10-21.md)
 confirm no deployed old state and select the documented economic policies. Complete
