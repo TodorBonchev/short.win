@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/usr/bin/python3",
+    "-I",
+    "/fixtures/vesting-runner.py"
+  ],
+  "fixtures": [
+    "fixtures/vesting-native.rs",
+    "fixtures/vesting-Cargo.toml",
+    "fixtures/vesting-runner.py",
+    "fixtures/source-identities.json"
+  ],
+  "source_mode": "read-only",
+  "workdir": "."
+}

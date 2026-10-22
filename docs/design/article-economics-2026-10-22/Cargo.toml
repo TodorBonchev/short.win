@@ -1,0 +1,12 @@
+[workspace]
+
+[package]
+name = "article-current-math-observation"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+shortwin-math = { path = "../../../crates/shortwin-math" }
+
+[profile.dev]
+debug = 0

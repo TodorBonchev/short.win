@@ -71,7 +71,7 @@ short.win lets anyone short any Solana token — including brand-new Pump.fun la
    - **Bonding curve** (not graduated): directly into the Pump.fun curve.
    - **Graduated**: directly into the token's canonical constant-product pool — PumpSwap for pump.fun graduates, Raydium AMM v4 / CPMM otherwise. ✅ Owner (v0.3). Jupiter is added in v1.1 as an optional better-price path, bounded by the on-chain pool quote.
 4. Sale proceeds `S` **stay locked in the position vault** alongside `M`. ✅ Owner confirmed (v0.3)
-5. Position records: `Q` owed, `S`, `M`, entry price, open time, tier, rate.
+5. Position records: `Q` owed, `S`, `M`, entry price, open time, tier, rent-curve coefficients and minimum rent.
 
 Keeping `S` in escrow is the single most important safety choice in this doc: collateral starts at `M + S` instead of just `M`, so the lender is protected by the sale proceeds plus the margin. The borrower never holds the tokens or the proceeds, so there's nothing to "run with."
 
@@ -194,6 +194,8 @@ if U > 80%: rate = base + slope1 × 80% + slope2 × (U − 80%)
 
 - **Minimum rent:** 1 hour of rent (Tier D: 4 hours), so flash open/close can't borrow for free.
 - Rent is denominated in SOL, accrued per second on current notional, paid from the vault on close/liquidation.
+
+A position keeps the rent-curve coefficients selected at open; its APR continues to vary with market utilization, and its SOL rent follows the borrowed tokens' value at the smoothed (EMA) price. Its minimum rent amount is fixed at open. See the [2026-10-22 article review](design/MEMECOIN_SHORT_ARTICLE_REVIEW_2026-10-22.md) for this distinction.
 
 ### 6.2 Protocol fees
 - **Open fee:** 0.25% of notional (protocol).

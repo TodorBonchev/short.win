@@ -1,0 +1,71 @@
+{
+  "decision": "rejected",
+  "record": {
+    "verdict": "rejected",
+    "fingerprint": "shortwin-math/release_in/frequency-dependent-vesting-rounding",
+    "title": "Intermediate vest rounding follows the specified per-release rule",
+    "description": "The fresh host-native check observed frequency-dependent intermediate claims: after the same 10,800-lamport sweep, two equal lenders and 7,200 elapsed seconds, a non-final exiting lender received 1,800 lamports with one accrual and zero with per-second accruals. This behavior matches the normative floor-on-remaining-balance rule. The current exit policy forfeits unreleased income to remaining holders; both fixed-end and last-holder controls paid the complete 10,800 lamports. The observation does not establish a security defect beyond the specified rounding residual.",
+    "claimed_root_cause": "release_in floors vest_bal multiplied by elapsed time over the remaining span and advances vest_last even when the release rounds to zero, so intermediate release depends on distinct-time prologue frequency.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/instructions/crank_price.rs",
+        "line": 83,
+        "scope": "handler",
+        "description": "A permissionless caller supplies the canonical versioned market, mint, config, oracle and required venue accounts; the handler reads Clock and runs the prologue. The caller does not supply the timestamp."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/engine/prologue.rs",
+        "line": 89,
+        "scope": "accrue",
+        "description": "At monotonic market_now, production pool::accrue releases the vest before booking lender rent. The public prologue persists the resulting pool fields."
+      },
+      {
+        "kind": "sink",
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 898,
+        "scope": "release_in",
+        "description": "The specified per-release floor can defer integer lamports at intermediate times. Same-time calls are idempotent, and now at or after vest_end releases the entire remaining balance."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "docs/design/ECONOMICS.md",
+        "line": 280,
+        "description": "The numerics table, expressly normative for shortwin-math, specifies floor(vest_bal*(now-vest_last)/(vest_end-vest_last)) and full release once now reaches vest_end. Section 9.4 repeats this exact rule at line 1409. A call-frequency-independent fractional-carry schedule is not the specified arithmetic."
+      },
+      {
+        "file": "docs/SPEC.md",
+        "line": 90,
+        "description": "The product specification describes linear six-hour vesting. The precise normative integer formula in ECONOMICS.md:280 defines how this description is rounded; this high-level wording alone does not establish an exact fractional-release entitlement."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 913,
+        "description": "Current production code floors each proportional release and advances vest_last at line 920. The independently inspected own promoted native log observed sparse/frequent intermediate vest balances of 7,200/10,800 lamports, exiting-lender claims of 1,800/0 and remaining-lender final claims of 9,000/10,800. The check compiled the actual current library and used its deposit, sweep, accrue, withdraw and claim interfaces; no duplicated arithmetic model supplied those results."
+      },
+      {
+        "file": "docs/design/ECONOMICS.md",
+        "line": 1451,
+        "description": "The documented policy assigns unreleased vest income to lenders who remain after another lender exits, with the last-holder exception. Thus an intermediate exiting lender has no promised claim to the still-unreleased balance."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 906,
+        "description": "The fixed-end branch releases all remaining vest. The native unchanged-holder control paid 5,400 lamports to each lender under both schedules, with zero remaining vest or vault balance."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 1897,
+        "description": "A withdrawal burning the final shares releases all remaining vest before the burn. The native last-holder controls paid all 10,800 lamports under both schedules; cadence did not extend the vest end or strand the income."
+      },
+      {
+        "file": "programs/shortwin/src/engine/prologue.rs",
+        "line": 55,
+        "description": "market_now clamps authentic Clock time to the last accrual. Combined with release_in idempotence at equal timestamps, arbitrarily many calls in one timestamp cannot accumulate this rounding effect."
+      }
+    ],
+    "reason": "The intermediate differential is real, but its security classification is refuted by the explicit normative per-release floor and the documented forfeiture of unreleased income on a non-final exit. For the single fixed-end vest at issue, each distinct-time release introduces less than one lamport of rounding delay, while repeated calls at the same integer timestamp add none; the end and last-holder controls flush the balance. The observed 1,800-lamport redistribution required 7,199 additional advancing accrual calls and conserved all 10,800 lamports. This establishes a bounded rounding residual under the specified accounting policy, without a demonstrated violated security rule or meaningful effect beyond that residual. No SBF, whole-program transaction, current fee or deployed-state result is inferred."
+  }
+}

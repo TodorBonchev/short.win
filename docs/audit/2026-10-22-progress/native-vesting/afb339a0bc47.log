@@ -1,0 +1,20 @@
+{"cgroup_controls_verified": {"memory.max": "6442450944", "memory.swap.max": "0", "pids.max": "128", "cpu.max": "200000 100000"}}
+SOURCE_REQUIRED_IDENTITIES_OK files=37
+source_math_lib_sha256=483bc1ffa1ea37fef45f50d22f2f46ca5234d7802f05d7518226810786054ab5
+source_pool_sha256=3d270b521f777b314a3e86048bb5c4396bc78129d4f47eb5898942e30ad55312
+rustc 1.98.1 (48a229cea 2026-09-01)
+binary: rustc
+commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985
+commit-date: 2026-09-01
+host: x86_64-unknown-linux-gnu
+release: 1.98.1
+LLVM version: 22.1.8
+NATIVE_PRODUCTION_POOL vest_s=21600 lump=10800 intermediate_s=7200 extra_accrual_calls=7199
+sparse intermediate vest_bal=7200 vest_last=1800007200 vest_end=1800021600 acc=1800000000000000000 acc_r=1800000000000000000 lender_sol=10800
+sparse unchanged_holders_end paid_a=5400 paid_b=5400 vault_remaining=0 vest_bal=0
+sparse a_exits_intermediate paid_a=1800 b_at_end=9000 vault_remaining=0 vest_bal=0
+sparse last_holder_flush paid_a=1800 paid_b=9000 vault_remaining=0 vest_bal=0 shares=0
+frequent intermediate vest_bal=10800 vest_last=1800007200 vest_end=1800021600 acc=0 acc_r=0 lender_sol=10800
+frequent unchanged_holders_end paid_a=5400 paid_b=5400 vault_remaining=0 vest_bal=0
+frequent a_exits_intermediate paid_a=0 b_at_end=10800 vault_remaining=0 vest_bal=0
+frequent last_holder_flush paid_a=0 paid_b=10800 vault_remaining=0 vest_bal=0 shares=0

@@ -1,0 +1,28 @@
+{
+  "artifact_sha256": "95a7c8079140b9e4b49c566e9d89153265c2cbd4796bce1f74fc70adcc51f4a9",
+  "checks": {
+    "agent": true,
+    "artifact": true,
+    "command": true,
+    "command_digest": true,
+    "environment": true,
+    "execution": true,
+    "fixtures": true,
+    "helpers": true,
+    "limits": true,
+    "no_failure": true,
+    "output": true,
+    "profile": true,
+    "promotion": true,
+    "request_identity": true,
+    "request_shape": true,
+    "source": true,
+    "source_mode_workdir": true,
+    "termination": true,
+    "tools": true
+  },
+  "generic_manifest_unverified_fields": "dependency_closure/real_bindgen_facade and independently_approved fields are generic preparation metadata; exact source/no-runtime-dependency host compile and separate policy/root authorities establish only the narrow observed library result.",
+  "interpretation": "Actual production shortwin-math library compiled fresh on host with fixture-only workspace and zero runtime dependencies. Unchanged holders split 10,800 lamports equally at end in both schedules; an intermediate non-final exit receives 1,800 versus 0 and the other dummy lender eventually receives 9,000 versus 10,800. Last-holder flush preserves total under both schedules. This does not establish SBF, whole-program transaction execution or deployed feasibility.",
+  "manifest_sha256": "46cba5230a02f7353cb8dc78befa7a756cd07b1bf58b8f4317b7a42f9bdebe3a",
+  "scope": "Trusted own native evidence identity evaluation only; no target code, build, fixture/model/helper execution by verifier. Exit status is not a verdict."
+}
