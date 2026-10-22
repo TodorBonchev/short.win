@@ -84,7 +84,10 @@ Squads program immutable. One could initialize with an explicitly labelled
 devnet-only authority layout and still leave the verifier failing; that would
 rehearse narrower program behavior, **not** the production authority topology.
 No such layout, member identities, create keys or funded fee vault exists in
-this packet. The repo's `shortwin-gov init-config` also requires a funded fee
+this packet. Four separate devnet-only service/smoke identities were
+[staged later](devnet-operator-plan-2026-10-22.md#selected-topology-and-identities),
+including a coverage-pauser public key, but it is not installed as protocol
+authority and remains unfunded. The repo's `shortwin-gov init-config` also requires a funded fee
 vault and either actual live guard deploy slots or reviewed configured values
 for missing ProgramData; recording stale mainnet slots as if they were devnet
 evidence would not close this gate.
@@ -114,7 +117,8 @@ was 16.638061120 SOL at the prior post-deployment read; it is not evidence
 that separate service and smoke wallets are funded.
 
 Before an initialization packet, select and publish the devnet-only governance
-trust/scope decision, real distinct public member and coverage identities,
+trust/scope decision, real distinct public member identities, install and fund
+the selected coverage identity,
 actual fee-vault and current guard-slot inputs, and build/source identities for
 the ops client. A `shortwin-gov verify` failure from mutable Squads must remain
 visible; do not weaken its immutability rule or mark production governance

@@ -18,6 +18,56 @@ Local files are under `/home/todor_dev/.local/state/shortwin-devnet-1.0.3/`: `co
 
 ## Backfill boundary and remaining operation
 
-Public devnet `getSignaturesForAddress(5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK)` returned the finalized deployment signature `2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j` at slot **513919880** as the program address's first signature. The indexer's [`streams`](../../services/indexer/src/ingest/rpc.rs) function (around line 615) also registers the configured venue ProgramData addresses. Its `BackfillSource::list` (around line 915) applies the one [`backfill.until_signature`](../../services/indexer/src/ingest/config.rs) value to **every** stream; [`list_signatures`](../../services/indexer/src/ingest/rpc.rs) describes both bounds as exclusive (around line 729). The deployment signature is therefore a verified boundary for the **program-address stream only**. How the public RPC handles that same signature for unrelated venue streams has not been exercised, so `until_signature` remains unset in the staged config. Backfill and the live writer were not started. Check each stream's boundary behavior and exact first program event before choosing an operational lower bound.
+Public devnet `getSignaturesForAddress(5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK)` returned the finalized deployment signature `2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j` at slot **513919880** as the program address's first signature. The indexer's [`streams`](../../services/indexer/src/ingest/rpc.rs) function (around line 615) also registers the configured venue ProgramData addresses. Its `BackfillSource::list` (around line 915) applies the one [`backfill.until_signature`](../../services/indexer/src/ingest/config.rs) value to **every** stream; [`list_signatures`](../../services/indexer/src/ingest/rpc.rs) describes both bounds as exclusive (around line 729). The deployment signature was therefore a verified boundary for the **program-address stream only**. At the initial staging check, its behavior for unrelated venue streams had not been exercised, so `until_signature` was left unset and neither backfill nor the live writer was started. The subsequent seven-stream check and bounded seed are recorded below.
 
-The next market-phase work remains: settle a compatible governance/coverage authority layout and venue/oracle evidence, select a real market and capital ceiling, provide separately funded keeper and smoke identities, prove ALT selection if v0 fallback needs it, perform bounded backfill then one live writer and rollups, demonstrate fresh reader/UI results, exercise keeper coverage and zero-reward exits, and verify an actual alert recipient and pause drill. None of those is completed by a build, an empty database, or the loader-only program deployment. Keep public trading and the stable 1.0.3 tag held until those receipts and the broader release gates are complete.
+## Subsequent bounded backfill seed
+
+A fresh public-devnet preflight found a finalized Pump/Pump-fees ProgramData transaction
+`4fWEbr1hnMDXkF6jAE27vEv1ckeT1qVYsZyYWEaTayYStKhFeXwNXZjf5duGkQo9EAP2CBNGrTHK1xCDaqEheRk6`
+at slot **510762112**. Used as the exclusive shared `until_signature`, it returned
+exactly the finalized short.win deployment signature at slot **513919880** for
+the program-address stream and zero signatures for all six venue ProgramData
+streams. The same seven-stream result was rechecked immediately before the
+local seed. This boundary intentionally excludes predeployment venue history.
+
+The bound was added atomically to the private mode-`0600`
+`config/indexer-ingest.toml` outside Git. The source-matched indexer binary
+(SHA-256 `9fb16ff3963d2f78eff0415928c2dc9bac9130c806742ea23b24470b3d3b536a`)
+ran `backfill` with a 120-second timeout and exited **0** in about five
+seconds. Its report was `txs_seen=1`, `txs_written=1`, `txs_duplicate=0`,
+`txs_failed=0`, `events=0`, `venue_trades=0`, `quarantined=0`,
+`markets_rebuilt=0`. The private log is
+`/home/todor_dev/.local/state/shortwin-devnet-1.0.3/logs/backfill-bounded-2026-10-22.log`
+(mode `0600`). A subsequent loopback reader returned HTTP 200 on health,
+status and empty markets. Status showed `confirmed_slot=finalized_slot=513919880`,
+the program stream at that slot, and `backfill_complete=true` for all seven
+streams. That flag means complete **only to the configured bound**; six venue
+streams had no post-bound transaction. The reader was stopped. No live writer,
+rollups or keeper was started by this backfill step, and no transaction was
+signed or sent.
+
+## Subsequent brief live-ingest smoke
+
+The source-matched indexer `live` process was run twice briefly against the
+private ingest config and loopback database. The retained rerun has a
+machine-readable mode-`0600` receipt at
+`/home/todor_dev/.local/state/shortwin-devnet-1.0.3/logs/live-retained-20261022T154420Z-634111.json`.
+It records UTC start/end, **15.01 seconds** of operation, the process alive
+after four seconds with six established TCP connections, explicit TERM and
+return code `-15` (shell equivalent `143`), plus the binary hash, sanitized
+config paths, private log SHA-256 and post-run reader status. The live log has
+**zero WARN, ERROR, 429 or retry entries**. This is an intentional bounded
+stop, not a graceful-shutdown assertion.
+
+The follow-up loopback reader returned HTTP 200 on health, status and empty
+markets. Status showed `confirmed_slot=513919880`,
+`finalized_slot=513933760`, `missing=0`, `quarantined=0`,
+`layout_warnings=0`, `logs_truncated=0`, the program cursor at the
+deployment slot, and no market. The advanced finalized slot demonstrates
+that finality polling ran during this short smoke. Both indexer processes
+were stopped; no writer or port `8080` listener remained. The reader's
+empty `trusted_proxies` warning is expected for the direct loopback setup.
+This checks startup, connectivity and finality for an uninitialized program;
+it does not establish sustained ingest, market events, rollups or alerting.
+
+The next market-phase work remains: settle a compatible governance/coverage authority layout and venue/oracle evidence, select a real market and capital ceiling, fund the separately staged keeper and smoke identities, prove ALT selection if v0 fallback needs it, run and monitor one sustained live writer and rollups, demonstrate fresh reader/UI results with real market data, exercise keeper coverage and zero-reward exits, and verify an actual alert recipient and pause drill. The bounded deployment-only backfill and brief live smoke do not establish those market behaviors. Keep public trading and the stable 1.0.3 tag held until those receipts and the broader release gates are complete.

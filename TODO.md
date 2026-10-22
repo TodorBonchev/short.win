@@ -23,8 +23,10 @@ complete SHA-256 VenueGuard correction for first deployment.
 - [ ] Verify actual funded/monitored keeper operation, covered markets, payer top-ups and
       alerts, plus running indexer destination `3` and 304-byte client artifact identities.
       [Local service staging](docs/deployment/devnet-local-service-staging-2026-10-22.md)
-      established source-matched builds, PostgreSQL migrations and an empty-reader
-      smoke; live chain ingest, funded keeper and alert delivery remain pending.
+      established source-matched builds, PostgreSQL migrations and a bounded
+      deployment-only backfill and brief live connectivity/finality smoke with
+      a loopback reader; sustained ingest with market events, funded keeper and
+      alert delivery remain pending.
 - [ ] Complete the objective gates and final exact-revision checks in the
       [1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
       before any stable tag or mainnet deployment. The
@@ -46,7 +48,9 @@ trade adapter or remove the remaining operating and audit gates.
       and current Pump/PumpSwap/fees executable bytes differ from the pinned
       mainnet fixtures without scoped adapter compatibility proof. A fresh Pyth
       sample passed at the dated read, but must pass again at execution. Confirm
-      a real market, governance/coverage identities, and funded live operators;
+      a real market, governance member identities and installation of the
+      [staged coverage key](docs/deployment/devnet-operator-plan-2026-10-22.md#selected-topology-and-identities),
+      and funded live operators;
       the program-only deployment and local service build do not close these.
 
 The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) and
