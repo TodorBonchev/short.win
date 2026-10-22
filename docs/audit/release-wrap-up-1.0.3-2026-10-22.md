@@ -97,6 +97,11 @@ The dedicated devnet payer/proposed upgrade authority is
 Git at `/home/todor_dev/.config/shortwin/devnet/release-testing-2026-10-22.json`,
 with directory mode 0700 and key mode 0600. No seed or private key is included in
 this record. The first two-SOL faucet request failed; the initial balance was zero.
+**Funding update, 07:20:41 UTC:** a fresh confirmed devnet RPC check at slot
+513,807,141 shows **25 SOL**, exceeding the 20-SOL planning target. Funding is
+complete for the planned reserve; actual deployment fees and test spending still
+need the concrete transaction estimate. The canonical program remains absent.
+[Public funding observation](probes/release-wrap-2026-10-22/devnet/funding-2026-10-22.json).
 The existing program signer has the canonical program address
 `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`; it is distinct from the payer.
 

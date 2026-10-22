@@ -48,6 +48,14 @@ Draft 1.0.3 is unreleased in the inspected records. Fixing that draft does not i
 
 ## Funding estimate and bounded faucet options
 
+**Funding complete for the planning target:** at 2026-10-22 07:20:41 UTC,
+confirmed devnet slot 513,807,141, the payer held **25 SOL**. This exceeds the
+20-SOL reserve target below. The initial zero balance and failed faucet probe
+remain historical observations, not current blockers. The same read-only check
+found the canonical program still absent. See the
+[funding receipt](../audit/probes/release-wrap-2026-10-22/devnet/funding-2026-10-22.json).
+Funding does not close the artifact, governance, venue or operator gates.
+
 Read-only devnet rent queries returned:
 
 | Account | Data B | Rent lamports |

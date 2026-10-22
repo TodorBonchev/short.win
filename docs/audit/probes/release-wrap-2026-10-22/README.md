@@ -17,6 +17,9 @@ scope, output identities and qualifications.
   This is not an executed transaction or an authorization request.
 - [Devnet wallet public metadata](devnet/devnet-wallet-metadata.json) and
   [failed faucet request plus zero-balance recheck](devnet/faucet-attempt.json).
+- [Later confirmed funding update](devnet/funding-2026-10-22.json): 25 SOL at
+  slot 513,807,141. This additive administrative observation closes funding only;
+  it is separate from the earlier retained/reviewed evidence freeze.
 - [Retention manifest](retention-manifest.json) records exact original and
   retained hashes and sizes. Original `.log` files are retained here as `.log.gz`;
   decompress them to compare the report's original log hash.

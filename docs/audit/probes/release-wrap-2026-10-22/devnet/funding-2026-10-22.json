@@ -1,0 +1,16 @@
+{
+  "observed_at_utc": "2026-10-22T07:20:41.764902+00:00",
+  "rpc_url": "https://api.devnet.solana.com",
+  "commitment": "confirmed",
+  "genesis_hash": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "context_slot": 513807141,
+  "public_payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "balance_lamports": 25000000000,
+  "balance_sol": 25,
+  "program_address": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+  "program_account_value": null,
+  "funding_target_sol": 20,
+  "funding_target_met": true,
+  "deployment_transactions_sent_by_this_check": 0,
+  "notes": "Read-only getGenesisHash/getBalance/getAccountInfo batch; closes funding prerequisite only. Historical zero balance and failed faucet request remain correctly dated."
+}

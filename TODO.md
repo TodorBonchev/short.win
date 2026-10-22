@@ -35,9 +35,6 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 ## Public-devnet test prerequisites
 
-- [ ] Fund the new devnet payer with test SOL; its public address, external key path
-      and the failed initial faucet request are in the
-      [integrated preparation record](docs/audit/release-wrap-up-1.0.3-2026-10-22.md).
 - [ ] Resolve the target-cluster profile before promising market E2E: canonical
       Raydium/Jupiter IDs are not executable there, devnet Squads fails the supported
       immutability check, and Pump dependency parity is unverified. Establish fresh
