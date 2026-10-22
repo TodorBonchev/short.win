@@ -1,0 +1,1283 @@
+[
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "shortwin-keeper/prepare_pamm_trader/unchanged-recipient-ata-readiness",
+    "title": "Cached PumpSwap preparation can miss closure of an unchanged recipient ATA",
+    "description": "A running keeper caches successful PumpSwap account preparation by its account-key vector. If a selected protocol-fee or buyback recipient's legitimately authorized token-account closure removes its required WSOL ATA while that vector stays unchanged, subsequent preparation returns before reading the missing account. The keeper's liquidate/expire transaction does not recreate these recipient ATAs, and the on-chain fixed trade-account check requires both to exist before exit planning. Source therefore supports repeated trading-exit refusal for affected markets until external recreation, a changed preparation vector, or keeper restart. This can delay forced exits affecting borrowers and pooled lender inventory; neither actual recipient closure capability, a bounded runtime lifecycle, prolonged deployment disruption nor financial loss has been demonstrated. Independent SOL-settlement paths use another account set and remain a containment consideration.",
+    "claimed_root_cause": "The keeper treats an unchanged PumpSwap preparation-key vector as continued account readiness, although selected recipient ATAs are owned by external recipients and their continued existence is checked on every on-chain trade. No source-visible refusal path invalidates this process-local preparation cache.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "services/keeper/src/graduation.rs",
+        "line": 349,
+        "scope": "pamm_accounts_of",
+        "description": "RPC-read canonical pool and GlobalConfig state select the live creator and external protocol/buyback recipients. The conditional initiating action is a native SPL Token CloseAccount accepted from the selected ATA owner or effective close authority, without changing the selected recipient key; actual configured authority and that lifecycle are unverified."
+      },
+      {
+        "kind": "propagation",
+        "file": "services/keeper/src/venue.rs",
+        "line": 314,
+        "scope": "pamm_account_keys",
+        "description": "The preparation vector includes both selected recipients' WSOL ATA keys, with each selected external recipient as the token-account owner passed to idempotent creation."
+      },
+      {
+        "kind": "propagation",
+        "file": "services/keeper/src/keeper.rs",
+        "line": 2139,
+        "scope": "prepare_pamm_trader",
+        "description": "Once an existence read or landed preparation has cached the vector, an equal vector returns before missing_pamm. Removing a recipient ATA without changing the vector does not force another account read or recreation."
+      },
+      {
+        "kind": "propagation",
+        "file": "services/keeper/src/keeper.rs",
+        "line": 2650,
+        "scope": "attempt_trading",
+        "description": "Trading exits prepend only pamm_creator_vault_prep, which handles a changed coin creator and does not recreate either unchanged selected recipient ATA."
+      },
+      {
+        "kind": "propagation",
+        "file": "services/keeper/src/ixs.rs",
+        "line": 58,
+        "scope": "trade_remaining",
+        "description": "Liquidate and expire append the same fixed venue TradeExtras before optional governed extras, including the selected recipient ATA slots."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 546,
+        "scope": "keeper_exit",
+        "description": "The shared liquidate/expire machinery parses Carry::Trade before venue-state evaluation, prologue and exit planning; a fixed-account refusal therefore occurs before UseSolSettle or UseExpire can redirect this attempt."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/venues/mod.rs",
+        "line": 1258,
+        "scope": "parse Carry::Trade",
+        "description": "The parser validates fixed trade accounts before parsing any optional extras set."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 541,
+        "scope": "check_trade",
+        "description": "Both protocol and buyback ATA slots must match their derived/table keys and be initialized SPL Token WSOL accounts. A missing, empty or System-owned account fails VenueAccountMismatch before a venue CPI."
+      },
+      {
+        "kind": "propagation",
+        "file": "services/keeper/src/keeper.rs",
+        "line": 1103,
+        "scope": "send_ixs_within",
+        "description": "A simulation error returns SimFailed before transaction submission; send_exit_floored maps this to Refused. This bounds transaction-fee and asset effects while leaving the requested trading exit undone."
+      },
+      {
+        "kind": "sink",
+        "file": "services/keeper/src/keeper.rs",
+        "line": 2480,
+        "scope": "account_exit",
+        "description": "The non-benign refusal is alerted and recorded without invalidating pamm_ready. Source contains no cache removal or expiry, so later ticks with the same vector continue skipping preparation; the multi-tick native outcome remains unobserved."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "services/keeper/src/venue.rs",
+        "line": 182,
+        "description": "Recipient selection is deterministic: the first non-default live-list entry starting from the mint's first byte. A refusal does not rotate to another recipient."
+      },
+      {
+        "file": "crates/shortwin-venue-state/src/pump_amm.rs",
+        "line": 357,
+        "description": "GlobalConfig parsing checks the PumpSwap owner, discriminator, minimum length and bool encodings; recipient lists are not arbitrary caller-authorized keys."
+      },
+      {
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 401,
+        "description": "ReadSet validation fixes GlobalConfig to the constant program configuration and the pool to the market's canonical pool; check_trade additionally verifies recipients against the live lists at lines 521-531."
+      },
+      {
+        "file": "services/keeper/src/venue.rs",
+        "line": 297,
+        "description": "PammAccount::Ata is constructed with the selected recipient as owner and WSOL under Tokenkeg. This establishes an external account-lifetime prerequisite, not public authority to close it."
+      },
+      {
+        "file": "services/keeper/src/keeper.rs",
+        "line": 1764,
+        "description": "Every processed PumpSwap market invokes prepare_pamm_trader before exit attempts, so the readiness fast path is on the normal keeper lifecycle."
+      },
+      {
+        "file": "services/keeper/src/keeper.rs",
+        "line": 2101,
+        "description": "missing_pamm would detect an absent account, wrong program owner or empty account data. The equal-vector cache branch at line 2139 skips this recovery read."
+      },
+      {
+        "file": "services/keeper/src/keeper.rs",
+        "line": 2144,
+        "description": "The vector is cached after no missing accounts are found, and at line 2154 after preparation lands. A full-file reference search finds only declaration, empty startup initialization, the equality read and these insertions; no invalidation or TTL exists."
+      },
+      {
+        "file": "services/keeper/src/graduation.rs",
+        "line": 405,
+        "description": "When preparation runs, each missing recipient ATA is recreated through create_ata_idempotent_ix; that helper names the keeper payer as signer at line 230. External recreation is consequently possible without changing the recipient."
+      },
+      {
+        "file": "services/keeper/src/venue.rs",
+        "line": 258,
+        "description": "The only inline trading preparation returns None when the creator equals the cached creator; otherwise it prepares only the live creator-vault WSOL ATA."
+      },
+      {
+        "file": "services/keeper/src/ixs.rs",
+        "line": 225,
+        "description": "Liquidate uses trade_remaining; expire does likewise at line 255. Their fixed PumpSwap recipient ATAs are constructed at venue.rs lines 399 and 406 independently of the extras choice."
+      },
+      {
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 461,
+        "description": "is_wsol_account rejects any non-Tokenkeg owner or empty data, then requires a successfully parsed token account with the WSOL mint; closed account state cannot pass this check."
+      },
+      {
+        "file": "services/keeper/src/keeper.rs",
+        "line": 2672,
+        "description": "Extras retries cover downstream venue failure or BadExtras, BadRemainingAccounts and DeniedAccount, not a Shortwin VenueAccountMismatch."
+      },
+      {
+        "file": "services/keeper/src/keeper.rs",
+        "line": 1901,
+        "description": "Chained exit fallback occurs only for UseSolSettle or UseExpire. The fixed ATA mismatch triggers neither, and account_exit does not repair accounts."
+      },
+      {
+        "file": "services/keeper/src/keeper.rs",
+        "line": 2775,
+        "description": "SimFailed maps to an exit Refused result, which account_exit records without landing the exit; the mismatch is absent from benign refusals at line 561."
+      },
+      {
+        "file": "services/keeper/src/keeper.rs",
+        "line": 764,
+        "description": "pamm_ready starts empty, bounding this stale success to a running keeper instance. A changed selected preparation-key vector also misses the equality fast path."
+      },
+      {
+        "file": "services/keeper/src/graduation.rs",
+        "line": 330,
+        "description": "The separate transition path is eligible only on PumpCurve/PumpMigrating markets; its explicit missing_pamm read at keeper.rs line 2193 does not routinely repair an already-PumpSwap market."
+      },
+      {
+        "file": "services/keeper/src/sweep.rs",
+        "line": 326,
+        "description": "The sweep/cashback helper creates the trader's WSOL ATA, not either external recipient ATA, so it is not a source-visible repair for this cause."
+      },
+      {
+        "file": "services/keeper/src/main.rs",
+        "line": 193,
+        "description": "The service continues ticking the same keeper instance after reports or errors; recording a refusal does not itself restart the instance or clear its cache."
+      },
+      {
+        "file": "services/keeper/src/ixs.rs",
+        "line": 260,
+        "description": "SOL settlement carries only the ReadSet and does not require recipient TradeExtras. Its separate eligibility limits any claim of universal exit unavailability."
+      },
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 1422,
+        "description": "The current normative account convention requires these accounts to preexist, failing VenueAccountMismatch otherwise, with client/keeper preparation paying creation cost. Keeper duty 6 at line 2046 describes recipient ATA preparation and rechecking on creator changes; historical fixture/review references in the document were not used as observed evidence."
+      }
+    ],
+    "blockers": [
+      "Configured recipient token owners and effective close authorities are not established by this repository review. A recipient key may be a PDA or restricted entity without an available closure instruction. No evidence establishes that an ordinary recipient operation or adversarially controlled authorized principal can remove a selected ATA while retaining its configured key; arbitrary public closure is not claimed.",
+      "This assignment grants source-only authority. The native device/PTY isolation gate remains pending, and fresh authenticated native token-processor/program or SBF provenance and exact offline dependencies are not established. No authorized native CloseAccount plus actual keeper multi-tick and downstream trading-consumer check was performed, and no source-copy model or stub result is substituted.",
+      "The duration and practical effect of account absence in the intended deployment are unobserved. Permissionless idempotent recreation, other venue/client activity, preparation-vector changes, keeper restart and separately eligible SOL settlement can limit the delay. No owner-observed recovery policy or runtime evidence establishes a prolonged forced-exit delay or financial loss."
+    ],
+    "validation_plan": {
+      "local": "After the infrastructure gate is independently resolved and root separately authorizes an exact offline attempt with fresh authenticated native/SBF dependencies and trusted promotion, use only dummy recipient authorities and accounts. Drive the actual production keeper tick to populate readiness for a valid PumpSwap market, close one selected WSOL ATA using the native SPL Token processor with its legitimate dummy authority while retaining the selected recipient key, then drive two bounded ticks and the actual liquidate/expire simulation consumer. Observe the preparation read/instruction boundary and exact refusal without submitting to a deployment. Include an unauthorized-closure rejection control and compare an unclosed-account control, a changed selected preparation-vector control, and explicit recreation or a fresh keeper instance; stop after the first supported minimum refusal and recovery result. If actual production/native interfaces or provenance cannot be supplied, retain that exact capability blocker rather than replacing the check with copied cache logic or mocked account validation.",
+      "deployment": "Ask the owner to inspect existing public configuration/account-authority records and recipient operating procedures for the recipient keys this keeper selects: which principal can authorize WSOL ATA closure, whether ordinary unwrapping/collection leaves the same configured recipient ATA absent, and which existing client/operator process recreates it with what recovery policy. Use owner-held observations only, request no secrets, and send no audit traffic or closure transactions to a deployment."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "shortwin-math/release_in/frequency-dependent-vesting-rounding",
+    "title": "Intermediate vest rounding follows the specified per-release rule",
+    "description": "The fresh host-native check observed frequency-dependent intermediate claims: after the same 10,800-lamport sweep, two equal lenders and 7,200 elapsed seconds, a non-final exiting lender received 1,800 lamports with one accrual and zero with per-second accruals. This behavior matches the normative floor-on-remaining-balance rule. The current exit policy forfeits unreleased income to remaining holders; both fixed-end and last-holder controls paid the complete 10,800 lamports. The observation does not establish a security defect beyond the specified rounding residual.",
+    "claimed_root_cause": "release_in floors vest_bal multiplied by elapsed time over the remaining span and advances vest_last even when the release rounds to zero, so intermediate release depends on distinct-time prologue frequency.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/instructions/crank_price.rs",
+        "line": 83,
+        "scope": "handler",
+        "description": "A permissionless caller supplies the canonical versioned market, mint, config, oracle and required venue accounts; the handler reads Clock and runs the prologue. The caller does not supply the timestamp."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/engine/prologue.rs",
+        "line": 89,
+        "scope": "accrue",
+        "description": "At monotonic market_now, production pool::accrue releases the vest before booking lender rent. The public prologue persists the resulting pool fields."
+      },
+      {
+        "kind": "sink",
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 898,
+        "scope": "release_in",
+        "description": "The specified per-release floor can defer integer lamports at intermediate times. Same-time calls are idempotent, and now at or after vest_end releases the entire remaining balance."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "docs/design/ECONOMICS.md",
+        "line": 280,
+        "description": "The numerics table, expressly normative for shortwin-math, specifies floor(vest_bal*(now-vest_last)/(vest_end-vest_last)) and full release once now reaches vest_end. Section 9.4 repeats this exact rule at line 1409. A call-frequency-independent fractional-carry schedule is not the specified arithmetic."
+      },
+      {
+        "file": "docs/SPEC.md",
+        "line": 90,
+        "description": "The product specification describes linear six-hour vesting. The precise normative integer formula in ECONOMICS.md:280 defines how this description is rounded; this high-level wording alone does not establish an exact fractional-release entitlement."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 913,
+        "description": "Current production code floors each proportional release and advances vest_last at line 920. The independently inspected own promoted native log observed sparse/frequent intermediate vest balances of 7,200/10,800 lamports, exiting-lender claims of 1,800/0 and remaining-lender final claims of 9,000/10,800. The check compiled the actual current library and used its deposit, sweep, accrue, withdraw and claim interfaces; no duplicated arithmetic model supplied those results."
+      },
+      {
+        "file": "docs/design/ECONOMICS.md",
+        "line": 1451,
+        "description": "The documented policy assigns unreleased vest income to lenders who remain after another lender exits, with the last-holder exception. Thus an intermediate exiting lender has no promised claim to the still-unreleased balance."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 906,
+        "description": "The fixed-end branch releases all remaining vest. The native unchanged-holder control paid 5,400 lamports to each lender under both schedules, with zero remaining vest or vault balance."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 1897,
+        "description": "A withdrawal burning the final shares releases all remaining vest before the burn. The native last-holder controls paid all 10,800 lamports under both schedules; cadence did not extend the vest end or strand the income."
+      },
+      {
+        "file": "programs/shortwin/src/engine/prologue.rs",
+        "line": 55,
+        "description": "market_now clamps authentic Clock time to the last accrual. Combined with release_in idempotence at equal timestamps, arbitrarily many calls in one timestamp cannot accumulate this rounding effect."
+      }
+    ],
+    "reason": "The intermediate differential is real, but its security classification is refuted by the explicit normative per-release floor and the documented forfeiture of unreleased income on a non-final exit. For the single fixed-end vest at issue, each distinct-time release introduces less than one lamport of rounding delay, while repeated calls at the same integer timestamp add none; the end and last-holder controls flush the balance. The observed 1,800-lamport redistribution required 7,199 additional advancing accrual calls and conserved all 10,800 lamports. This establishes a bounded rounding residual under the specified accounting policy, without a demonstrated violated security rule or meaningful effect beyond that residual. No SBF, whole-program transaction, current fee or deployed-state result is inferred."
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "shortwin/apply_config/unsafe-authority-transfer",
+    "title": "A manually approved authority change can install an unusable governance key",
+    "description": "The current governance signer can manually propose distinct nondefault authority keys, and a public caller can apply that stored payload after its timelock without successor acceptance. If the governance successor has no reachable signing path, subsequent ordinary configuration proposals require an unavailable signer. This is an honest-governance error path, not an outsider-selected transfer. The SPEC explicitly discloses the unchanged behavior, and the supported governance CLI refuses migration to a new governance multisig. No independent production transaction result, permanent protocol lock, fund loss, or exercised upgrade recovery was established.",
+    "claimed_root_cause": "ConfigChange::check_shape delegates authority validation to nondefault and pairwise-distinct key checks, while ApplyConfig has no successor Signer. GlobalConfig::apply replaces governance before its next consumer requires the installed key as a signer.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 87,
+        "scope": "shortwin::propose_config",
+        "description": "An authenticated current governance principal submits ConfigChange::Authorities with a mistaken nondefault, distinct governance successor and the intended other authority keys."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/propose_config.rs",
+        "line": 34,
+        "scope": "handler",
+        "description": "The canonical config is bound to the current governance Signer. check_change validates the shape and would-be parameters, then the handler stores the exact payload with now plus timelock_s."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/apply_config.rs",
+        "line": 77,
+        "scope": "handler",
+        "description": "A public applier supplies no replacement authority payload. The handler decodes stored pending, requires maturity and nonexpiry, repeats check_change, applies it and clears pending. Authorities application also needs its exact writable System-owned, non-executable fee recipient."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/state/config.rs",
+        "line": 193,
+        "scope": "GlobalConfig::apply",
+        "description": "The stored successor replaces governance without acceptance. The next ProposeConfig signer comparison uses this installed key, so the old governance and Emergency keys alone cannot authorize an ordinary repair if the successor is unusable."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/instructions/propose_config.rs",
+        "line": 19,
+        "description": "Source-only: governance is a Signer; the config has its canonical seed, stored bump, AccountLoader type and version, and line 25 binds its governance field to that signer. An outsider or Emergency cannot choose the successor without current governance authorization."
+      },
+      {
+        "file": "programs/shortwin/src/state/config.rs",
+        "line": 777,
+        "description": "Source-only: check_authorities rejects default governance, pause and fee keys and rejects duplicate installed roles at line 793. It does not establish control of a successor or a reachable signing path; default coverage is intentionally allowed."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/apply_config.rs",
+        "line": 61,
+        "description": "Source-only: apply requires pending, not_before <= Clock time and time <= not_before plus the 14-day window, decodes and rechecks only stored pending, then calls apply and clears it at lines 80-81. Its Accounts structure has no successor Signer."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/apply_config.rs",
+        "line": 86,
+        "description": "Source-only: an Authorities change must supply the exact new fee recipient; check_fee_recipient requires System ownership and non-executability. Account mutability and transaction rollback remain necessary controls, so a valid intended recipient is a prerequisite."
+      },
+      {
+        "file": "programs/shortwin/src/state/config.rs",
+        "line": 193,
+        "description": "Source-only: the Authorities arm assigns the four stored keys directly. Future proposals still use the signer equality constraint in propose_config.rs:25. This establishes the source path, not an observed runtime loss."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/cancel_config.rs",
+        "line": 40,
+        "description": "Source-only: current governance may cancel before application; Emergency cannot cancel Authorities or Timelock. Cancellation only clears pending and provides no installed-governance replacement. set_pause and disable_venue likewise provide only their bounded flag controls."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/initialize_config.rs",
+        "line": 98,
+        "description": "Source-only: initialization is init-only at lines 37-43 and authenticates the separate ProgramData upgrade authority. apply_config does not transfer that loader role. A controlled retained upgrade authority may permit recovery, but its deployment identity, control and recovery procedure were not observed."
+      },
+      {
+        "file": "services/ops/src/cli.rs",
+        "line": 553,
+        "description": "Source-only: governing_ms searches only the layout's two multisigs and explicitly refuses governance migration to a new multisig. The tool derives its authority vaults in config.rs:295-317. The surviving hypothesis concerns a manually prepared on-chain change, not the supported CLI migration path."
+      },
+      {
+        "file": "docs/SPEC.md",
+        "line": 405,
+        "description": "Project requirement context: the SPEC expressly records that apply_config installs new authority keys without their signatures and that AIR-04 changes wording/known issues only. Section 11 at line 280 separately assigns the original Governance vault the upgrade role. Disclosure does not supply independent runtime evidence or justify a permanence claim."
+      },
+      {
+        "file": "tests/litesvm/src/env.rs",
+        "line": 155,
+        "description": "Validation capability context: the actual integration harness loads shortwin.so from the SBF build path identified at lines 43-49 and reads the ELF into LiteSVM at lines 276-287. A host-only state-method result cannot establish this production transaction path or authenticate that SBF product."
+      }
+    ],
+    "blockers": [
+      "No independent bounded transaction through freshly built selected-source SBF has observed the complete propose, timed public apply and next-proposal effect. The approved original-v3 profiles have no established authenticated SBF toolchain, exact offline dependency closure or fresh program-product provenance; root also reports original-v3 native execution held pending device/PTY policy and measurement evidence. No target code or fixture was executed, and an unscheduled host-only draft was withdrawn because it could not decide this boundary.",
+      "The actual signing/review procedure for any manually prepared governance migration and the identity, continued control and accepted recovery policy of the separate loader authority are not source observations. The source explicitly discloses unchecked config transfer and the supported CLI refuses new-governance migration, so neither deployment exposure nor permanent loss can be inferred."
+    ],
+    "validation_plan": {
+      "local": "After separate approval of an authenticated offline SBF toolchain, dependencies, fresh selected-source program and isolated runtime, use dummy controlled governance/Emergency principals and an unused off-curve successor with no production signing path. Run the actual propose_config entrypoint with unchanged valid other roles and fee recipient; respect the intended Squads delay if testing that layout and the program timelock; publicly apply within the 14-day window using the exact writable System fee recipient. Observe installed governance and cleared pending, then test ordinary proposals from the old governance and Emergency and an unsigned installed successor. Include a controlled-successor positive case and pre-application governance cancellation control. Stop at the minimum observed loss or source refutation; do not use a copied formula, native surrogate, stale ELF, funds or external endpoints, and do not infer upgrade recovery from unchanged loader metadata.",
+      "deployment": "Have the owner observe, without audit traffic, whether governance migrations use only the supported CLI or a separately reviewed manual transaction procedure, how successor control is verified there, which principal currently holds the program's loader upgrade authority, whether that principal remains controlled independently of config rotations, and whether recovery from an unusable config governance key is an accepted and exercised policy."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "shortwin/assess/manipulable-liquidity-history",
+    "title": "Preserved low liquidity history matches the accepted FITX-1 residual",
+    "description": "Directional aggregation can retain a genuinely reached low liquidity EMA after an LP redeposits and adds withdrawal-wrapped observations. The current specification explicitly accepts this exact sequence, including AIR-14's widening. The proposed trace does not establish a liquidation outside that accepted policy.",
+    "claimed_root_cause": "A bucket spanning the existing liquidity EMA preserves that EMA, so a genuinely low historical floor need not recover merely because the LP redeposits between observations.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/instructions/crank_price.rs",
+        "line": 83,
+        "scope": "crank_price::handler",
+        "description": "A public caller supplies the market's venue ReadSet after permitted changes to its own external LP liquidity; parse validates account identities and the handler reads actual venue state rather than a caller-supplied price or depth."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/engine/prologue.rs",
+        "line": 174,
+        "scope": "prologue::run",
+        "description": "The prologue rolls a completed bucket before recording the current pre-trade venue observation at line 206; the instruction's own observation does not enter the history used by its decision."
+      },
+      {
+        "kind": "propagation",
+        "file": "crates/shortwin-math/src/observe.rs",
+        "line": 635,
+        "scope": "observe::steady_step",
+        "description": "Liquidity extrema feed aggregate and the weighted EMA, then a cached reprojection enters the ring. Aggregate at line 797 retains the existing EMA when the bucket's low and high span it, establishing the proposed state-preservation mechanism in source."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 357,
+        "scope": "liquidate::assess",
+        "description": "The spot quote uses max(live depth, the EMA-based floor), with the upper median of bucket highs under the guard; the newest required ring entries independently supply the EMA leg. A low stored EMA alone does not override a healthy spot leg at restored live depth."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 438,
+        "scope": "liquidate::plan",
+        "description": "A buyback still requires a fresh reference, CR-liquidatability, the live budget and slippage predicate, and the reference-derived maximum input. A non-CR-liquidatable expired position is routed to expiry. This decision boundary does not grant liquidation merely because a low EMA persisted."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "docs/SPEC.md",
+        "line": 332,
+        "description": "The normative FITX-1 decision explicitly accepts a genuine short withdrawal whose low reading is frozen, bounded by the liquidation the same LP obtains by withdrawing permanently. This is the assigned cause, rather than an unstated requirement that historical depth must automatically recover."
+      },
+      {
+        "file": "docs/SPEC.md",
+        "line": 407,
+        "description": "The owner explicitly accepts the widened held-low residual after AIR-14. This is current policy evidence; its quoted simulation results are historical claims and were not treated as independent runtime evidence."
+      },
+      {
+        "file": "docs/design/ECONOMICS.md",
+        "line": 553,
+        "description": "The current liquidation rule expressly leaves a genuinely reached low frozen by withdrawal-wrapped cranks as FITX-1. It distinguishes the upper-median guarded spot floor from the exit reference's lower-median guard and describes the permanent-withdrawal boundary."
+      },
+      {
+        "file": "crates/shortwin-math/src/observe.rs",
+        "line": 797,
+        "description": "The implemented directional clamp preserves an EMA lying inside the authentic bucket range; steady_step consumes that result at lines 635-644. This supports retention of low history, not an independently observed adverse liquidation or attacker profit."
+      },
+      {
+        "file": "crates/shortwin-math/src/bounds.rs",
+        "line": 168,
+        "description": "The actual spot-liquidity implementation takes the maximum of live depth and its floor. Under the post-change guard the floor is min(EMA liquidity, the upper median of bucket highs), preventing the old lower-median guarded-floor interpretation from supporting this claim."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 438,
+        "description": "The current plan enforces freshness, both CR legs for the liquidation path, live buyback allowance, the expiry distinction and the exit bound through line 466. keeper_exit additionally requires warm-up completion at line 577 and bounds actual spend and delivered tokens at lines 645-648."
+      },
+      {
+        "file": "programs/shortwin/src/engine/bounds.rs",
+        "line": 67,
+        "description": "Raydium and PumpSwap reference caps use the refreshed locked depth with a fixed 100-percent divisor; reference at lines 110-118 still takes max(live, capped credited history). The candidate identifies no alternative route around these current controls."
+      }
+    ],
+    "reason": "Rejected as a vulnerability as framed, while retaining the factual source observation. The lower-trust actor needs its own withdrawable external LP inventory and repeated transactions; the public crank accepts validated market/venue accounts, not arbitrary history writes. A genuine low followed by mixed-bucket preservation is the precise FITX-1 residual authorized by SPEC line 332, with AIR-14's widening expressly accepted at line 407 and restated in ECONOMICS line 3610 and ARCHITECTURE line 965. The implementation retains the live-depth maximum and independent liquidation predicates, so a low EMA by itself cannot liquidate a position whose current robust-spot leg remains healthy. Draining the live pool again exercises the documented residual; the proposal supplies no source-grounded deviation from its accepted permanent-withdrawal boundary. There is therefore no identified violated requirement or additional meaningful security effect to keep pending under this fingerprint. This is a source-and-requirements rejection, not a runtime proof of universal economic equivalence: no target code, fixture, build, model, network or deployment was executed, and historical test or measurement claims were not used as independent evidence."
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "shortwin/deposit/donation-extends-deposit-hold",
+    "title": "Repeated donations may prolong deposit entry delay after settlement",
+    "description": "An unprivileged fee-paying donor can supply its own SOL to a canonical market trader and request sweep_trader(). With surviving shares, the Trader sweep bit already set and a settlement hold still armed, the credited donation enters the shared vest that deposit requires to become empty. Source permits a later donation to extend or restart that vest, potentially delaying another lender's otherwise valid deposit. The saved settlement timestamp is explicitly not a deadline: later-income extension is documented behavior. The unresolved concern is meaningful, inexpensive repeated entry delay beyond the accepted policy, not loss of principal or a freeze of existing lenders' withdrawal paths. No native transaction result or repeated-delay cost was independently observed.",
+    "claimed_root_cause": "The program clears an armed deposit-hold marker only on a successful deposit after the entire shared vest reaches zero; it does not distinguish settlement-protected SOL from later ordinary Trader donations in that vest. A donor may therefore renew a prospective lender's entry delay while the marker remains armed, subject to real funding, source-bit routing, floor-weighted vesting, timing and policy limits.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/instructions/sweep_trader.rs",
+        "line": 184,
+        "scope": "handler",
+        "description": "Public no-argument sweep_trader consumes canonical market/trader accounts after a donor transfers its own lamports to the trader. The Accounts structure has no caller-authorization signer; account identities and the fee-paying transaction remain required."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/engine/trader.rs",
+        "line": 142,
+        "scope": "normalise_pdas",
+        "description": "Require empty System-owned trader PDAs and transfer their actual lamports to the fixed market_vault using the PDA seeds. The caller cannot invent a credit amount or redirect the destination."
+      },
+      {
+        "kind": "propagation",
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 2225,
+        "scope": "sweep",
+        "description": "Add recovered lamports to lender_sol. With shares and the Trader bit already set, the ordinary-sweep branch calls vest_in; a first pending sweep after a flush instead credits existing holders immediately."
+      },
+      {
+        "kind": "propagation",
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 948,
+        "scope": "vest_in",
+        "description": "Release the amount due, then merge a positive donation using the floor-weighted remaining span; if the old vest is empty, start a fresh configured span. Zero donations do nothing and small donations need not extend a large running vest."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/instructions/deposit.rs",
+        "line": 130,
+        "scope": "handler",
+        "description": "After real prologue accrual, an armed nonnegative marker requires vest_bal == 0 or returns PoolDrained before the token transfer. Only a successful deposit clears the marker; the stored timestamp alone cannot release the gate."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/instructions/sol_settle.rs",
+        "line": 327,
+        "description": "The actual settlement instruction stores the hold when pool::settle returns hold. This requires a legitimate settlement; the donor cannot directly write the marker through the sweep instruction."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 2427,
+        "description": "A settlement flushing at the 1/1000 remaining-claims threshold empties the vest and clears sweep bits. Otherwise hold requires surviving shares and nonzero vest_bal (line 2437). A full wipe or unperformed source sweep is not an equivalent donation-vesting prerequisite."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/sweep_trader.rs",
+        "line": 143,
+        "description": "Config version, canonical market PDA, has_one market_vault/trader/trader_wsol, market-vault PDA, fixed token/system programs and exact remaining-account keys constrain the public sweep. The handler books the recovered real amount after normalization and accrual (lines 275-284 and 301-370), then enforces zero trader balances and the vault floor (lines 397-402)."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 377,
+        "description": "sweep_destination selects immediate Lenders credit while a source bit is clear, WipeRecord or Protocol with no shares, and Vest only for a later sweep with shares and that source bit set. The first pending post-flush donation cannot establish this vest-extension path."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 965,
+        "description": "The running-vest weighted span is floored; a dust addition can leave the end unchanged. A positive addition after the old balance releases takes the fresh-span branch (line 981). These are source semantics, not executed transaction or cost measurements."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/deposit.rs",
+        "line": 129,
+        "description": "Accrual precedes the shared-vest zero check. A normal lender still needs its signature, a safe canonical mint, valid lender records, positive amount/minted shares, min_shares, sufficient pool state and completed source bits. A decisive comparison must make the no-donation deposit pass these other gates so an unrelated PoolDrained failure is not misattributed."
+      },
+      {
+        "file": "programs/shortwin/src/state/market.rs",
+        "line": 461,
+        "description": "The field explicitly documents that deposits wait for the actual shared vest, because later credits can move its end. Legacy marker zero and pending required venue rewards can also arm a hold; initialized no-hold is -1."
+      },
+      {
+        "file": "docs/design/ECONOMICS.md",
+        "line": 1296,
+        "description": "Normative policy expressly says the saved positive timestamp is not a release deadline, another lump can extend the shared vest, a successful deposit clears the marker, and ordinary sweeps do not themselves arm a fresh hold after it clears. ARCHITECTURE.md:10-21 likewise permits later-income extension and preserves existing exits. A simple extension past the initial timestamp is therefore intended behavior, not evidence of a policy violation."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/withdraw.rs",
+        "line": 186,
+        "description": "Withdrawal accrues then calls pool::withdraw without the deposit-hold gate. Existing inventory, allowance, pending-balance and last-shares-borrowed constraints still apply. pool.rs:1897 releases the remaining vest to a permitted last-holder exit. This review supplies no evidence that the donation locks existing principal or disables normal claims/withdrawals."
+      },
+      {
+        "file": "tests/litesvm/tests/ai2_halted_s3_vest_it.rs",
+        "line": 299,
+        "description": "Current test source deliberately funds a later real sweep, expects extended_end > first_end, expects PoolDrained at the old end and eventual deposit success after the new end. It documents the intended large-donation extension and a legitimate nonflushing-settlement setup in the same test; it was not run and does not establish cheap repeated denial or current native behavior."
+      },
+      {
+        "file": "tests/litesvm/Cargo.toml",
+        "line": 12,
+        "description": "The existing integration interface loads target/deploy/shortwin.so; the host shortwin dependency supplies account/instruction types only (lines 12-19). A pool-only host calculation would miss the program-side marker gate, actual System transfer, Anchor accounts and SBF/runtime acceptance. No authenticated fresh current-program artifact or observed native result is supplied."
+      }
+    ],
+    "blockers": [
+      "No independently observed bounded current-production sequence establishes an otherwise valid new-lender deposit succeeding without donation but failing solely because a low-cost later donor renews the armed hold. Real settlement reachability, exact remaining vest, accepted transfer/sweep ordering, repeated-delay funding/fees and recovery were not executed; committed tests are source evidence only.",
+      "No authenticated freshly built current-commit SBF program, relevant toolchain/dependency closure and integration-binary provenance are supplied. Native invocation is explicitly outside this source-only authorization, and the supplied original-v3 infrastructure qualification still leaves the device/PTY policy measurement and observer-completion conditions unresolved. No target code, test, build, model, helper or native attempt was executed, and no promoted runtime artifact exists. A duplicated formula or pool-only host surrogate cannot decide this production boundary.",
+      "Current source explicitly accepts later-income extension of the shared hold and retains existing lenders' normal exits. Owner acceptance or rejection of sustained inexpensive donation-driven entry delay, including its allowed duration/cost bounds, is not supplied. Mere delay past the initially saved timestamp cannot establish a defect under the documented policy."
+    ],
+    "validation_plan": {
+      "local": "After separately reviewed execution controls, exact root authority and authenticated offline fresh current-source SBF/harness provenance are available, run one isolated dummy-market comparison through the actual instructions. Reach a legitimate nonflushing settlement with surviving shares and nonzero vest, complete the required source bits and make the same prospective lender's no-donation deposit succeed after release. On a clone of that legitimately reached state, use only a funded dummy donor's normal System transfer bundled with public sweep_trader near release, then submit the identical deposit. Record exact accepted accounts, Clock values, configured vest duration, before/after marker and vest, balances, transferred lamports, transaction fees and error; prove PoolDrained is caused by the vest gate and that a failed deposit transfers no principal. If needed, allow at most one further positive renewal to measure a bounded repeated delay. Then stop donating, advance to the resulting end and check recovery; check an existing holder's otherwise permitted withdrawal/claim to bound the effect. Stop after this minimum entry-delay comparison. Do not use a hand-written arithmetic model, mutate the hold to synthesize reachability, reuse old products, fetch dependencies or contact a deployment.",
+      "deployment": "Have the owner observe and state the intended lending-entry liveness policy for a settlement-armed market: whether unprivileged donors may repeatedly prolong entry by adding genuine income, and any accepted maximum delay or minimum economic cost. Compare only the bounded native delay/cost established locally against that policy. If the documented dynamic hold intentionally accepts the measured behavior, reject this concern as that tradeoff; no deployment traffic or production transaction is requested."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "shortwin/exit_risk_cap_bps/live-supply-risk-fee",
+    "title": "PumpSwap historical-price quotes intentionally retain live-supply fees",
+    "description": "The supply dependency is present: an authentic holder burn can change the current fee applied to historical-price quotes. The current requirements explicitly retain that dependency, and the assigned observation alone does not establish a violation of a promised historical-fee guarantee.",
+    "claimed_root_cause": "PumpSwap resolves its fee at the stored EMA price using the mint supply read in the current transaction, then uses that result to cap current risk quotes over historical price/liquidity entries.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 249,
+        "scope": "liquidate",
+        "description": "Any keeper signer can submit the liquidation interface for a position bound to its borrower and market; a preceding holder-authorized token action can affect the authentic mint supply."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 555,
+        "scope": "keeper_exit",
+        "description": "After mint identity and remaining-account checks, the exit reads PumpSwap state with venues::mint_supply from the named mint."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 702,
+        "scope": "read_state",
+        "description": "The same live supply enters the current fee schedule and its fee calculation at the stored EMA price; canonical pool, vault and fee-account identities remain checked."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/venues/mod.rs",
+        "line": 822,
+        "scope": "VenueState::exit_risk_cap_bps",
+        "description": "The risk cap is the minimum of the position hard cap and the resolved EMA-price fee. It is not a stored historical supply or fee snapshot."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/engine/guard.rs",
+        "line": 43,
+        "description": "The mint key, mint owner and token-program key must match the market. The candidate uses authentic changed supply, not substitution of an arbitrary supply account."
+      },
+      {
+        "file": "crates/shortwin-math/src/fees.rs",
+        "line": 231,
+        "description": "pump_amm computes the fee tier from effective_quote times live base_supply divided by base_reserve, including creator override/default semantics. FeeBps::capped bounds the fee rather than freezing an earlier tier."
+      },
+      {
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 716,
+        "description": "The EMA fee uses the same live-supply schedule as the execution fee, changing only the price reference. This independently verifies the stated dependency in production source."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 338,
+        "description": "The capped current quoter is applied to robust spot and each cached persistence-ring state. Historical price/liquidity persistence does not store or promise an immutable fee."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 438,
+        "description": "A real liquidation still requires a fresh reference, liquidation eligibility, affordable/slippage-bounded live buyback and the reference max_in bound; pump_amm::buy additionally checks actual received tokens and measured spend before payouts."
+      },
+      {
+        "file": "programs/shortwin/src/state/position.rs",
+        "line": 153,
+        "description": "The position snapshots venue_fee_hard_cap_bps. The reviewed position terms do not snapshot mint supply or a historical fee tier."
+      },
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 1491,
+        "description": "The current fee contract applies the live fee tier to hypothetical ring, exit-reference and other historical-price states."
+      },
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 1563,
+        "description": "The current risk-fee contract explicitly resolves the EMA-price tier on live mint supply and retains the same-transaction burn residual. Production source implements this rule."
+      },
+      {
+        "file": "docs/SPEC.md",
+        "line": 404,
+        "description": "The current normative specification explicitly accepts and discloses that a holder burn can raise a PumpSwap position exit risk fee. This is intent calibration, not runtime proof."
+      }
+    ],
+    "reason": "The candidate assumes supply-independent historical risk fees, but the current contract explicitly uses current authenticated fees for historical-price quotes and retains the burn dependency. Independent source review verifies that implementation: mint and canonical fee-account identity checks, live fee selection, the EMA-price ceiling, the position locked hard cap, persistence over stored price/liquidity, and separate live-buyback affordability/reference/CPI checks. Thus the fee movement by itself contradicts no promised historical-fee or account-authority boundary. No separate concrete unintended asset effect beyond that disclosed dependency was established. This rejects the assigned vulnerability claim without claiming that burns cannot affect exit economics. No native execution occurred; fresh SBF, offline dependency and external venue-program provenance were unavailable, so no actual victim liquidation, collateral loss or attacker profit is asserted."
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "shortwin/flag_venue_upgraded/unhashed-slot-upgrade-latch",
+    "title": "A hashless venue may let an extension latch opens",
+    "description": "An outsider could potentially make an unchanged-ELF extension stop other borrowers' new opens until Emergency revalidation, but only for an admission-ready market whose growable dependency still has no recorded fingerprint. The source expressly documents this bootstrap residual and requires hashed revalidation immediately after initialization; the operations CLI stages that hash automatically. This review establishes the conditional source path, not an active deployment exposure or an observed runtime effect.",
+    "claimed_root_cause": "initialize_config leaves the upgrade bits clear and records deploy slots without fingerprints. For a venue with no fingerprint, flag_venue_upgraded accepts a changed canonical ProgramData slot without comparing the ELF, so an otherwise permitted extension could set the persistent admission latch. A trusted equal-slot revalidation with an all-zero hash can also restore this mode. Correct hashed revalidation prevents this particular unchanged-ELF extension path.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 123,
+        "scope": "shortwin::flag_venue_upgraded",
+        "description": "The public instruction accepts a venue index and forwards to the handler. A stranger needs no protocol authority, but must provide the genuine fixed venue ProgramData; the claimed preceding permissionless loader extension remains an unverified runtime prerequisite."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/flag_venue_upgraded.rs",
+        "line": 111,
+        "scope": "handler",
+        "description": "The handler reads the loader-owned ProgramData deploy slot after the account constraints bind its address, owner, guard PDA, layout version and bounded venue index."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/flag_venue_upgraded.rs",
+        "line": 127,
+        "scope": "handler",
+        "description": "With the venue bit clear, the slot must differ from guard_slot. The ELF comparison at line 130 runs only for Some fingerprint; None reaches the bit assignment at line 136 and records the flag slot and time."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/open_short.rs",
+        "line": 291,
+        "scope": "handler",
+        "description": "A later open on an affected market reads the canonical VenueGuard and calls the latch guard. Pump-fees affects PumpCurve and PumpSwap; either Raydium dependency affects both Raydium open masks."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/engine/guard.rs",
+        "line": 112,
+        "scope": "latch",
+        "description": "A set bit intersecting the market's venue mask rejects the new open with VenueUpgraded. This is a conditional recoverable admission refusal; no asset loss or direct exit lock was demonstrated."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/instructions/flag_venue_upgraded.rs",
+        "line": 49,
+        "description": "FlagVenueUpgraded requires the typed canonical VenueGuard PDA at the supported version, venue < VENUE_PROGRAMS, the compile-time venue ProgramData address and upgradeable-loader ownership. There is no protocol-authority signer; forged or freely substituted ProgramData is not a viable input."
+      },
+      {
+        "file": "crates/shortwin-venue-state/src/program_data.rs",
+        "line": 55,
+        "description": "The reader independently checks loader ownership, minimum header length, tag 3 and a valid upgrade-authority Option tag, then reads the slot. It does not establish that any deployed loader permits an outsider to mutate this genuine account by extension."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/initialize_config.rs",
+        "line": 155,
+        "description": "The upgrade-authority-only initializer creates VenueGuard with upgraded = 0 and caller-supplied guard_slot; it installs no ELF fingerprint. GlobalConfig venue_enabled is written from the authorized arguments at line 136, so the on-chain initializer does not itself require hashed revalidation before enabling venues."
+      },
+      {
+        "file": "programs/shortwin/src/state/venue_guard.rs",
+        "line": 103,
+        "description": "elf_fingerprint returns None when guard_len is zero. Only indices 2 through 5 have storage; pump and PumpSwap always use the slot-only rule. The source's full-capacity explanation for those two accounts is a deployment assertion, not a fresh observation."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/flag_venue_upgraded.rs",
+        "line": 100,
+        "description": "With a recorded fingerprint and a grown account, is_upgrade compares the current trimmed-ELF hash with the complete recorded 32-byte digest. An unchanged ELF within the hash-size bound fails VenueNotUpgraded without writing the latch; this real preventing layer limits the candidate to the absent-fingerprint mode."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/revalidate_venue.rs",
+        "line": 37,
+        "description": "Only the pause_authority Signer bound to canonical GlobalConfig can revalidate. Lines 72-108 require the reviewed slot or, for a fingerprint-capable venue and nonzero hash, exact current ELF equality; they update guard_slot, record or clear the fingerprint and clear the bit. A stranger cannot create a hashless mode or clear the bit through this instruction."
+      },
+      {
+        "file": "programs/shortwin/src/constants.rs",
+        "line": 137,
+        "description": "Pump-fees is in both live Pump open masks, and each Raydium open mask includes both Raydium programs. Jupiter has no current VenueKind open-mask consumer, so flagging Jupiter alone does not establish the claimed admission effect."
+      },
+      {
+        "file": "programs/shortwin/src/engine/guard.rs",
+        "line": 108,
+        "description": "latch rejects an intersecting upgraded bit; its caller in open_short is line 291. Additional source consumers gate Raydium listings and pool-selection candidates, while the module explicitly excludes the open guards from exits. No independent exit-disruption or permanent-fund-lock claim is supported."
+      },
+      {
+        "file": "services/ops/src/cli.rs",
+        "line": 787,
+        "description": "The normal revalidate-venue staging path reads canonical ProgramData, computes and prints its full trimmed-ELF SHA-256, checks the requested deploy slot and stages that hash. init_config at lines 354-428 checks live slots but sends initialization separately, so completing the documented hashed follow-up is an operational control."
+      },
+      {
+        "file": "services/README.md",
+        "line": 698,
+        "description": "The current runbook explicitly discloses that a pre-fingerprint extension can latch a venue and requires Emergency hashed revalidation immediately after init-config for growable dependencies. This is intended setup policy and a known residual, not proof that any active deployment omits the step."
+      },
+      {
+        "file": "docs/SPEC.md",
+        "line": 404,
+        "description": "The accepted ExtendProgram residual concerns the loader's rest-of-slot unavailability and retry behavior. That disclosure does not establish this distinct until-revalidation latch effect; historical loader observations, costs and test claims were not treated as current runtime evidence."
+      }
+    ],
+    "blockers": [
+      "No owner-observed current state establishes an admission-ready, enabled and otherwise unpaused market during a hashless interval for pump-fees or either Raydium dependency. The runbook requires immediate hashed revalidation, and the normal operations command supplies the hash; a configuration that completed that step prevents this claimed path.",
+      "The applicable deployed loader version and feature state, outsider extension authorization, exact canonical ProgramData upgradeability and remaining allocation headroom were not independently established. Source comments and historical size/slot observations cannot prove that the required unchanged-ELF slot-changing action is currently possible.",
+      "No bounded execution through the actual current loader and fresh production program interface was observed. This source-only assignment supplies neither fresh SBF/dependency provenance nor a per-case native execution grant; no local attempt or capability-failure result is asserted."
+    ],
+    "validation_plan": {
+      "local": "After exact-case authorization, authenticated loader/tool/dependency provenance and independently approved isolation are available, have the trusted coordinator freshly build the frozen production program and run a minimal offline dummy-market integration through the real loader and public flag instruction. Bind the canonical growable dependency account, record its before/after slot, length and trimmed-ELF digest, perform one permitted unchanged-ELF extension without the protocol's authority, and check whether a hashless guard sets its bit and a later otherwise-valid dummy open returns VenueUpgraded. Use one paired correctly fingerprinted control to require VenueNotUpgraded and no latch write, then check authenticated hashed revalidation clears the candidate latch. Stop at these admission and recovery results; do not substitute copied formulas, forged-header writes, stub effects, old SBF products or deployed traffic.",
+      "deployment": "Ask the owner to observe configuration and identity facts without sending audit transactions: the cluster's current loader version/features and extension permissions, the exact canonical ProgramData owners, authorities and allocation headroom, VenueGuard guard_len/guard_slot/upgraded, enabled venue and pause states, and whether legitimate opens were admitted before the required post-init hashed revalidations or after any later zero-hash revalidation. Establish whether such a hashless active interval actually exists for an affected dependency. Do not direct extension or flagging traffic at a deployment."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "shortwin/initialize_config/unsafe-authority-initialization",
+    "title": "Initial authority roles do not require acceptance",
+    "description": "The initializer copies non-default, pairwise-distinct role keys without requiring the selected roles to sign. The current bootstrap contract gives this choice exclusively to the program's authenticated upgrade authority. The candidate establishes a possible bootstrap configuration mistake, but no violation of an initial-consent guarantee or authority available to a less-trusted principal.",
+    "claimed_root_cause": "The canonical upgrade-authority-signed initializer installs validated role public keys without requiring initial role acceptance.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 82,
+        "scope": "shortwin::initialize_config",
+        "description": "The public initialization instruction accepts InitConfigArgs and delegates to the InitializeConfig account validation and handler; the caller must act as this program's upgrade authority."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/initialize_config.rs",
+        "line": 94,
+        "scope": "InitializeConfig",
+        "description": "The authority is a Signer at line 35. ProgramData is constrained to the PDA derived from crate::ID under the upgradeable loader, and its upgrade authority must equal that signer. The caller cannot substitute an arbitrary authority record."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/initialize_config.rs",
+        "line": 107,
+        "scope": "handler",
+        "description": "check_authorities validates the upgrader-supplied keys for required non-default values and pairwise separation. It does not prove that the selected roles can sign."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/instructions/initialize_config.rs",
+        "line": 140,
+        "scope": "handler",
+        "description": "The handler installs the supplied roles in the canonical newly initialized GlobalConfig. This is the documented privileged bootstrap assignment; future governance proposals separately require the stored governance key to sign."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/instructions/initialize_config.rs",
+        "line": 35,
+        "description": "The bootstrap authority is a Signer, and lines 94-101 bind it to the canonical loader ProgramData's upgrade_authority_address. The config and companion accounts use init with fixed seeds and canonical bumps."
+      },
+      {
+        "file": "programs/shortwin/src/state/config.rs",
+        "line": 769,
+        "description": "check_authorities rejects default governance, pause authority and fee recipient, and rejects duplicate installed roles. Optional default coverage disables that role. The absence of an acceptance check is a source fact."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/propose_config.rs",
+        "line": 19,
+        "description": "Future proposals require a governance Signer, with the config.governance equality constraint at line 25. An uncontrolled governance key could therefore obstruct later proposals, conditional on the trusted upgrader selecting it."
+      },
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 1015,
+        "description": "The documented initializer is signed by the program upgrade authority, writes the authorities from args, and specifies non-default and pairwise-distinct role checks. Initial role acceptance is not part of this documented bootstrap interface."
+      },
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 1036,
+        "description": "The architecture explicitly treats replacement of program code by the upgrade authority as a trust assumption. The same principal allowed to choose bootstrap role keys already controls this stronger capability."
+      },
+      {
+        "file": "services/ops/src/config.rs",
+        "line": 295,
+        "description": "The supported governance tool derives governance as Governance vault 0, fee_recipient as Governance vault 1, and pause_authority as Emergency vault 0; cli.rs:405-409 uses those derived roles for initialization. These operational controls reduce direct address-entry mistakes but do not add an on-chain role-signature requirement."
+      },
+      {
+        "file": "services/ops/src/verify.rs",
+        "line": 145,
+        "description": "The separate verify command checks that each multisig is Squads-owned and matches the configured create key, autonomy, threshold, time lock and members; lines 319-340 check the installed config roles. cli.rs:175-182 dispatches init-config separately, so these verification checks must not be described as an automatic pre-init gate."
+      }
+    ],
+    "reason": "The decisive source contradiction is the proposed security boundary: initialization is an explicitly authorized decision of the genuine program upgrade authority, not an action available to an outsider or a less-privileged role. ARCHITECTURE.md:1015 delegates bootstrap role assignment to that principal, and :1036 explicitly trusts it to replace the program code. Non-acceptance permits that already-trusted principal to misconfigure its bootstrap, but the candidate identifies no independent initial-consent guarantee, unauthorized principal, or security effect beyond that authorized choice. The supported CLI derives the principal vault addresses and offers separate layout verification. This case is therefore a bootstrap hardening concern rather than a source-grounded vulnerability; no assumption that every possible supplied key is usable or that recovery has occurred is needed for this rejection."
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "shortwin/inputs/transaction-controlled-settlement-legs",
+    "title": "LP-controlled settlement legs remain an unvalidated accepted residual",
+    "description": "A holder of unlocked venue LP who also signs as a permissionless keeper can present genuinely reduced venue reserves to S1/S2 by withdrawing around sol_settle. The position must already be CR-liquidatable or expired, the historical box must permit the leg, and a live arming clock must have matured. Current policy explicitly retains this AIR-20 behavior. Source establishes the path to collateral distribution, but does not establish a reachable bundle that makes another borrower worse off than the honest exit after the LP restores liquidity and pays all costs.",
+    "claimed_root_cause": "arming::inputs floors only the CR spot quote at max(L_live, the guarded EMA floor). It deliberately passes raw l_live, b_live and sigma_live into S1/S2; their historical box-corner conjunction can permit settlement while the honest current state outside that box would veto a live leg.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 265,
+        "scope": "shortwin::sol_settle",
+        "description": "The public no-argument instruction accepts any keeper signer and the constrained market, borrower position and venue ReadSet; a venue LP may order its own withdrawal before this instruction."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/sol_settle.rs",
+        "line": 203,
+        "scope": "sol_settle::evaluate",
+        "description": "The handler key-checks the adopted venue ReadSet, reads its current state, runs the prologue, and assembles settlement inputs; no borrower signature authorizes the settlement."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/engine/arming.rs",
+        "line": 213,
+        "scope": "arming::inputs",
+        "description": "RiskQuotes::live consumes the current pricing reserves. The separate spot quote receives the liquidity floor at line 223, while SettleInputs retains the raw live liquidity, cost and slippage at lines 259-261."
+      },
+      {
+        "kind": "propagation",
+        "file": "crates/shortwin-math/src/settle.rs",
+        "line": 615,
+        "scope": "settle::evaluate",
+        "description": "After warm-up, CR-or-expiry eligibility and refutation checks, S1/S2 consume the live inputs plus the robust spot and historical corner. Settlement requires the live arm to have accumulated persist_n EMA updates; the kind is chosen again at execution."
+      },
+      {
+        "kind": "propagation",
+        "file": "crates/shortwin-math/src/settle.rs",
+        "line": 686,
+        "scope": "settle::settlement",
+        "description": "An admitted S1 assigns V minus K_s to lenders and zero to the borrower. S2 additionally requires the existing corner-amount agreement check and pays the EMA amount; this review makes no claim that the amount check is defective."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/instructions/sol_settle.rs",
+        "line": 494,
+        "scope": "sol_settle::handler",
+        "description": "After the payout equality check and pool accounting, the handler transfers the lender take from position collateral to market_vault, pays the keeper, reduces exposure, and closes the remaining position balance to its recorded borrower at line 510."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/instructions/sol_settle.rs",
+        "line": 103,
+        "description": "Accounts constrain config/market PDAs, position PDA and market/borrower relationships, exposure and vault. The keeper is any signer; the recorded borrower is an unchecked recipient, not a required signer."
+      },
+      {
+        "file": "programs/shortwin/src/venues/raydium_cpmm.rs",
+        "line": 169,
+        "description": "The real CPMM reader validates owners/layouts, pool-config/vault/LP-mint relationships, token mints and adoption consistency. Lines 238-249 derive pricing reserves and locked depth from the genuine current accounts. This is a genuine LP-state hypothesis, not arbitrary account substitution."
+      },
+      {
+        "file": "programs/shortwin/src/engine/arming.rs",
+        "line": 208,
+        "description": "Current venue liquidity and live risk quotes remain separate from the CR spot quote floored by bounds::spot_liquidity at line 223. The CR gate is spot_leg AND the persistent EMA leg; position settlement terms are locked by arming::terms."
+      },
+      {
+        "file": "crates/shortwin-math/src/settle.rs",
+        "line": 156,
+        "description": "S1 requires its live, robust-spot/live-depth and historical-corner cost tests together. S2 at line 173 requires the analogous three slippage tests. Draining a live leg alone is insufficient."
+      },
+      {
+        "file": "crates/shortwin-math/src/settle.rs",
+        "line": 583,
+        "description": "Executable-venue warm-up returns without deciding. Line 593 returns unless already CR-liquidatable or expired; line 610 enforces restart-aware arm liveness; line 611 applies refutation; lines 629-641 reset a new arm and require persist_n later EMA integrations. A live arm can be kept when neither leg holds, so a full intermediate history still matters."
+      },
+      {
+        "file": "crates/shortwin-math/src/observe.rs",
+        "line": 559,
+        "description": "An observation integrates only from a prior completed bucket; record at line 463 merges the same-second extrema. Prologue::run rolls before recording the current state, so a single transaction cannot fabricate the later EMA updates a new arm requires."
+      },
+      {
+        "file": "crates/shortwin-math/src/params.rs",
+        "line": 1017,
+        "description": "Compiled ranges admit pool_lock_min_bps of 2000 and venue fees of 100 bps, but settle_persist_n remains at least 40 at line 1025. These accepted parameter values do not establish a valid victim, venue LP position or adverse result."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/sol_settle.rs",
+        "line": 287,
+        "description": "Production recalculates waterfall::settle and requires equality with the math decision, books pool settlement, then moves collateral and closes to the borrower. waterfall::settle conserves V, caps S2/S3 at FV, and allocates the excess lender premium to vesting; source does not establish the counterfactual borrower loss or LP profit."
+      },
+      {
+        "file": "docs/SPEC.md",
+        "line": 405,
+        "description": "Current owner policy explicitly retains AIR-20 corner-only veto behavior and declines its optional code change. ARCHITECTURE.md:1298 describes the outside-box residual and model-only default/no-loss and low-lock/high-fee estimates; those are policy/context, not independently observed execution."
+      },
+      {
+        "file": "crates/shortwin-math/src/settle.rs",
+        "line": 1004,
+        "description": "The committed AIR-20 test supplies Toy quotes and checks s1_legs only. It does not exercise an accepted borrower position, actual venue LP instructions, the complete arming history or collateral/cost effects and was not executed."
+      },
+      {
+        "file": "tests/litesvm/Cargo.toml",
+        "line": 11,
+        "description": "The native integration harness loads an SBF short.win artifact, while tests/litesvm/src/fork.rs:572 loads dumped external Raydium programs. Their presence or source comments do not establish fresh reviewed program/tool/dependency provenance for this independent validation."
+      }
+    ],
+    "blockers": [
+      "No independently observed real-venue dummy transaction establishes an outside-box victim and an LP withdrawal/redeposit sequence that survives the guarded eligibility gate, fresh-bucket requirement, refutation, restart rules and mature arming state, then changes settlement relative to the same-state honest exit.",
+      "A fresh reviewed short.win SBF build and authenticated external venue/tool/dependency provenance path are not available for this assignment. The existing LiteSVM route loads prebuilt or dumped products; executing those or the Toy predicate test would not meet the required evidence contract. No target code, builds, tests, fixtures or binaries were executed.",
+      "Additional borrower loss and the complete LP/keeper/lender/protocol/venue cost and payout difference remain undecided. The documented default no-loss and approximately 1.2 percent model estimates are not adopted as runtime evidence or severity."
+    ],
+    "validation_plan": {
+      "local": "After a separately approved offline provenance path exists, use fresh reviewed short.win SBF and authenticated real-CPMM/SPL programs with dummy accounts. Open a position through production instructions under compiled-valid 20-percent minimum lock and 1-percent venue-fee terms, and create its non-point historical box through real observations. Compare cloned honest and LP-withdraw/sol_settle/redeposit paths at the same times, recording the CR gate, every intermediate arm/refutation/restart update through the locked persistence interval, and final live-plus-corner predicates. Require genuine LP ownership, withdrawal and restoration instructions rather than balance patches or copied formulas. Compare the honest buyback/exit with the completed settlement using borrower collateral and extinguished debt, lender token/SOL claims and vesting, keeper/protocol/venue payments, LP balances, rounding and transaction costs. Stop at the first complete differential or a preventing control; do not test or rely on any defect in the excluded FV-corner arithmetic case."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "shortwin/keeper_exit/pre-roll-risk-fee-resolution",
+    "title": "Keeper exit uses the risk fee resolved before its EMA roll",
+    "description": "A permissionless keeper can invoke liquidate or expire while a completed observation bucket is pending. The shared keeper_exit path caches the PumpSwap fee at the pre-roll EMA, then assesses the post-roll observation with that cached cap. Whether this can charge a borrower a penalty or change an accepted exit payout contrary to the intended fee basis remains unvalidated.",
+    "claimed_root_cause": "keeper_exit constructs an immutable VenueState, including the PumpSwap fee at market.ema_price, before prologue::run integrates the completed bucket; assess and the exit reference subsequently consume the updated observation with the earlier fee cap.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 159,
+        "scope": "handler",
+        "description": "Any signing keeper supplies the selected position and remaining accounts; Anchor constraints bind the borrower, market, vaults, mint, token program and exposure before handler calls keeper_exit."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 557,
+        "scope": "keeper_exit",
+        "description": "After canonical remaining-account checks, read_state_boxed_for_exit resolves the PumpSwap fee against the market EMA currently stored before this instruction runs the prologue."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 565,
+        "scope": "keeper_exit",
+        "description": "prologue::run may roll a completed bucket and update the market EMA and ring while the previously constructed VenueState remains unchanged."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 581,
+        "scope": "keeper_exit",
+        "description": "plan assesses the post-prologue market and computes its reference using the retained state; the same function serves liquidation and expiry."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 677,
+        "scope": "keeper_exit",
+        "description": "Only if all plan checks, the actual bounded buyback and waterfall succeed, the position pays the computed keeper amount. No accepted native exit showing a fee-timing-induced borrower loss was observed."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 715,
+        "description": "read_state computes fee_ema from the stored market.ema_price, live mint supply and canonical external fee schedule, then saves its one-way rate in PoolVenue.fee_ppm_at_ema at line 731."
+      },
+      {
+        "file": "programs/shortwin/src/venues/mod.rs",
+        "line": 1078,
+        "description": "read_state_boxed_for_exit enables EMA fee resolution only for PumpSwap. exit_risk_cap_bps at line 822 takes the minimum of that saved rate rounded to bps and the position hard cap; FeeBps::capped additionally preserves a lower live fee."
+      },
+      {
+        "file": "programs/shortwin/src/engine/prologue.rs",
+        "line": 174,
+        "description": "The prologue rolls the observation, subsequently records the pre-trade venue observation and writes the updated observation back at line 213; it does not rebuild the caller VenueState."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 338,
+        "description": "assess takes its risk cap from the retained state and applies it to the robust spot and persistent ring quotes. The execution quote and buyback affordability/slippage checks retain the live fee."
+      },
+      {
+        "file": "programs/shortwin/src/engine/bounds.rs",
+        "line": 114,
+        "description": "The keeper reference quote uses the same saved exit risk cap with the post-roll observation reference. Locked-depth capping and the position terms still constrain the reference and max_in."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/liquidate.rs",
+        "line": 438,
+        "description": "Freshness, CR liquidatability or expiry classification, live-fee buyback allowance and the reference bound must all pass; warm-up and executable-venue checks precede plan. The actual buy at line 645 must return q tokens and spend no more than max_in plus the locked tolerance, with post-CPI trader and vault checks at lines 704-707."
+      },
+      {
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 401,
+        "description": "The caller cannot invent the fee schedule: check_read binds P0-P5 to the canonical pool, cached vaults and fixed global/fee-config keys, and binds P6 to the pool LP mint. read_state checks pool identity, vault ownership, fee-config parsing and executable reserves."
+      },
+      {
+        "file": "crates/shortwin-venue-state/src/pump.rs",
+        "line": 709,
+        "description": "read_fee_config requires the pump-fees owner and discriminator and parses account-supplied tier vectors. The active authentic thresholds and fee components are external data, not fixed by this source."
+      },
+      {
+        "file": "docs/design/ECONOMICS.md",
+        "line": 282,
+        "description": "Current normative order says the body reads the post-roll EMA state. This supports reviewing observation timing but does not by itself specify when the exit fee tier must be resolved."
+      },
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 2314,
+        "description": "Current normative AIR-10 text expressly caps the exit risk view at the tier at stored P_ema and names read_state_boxed_for_exit. It does not expressly settle whether this first-roll caller must retain its pre-roll tier or re-resolve after the roll; this is policy context, not native execution evidence."
+      }
+    ],
+    "blockers": [
+      "The security expectation for fee timing is unresolved: the normative body-order rule uses post-roll observations, while AIR-10 names the stored EMA tier. Owner confirmation of the intended basis for a keeper exit that itself rolls a bucket is necessary; an intentional pre-roll fee basis would refute the proposed policy mismatch unless a separate meaningful invariant violation is demonstrated.",
+      "No authenticated canonical PumpSwap FeeConfig snapshot, live supply and creator-override context, and legally reachable position/observation/reserve history establish a binding pre/post-roll fee difference. The lower live fee and locked hard cap can erase a tier difference; arbitrary planted thresholds would not establish the claimed production condition.",
+      "No complete native production-interface exit has shown that the timing difference survives the executable-venue, warm-up, freshness, robust-spot, persistent-EMA, live affordability/slippage, reference-bound, actual buyback and payment checks and reduces another dummy borrower's funds. No target execution, build, dependency resolution, source-derived model or fixture processing was performed in this review."
+    ],
+    "validation_plan": {
+      "local": "After the fee-timing expectation and authentic non-secret fee terms are established, separately authorize a minimal offline check at commit 56f660027f88ee60a33b9d2b5da516daccc9c9b9 with verified source/dependency closure and fresh program, token and PumpSwap runtime provenance. Use actual production instructions to open one dummy position and build a legal completed-bucket history crossing an authentic binding tier. Fork the same local bank and timestamp: in one branch invoke the keeper exit that performs the roll; in the other invoke crank_price before the identical keeper exit without changing venue reserves. Verify that non-fee decision inputs agree, retain every production guard and actual venue CPI/payment, and compare classification and borrower/keeper balance deltas. Stop at the first accepted dummy exit proving the claimed unauthorized penalty or payout difference, or a concrete preventing control. Do not substitute copied fee arithmetic, mock payouts, stale SBF products or any settlement-corner check. Execute only after the required OS controls and trusted promotion have been independently established for that exact request.",
+      "deployment": "The owner should document whether first-roll keeper exits intentionally use the pre-roll fee tier, and provide bank-tagged non-secret observations of the canonical FeeConfig, mint supply, pool creator-fee settings and program identities needed to determine whether an authentic binding tier crossing is possible. These are configuration/policy observations; no audit traffic to a deployment is required."
+    }
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "shortwin/math_tiers/unbounded-tier-allocation",
+    "title": "SOL fee-tier materialization may prevent the exit fallback",
+    "description": "Both Pump adapters collect every accepted SOL-schedule tier into a Vec; the curve also converts the PumpSwap schedule into a retained Rc slice. These operations occur before sol_settle selects its risk fallback. An externally admitted schedule that exceeds the actual instruction resource budget could therefore prevent honest keepers from settling affected borrowers' positions, despite the intended unreadable-venue fallback. Ordinary callers cannot supply arbitrary fee bytes: the accounts have fixed keys and the pfee owner/discriminator. No supported failing schedule or shared exit failure has been established.",
+    "claimed_root_cause": "The borrowed fee reader checks count-to-byte arithmetic and account bounds, but the consumers materialize the entire SOL tier list with infallible collect and, on the curve, Vec-to-Rc conversion before returning a venue view. They impose no consumer tier-count/resource bound or allocation-error fallback. This is conditional on the external canonical writer admitting a list large enough to exceed the real production budget; per-quote copies are not present.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 265,
+        "scope": "shortwin::sol_settle",
+        "description": "A permissionless keeper invokes SOL settlement with a real position and its market's venue ReadSet; the caller selects accounts but cannot replace authenticated canonical fee data."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/sol_settle.rs",
+        "line": 205,
+        "scope": "evaluate",
+        "description": "After venues::parse key-checks the ReadSet, evaluate reads the boxed venue state before calling risk_quoter or advancing the no-route settlement path."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/venues/pump_curve.rs",
+        "line": 445,
+        "scope": "pricing_inputs",
+        "description": "A curve with nonzero virtual tokens reads its canonical pump FeeConfig and materializes its SOL tier schedule before resolving pricing."
+      },
+      {
+        "kind": "propagation",
+        "file": "crates/shortwin-venue-state/src/pump.rs",
+        "line": 695,
+        "scope": "tiers_at",
+        "description": "The reader converts the u32 count, checks count times 40 and the end offset, and borrows only bytes inside the account. Both vectors and trailing fees must fit; there is no separate semantic tier-count cap."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/venues/pump_curve.rs",
+        "line": 446,
+        "scope": "pricing_inputs",
+        "description": "math_tiers collects the full curve SOL list into a Vec; normal Option-based parsing and pricing failures can return a not-executable view only after preceding allocations complete."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/venues/pump_curve.rs",
+        "line": 506,
+        "scope": "pricing_inputs",
+        "description": "The curve materializes the canonical PumpSwap SOL list and converts it to Rc<[FeeTier]> for the returned pricing state, before read_state returns and the settlement fallback can be selected. A resource failure here remains unobserved."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "programs/shortwin/src/venues/pump_curve.rs",
+        "line": 310,
+        "description": "read_keys fixes both fee-config addresses and check_read delegates exact count/key checks to raydium::check_keys. PumpSwap fixed_read_keys likewise fixes its fee-config address; an ordinary caller cannot substitute a larger forged account."
+      },
+      {
+        "file": "crates/shortwin-venue-state/src/pump.rs",
+        "line": 709,
+        "description": "read_fee_config verifies the pfee owner and discriminator, uses checked tiers_at for both vectors, and requires the trailing 24-byte fees to fit. This is a bounded borrowed parser, not an unchecked count allocation."
+      },
+      {
+        "file": "crates/shortwin-venue-state/src/pump.rs",
+        "line": 583,
+        "description": "Source documents a 4097-byte canonical allocation. The checked layout requires 97 + 40*(SOL count + stable count) bytes, so that allocation permits at most 100 tiers jointly per config. The parser does not enforce the documented allocation size; larger reachable sizes require proof of the real canonical writer's resize policy."
+      },
+      {
+        "file": "programs/shortwin/src/venues/pump_curve.rs",
+        "line": 404,
+        "description": "math_tiers maps all SOL entries and collects a Vec. pricing_inputs invokes it for the curve at line 446 and for PumpSwap inside Rc::from at line 506; the curve's executable decision occurs later at line 572. Stable tiers are parsed but are not copied by these consumers."
+      },
+      {
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 701,
+        "description": "After pool identity, vault, owner/layout and reserve checks, the PumpSwap adapter collects all SOL tiers, resolves a borrowed schedule, and only later decides executable status, including the buy-disable flag at line 745. Its tier Vec is temporary; the returned PoolVenue retains resolved fee values."
+      },
+      {
+        "file": "programs/shortwin/src/venues/mod.rs",
+        "line": 595,
+        "description": "curve_pricing lends &self.pool_tiers to PammFeeSchedule. CurvePricing and PammFeeSchedule carry borrowed slices, and CurvePricingInputs clones share an Rc. This refutes a new tier-vector allocation on every quote or state clone; runtime allocation size and peak remain unmeasured."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/sol_settle.rs",
+        "line": 212,
+        "description": "risk_quoter is invoked only after read_state_boxed_for_exit returns. Its cap-only and PumpSwap fee-view fallbacks therefore do not bypass adapter allocations. CloseShort and keeper_exit also read venue state first (close_short.rs:169 and liquidate.rs:557); expire calls keeper_exit. This establishes reachable control flow, not an observed exit failure."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/propose_pool.rs",
+        "line": 218,
+        "description": "incumbent refuses PumpCurve, PumpMigrating and PumpSwap with PumpVenuePrecedence; execute_pool_switch also requires a Raydium or None market. These paths do not provide an immediate caller-selected alternate pool for a Pump market. A flag_venue_upgraded call changes a separate latch, not canonical fee data or the unconditional settlement read."
+      }
+    ],
+    "blockers": [
+      "The current canonical pfee setter's accepted SOL/stable counts, authorization and allocation/resize limits are not established by the reviewed first-party source. An ordinary caller has no demonstrated fee-list writer. The documented 4097-byte allocation supplies a real effective bound of 100 joint tiers per config; an invented larger account is not reachability evidence.",
+      "No bounded execution through fresh authenticated production SBF has established FeeTier layout, Vec/Rc allocation behavior and retained heap/CU peak at any writer-admitted count, or an honest dummy exit failing before its fallback. The source-only authorization grants no native execution; device/PTY isolation qualification and fresh toolchain/dependency/program provenance remain unresolved. No native request or attempt was made.",
+      "The supported failing condition, duration and recovery of affected Pump exits remain unobserved. Transaction rollback contains a possible failure to the instruction; shared availability would require the same authentic configuration to keep rejecting otherwise eligible honest exits, rather than merely consuming the initiating caller's budget."
+    ],
+    "validation_plan": {
+      "local": "Obtain the owner's pinned canonical pfee setter and allocation contract first. If it admits a relevant boundary list, after independent isolation/provenance approval use an offline fresh SBF build of this frozen production path and dummy canonical accounts to compare the normal schedule with only the largest admitted bounded schedule. Observe the actual adapter read and one otherwise eligible dummy sol_settle call under the intended heap/CU budget; stop at the first controlled view, successful fallback, or resource failure. Record allocation/compute peak and whether fallback was reached. Do not use copied formulas, a host allocator model, an unsupported oversized buffer, repeated exhaustion or stopped settlement-math fixtures.",
+      "deployment": "Without sending audit transactions, have the owner establish current canonical fee-account sizes/counts and the deployed pfee writer/resize policy, plus the production program and transaction heap/CU configuration and authorized recovery procedure. These facts determine whether the local maximum is supported and whether a demonstrated local resource failure could persist across honest users' exits."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "shortwin/open_short/pre-roll-risk-fee-resolution",
+    "title": "The pre-roll fee basis is explicitly specified for opening caps",
+    "description": "The ordering observation is accurate: an open retains the pump fee resolved at the stored EMA while the prologue can advance the EMA used for reserve sizing. The current opening-cap rule expressly specifies this split, so the proposed requirement to recompute the cap fee after the roll is refuted by the frozen source's design contract.",
+    "claimed_root_cause": "The pump cap fee is resolved before the observation roll, while opening-cap reserve inputs use the post-roll EMA, purportedly violating a requirement that both use the post-roll price and admitting a harmful oversized open.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 214,
+        "scope": "shortwin::open_short",
+        "description": "A borrower submits q and execution limits to the public open instruction; OpenShort requires the borrower signer and binds the market, position, exposure, vault and mint accounts."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/open_short.rs",
+        "line": 262,
+        "scope": "handler",
+        "description": "After static, mint, inventory and remaining-account checks, read_state_boxed_for_open resolves a pre-trade VenueState and its fee at the stored EMA; prologue::run subsequently rolls the observation at lines 274-282."
+      },
+      {
+        "kind": "sink",
+        "file": "programs/shortwin/src/instructions/open_short.rs",
+        "line": 406,
+        "scope": "handler",
+        "description": "check_open receives the post-roll p_ema and the retained state's cap_fee_ppm. This is the explicitly specified pre-roll fee and post-roll reserve basis, rather than a demonstrated cap-policy bypass."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 1735,
+        "description": "The current Size caps section explicitly defines both pump fee-scaled caps with min(live fee, fee at the stored pre-roll EMA seen by the reader). This is direct intent evidence contradicting the proposal's assumed mandatory post-roll fee basis; historical reproduction claims embedded in the paragraph were not used as execution evidence."
+      },
+      {
+        "file": "docs/design/ARCHITECTURE.md",
+        "line": 1732,
+        "description": "The same Size caps section expressly identifies the reserve-sizing EMA as post-roll. Read together with line 1735, the two time bases are an explicit rule rather than an unspecified implementation exception."
+      },
+      {
+        "file": "programs/shortwin/src/venues/pump_amm.rs",
+        "line": 715,
+        "description": "The PumpSwap reader obtains market.ema_price, resolves fee_ema from it using the accepted live fee schedule and supply, and stores that rate in fee_ppm_at_ema at line 731. The curve reader independently uses its stored EMA at pump_curve.rs:477-482."
+      },
+      {
+        "file": "programs/shortwin/src/venues/mod.rs",
+        "line": 796,
+        "description": "cap_fee_ppm returns min(self.fee_ppm, the pump view's fee_ppm_at_ema). The for-open reader at line 1063 enables that resolution; no post-prologue recomputation is part of this source path."
+      },
+      {
+        "file": "programs/shortwin/src/engine/prologue.rs",
+        "line": 174,
+        "description": "The prologue rolls the observation and stores it at line 213. Observation::integrate rolls only a completed bucket and steady_step can change the EMA, so the original ordering observation is retained as accurate source behavior."
+      },
+      {
+        "file": "programs/shortwin/src/engine/caps.rs",
+        "line": 118,
+        "description": "check_open enforces the fee-scaled position cap using the supplied phi_ppm and enforces OI at lines 122-125; impact, utilization, curve, wallet and inventory checks remain present. The supplied phi is the specified pre-roll fee policy."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/open_short.rs",
+        "line": 290,
+        "description": "Executable venue, fee limits, venue warm-up, EMA freshness, spot deviation, price ceiling and boost guards precede cap use. A cap pass still requires the measured sell, minimum and maximum notional, D4 margin, borrower fee limits and final vault/utilization postconditions at lines 530-668. These are source-visible controls, not proof of an accepted harmful trade."
+      }
+    ],
+    "reason": "The concrete contradiction is the current cap requirement itself: ARCHITECTURE.md:1735 expressly chooses the stored pre-roll EMA for the fee, while :1732 chooses the post-roll EMA for reserve sizing. The source implements that exact split and enforces its resulting caps. The proposed comparison against a hypothetically recomputed post-roll fee therefore does not establish a violation of the specified opening-cap invariant. The supplied case identifies no separate demonstrated harmful result beyond that assumed inconsistency. This rejects the assigned timing-mismatch claim as a vulnerability; it does not assert runtime economic safety for all fee histories. No target execution, build, model, fixture or native artifact was used."
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "shortwin/sync_lender/repeated-accrual-truncation",
+    "title": "Repeated lender touches discard fractional credits",
+    "description": "Current and parked lenders do floor each intervening accumulator delta before replacing their snapshots. This is the precise bounded per-sync rounding residual explicitly accepted in the current specification as KI-68; the reviewed source does not establish an additional security effect beyond it.",
+    "claimed_root_cause": "The current and parked accrual paths floor shares times each signed accumulator delta and advance snapshots without retaining a lender-level fractional remainder.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "programs/shortwin/src/lib.rs",
+        "line": 196,
+        "scope": "sync_lender",
+        "description": "The public instruction accepts max_epochs and delegates to the SyncLender handler."
+      },
+      {
+        "kind": "propagation",
+        "file": "programs/shortwin/src/instructions/sync_lender.rs",
+        "line": 118,
+        "scope": "handler",
+        "description": "With the genuine key-bound owner unsigned, the handler intentionally invokes touch_pot and persists the lender and vault after its rebase post-condition."
+      },
+      {
+        "kind": "sink",
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 1474,
+        "scope": "touch_tail",
+        "description": "For a current lender without a forward chain, pending and real accrue floored deltas; lines 1487-1488 replace snapshots and lines 1499-1500 store the checked integer balances."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "docs/SPEC.md",
+        "line": 370,
+        "description": "The current owner-approved KI-68 contract explicitly accepts third-party sync of a current or parked lender rounding away at most one lamport of entitlement and realised allocation per sync, with no program change. Its stated transaction fee is design context, not an independently observed runtime fact."
+      },
+      {
+        "file": "crates/shortwin-math/src/num/mod.rs",
+        "line": 133,
+        "description": "accrued at pool.rs:598 calls mul_div_i128 with Floor. The signed primitive flips rounding on negative magnitudes, uses the checked wide mul_div path, and rejects unrepresentable results. Each successful floor introduces less than one lamport of error, for either sign."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 1214,
+        "description": "The non-chain conversion path has the same delta flooring; parking on a live wipe record advances its snapshots at lines 1224-1229. This matches the expressly accepted parked case."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 1403,
+        "description": "The forward chain instead subtracts cumulative floors and advances its snapshots, so repeated walks telescope within each epoch. The unsigned hold does not convert shares or write conversion remainders."
+      },
+      {
+        "file": "programs/shortwin/src/instructions/sync_lender.rs",
+        "line": 74,
+        "description": "Typed market/vault/lender accounts, market PDA and version checks, lender PDA seeds and owner/market relationships bind the real lender. Market is read-only and the handler never releases vest or advances its credit indices; an unchanged-index repeat accrues zero."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 1908,
+        "description": "Final withdrawal credits whole entitlement and realised carries, moves any realised surplus to the pot and clears both carries. Lines 1897-1904 first release any remaining vest. These aggregate carries do not retain previously discarded lender fractions."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 2026,
+        "description": "An empty pool with legacy SOL carry is quarantined before a new deposit, preventing a subsequent cohort from inheriting that carry."
+      },
+      {
+        "file": "crates/shortwin-math/src/pool.rs",
+        "line": 2136,
+        "description": "A claim draws only its own deficit from unmatched and pays no more than pending, unclaimed real and lender_sol. The signed owner receives payment through claim_sol.rs:107; sync itself transfers no SOL and grants no share-conversion authority."
+      }
+    ],
+    "reason": "The arithmetic observation is real, but the proposed invariant that permissionless touches must preserve all cumulative fractions is not this product's intended contract. SPEC.md:370 explicitly accepts this same current/parked, repeatable per-sync residual. Independent source review found the corresponding bound for both signed entitlement and realised allocation, no loss from repeating an unchanged snapshot, cumulative rather than per-delta flooring on the forward chain, owner-only rebase conversion, and the terminal vest/carry and payout controls. Repeated effective touches can accumulate the documented dust and are not asserted to be compensated later. Transaction batching can amortize fees, so this rejection does not assume a separate 5,000-lamport payment for every invocation. No source-grounded extraction or amplification outside the accepted residual survived. This is a source-based rejection of the claimed vulnerability, not a runtime confirmation; no target code, native check, build, test or model was executed."
+  }
+]

@@ -1,0 +1,380 @@
+{
+  "schema_version": 1,
+  "checkpoint_at": "2026-10-22T00:49:02.107792+00:00",
+  "audit_status": "in_progress",
+  "is_final_security_report": false,
+  "audited_source_commit": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+  "audit_branch": "audit-1.0.3-full-2026-10-21",
+  "source_reviews": {
+    "rust_passes": 3,
+    "independent_rust_specialty_reviews": 36,
+    "broader_independent_reviews": 21,
+    "source_hunting_status": "converged_with_disclosed_gaps",
+    "methodology_qualifications": "Bounded rereads, tool-output truncation and output-cap deviations are retained in the external source-review qualification; source declarations/hashes are not semantic or runtime proof."
+  },
+  "candidate_decisions": {
+    "total_unique_hypotheses": 36,
+    "independently_decided": 13,
+    "rejected": 6,
+    "needs_validation": 7,
+    "confirmed": 0,
+    "all_seven_retained_records_separately_phase5_verified": true,
+    "remaining_without_independent_disposition": 23
+  },
+  "source_coverage_states": {
+    "covered": 73,
+    "candidate": 42,
+    "blocked": 8
+  },
+  "coverage_state_qualification": "Hunting-ledger states remain preserved; candidate units are not confirmed bug counts.",
+  "source_blocked_units": [
+    {
+      "coverage_id": "services%2Findexer%2Fsrc%2Fapi%2Froutes.rs%23ROUTES::services%2Findexer%2Fsrc%2Fapi%2Fmod.rs%23edge::services%2Findexer%2Fapi::ATTACK-CLASSES.md%23Access%20control::services%2Findexer%2Fapi%23WebSocket%20replay%20fanout%20and%20disconnect",
+      "owner": "hunter_indexer_api",
+      "unresolved": [
+        "Automatic security review blocked this subagent for possible cybersecurity risk. The run terminated; its blocked request was not rephrased, retried, or assigned to another agent. Partial notes and a proposed fixture remain unverified."
+      ]
+    },
+    {
+      "coverage_id": "services%2Findexer%2Fsrc%2Fapi%2Froutes.rs%23ROUTES::services%2Findexer%2Fsrc%2Fapi%2Fmod.rs%23edge::services%2Findexer%2Fapi::ATTACK-CLASSES.md%23Access%20control::services%2Findexer%2Fapi%23anonymous%20keyed%20and%20proxy%20reads",
+      "owner": "hunter_indexer_api",
+      "unresolved": [
+        "Automatic security review blocked this subagent for possible cybersecurity risk. The run terminated; its blocked request was not rephrased, retried, or assigned to another agent. Partial notes and a proposed fixture remain unverified."
+      ]
+    },
+    {
+      "coverage_id": "services%2Findexer%2Fsrc%2Fapi%2Froutes.rs%23ROUTES::services%2Findexer%2Fsrc%2Fapi%2Fmod.rs%23edge::services%2Findexer%2Fapi::ATTACK-CLASSES.md%23Injection::services%2Findexer%2Fapi%23WebSocket%20replay%20fanout%20and%20disconnect",
+      "owner": "hunter_indexer_api",
+      "unresolved": [
+        "Automatic security review blocked this subagent for possible cybersecurity risk. The run terminated; its blocked request was not rephrased, retried, or assigned to another agent. Partial notes and a proposed fixture remain unverified."
+      ]
+    },
+    {
+      "coverage_id": "services%2Findexer%2Fsrc%2Fapi%2Froutes.rs%23ROUTES::services%2Findexer%2Fsrc%2Fapi%2Fmod.rs%23edge::services%2Findexer%2Fapi::ATTACK-CLASSES.md%23Injection::services%2Findexer%2Fapi%23anonymous%20keyed%20and%20proxy%20reads",
+      "owner": "hunter_indexer_api",
+      "unresolved": [
+        "Automatic security review blocked this subagent for possible cybersecurity risk. The run terminated; its blocked request was not rephrased, retried, or assigned to another agent. Partial notes and a proposed fixture remain unverified."
+      ]
+    },
+    {
+      "coverage_id": "services%2Findexer%2Fsrc%2Fapi%2Froutes.rs%23ROUTES::services%2Findexer%2Fsrc%2Fapi%2Fmod.rs%23edge::services%2Findexer%2Fapi::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Findexer%2Fapi%23WebSocket%20replay%20fanout%20and%20disconnect",
+      "owner": "hunter_indexer_api",
+      "unresolved": [
+        "Automatic security review blocked this subagent for possible cybersecurity risk. The run terminated; its blocked request was not rephrased, retried, or assigned to another agent. Partial notes and a proposed fixture remain unverified."
+      ]
+    },
+    {
+      "coverage_id": "services%2Findexer%2Fsrc%2Fapi%2Froutes.rs%23ROUTES::services%2Findexer%2Fsrc%2Fapi%2Fmod.rs%23edge::services%2Findexer%2Fapi::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Findexer%2Fapi%23anonymous%20keyed%20and%20proxy%20reads",
+      "owner": "hunter_indexer_api",
+      "unresolved": [
+        "Automatic security review blocked this subagent for possible cybersecurity risk. The run terminated; its blocked request was not rephrased, retried, or assigned to another agent. Partial notes and a proposed fixture remain unverified."
+      ]
+    },
+    {
+      "coverage_id": "services%2Fkeeper%2Fsrc%2Fcoverage.rs%23check-foreign::services%2Fkeeper%2Fsrc%2Fcoverage.rs%23historical-held-liquidity-freeze-residual::services%2Fkeeper::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::legacy-memory%23current-source-revalidation",
+      "owner": "hunter_legacy_keeper",
+      "unresolved": [
+        "The economic consequence of a genuine held withdrawal followed by repeated liquidity wraps remains unvalidated against the current guarded spot floor and exit-reference caps; source preservation alone does not establish an unauthorized liquidation or settlement change.",
+        "The source-only assignment supplies no approved OS-enforced sandbox invocation and forbids target tests, builds and fixture processing. No current native producer/consumer comparison against a permanent-withdrawal control was executed."
+      ]
+    },
+    {
+      "coverage_id": "tests%2Ffuzz%2Fsrc%2Fworld.rs%23stateful%20validation::tests%2Ffixtures%2Fmanifest.json%23fixture%20identity::test-and-tooling::ATTACK-CLASSES.md%23Wildcard::test-and-tooling%23fuzz%20bench%20local%20validator%20and%20media",
+      "owner": "hunter_validation_tools_w2",
+      "unresolved": [
+        "Source tracing of the reassigned fixture-selection/mode/result handoffs is complete, but no root-approved isolated native invocation was supplied. The exact bytes actually loaded by present LiteSVM/Mollusk/validator processes, active dependency feature behavior, wrapper execution, success/failure predicates on those bytes and attribution of existing benchmark/fuzz/media outputs to frozen commit 56f660027f88ee60a33b9d2b5da516daccc9c9b9 remain unobserved. Settling those facts requires a separately authorized bounded offline native run recording source identity, resolved tool/runtime inputs, actual loaded ELF digests, manifest digest, mode overrides and the relevant native outcomes; inventory, named paths and cached reports cannot substitute.",
+        "The current pump/PumpSwap manifest entries declare no verified program source/build and deliberately share older instruction/depth probe profiles. The checked/reconstructed digest controls establish only agreement with the local manifest when executed; they cannot establish external source-to-binary provenance or full current native compatibility. Independent source-to-binary evidence, or bounded owner-authorized supported-path runtime observations against the pinned bytes, is the precise missing fact. No source-grounded unauthorized actor/handoff survived to a candidate."
+      ]
+    }
+  ],
+  "unvalidated_hypotheses": [
+    {
+      "fingerprint": "deployment:compose/indexer-shared-secret-directory",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fdeploy%2Fdocker-compose.yml%23services::services%2Findexer%2Fdeploy%2Finitdb%2F01-roles.sh%23roles::deployment::ATTACK-CLASSES.md%23Access%20control::deployment%23config%20image%20roles%20and%20secrets",
+        "services%2Findexer%2Fdeploy%2Fdocker-compose.yml%23services::services%2Findexer%2Fdeploy%2Finitdb%2F01-roles.sh%23roles::deployment::ATTACK-CLASSES.md%23Access%20control::deployment%23startup%20migration%20restart%20and%20fallback",
+        "services%2Findexer%2Fdeploy%2Fdocker-compose.yml%23services::services%2Findexer%2Fdeploy%2Finitdb%2F01-roles.sh%23roles::deployment::ATTACK-CLASSES.md%23Cryptography%20and%20secrets::deployment%23config%20image%20roles%20and%20secrets",
+        "services%2Findexer%2Fdeploy%2Fdocker-compose.yml%23services::services%2Findexer%2Fdeploy%2Finitdb%2F01-roles.sh%23roles::deployment::ATTACK-CLASSES.md%23Cryptography%20and%20secrets::deployment%23startup%20migration%20restart%20and%20fallback"
+      ]
+    },
+    {
+      "fingerprint": "gapcal/rpc/transaction-cache-signature-path-escape",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "scripts%2Fgapcal%2Ffetch.py%23RPC%20signature%20ingestion::scripts%2Fgapcal%2Frpc.py%23transaction%20cache%20file%20paths::test-and-tooling::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::test-and-tooling%23research%20crawler%20cache%20lifecycle"
+      ]
+    },
+    {
+      "fingerprint": "indexer/analytics/invocation-prune-before-reopened-hour-recomputation",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fanalytics%2Fformulas.rs%23derived%20market%20lender%20and%20settlement%20values::services%2Findexer%2Fmigrations%2F0006_analytics.sql%23SQL%20formulas%20counters%20and%20hourly%20rollups::services%2Findexer%2Fanalytics::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fanalytics%23analytics%20formula%20late-data%20rollback%20and%20rollup%20recomputation"
+      ]
+    },
+    {
+      "fingerprint": "indexer/analytics/rollback-null-block-time-misses-rollup-rewind",
+      "phase3_status": "native_request_checkpoint_pending_procedural_review",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fanalytics%2Fformulas.rs%23derived%20market%20lender%20and%20settlement%20values::services%2Findexer%2Fmigrations%2F0006_analytics.sql%23SQL%20formulas%20counters%20and%20hourly%20rollups::services%2Findexer%2Fanalytics::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fanalytics%23analytics%20formula%20late-data%20rollback%20and%20rollup%20recomputation"
+      ]
+    },
+    {
+      "fingerprint": "indexer/analytics/rollup-cursor-before-deferred-projection-rebuild",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fanalytics%2Fformulas.rs%23derived%20market%20lender%20and%20settlement%20values::services%2Findexer%2Fmigrations%2F0006_analytics.sql%23SQL%20formulas%20counters%20and%20hourly%20rollups::services%2Findexer%2Fanalytics::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fanalytics%23analytics%20formula%20late-data%20rollback%20and%20rollup%20recomputation"
+      ]
+    },
+    {
+      "fingerprint": "indexer/finality/late-confirmed-watermark",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fingest%23finality%20rollback%20replay%20and%20rebuild",
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fingest%23live%20backfill%20and%20duplicate%20delivery",
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::services%2Findexer%2Fingest%23finality%20rollback%20replay%20and%20rebuild",
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::services%2Findexer%2Fingest%23live%20backfill%20and%20duplicate%20delivery"
+      ]
+    },
+    {
+      "fingerprint": "indexer/ingest/config-history-repair-misses-locked-term-dependents",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fingest%2Fproject.rs%23locked%20terms%20and%20derived%20exit%20fees::services%2Findexer%2Fsrc%2Fingest%2Fproject.rs%23global%20history%20repair%20and%20dependent%20market%20rebuild::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fingest%23configuration%20history%20repair%20locked%20terms%20and%20dependent%20fee%20recomputation"
+      ]
+    },
+    {
+      "fingerprint": "indexer/ingest/live/pubsub-unbounded-backlog",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fingest%2Flive.rs%23external%20PubSub%20notifications::services%2Findexer%2Fsrc%2Fingest%2Flive.rs%23buffering%20gapfill%20release%20and%20reconnect::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Findexer%2Fingest%23live%20PubSub%20buffering%20gapfill%20reconnect%20and%20cancellation"
+      ]
+    },
+    {
+      "fingerprint": "indexer/ingest/rpc/nonprogressing-page-retention",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fingest%2Flive.rs%23external%20PubSub%20notifications::services%2Findexer%2Fsrc%2Fingest%2Flive.rs%23buffering%20gapfill%20release%20and%20reconnect::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Findexer%2Fingest%23live%20PubSub%20buffering%20gapfill%20reconnect%20and%20cancellation"
+      ]
+    },
+    {
+      "fingerprint": "indexer/project/reused-position-pda",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fingest%23finality%20rollback%20replay%20and%20rebuild",
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fingest%23live%20backfill%20and%20duplicate%20delivery",
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::services%2Findexer%2Fingest%23finality%20rollback%20replay%20and%20rebuild",
+        "services%2Findexer%2Fsrc%2Fingest%2Fraw.rs%23RawTx::services%2Findexer%2Fsrc%2Fingest%2Fwriter.rs%23durable%20ingest::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::services%2Findexer%2Fingest%23live%20backfill%20and%20duplicate%20delivery"
+      ]
+    },
+    {
+      "fingerprint": "indexer/protocol_params_history/intra_instruction_position",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Findexer%2Fsrc%2Fingest%2Fproject.rs%23configuration%20snapshots%20and%20locked%20terms%20for%20nested%20CPI%20inputs::services%2Findexer%2Fmigrations%2F0005_admin.sql%23history%20identity%20and%20intra-instruction%20chain%20order::services%2Findexer%2Fingest::ATTACK-CLASSES.md%23Business%20logic::services%2Findexer%2Fingest%23nested%20CPI%20configuration%20history%20identity%20and%20intra-instruction%20order"
+      ]
+    },
+    {
+      "fingerprint": "keeper/market-admission/full-universe-work-before-budget",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Fkeeper%2Fsrc%2Fview.rs%23permissionless%20market%20and%20position%20discovery::services%2Fkeeper%2Fsrc%2Fkeeper.rs%23discovery%20scheduling%20and%20retained%20market%20state::services%2Fkeeper::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Fkeeper%23market%20discovery%20admission%20scheduling%20and%20cache%20cleanup"
+      ]
+    },
+    {
+      "fingerprint": "keeper/metrics/idle-connection-snapshot-retention",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Fkeeper%2Fsrc%2Fmain.rs%23optional%20metrics%20TCP%20listener::services%2Fkeeper%2Fsrc%2Fmain.rs%23serve_metrics%20connection%20tasks%20and%20snapshot%20lifetime::services%2Fkeeper::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Fkeeper%23metrics%20bind%20accept%20read%20write%20refresh%20disconnect%20and%20shutdown"
+      ]
+    },
+    {
+      "fingerprint": "keeper/pool-discovery/quadratic-dedup-before-ranking",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Fkeeper%2Fsrc%2Fview.rs%23permissionless%20market%20and%20position%20discovery::services%2Fkeeper%2Fsrc%2Fkeeper.rs%23discovery%20scheduling%20and%20retained%20market%20state::services%2Fkeeper::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Fkeeper%23market%20discovery%20admission%20scheduling%20and%20cache%20cleanup"
+      ]
+    },
+    {
+      "fingerprint": "keeper/position-tracking/closed-throttle-retention",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "services%2Fkeeper%2Fsrc%2Fview.rs%23permissionless%20market%20and%20position%20discovery::services%2Fkeeper%2Fsrc%2Fkeeper.rs%23discovery%20scheduling%20and%20retained%20market%20state::services%2Fkeeper::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::services%2Fkeeper%23market%20discovery%20admission%20scheduling%20and%20cache%20cleanup"
+      ]
+    },
+    {
+      "fingerprint": "release/fetch-image/metadata-symlink-follow",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        ".github%2Fworkflows%2Fci.yml%23jobs::.github%2Fworkflows%2Fci.yml%23permissions::build-and-release::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::build-and-release%23build%20verify%20artifact%20and%20promotion"
+      ]
+    },
+    {
+      "fingerprint": "release/fetch-image/unvalidated-blob-path",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        ".github%2Fworkflows%2Fci.yml%23jobs::.github%2Fworkflows%2Fci.yml%23permissions::build-and-release::ATTACK-CLASSES.md%23Resource%20and%20file%20handling::build-and-release%23build%20verify%20artifact%20and%20promotion"
+      ]
+    },
+    {
+      "fingerprint": "shortwin-math/settlement/nonmonotone-fv-corner-check",
+      "phase3_status": "provider_stopped_no_retry",
+      "linked_coverage_ids": [
+        "programs%2Fshortwin%2Fsrc%2Flib.rs%23crank%20and%20risk%20evaluation::programs%2Fshortwin%2Fsrc%2Fengine%2Fobserve.rs%23observation%20and%20thresholds::crates%2Fshortwin-math::ATTACK-CLASSES.md%23Business%20logic::crates%2Fshortwin-math%23extreme%20stale%20and%20zero%20values",
+        "programs%2Fshortwin%2Fsrc%2Flib.rs%23crank%20and%20risk%20evaluation::programs%2Fshortwin%2Fsrc%2Fengine%2Fobserve.rs%23observation%20and%20thresholds::crates%2Fshortwin-math::ATTACK-CLASSES.md%23Business%20logic::crates%2Fshortwin-math%23slot%20timestamp%20and%20threshold"
+      ]
+    },
+    {
+      "fingerprint": "shortwin/read_state/ema-fee-double-rounding",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "crates%2Fshortwin-math%2Fsrc%2Flib.rs%23public%20math%20API::crates%2Fshortwin-math%2Fsrc%2Fnum%2Fu256.rs%23checked%20arithmetic::crates%2Fshortwin-math::ATTACK-CLASSES.md%23Business%20logic::crates%2Fshortwin-math%23rounding%20and%20units"
+      ]
+    },
+    {
+      "fingerprint": "shortwin/sol_settle/pre-roll-risk-fee-resolution",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "programs%2Fshortwin%2Fsrc%2Flib.rs%23position%20and%20pool%20transitions::programs%2Fshortwin%2Fsrc%2Fengine%2Fpool_select.rs%23migration%20and%20adoption::programs%2Fshortwin::ATTACK-CLASSES.md%23Business%20logic::programs%2Fshortwin%23exit%20fallback%20and%20recovery",
+        "programs%2Fshortwin%2Fsrc%2Flib.rs%23position%20and%20pool%20transitions::programs%2Fshortwin%2Fsrc%2Fengine%2Fpool_select.rs%23migration%20and%20adoption::programs%2Fshortwin::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::programs%2Fshortwin%23exit%20fallback%20and%20recovery",
+        "programs%2Fshortwin%2Fsrc%2Fvenues%2Fmod.rs%23trade%20CPI::programs%2Fshortwin%2Fsrc%2Fvenues%2Fmod.rs%23remaining%20accounts%20and%20signer%20seeds::programs%2Fshortwin%2Fvenues::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::programs%2Fshortwin%2Fvenues%23read%20and%20pre-CPI"
+      ]
+    },
+    {
+      "fingerprint": "web.tx.post-submission-rpc-failure-retry",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "apps%2Fweb%2Fsrc%2Ftx%2FuseTxFlow.ts%23sign::apps%2Fweb%2Fsrc%2Ftx%2Fintegrity.ts%23assertSameIntent::apps%2Fweb::ATTACK-CLASSES.md%23Business%20logic::apps%2Fweb%23sign%20send%20confirm%20cancel%20and%20unknown",
+        "apps%2Fweb%2Fsrc%2Ftx%2FuseTxFlow.ts%23sign::apps%2Fweb%2Fsrc%2Ftx%2Fintegrity.ts%23assertSameIntent::apps%2Fweb::ATTACK-CLASSES.md%23Chained%20vulnerabilities%20and%20trust%20boundaries::apps%2Fweb%23sign%20send%20confirm%20cancel%20and%20unknown"
+      ]
+    },
+    {
+      "fingerprint": "web/lend/subunit-warning-partial-sync-prefix",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "apps%2Fweb%2Fsrc%2Ffeatures%2Flend%2Fpreviews.ts%23lender%20previews%20and%20disclosures::crates%2Fshortwin-math-wasm%2Fsrc%2Flender.rs%23native%20lender%20state%20and%20preview%20semantics::apps%2Fweb::ATTACK-CLASSES.md%23Business%20logic::apps%2Fweb%23lender%20preview%20conversion%20vesting%20and%20disclosure"
+      ]
+    },
+    {
+      "fingerprint": "web/lend/subunit-warning-scheduled-release-readonly-actions",
+      "phase3_status": "source_review_prepared",
+      "linked_coverage_ids": [
+        "apps%2Fweb%2Fsrc%2Ffeatures%2Flend%2Fpreviews.ts%23lender%20previews%20and%20disclosures::crates%2Fshortwin-math-wasm%2Fsrc%2Flender.rs%23native%20lender%20state%20and%20preview%20semantics::apps%2Fweb::ATTACK-CLASSES.md%23Business%20logic::apps%2Fweb%23lender%20preview%20conversion%20vesting%20and%20disclosure"
+      ]
+    }
+  ],
+  "provider_stopped_tasks": [
+    {
+      "scope": "Public indexer API and WebSocket server review and fixture",
+      "status": "stopped_no_retry",
+      "source_coverage_units": 6
+    },
+    {
+      "scope": "Independent nonmonotone settlement FV-corner review",
+      "fingerprint": "shortwin-math/settlement/nonmonotone-fv-corner-check",
+      "status": "stopped_no_retry",
+      "source_coverage_units": 0,
+      "candidate_units_with_no_independent_disposition": 2
+    }
+  ],
+  "native_validation": {
+    "completed_project_fixture_attempts": 1,
+    "successful_project_fixture_attempts": 1,
+    "profile": "native-pg",
+    "completed_case": "shortwin-math/release_in/frequency-dependent-vesting-rounding",
+    "completed_case_verdict": "rejected",
+    "scope": "Actual freshly compiled host production math library; no SBF, whole-program or deployment claim",
+    "analytics_rollback": "Owned request and separate procedural review prepared; no native invocation yet",
+    "project_lockfile_advisory_scan": "not_run; separate containment lane stopped after technical measurement failure",
+    "fresh_sbf_venue_provenance": "not_available_for_current_validation_requests"
+  },
+  "project_source_fixes_during_this_audit": 0,
+  "prior_fixes_commit": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+  "baseline_main_ci": {
+    "run_id": 39556305501,
+    "url": "https://github.com/TodorBonchev/short.win/actions/runs/39556305501",
+    "status": "success",
+    "qualification": "Baseline result on audited main commit; not proof for the new audit hypotheses"
+  },
+  "selected_github_skills": [
+    {
+      "name": "Cloudflare security-audit",
+      "url": "https://github.com/cloudflare/security-audit-skill/blob/main/skills/security-audit/SKILL.md",
+      "installed_commit": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8"
+    },
+    {
+      "name": "Trail of Bits solana-vulnerability-scanner",
+      "url": "https://github.com/trailofbits/skills/blob/main/plugins/building-secure-contracts/skills/solana-vulnerability-scanner/SKILL.md",
+      "usage": "Rendered documentation/checklist guidance only; upstream commit unverified; no scanner run",
+      "attribution": "Trail of Bits, CC-BY-SA-4.0"
+    }
+  ],
+  "requested_rust_auditor": {
+    "url": "https://github.com/TodorBonchev/rust-auditor",
+    "installed_commit": "6c41e1d46386de7fd9b1fa48c847e876ac8b2676"
+  },
+  "exports": [
+    {
+      "path": "reviewed-candidates.json",
+      "original_audit_workspace_path": "findings.json",
+      "bytes": 108931,
+      "sha256": "8d1bab2486b7dd3d8ab6d737249b3129108b54f419e48b98974a089e142e0dc0"
+    },
+    {
+      "path": "native-vesting/afb339a0bc47.log",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/artifacts/afb339a0bc47.log",
+      "bytes": 1386,
+      "sha256": "95a7c8079140b9e4b49c566e9d89153265c2cbd4796bce1f74fc70adcc51f4a9"
+    },
+    {
+      "path": "native-vesting/afb339a0bc47.log.promotion.json",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/artifacts/afb339a0bc47.log.promotion.json",
+      "bytes": 7379,
+      "sha256": "46cba5230a02f7353cb8dc78befa7a756cd07b1bf58b8f4317b7a42f9bdebe3a"
+    },
+    {
+      "path": "native-vesting/verifier-result.json",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/scratch/verifier-result.json",
+      "bytes": 5662,
+      "sha256": "a7f7241eb15f8a6d0c5bbd110eab5c14c0cb16ea563ed6c69e5ceff724251a0c"
+    },
+    {
+      "path": "native-vesting/native-evidence-checks.json",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/scratch/native-evidence-checks.json",
+      "bytes": 1581,
+      "sha256": "49f44ec9cb993d93ee0beb1903c53ea348520e4c9e6697b31523f640b2ff71ec"
+    },
+    {
+      "path": "native-vesting/request.json",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/scratch/requests/vesting-production-native.json",
+      "bytes": 301,
+      "sha256": "dd83a4f5fe930773b4c802cd4cafadf863aa87db11e53f9893b9f71991227edc"
+    },
+    {
+      "path": "native-vesting/fixtures/vesting-native.rs",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/scratch/fixtures/vesting-native.rs",
+      "bytes": 4260,
+      "sha256": "5c8c159e78fa2a9aff4844fa1e4ce16023ee756d650b3524149f40d623e39d3e"
+    },
+    {
+      "path": "native-vesting/fixtures/vesting-Cargo.toml",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/scratch/fixtures/vesting-Cargo.toml",
+      "bytes": 216,
+      "sha256": "b824990d54b8384c9866ce874dd1a869c2d8501b9d2b95795e4bd289dcd151d3"
+    },
+    {
+      "path": "native-vesting/fixtures/vesting-runner.py",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/scratch/fixtures/vesting-runner.py",
+      "bytes": 1045,
+      "sha256": "3cea871f4bd7e886046b314a9a6c34ee1505472a0770b769a06c65faf9489dc8"
+    },
+    {
+      "path": "native-vesting/fixtures/source-identities.json",
+      "original_audit_workspace_path": "agents/verify_p3_01_math_vesting/scratch/fixtures/source-identities.json",
+      "bytes": 4072,
+      "sha256": "867c5e3433ae4d05b464087aba5e073c45bad792a83ff653477f36ec9de305c2"
+    }
+  ],
+  "external_audit_workspace": "/home/todor_dev/security-audit-skill/short.win/run-1",
+  "external_evidence_qualification": "Detailed ledgers, role histories, exact singleton authorities and procedural reviews remain in the local audit workspace. Native files here are byte-for-byte evidence archives; original manifest paths describe that workspace."
+}

@@ -1,0 +1,12 @@
+[package]
+name = "phase3-vesting-production-native"
+version = "0.0.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+shortwin-math = { path = "/source/crates/shortwin-math" }
+
+[profile.release]
+overflow-checks = true
