@@ -67,6 +67,11 @@ recorded in `byte-comparison.json`, not a compiled artifact checked into Git.
   `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc`.
   The program is executable but uninitialized; see the
   [deployment result](../../../deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md).
+- [Jupiter mainnet administrative pin review](jupiter-mainnet-pin-2026-10-22.md):
+  retains the current ProgramData/ELF/IDL identity and scoped 1.0.3 interface
+  disposition. The new [live-check log](jupiter-live-check-after-pin-2026-10-22.log)
+  passes without changing program source or the deployed ELF. The earlier
+  failed aggregate check remains historical evidence.
 - [Final documentation/provenance review](independent/final-doc-review.json)
   checks the current claims against the retained build and historical fuzz evidence.
 

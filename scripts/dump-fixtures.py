@@ -101,8 +101,11 @@ accounts, one for the 45-byte ProgramData headers, then one ``getAccountInfo`` p
 paced). It compares each against its **newest** fixture (deploy slot, upgrade authority, trimmed
 ELF sha256; older groups of the same program, kept for T-LATCH, are listed but not compared) and
 each ``VenueGuard`` program's deploy slot against the newest ``VENUE_GUARD_SLOTS_YYYY_MM_DD`` in
-``programs/shortwin/src/constants.rs`` (the test baseline; Jupiter has no fixture, so its slot is
-compared with that constant only). Run it before every freeze and merge.
+``programs/shortwin/src/constants.rs`` (the test baseline). Jupiter has no execution fixture in
+this release. Its later redeploy is pinned below as a dated administrative exception, with its
+ProgramData size, authority and trimmed ELF hash checked as well as its slot. The older program
+test baseline and its failed preflight remain historical evidence. Run this check before every
+freeze and merge.
 
 The pump coin roles are pinned mints (``PUMP_COINS``). A curve moves on: at a refresh each role's
 expectation is re-checked (e.g. "near" must still be live with ``rT`` at most ``NEAR_RT_MAX``,
@@ -2944,6 +2947,21 @@ CONSTANTS_RS = os.path.normpath(
     os.path.join(HERE, "..", "programs", "shortwin", "src", "constants.rs"))
 LIVE_PACE_S = 1.0  # between the large reads, to stay gentle on the public endpoints
 
+# Mainnet Jupiter was redeployed after the 2026-10-21 frozen program/test baseline. There is no
+# Jupiter VenueKind or trade adapter in 1.0.3, so retain that baseline and the exact deployed
+# short.win ELF rather than changing program source just to refresh an administrative pin.
+# Scoped evidence: docs/audit/probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md.
+JUPITER_LIVE_PIN_2026_10_22 = {
+    "program": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "program_data": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+    "deploy_slot": 459_479_624,
+    "program_data_len": 2_892_269,
+    "upgrade_authority": "CvQZZ23qYDWF2RUpxYJ8y9K4skmuvYEEjH7fK58jtipQ",
+    "elf_trimmed_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+    "idl_account": "C88XWfp26heEmDkmfSzeXP7Fd7GQJ2j9dDTUsyiZbUTa",
+    "idl_account_sha256": "c468169462ca9330e499b597ce8d540308dcb66616002aaefa168551e3870558",
+}
+
 
 def venue_guard_baseline():
     """The `VenueGuard` programs as ``constants.rs`` pins them: (name of the newest
@@ -2973,7 +2991,15 @@ def venue_guard_baseline():
         programs.append((const.removesuffix("_PROGRAM_ID").lower(), m.group(1)))
     if not len(programs) == len(pds) == len(slots):
         raise SystemExit(f"{CONSTANTS_RS}: VenueGuard arrays of different lengths")
-    return name, [(lb, p, pd_, sl) for (lb, p), pd_, sl in zip(programs, pds, slots)]
+    result = [(lb, p, pd_, sl) for (lb, p), pd_, sl in zip(programs, pds, slots)]
+    for i, (label, program, program_data, _) in enumerate(result):
+        if label == "jupiter":
+            pin = JUPITER_LIVE_PIN_2026_10_22
+            if (program, program_data) != (pin["program"], pin["program_data"]):
+                raise SystemExit("Jupiter ID or ProgramData changed; review the live pin")
+            result[i] = (label, program, program_data, pin["deploy_slot"])
+            return f"{name} + JUPITER_LIVE_PIN_2026_10_22", result
+    raise SystemExit("the VenueGuard baseline has no Jupiter entry")
 
 
 def _fmt_slot(slot):
@@ -3035,6 +3061,46 @@ def cmd_check_live(args):
         fx = fixtures.get(program_data, [])
         if not fx:
             notes.append("no fixture")
+            if label == "jupiter":
+                pin = JUPITER_LIVE_PIN_2026_10_22
+                if head["owner"] != LOADER_UPGRADEABLE:
+                    why.append(f"ProgramData owner {head['owner']} != upgradeable loader")
+                if head["space"] != pin["program_data_len"]:
+                    why.append(f"ProgramData length {head['space']} != administrative pin "
+                               f"{pin['program_data_len']}")
+                if live_auth != pin["upgrade_authority"]:
+                    why.append(f"upgrade authority {live_auth} != administrative pin "
+                               f"{pin['upgrade_authority']}")
+                if live_slot == pin["deploy_slot"]:
+                    time.sleep(LIVE_PACE_S)
+                    full = rpc.call("getAccountInfo", [program_data, {"encoding": "base64"}])
+                    if full["value"] is None:
+                        why.append("ProgramData missing on full read")
+                    else:
+                        full_data = decode_value(full["value"])["data"]
+                        if (len(full_data) != pin["program_data_len"]
+                                or full_data[:45] != h):
+                            why.append("ProgramData changed between header and full reads")
+                        else:
+                            live_trim = sha256(full_data[45:].rstrip(b"\0"))
+                            if live_trim != pin["elf_trimmed_sha256"]:
+                                why.append(f"trimmed ELF {live_trim[:8]}… != administrative pin "
+                                           f"{pin['elf_trimmed_sha256'][:8]}…")
+                            else:
+                                notes.append(f"ELF = administrative pin ({live_trim[:8]}…)")
+                    idl = rpc.call("getAccountInfo", [pin["idl_account"], {"encoding": "base64"}])
+                    if idl["value"] is None:
+                        why.append("Jupiter IDL account missing")
+                    else:
+                        idl_account = decode_value(idl["value"])
+                        idl_hash = sha256(idl_account["data"])
+                        if idl_account["owner"] != pin["program"]:
+                            why.append("Jupiter IDL account owner changed")
+                        if idl_hash != pin["idl_account_sha256"]:
+                            why.append(f"Jupiter IDL account {idl_hash[:8]}… != "
+                                       f"administrative pin {pin['idl_account_sha256'][:8]}…")
+                        else:
+                            notes.append(f"IDL = administrative pin ({idl_hash[:8]}…)")
         else:
             cur = fx[0]
             notes.append(f"fixture {cur['group']} {_fmt_slot(cur['decoded']['deploy_slot'])}")

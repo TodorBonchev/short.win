@@ -61,9 +61,9 @@ pyth_sol_usd = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"
 pyth_feed_id = "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d"
 # `VenueGuard.guard_slot`: the venue programs' ProgramData deploy slots at launch, in VenueGuard
 # order (pump, PumpSwap, pump-fees, AMM v4, CPMM, Jupiter). `init-config` reads each ProgramData
-# and refuses a slot that differs from the live one. Values read on 2026-10-02 (CPMM and Jupiter
-# were redeployed after `VENUE_GUARD_SLOTS_2026_09_27`): re-read them on the day.
-guard_slots = [449734335, 446462733, 446465969, 445763204, 452376460, 451957263]
+# and refuses a slot that differs from the live one. Mainnet values read on 2026-10-22;
+# re-read them on the day and use cluster-specific values for any non-mainnet deployment.
+guard_slots = [458921440, 458921517, 456132171, 445763204, 452376460, 459479624]
 # The parameters, tiers, EMA and kink parameters are the program's compiled defaults (ECON §15);
 # later changes go through `propose_config` (Governance, timelocked).
 

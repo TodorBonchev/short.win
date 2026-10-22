@@ -12,8 +12,17 @@ to build and test the code, what the code relies on, and what we already know ab
   SHA-256 `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc`.
   This is an uninitialized loader deployment. Devnet governance and supported
   market end-to-end operation, the incomplete broader audit, and the stable
-  release tag remain open. See the [deployment result](deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
-  and [retained deployment evidence](audit/probes/release-wrap-2026-10-22/deployment-packet/README.md).
+  release tag remain open. See the [deployment result](deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md),
+  [retained deployment evidence](audit/probes/release-wrap-2026-10-22/deployment-packet/README.md),
+  [local service staging](deployment/devnet-local-service-staging-2026-10-22.md)
+  and [market feasibility hold](deployment/devnet-market-feasibility-2026-10-22.md).
+- **Release configuration and owner decision (2026-10-22):** a fresh
+  [mainnet Jupiter pin review](audit/probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md)
+  resolved the dated administrative drift; the aggregate live check now passes.
+  Jupiter remains outside the 1.0.3 trade adapter. The
+  [owner-delegated release call](audit/owner-delegated-release-decision-1.0.3-2026-10-22.md)
+  is no stable tag or mainnet deployment until the remaining audit and operating
+  gates have actual evidence.
 - **Integrated devnet preparation (2026-10-22):** the unreleased version remains
   1.0.3. Formatting the corrected article comment at `7b11cc7` preserves diagnostic
   locations: fresh native and pinned-Docker builds exactly reproduce the canonical

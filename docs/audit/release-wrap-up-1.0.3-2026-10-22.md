@@ -97,9 +97,11 @@ Before a stable `v1.0.3` tag, finish its remaining release/operating requirement
 under [AUDIT §12](../AUDIT.md#12-logistics-and-change-policy). The canonical
 program/fuzzer/fixture fuzz requirement is satisfied by the completed original
 run and demonstrated equivalence, with no combined durations. Preserve the
-existing failed mainnet Jupiter live-pin check;
-it requires an explicit upstream/configuration disposition before a mainnet
-release, rather than an unexplained pin update.
+existing failed mainnet Jupiter live-pin check as historical evidence. A later
+[scoped mainnet ProgramData/IDL/configuration review](probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md)
+and fresh passing aggregate live check resolved that dated administrative drift.
+Jupiter remains outside the 1.0.3 trade adapter; recheck live identities at
+final release time.
 
 ### Fresh qualification interrupted
 
@@ -147,6 +149,15 @@ VenueGuard and OracleCache remain absent: this is an **uninitialized,
 program-only** deployment. The total debit from the initial 25 SOL was
 8.361938880 SOL. See the [deployment receipt](../deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
 and [retained transaction evidence](probes/release-wrap-2026-10-22/deployment-packet/README.md).
+
+**Later devnet preparation:** [local service staging](../deployment/devnet-local-service-staging-2026-10-22.md)
+built source-matched keeper/indexer binaries and a devnet web artifact, applied
+nine PostgreSQL migrations and passed an empty-reader smoke. No live writer,
+keeper or market was run. A [fresh feasibility review](../deployment/devnet-market-feasibility-2026-10-22.md)
+found mutable devnet Squads and devnet Pump executable bytes different from the
+pinned mainnet fixtures; a sampled Pyth update was fresh. Signed initialization
+and market testing remain held until a coherent authority layout and scoped
+venue compatibility are demonstrated.
 
 **Historical first attempt:** the first approved devnet CLI invocation failed
 while writing the program, reporting `Max retries exceeded`. At that time, the

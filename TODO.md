@@ -4,6 +4,7 @@ This file lists unfinished work only. Completed audit and release evidence is in
 [the integrated devnet preparation record](docs/audit/release-wrap-up-1.0.3-2026-10-22.md),
 [the 1.0.3 handoff](docs/audit/handoff-1.0.3-2026-10-20.md),
 [the current readiness record](docs/audit/release-readiness-1.0.3-2026-10-21.md),
+[the owner-delegated release decision](docs/audit/owner-delegated-release-decision-1.0.3-2026-10-22.md),
 [the findings tracker](docs/audit/findings.md), and
 [the validation record](docs/audit/ai-review-3/validation-1.0.3.md).
 The 1.0.3 candidate is unreleased as a stable tag. Its
@@ -19,25 +20,34 @@ complete SHA-256 VenueGuard correction for first deployment.
       before any whole-codebase audit-complete claim. Seven independently retained
       hypotheses require validation and 23 lack independent disposition; preserve
       the two provider-stopped scope gaps without retrying those tasks.
-- [ ] Resolve the [current Jupiter live-pin drift](docs/audit/release-checks-1.0.3-2026-10-22.md)
-      through explicit upstream/deployment configuration review before a mainnet
-      release. Jupiter is excluded from the selected uninitialized devnet rehearsal;
-      keep the failed aggregate live check recorded and do not silently repin it.
 - [ ] Verify actual funded/monitored keeper operation, covered markets, payer top-ups and
       alerts, plus running indexer destination `3` and 304-byte client artifact identities.
-      Tests establish compatibility; operating evidence is still pending.
-- [ ] Obtain owner review of the [concrete 1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
-      after its remaining preflight requirements are satisfied. The final canonical
-      runtime bytes and prior ≥24 h fuzz attribution are now established for `7b11cc7`
-      by fresh native/pinned-Docker builds and source-input equivalence.
+      [Local service staging](docs/deployment/devnet-local-service-staging-2026-10-22.md)
+      established source-matched builds, PostgreSQL migrations and an empty-reader
+      smoke; live chain ingest, funded keeper and alert delivery remain pending.
+- [ ] Complete the objective gates and final exact-revision checks in the
+      [1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
+      before any stable tag or mainnet deployment. The
+      [owner-delegated decision](docs/audit/owner-delegated-release-decision-1.0.3-2026-10-22.md)
+      is recorded as **no-go now**; no further generic policy choice is pending.
+      The canonical runtime bytes and prior ≥24 h fuzz attribution are established
+      for `7b11cc7` by fresh native/pinned-Docker builds and source-input equivalence.
+
+The dated [Jupiter mainnet pin disposition](docs/audit/probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md)
+closed the observed configuration drift with a passing fresh live check. Recheck
+the live identities at the final release revision; this does not add a Jupiter
+trade adapter or remove the remaining operating and audit gates.
 
 ## Public-devnet test prerequisites
 
-- [ ] Resolve the target-cluster profile before promising market E2E: canonical
-      Raydium/Jupiter IDs are not executable there, devnet Squads fails the supported
-      immutability check, and Pump dependency parity is unverified. Establish fresh
-      Pyth observations and actual operator/client/indexer configurations. A
-      program-only deployment does not close these requirements.
+- [ ] Resolve the [devnet market feasibility gates](docs/deployment/devnet-market-feasibility-2026-10-22.md)
+      before promising market E2E: canonical Raydium/Jupiter IDs are not
+      executable there, devnet Squads fails the supported immutability check,
+      and current Pump/PumpSwap/fees executable bytes differ from the pinned
+      mainnet fixtures without scoped adapter compatibility proof. A fresh Pyth
+      sample passed at the dated read, but must pass again at execution. Confirm
+      a real market, governance/coverage identities, and funded live operators;
+      the program-only deployment and local service build do not close these.
 
 The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) and
 accurately labelled [focused](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md) /
@@ -64,8 +74,10 @@ refresh and legacy keeper cleanup are complete in the source candidate.
 - [ ] Re-measure O19's real-venue held sandwich, FITX-1 fork figures,
       graduation rows, KI-02's real-venue figures and KI-76's cost estimate
       if those historical figures are used for a new decision.
-- [ ] Measure Jupiter's ProgramData ELF size and extension hash cost before
-      adding Jupiter to a future venue latch mask.
+- [ ] Measure Jupiter's ProgramData extension hash compute/latency on the
+      reviewed binary before adding Jupiter to a future venue latch mask. The
+      current ProgramData/ELF sizes and hashes are already recorded in the
+      [dated mainnet pin review](docs/audit/probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md).
 - [ ] Optional: make the documented keeper deployment/alert thresholds
       configurable.
 - [ ] Repair or re-record the changed-message signature in

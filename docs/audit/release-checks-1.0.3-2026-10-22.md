@@ -1,5 +1,11 @@
 # 1.0.3 release checks and owner-review plan (2026-10-22 Europe/Kyiv)
 
+> Historical predeployment snapshot. The program-only devnet deployment later
+> [completed](../deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md), and the
+> [Jupiter administrative pin drift](probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md)
+> was dispositioned with a later passing live check. Its original failed check
+> and unfulfilled operating/audit gates remain accurately recorded below.
+
 **Technical fix gates passed; first-deployment readiness remains pending.** This is
 an unreleased preparation record. No tag, deployment, governance/financial transaction
 or media publication was performed. The owner confirmed no previous deployment and
