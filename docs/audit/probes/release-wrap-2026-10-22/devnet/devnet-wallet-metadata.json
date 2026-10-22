@@ -1,0 +1,9 @@
+{
+  "purpose": "devnet-only release testing payer and proposed upgrade authority",
+  "public_address": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "private_key_path": "/home/todor_dev/.config/shortwin/devnet/release-testing-2026-10-22.json",
+  "directory_permissions": "0o700",
+  "key_permissions": "0o600",
+  "cluster_url": "https://api.devnet.solana.com",
+  "private_material_logged": false
+}

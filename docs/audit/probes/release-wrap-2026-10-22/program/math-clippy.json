@@ -1,0 +1,33 @@
+{
+  "label": "math-clippy",
+  "cwd": "/home/todor_dev/Projects/short.win-release-devnet",
+  "argv": [
+    "cargo",
+    "clippy",
+    "-p",
+    "shortwin-math",
+    "--all-targets",
+    "--locked",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "timeout_seconds": 600,
+  "env": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000"
+  },
+  "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "status_before": " M apps/web/src/config/parseConfig.test.ts\n M apps/web/src/config/parseConfig.ts\n",
+  "start_utc": "2026-10-22T01:45:09.133408+00:00",
+  "pid": 430405,
+  "exit_code": 0,
+  "elapsed_seconds": 8.23353581999254,
+  "end_utc": "2026-10-22T01:45:17.367083+00:00",
+  "log_sha256": "ff76971ea13708bbd86102658d8b596856c7f699cbc35b9ffca342c147ad7fb8",
+  "status_after": " M apps/web/src/config/parseConfig.test.ts\n M apps/web/src/config/parseConfig.ts\n"
+}

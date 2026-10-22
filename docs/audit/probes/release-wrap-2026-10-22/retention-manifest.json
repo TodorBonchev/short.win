@@ -1,0 +1,528 @@
+{
+  "created_at_utc": "2026-10-22T01:51:38.925717+00:00",
+  "source_commit": "bf166672efee578b6a2a1835e0dd53729c548671",
+  "basis": "program checks ran on b31c02a; bf166672 adds independently reviewed webconfigfix; source boundaries retained in reports",
+  "files": [
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/FRESH_RESULTS.md",
+      "retained": "program/FRESH_RESULTS.md",
+      "original_sha256": "56ee7a0fe08051c7c0c1e000459f9adf9b20b834982f2bcc8b955b70a2f3306b",
+      "retained_sha256": "56ee7a0fe08051c7c0c1e000459f9adf9b20b834982f2bcc8b955b70a2f3306b",
+      "original_bytes": 9026,
+      "retained_bytes": 9026
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/TOOLCHAIN.md",
+      "retained": "program/TOOLCHAIN.md",
+      "original_sha256": "daebdf9aa4ebcf34c87bff81dfee006d593e2273404432b8510acf40743d74d6",
+      "retained_sha256": "daebdf9aa4ebcf34c87bff81dfee006d593e2273404432b8510acf40743d74d6",
+      "original_bytes": 3331,
+      "retained_bytes": 3331
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/sbf-build.json",
+      "retained": "program/sbf-build.json",
+      "original_sha256": "f751fe6131734c68dbd2d478777b694b2cd278c695d70585e460c90a333eadc3",
+      "retained_sha256": "f751fe6131734c68dbd2d478777b694b2cd278c695d70585e460c90a333eadc3",
+      "original_bytes": 920,
+      "retained_bytes": 920
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/sbf-build.log",
+      "retained": "program/sbf-build.log.gz",
+      "original_sha256": "90300ae0ead28add5fd26678bf89da610438e58be1149eac0d598ae2b04cdd0b",
+      "retained_sha256": "e797efec528a51bbdc2df4a0aa107ca593f8f198c26a703e3fccbdf74ef6e876",
+      "original_bytes": 6690,
+      "retained_bytes": 1586
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/idl-build.json",
+      "retained": "program/idl-build.json",
+      "original_sha256": "811527d2267bcc8e7cc942df37efea28076bbb7a6aca918f8098273d5b71cd0b",
+      "retained_sha256": "811527d2267bcc8e7cc942df37efea28076bbb7a6aca918f8098273d5b71cd0b",
+      "original_bytes": 991,
+      "retained_bytes": 991
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/idl-build.log",
+      "retained": "program/idl-build.log.gz",
+      "original_sha256": "f0d8f6fb9c60b347f9231231f8af4b20f4bb86222ca1f306c83b1bf1678b0a08",
+      "retained_sha256": "d3bb7ac2b525d2f9df87e2267704b68bf83eb7b8a2194df01af250a3645ebc54",
+      "original_bytes": 7530,
+      "retained_bytes": 2020
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/idl-diff.json",
+      "retained": "program/idl-diff.json",
+      "original_sha256": "272b90151cb41d7143569143a64731096ddaabbb741645f870d38b6ee708becd",
+      "retained_sha256": "272b90151cb41d7143569143a64731096ddaabbb741645f870d38b6ee708becd",
+      "original_bytes": 876,
+      "retained_bytes": 876
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/idl-diff.log",
+      "retained": "program/idl-diff.log.gz",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "original_bytes": 0,
+      "retained_bytes": 20
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/fmt-check.json",
+      "retained": "program/fmt-check.json",
+      "original_sha256": "d864db23f8fc5f77171c017936612d0c1f1764dd3f4b717ac90775853c8db7f3",
+      "retained_sha256": "d864db23f8fc5f77171c017936612d0c1f1764dd3f4b717ac90775853c8db7f3",
+      "original_bytes": 810,
+      "retained_bytes": 810
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/fmt-check.log",
+      "retained": "program/fmt-check.log.gz",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "original_bytes": 0,
+      "retained_bytes": 20
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/math-tests.json",
+      "retained": "program/math-tests.json",
+      "original_sha256": "66fa0a0908e959a2993bf5210cafb7655d13da74f5cfb99e9a147f3cb629fce6",
+      "retained_sha256": "66fa0a0908e959a2993bf5210cafb7655d13da74f5cfb99e9a147f3cb629fce6",
+      "original_bytes": 981,
+      "retained_bytes": 981
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/math-tests.log",
+      "retained": "program/math-tests.log.gz",
+      "original_sha256": "8b741fd3648565229ef987ffb3e027e14fce4487192fcda10c7ba0d87e3abd80",
+      "retained_sha256": "f298d2ad99fb4ae99af790be5cf5a50b18547f4a50cd2b751c981551711cca25",
+      "original_bytes": 31257,
+      "retained_bytes": 7883
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/math-clippy.json",
+      "retained": "program/math-clippy.json",
+      "original_sha256": "535f685e7a0dbcceacd633b3e208d53439b20a5bfdb8d862a3ed6ef4583d309c",
+      "retained_sha256": "535f685e7a0dbcceacd633b3e208d53439b20a5bfdb8d862a3ed6ef4583d309c",
+      "original_bytes": 1056,
+      "retained_bytes": 1056
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/math-clippy.log",
+      "retained": "program/math-clippy.log.gz",
+      "original_sha256": "ff76971ea13708bbd86102658d8b596856c7f699cbc35b9ffca342c147ad7fb8",
+      "retained_sha256": "43b82d8ba3eab54d8dd066d3a21fafc20b8180bdc4dec42a86aff59854b789d4",
+      "original_bytes": 1350,
+      "retained_bytes": 555
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/a49-check.json",
+      "retained": "program/a49-check.json",
+      "original_sha256": "f2fe38d0de00abae983ec7db04386deaa70bf6706cad2ed062f09aa53930fde0",
+      "retained_sha256": "f2fe38d0de00abae983ec7db04386deaa70bf6706cad2ed062f09aa53930fde0",
+      "original_bytes": 959,
+      "retained_bytes": 959
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/a49-check.log",
+      "retained": "program/a49-check.log.gz",
+      "original_sha256": "ac6a2aebba5cac40f6ab7e022d3816d9340c9721ddd3a38dc0b48b15c5be4d62",
+      "retained_sha256": "5efbbbca6ccd7acd8a375cf5b0a6ac5e2886b0ca2ff8f915fd7220951195a028",
+      "original_bytes": 264,
+      "retained_bytes": 166
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/security-txt-check.json",
+      "retained": "program/security-txt-check.json",
+      "original_sha256": "468779a7498a0bbc0a7fb9a7e183c9612921b5adcf67f3f707a45704333d1e71",
+      "retained_sha256": "468779a7498a0bbc0a7fb9a7e183c9612921b5adcf67f3f707a45704333d1e71",
+      "original_bytes": 965,
+      "retained_bytes": 965
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/security-txt-check.log",
+      "retained": "program/security-txt-check.log.gz",
+      "original_sha256": "d0ec12794a3e2d6b18ebec8674dc1b0a5fcaa15db1daf8d09b900c929740e5f1",
+      "retained_sha256": "1e08428e06ba7163d67d67491a1803bef075f8b90f2a3a16a2e53033227334af",
+      "original_bytes": 353,
+      "retained_bytes": 224
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/artifact-comparison.json",
+      "retained": "program/artifact-comparison.json",
+      "original_sha256": "7ab465b066980c7789d96861dfe2c3551115bbd24713521aea684313df84652a",
+      "retained_sha256": "7ab465b066980c7789d96861dfe2c3551115bbd24713521aea684313df84652a",
+      "original_bytes": 909,
+      "retained_bytes": 909
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/artifact-comparison.log",
+      "retained": "program/artifact-comparison.log.gz",
+      "original_sha256": "f99888af9803aa7e533788c1cd3843c0900f79739e85f24881dbfa22e1ca137f",
+      "retained_sha256": "0ea2b0d77b2002137276ff2d775f101e42806790816a2cd9f5a2840b67f2bf3e",
+      "original_bytes": 2563,
+      "retained_bytes": 1011
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/fresh-disassembly.json",
+      "retained": "program/fresh-disassembly.json",
+      "original_sha256": "3a2ac7071333420b01760d8799777fd71838a94dabdd7cec94e95b00c2d64558",
+      "retained_sha256": "3a2ac7071333420b01760d8799777fd71838a94dabdd7cec94e95b00c2d64558",
+      "original_bytes": 1000,
+      "retained_bytes": 1000
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/fresh-disassembly.log",
+      "retained": "program/fresh-disassembly.log.gz",
+      "original_sha256": "45e5e3a766f3e997f3a4d3322604a59a06fe9027b5fbefe1b5ca4f620c3728bf",
+      "retained_sha256": "2105983bb7baa16a13fa75450c1779703b332100e73141d5c751650d2963b190",
+      "original_bytes": 831,
+      "retained_bytes": 362
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/canonical-disassembly.json",
+      "retained": "program/canonical-disassembly.json",
+      "original_sha256": "1935d5b25fcfc463eac3ffe6ff64fc786eb859d4c7a098176463ec33fb65f6b5",
+      "retained_sha256": "1935d5b25fcfc463eac3ffe6ff64fc786eb859d4c7a098176463ec33fb65f6b5",
+      "original_bytes": 1009,
+      "retained_bytes": 1009
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/canonical-disassembly.log",
+      "retained": "program/canonical-disassembly.log.gz",
+      "original_sha256": "19c39cd41fa9dafc99298dafc1516cb9b4e9e285db94e8e9901b1c34abffc2a3",
+      "retained_sha256": "86f69232f68b6dab24a2a9089df676dfa6410d60b4d7eda93790955078320655",
+      "original_bytes": 837,
+      "retained_bytes": 368
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/compare-artifacts.py",
+      "retained": "program/compare-artifacts.py",
+      "original_sha256": "897d55d7c545ff747e4437537af172d2b83adfb0cf5ad9aedbb275574b1f1a2a",
+      "retained_sha256": "897d55d7c545ff747e4437537af172d2b83adfb0cf5ad9aedbb275574b1f1a2a",
+      "original_bytes": 2360,
+      "retained_bytes": 2360
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/focused-checks.md",
+      "retained": "services/focused-checks.md",
+      "original_sha256": "396495033242c1454c11c631029608c9adf9b60c523cf79c07449628b1420fef",
+      "retained_sha256": "396495033242c1454c11c631029608c9adf9b60c523cf79c07449628b1420fef",
+      "original_bytes": 5868,
+      "retained_bytes": 5868
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/audit-scope.log",
+      "retained": "services/audit-scope.log.gz",
+      "original_sha256": "eddeb5c812f6d5c07a6aaf83648868a2f8d2aee6b52b6fc16fafd13d4d24f1dd",
+      "retained_sha256": "dcecd10295528018d0249669e8064ceff4bb83fe7f8b1a46bcbbeb7404a16cf1",
+      "original_bytes": 77,
+      "retained_bytes": 90
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/fixture-static.log",
+      "retained": "services/fixture-static.log.gz",
+      "original_sha256": "63d1fc8c9c0450c27899942a10ed0557bf735a6617b65dffacd6b7ec7bae6294",
+      "retained_sha256": "d773076426279a0cdb6ec66301921a84d4c064cbe7b9ab508803d1a0ab7881be",
+      "original_bytes": 121,
+      "retained_bytes": 128
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/pnpm-offline-install.log",
+      "retained": "services/pnpm-offline-install.log.gz",
+      "original_sha256": "4e21f97723a92168391b003ffe2fbb5c924dbe5e8f41a19907112fea797a8a08",
+      "retained_sha256": "77a06891412d4afb071643d17715db19613c5d65cef0c8eb55d41247a6db3f64",
+      "original_bytes": 706,
+      "retained_bytes": 453
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/pnpm-locked-install.log",
+      "retained": "services/pnpm-locked-install.log.gz",
+      "original_sha256": "732327c99a5bc955841e685eaf5955fd0f792d2dd375f60e25b47dbae06cca9b",
+      "retained_sha256": "c5da72ea4b6dcce6e4dfb1193ee3cded1e8b1ca180d78efa2a3f94cd85154d7f",
+      "original_bytes": 547,
+      "retained_bytes": 322
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/client-check.log",
+      "retained": "services/client-check.log.gz",
+      "original_sha256": "beb92795d6066caf26caed38d8a4d0216af32fd3bcf0b544351a81366531c5cf",
+      "retained_sha256": "b50c71b13ce1d561741ad2e934e73ee7daf76c5e357791bcaf11a8c5b5987d37",
+      "original_bytes": 2235,
+      "retained_bytes": 1089
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/web-focused-baseline.log",
+      "retained": "services/web-focused-baseline.log.gz",
+      "original_sha256": "5de752ac167dc30b842f4e5dd96866edad58cd7d413961990f890ab925133c9a",
+      "retained_sha256": "a6a7402912ba67121b177d308e324a55c94a9f40e343841fd0b646509d413fb6",
+      "original_bytes": 235,
+      "retained_bytes": 200
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/devnet-explorer-baseline.log",
+      "retained": "services/devnet-explorer-baseline.log.gz",
+      "original_sha256": "566dd422fd90082b0a97473565eafcff0d59e7e451379b90ef7e31808d305ad6",
+      "retained_sha256": "b0093e98cfb1a2054be1e07716e8d42ac8ae7ce8a26f365512a884d5b6982a52",
+      "original_bytes": 76,
+      "retained_bytes": 88
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/keeper-event-auth.log",
+      "retained": "services/keeper-event-auth.log.gz",
+      "original_sha256": "34830e8252a8f43b9ca1c6a0ded486019db34ad7b23c47bdc42079d0f6525471",
+      "retained_sha256": "572a26b70f0be7333824d005c62b5143de3700c5a07b9bc0da09035697838069",
+      "original_bytes": 14851,
+      "retained_bytes": 3873
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/web-focused-patched.log",
+      "retained": "services/web-focused-patched.log.gz",
+      "original_sha256": "e59e99980a0440732fe49f437dfb5d22d94bd85e07fe5440f2bb0d34f1f09835",
+      "retained_sha256": "8cf839a43d76e086e1fbb464507ee7ad98c014fd1e4d517567e95f0af87a18da",
+      "original_bytes": 235,
+      "retained_bytes": 197
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/client-codegen-fresh.log",
+      "retained": "services/client-codegen-fresh.log.gz",
+      "original_sha256": "6d877758598b53466b8af476f3175e672b8208e8780ede490041eabaf3e244d4",
+      "retained_sha256": "2041c93afa2215ed362b073def660d9a1e923b625e2f64b1709b277374a1eb46",
+      "original_bytes": 146,
+      "retained_bytes": 96
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/client-codegen-diff.log",
+      "retained": "services/client-codegen-diff.log.gz",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "original_bytes": 0,
+      "retained_bytes": 20
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/codama-check.json",
+      "retained": "services/codama-check.json",
+      "original_sha256": "cff4540f3973cfef39352d05dac47140fbd21a8618a53e89e19d280f5b20e047",
+      "retained_sha256": "cff4540f3973cfef39352d05dac47140fbd21a8618a53e89e19d280f5b20e047",
+      "original_bytes": 916,
+      "retained_bytes": 916
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/wasm-fresh-build.log",
+      "retained": "services/wasm-fresh-build.log.gz",
+      "original_sha256": "d1be6117363c5ecc5b03e22a18890fa989c7b5e8ffcc9be198a2296297dd525a",
+      "retained_sha256": "9600a4d0ae63858a50bbc060ff9bb3df22c920f253c9f27956ee37273a09f181",
+      "original_bytes": 1002,
+      "retained_bytes": 395
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/wasm-node-smoke.log",
+      "retained": "services/wasm-node-smoke.log.gz",
+      "original_sha256": "58c9d52386522434f554641c5a96594240f3a87039758288b59037ea74bbadd9",
+      "retained_sha256": "64040499295470c4d218b495d3260dcb41525c0af352df90fdad6558c326e470",
+      "original_bytes": 22,
+      "retained_bytes": 42
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/web-production-build.log",
+      "retained": "services/web-production-build.log.gz",
+      "original_sha256": "946cb77e19e62e6529b902554b54ea8ec69a5f71089ad5d0d7710e71daec4dd4",
+      "retained_sha256": "ccaed333d2bb2c7a07072ed469a7de042acecefcb88e1c32d6b9e1d7e0664ee5",
+      "original_bytes": 6553,
+      "retained_bytes": 2008
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/web-config-biome.log",
+      "retained": "services/web-config-biome.log.gz",
+      "original_sha256": "ea8da84394d5ebdf969f7e609674657186a865817df5f1fb6313a14101b57d1e",
+      "retained_sha256": "035b13b1fd6140ba0925617c6df27284d529d609baf3c4db10f04b54fb66628a",
+      "original_bytes": 42,
+      "retained_bytes": 59
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/final-diff-check.log",
+      "retained": "services/final-diff-check.log.gz",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "retained_sha256": "9ceffb7310338057cfe71a4ae1e2c98d2c485d81cdef906532a801f457a38d64",
+      "original_bytes": 0,
+      "retained_bytes": 20
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/explorer-default.patch",
+      "retained": "services/explorer-default.patch",
+      "original_sha256": "59d3b8be1c05bd1e43bc28ed336db80f905a74bcb43ceef21ff11ec9eb537473",
+      "retained_sha256": "59d3b8be1c05bd1e43bc28ed336db80f905a74bcb43ceef21ff11ec9eb537473",
+      "original_bytes": 2765,
+      "retained_bytes": 2765
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/devnet-rpc-raw.json",
+      "retained": "devnet/devnet-rpc-raw.json",
+      "original_sha256": "360ddfb5e72a56bceb08de4cdd3f1a157c8d76e7c2720b21792b369d8d043e49",
+      "retained_sha256": "360ddfb5e72a56bceb08de4cdd3f1a157c8d76e7c2720b21792b369d8d043e49",
+      "original_bytes": 20172,
+      "retained_bytes": 20172
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/devnet-rpc-summary.json",
+      "retained": "devnet/devnet-rpc-summary.json",
+      "original_sha256": "7a76dbbafb3fde8a1288cccf624323d531dd4d944aec94a8b9c9929baa508f97",
+      "retained_sha256": "7a76dbbafb3fde8a1288cccf624323d531dd4d944aec94a8b9c9929baa508f97",
+      "original_bytes": 17575,
+      "retained_bytes": 17575
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/devnet-cost-oracle-raw.json",
+      "retained": "devnet/devnet-cost-oracle-raw.json",
+      "original_sha256": "23ec23941869aeb50e12647e00536f9eb24a71ce66c1b387e573aa541d8752a9",
+      "retained_sha256": "23ec23941869aeb50e12647e00536f9eb24a71ce66c1b387e573aa541d8752a9",
+      "original_bytes": 6443,
+      "retained_bytes": 6443
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/devnet-cost-oracle-summary.json",
+      "retained": "devnet/devnet-cost-oracle-summary.json",
+      "original_sha256": "29247e11f8bae1e0d2e8a8a649fa6dd077c8dd51bc0dc21ee0913e98c95aa6af",
+      "retained_sha256": "29247e11f8bae1e0d2e8a8a649fa6dd077c8dd51bc0dc21ee0913e98c95aa6af",
+      "original_bytes": 950,
+      "retained_bytes": 950
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/gates.json",
+      "retained": "devnet/gates.json",
+      "original_sha256": "37d29b15262dbc2ae24021c010e484845719af6e32b115d184a9e14e8548cb46",
+      "retained_sha256": "37d29b15262dbc2ae24021c010e484845719af6e32b115d184a9e14e8548cb46",
+      "original_bytes": 3723,
+      "retained_bytes": 3723
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/public-inputs.required.json",
+      "retained": "devnet/public-inputs.required.json",
+      "original_sha256": "a3b153daea7ae45f828e5e0c187ce8d7a8fb7005b3dd527692a3818cc2ac4a30",
+      "retained_sha256": "a3b153daea7ae45f828e5e0c187ce8d7a8fb7005b3dd527692a3818cc2ac4a30",
+      "original_bytes": 1513,
+      "retained_bytes": 1513
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/read-only-devnet-preflight.py",
+      "retained": "devnet/read-only-devnet-preflight.py",
+      "original_sha256": "432dab296c030f07bd8f9424c7736a914d485d834e5d9ca108f9bd8b2db0d2ca",
+      "retained_sha256": "432dab296c030f07bd8f9424c7736a914d485d834e5d9ca108f9bd8b2db0d2ca",
+      "original_bytes": 7018,
+      "retained_bytes": 7018
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/read-only-devnet-cost-oracle.py",
+      "retained": "devnet/read-only-devnet-cost-oracle.py",
+      "original_sha256": "4aefe767bc031181a5a5bd7a53f2888a41544652bb1457119351a1e6ea8d0cb1",
+      "retained_sha256": "4aefe767bc031181a5a5bd7a53f2888a41544652bb1457119351a1e6ea8d0cb1",
+      "original_bytes": 3012,
+      "retained_bytes": 3012
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_devnet_plan/devnet-config-runbook-proposal.md",
+      "retained": "devnet/devnet-config-runbook-proposal.md",
+      "original_sha256": "bdb04ed8754ec110ecb68db658a6b9d907ee36ad8d5b842f7e9a21ab753762d4",
+      "retained_sha256": "bdb04ed8754ec110ecb68db658a6b9d907ee36ad8d5b842f7e9a21ab753762d4",
+      "original_bytes": 6058,
+      "retained_bytes": 6058
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_verifier_readiness/readiness.md",
+      "retained": "verifier/readiness.md",
+      "original_sha256": "2aa3950392d9f0502982cee4ce0f4ab61eed5efc7b12ba490aef39eca9243cf9",
+      "retained_sha256": "2aa3950392d9f0502982cee4ce0f4ab61eed5efc7b12ba490aef39eca9243cf9",
+      "original_bytes": 4841,
+      "retained_bytes": 4841
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_verifier_readiness/candidate-executable-hash.log",
+      "retained": "verifier/candidate-executable-hash.log.gz",
+      "original_sha256": "70b6493745595ad7f281e31181c88c664a5c0e22924951f05cb9ac7fdb6803c2",
+      "retained_sha256": "ea1760bd47aea9049776ab6a29f590eaed70ded674ee6d810749cc7e2ad2030e",
+      "original_bytes": 65,
+      "retained_bytes": 72
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_verifier_readiness/docker-pinned-image.log",
+      "retained": "verifier/docker-pinned-image.log.gz",
+      "original_sha256": "865580de498032587fbb5f8aa143097940fa95abf2f333ac33e2b94348923ca2",
+      "retained_sha256": "58c2d444360331aad113268fdcd1fd4f3fe7f7c5f469e3d2b7a7eff9ada3fdb7",
+      "original_bytes": 92,
+      "retained_bytes": 101
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_verifier_readiness/docker-sudo-pinned-image.log",
+      "retained": "verifier/docker-sudo-pinned-image.log.gz",
+      "original_sha256": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+      "retained_sha256": "a020aa4a7079d99c65649d3cca977f568029f67d515c37aff86a3f41fb8486cd",
+      "original_bytes": 29,
+      "retained_bytes": 49
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_verifier_readiness/docker-sudo-version.log",
+      "retained": "verifier/docker-sudo-version.log.gz",
+      "original_sha256": "9b3a3b7a78f239c4473bb193476b1a860c91f1c2b4fab9c7639eceea414a60fb",
+      "retained_sha256": "a020aa4a7079d99c65649d3cca977f568029f67d515c37aff86a3f41fb8486cd",
+      "original_bytes": 29,
+      "retained_bytes": 49
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_verifier_readiness/docker-version.log",
+      "retained": "verifier/docker-version.log.gz",
+      "original_sha256": "4297536172e0a526d1ec8626a3eb22d63bd7e3e24f10fc3f9e81fbefc98b55bb",
+      "retained_sha256": "d2908882da9ee49221afbe9cd819c90f616f0394c491bfbaf0d0b6c1173fd9b6",
+      "original_bytes": 327,
+      "retained_bytes": 230
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_verifier_readiness/solana-verify-version.log",
+      "retained": "verifier/solana-verify-version.log.gz",
+      "original_sha256": "c4d7e54434b74ea24fbc3d075e161508490abd2982d86a4dbf7faa54a4885439",
+      "retained_sha256": "7cee53d439921df332ec5ffd488af587a61f86967b47754a54f7ec30a4e6faac",
+      "original_bytes": 20,
+      "retained_bytes": 40
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/devnet-wallet-metadata.json",
+      "retained": "devnet/devnet-wallet-metadata.json",
+      "original_sha256": "1c2a78ee0826043762f283cb909c13d66176bbf047c800c3819d95b88e70b2b4",
+      "retained_sha256": "1c2a78ee0826043762f283cb909c13d66176bbf047c800c3819d95b88e70b2b4",
+      "original_bytes": 401,
+      "retained_bytes": 401
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/faucet-attempt.json",
+      "retained": "devnet/faucet-attempt.json",
+      "original_sha256": "a41a83c3b657eefc5aa0d39721b7958993a46ebd1b375363f4a1b0a8c052eab9",
+      "retained_sha256": "a41a83c3b657eefc5aa0d39721b7958993a46ebd1b375363f4a1b0a8c052eab9",
+      "original_bytes": 598,
+      "retained_bytes": 598
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/final-checks.json",
+      "retained": "program/final-checks.json",
+      "original_sha256": "52056b024a28b06ca1e987d6903b9737e7e85ff21d3b6e59b43ddddca76c1c58",
+      "retained_sha256": "52056b024a28b06ca1e987d6903b9737e7e85ff21d3b6e59b43ddddca76c1c58",
+      "original_bytes": 11008,
+      "retained_bytes": 11008
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_independent_check/INDEPENDENT_REVIEW.md",
+      "retained": "independent/INDEPENDENT_REVIEW.md",
+      "original_sha256": "49787238d8711e50002bcb78d3a7153ef213b5bb3e78fbf3812dde2ec918b417",
+      "retained_sha256": "49787238d8711e50002bcb78d3a7153ef213b5bb3e78fbf3812dde2ec918b417",
+      "original_bytes": 6723,
+      "retained_bytes": 6723
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_independent_check/retention-review.json",
+      "retained": "independent/retention-review.json",
+      "original_sha256": "44873ad3bb878b39cb02972b54146c8c3e33b0ee80d41aa88dce221bf56fd3a7",
+      "retained_sha256": "44873ad3bb878b39cb02972b54146c8c3e33b0ee80d41aa88dce221bf56fd3a7",
+      "original_bytes": 164,
+      "retained_bytes": 164
+    }
+  ],
+  "updated_at_utc": "2026-10-22T01:56:48.621329+00:00"
+}

@@ -1,0 +1,30 @@
+{
+  "label": "a49-check",
+  "cwd": "/home/todor_dev/Projects/short.win-release-devnet",
+  "argv": [
+    "python3",
+    "scripts/check-a49.py",
+    "--has-id",
+    "target/program-readiness-2026-10-22/deploy/mock_cpamm.so",
+    "--no-id",
+    "target/program-readiness-2026-10-22/deploy/shortwin.so"
+  ],
+  "timeout_seconds": 60,
+  "env": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000"
+  },
+  "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "status_before": "",
+  "start_utc": "2026-10-22T01:43:04.560736+00:00",
+  "pid": 422812,
+  "exit_code": 0,
+  "elapsed_seconds": 0.06432514599873684,
+  "end_utc": "2026-10-22T01:43:04.625258+00:00",
+  "log_sha256": "ac6a2aebba5cac40f6ab7e022d3816d9340c9721ddd3a38dc0b48b15c5be4d62",
+  "status_after": ""
+}

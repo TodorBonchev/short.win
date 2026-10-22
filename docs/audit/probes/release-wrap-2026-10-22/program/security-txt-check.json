@@ -1,0 +1,31 @@
+{
+  "label": "security-txt-check",
+  "cwd": "/home/todor_dev/Projects/short.win-release-devnet",
+  "argv": [
+    "python3",
+    "scripts/check-security-txt.py",
+    "--forbid-placeholders",
+    "--source-release",
+    "v1.0.3",
+    "target/program-readiness-2026-10-22/deploy/shortwin.so",
+    "short.win"
+  ],
+  "timeout_seconds": 60,
+  "env": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000"
+  },
+  "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "status_before": "",
+  "start_utc": "2026-10-22T01:43:48.307075+00:00",
+  "pid": 423489,
+  "exit_code": 0,
+  "elapsed_seconds": 0.0642755769949872,
+  "end_utc": "2026-10-22T01:43:48.371539+00:00",
+  "log_sha256": "d0ec12794a3e2d6b18ebec8674dc1b0a5fcaa15db1daf8d09b900c929740e5f1",
+  "status_after": ""
+}

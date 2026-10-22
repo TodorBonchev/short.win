@@ -1,0 +1,35 @@
+{
+  "label": "idl-build",
+  "cwd": "/home/todor_dev/Projects/short.win-release-devnet",
+  "argv": [
+    "anchor",
+    "idl",
+    "build",
+    "-p",
+    "shortwin",
+    "-o",
+    "target/program-readiness-2026-10-22/idl/shortwin.json",
+    "-t",
+    "target/program-readiness-2026-10-22/types/shortwin.ts",
+    "--",
+    "--locked"
+  ],
+  "timeout_seconds": 1200,
+  "env": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000"
+  },
+  "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "status_before": "",
+  "start_utc": "2026-10-22T01:42:27.781084+00:00",
+  "pid": 419305,
+  "exit_code": 0,
+  "elapsed_seconds": 37.30094614501286,
+  "end_utc": "2026-10-22T01:43:05.082181+00:00",
+  "log_sha256": "f0d8f6fb9c60b347f9231231f8af4b20f4bb86222ca1f306c83b1bf1678b0a08",
+  "status_after": ""
+}

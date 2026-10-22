@@ -4,7 +4,14 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
-- **Current unreleased 1.0.3 (2026-10-22 local):** owner-selected policy decisions and an
+- **Integrated devnet preparation (2026-10-22):** the unreleased version remains
+  1.0.3. The article comment correction changes one Anchor diagnostic line-number
+  byte in a fresh ELF, so the prior final-byte fuzz result must retain its original
+  artifact attribution. New candidate qualification and actual devnet dependency,
+  governance and funding prerequisites remain open. The newer whole-repo audit
+  checkpoint is incomplete. See the
+  [integrated preparation record](audit/release-wrap-up-1.0.3-2026-10-22.md).
+- **Pre-integration 1.0.3 gate snapshot (2026-10-22 local):** owner-selected policy decisions and an
   accurately attributed AI-assisted fix review are recorded. The program has never
   been deployed. Complete-digest VenueGuard artifacts supersede earlier program
   hashes; exact-ref full CI and final-byte ≥24 h fuzz passed. Jupiter live-pin drift

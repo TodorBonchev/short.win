@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-22",
+  "mode": "read_only_bounded_public_devnet_rpc",
+  "worktree_head": "f492ec2",
+  "observed_gate_ref": "30ba1f54b09bb0fae5a01072c1b5750e8251b76d",
+  "gates": [
+    {
+      "gate": "exact_revision",
+      "status": "pending",
+      "requirement": "Select final source+version. Existing ELF hashes match earlier canonical artifact, not a new f492ec2 build."
+    },
+    {
+      "gate": "release_elf",
+      "status": "fresh_root_build_verifier_and_gates_pending",
+      "requirement": "Root reports fresh1,644,024B SHA256d8d08784\u2026e182, diagnosticline72to73 change. Verifier and relevantgates remainpending."
+    },
+    {
+      "gate": "cluster_rpc",
+      "status": "passed_observation",
+      "requirement": "Publicdevnet genesis EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG at confirmed slot513721817; use explicitRPC/WSS in finalpacket."
+    },
+    {
+      "gate": "program_signer",
+      "status": "root_verified_public_identity",
+      "requirement": "Root verified existing canonical signer public key equals 5yvy\u2026VpKK; reviewer read no keypair."
+    },
+    {
+      "gate": "authority_payer_funder",
+      "status": "payer_and_proposed_authority_known_funding_pending",
+      "requirement": "Root-created public key3Jfr\u2026cS14 is proposed payer/initialauthority. Initialbalance0; single2SOLairdropfailed; funder/funding stillpending."
+    },
+    {
+      "gate": "venue_scope",
+      "status": "partial_and_blocked",
+      "requirement": "Pump/PumpSwap/pfee source IDs executable but different unverified devnet profiles; canonical Raydium/Jupiter IDs nonexecutables; no real market supplied."
+    },
+    {
+      "gate": "squads",
+      "status": "failed_immutability",
+      "requirement": "Devnet SQDS4ProgramData has authority HM5y4mz3Bt9JY9mr1hkyhnvqxSH4H2u2451j7Hc2dtvK; currentgovverify willFAIL."
+    },
+    {
+      "gate": "pyth",
+      "status": "failed_freshness_observation",
+      "requirement": "Correct receiver/schema/Full/feed/positiveprice/confidence, but coherent Clock age134s versus defaultmaxage120; require freshtransaction-timecheck."
+    },
+    {
+      "gate": "governance_layout",
+      "status": "missing_public_input",
+      "requirement": "Real 3-of-5 governance and 2-of-4 emergency member/create public keys, coverage key and derived distinct vault identities."
+    },
+    {
+      "gate": "funding",
+      "status": "rents_observed_payer_pending",
+      "requirement": "OldcanonicalELF conservativeprogram+PD+buffer rent16.705834SOL; initrents0.14600428SOL; fees/governance/market/operatingreserves and actualpayerbalance pending."
+    },
+    {
+      "gate": "operator",
+      "status": "missing_public_input",
+      "requirement": "Keeper/indexer/frontend hosts+artifacts+public config, coverage set, funded zero-reward backstop, top-up ownership and alerts."
+    },
+    {
+      "gate": "approval",
+      "status": "not_requested",
+      "requirement": "Concrete reviewed transaction summary and user approval required before signing/deploying; none requested/performed in this packet."
+    },
+    {
+      "gate": "normal_devnet_smoke",
+      "status": "not_run",
+      "requirement": "Small real supported test market with observations/lend/open/add-margin/close/withdraw, narrow reader UI smoke, then exact account/hash postcheck."
+    },
+    {
+      "gate": "stable_release_signoff",
+      "status": "not_satisfied_by_devnet",
+      "requirement": "Version/tag and devnet rehearsal do not close final stable release/security signoff or unresolved mainnet preflight."
+    }
+  ],
+  "integrated_source_head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "rpc_evidence": "devnet-rpc-raw.json",
+  "cost_oracle_evidence": "devnet-cost-oracle-raw.json"
+}

@@ -1,0 +1,56 @@
+diff --git i/apps/web/src/config/parseConfig.test.ts w/apps/web/src/config/parseConfig.test.ts
+index 3e4e483..fc8f03c 100644
+--- i/apps/web/src/config/parseConfig.test.ts
++++ w/apps/web/src/config/parseConfig.test.ts
+@@ -91,4 +91,34 @@ describe('parseConfig', () => {
+         expect(c.priorityFeeMaxMicroLamports).toBe(250_000n);
+         expect(c.enableTestVenue).toBe(true);
+     });
++
++    it('defaults transaction explorer links to the selected cluster', () => {
++        const urls = {
++            VITE_RPC_URL: 'https://rpc.example',
++            VITE_RPC_WS_URL: 'wss://rpc.example',
++            VITE_INDEXER_URL: 'https://api.example',
++            VITE_INDEXER_WS_URL: 'wss://api.example/v1/ws',
++        };
++        expect(parseConfig({ ...urls, VITE_CLUSTER: 'devnet' }).explorerTxUrl).toBe(
++            'https://explorer.solana.com/tx/{sig}?cluster=devnet',
++        );
++        for (const cluster of ['mainnet', 'localnet']) {
++            expect(parseConfig({ ...urls, VITE_CLUSTER: cluster }).explorerTxUrl).toBe(
++                'https://explorer.solana.com/tx/{sig}',
++            );
++        }
++    });
++
++    it('preserves an explicitly configured transaction explorer template', () => {
++        const explorerTxUrl = 'https://explorer.example/tx/{sig}?network=custom';
++        const config = parseConfig({
++            VITE_CLUSTER: 'devnet',
++            VITE_RPC_URL: 'https://rpc.example',
++            VITE_RPC_WS_URL: 'wss://rpc.example',
++            VITE_INDEXER_URL: 'https://api.example',
++            VITE_INDEXER_WS_URL: 'wss://api.example/v1/ws',
++            VITE_EXPLORER_TX_URL: explorerTxUrl,
++        });
++        expect(config.explorerTxUrl).toBe(explorerTxUrl);
++    });
+ });
+diff --git i/apps/web/src/config/parseConfig.ts w/apps/web/src/config/parseConfig.ts
+index b4b3f34..ac4766b 100644
+--- i/apps/web/src/config/parseConfig.ts
++++ w/apps/web/src/config/parseConfig.ts
+@@ -104,7 +104,11 @@ export function parseConfig(env: Readonly<Record<string, string | boolean | unde
+     else if (!(mwaText === undefined || mwaText === '' || mwaText === true || mwaText === 'true')) {
+         problems.push('VITE_ENABLE_MOBILE_WALLET_ADAPTER must be true or false');
+     }
+-    const explorerTxUrl = s('VITE_EXPLORER_TX_URL') ?? 'https://explorer.solana.com/tx/{sig}';
++    const defaultExplorerTxUrl =
++        cluster === 'devnet'
++            ? 'https://explorer.solana.com/tx/{sig}?cluster=devnet'
++            : 'https://explorer.solana.com/tx/{sig}';
++    const explorerTxUrl = s('VITE_EXPLORER_TX_URL') ?? defaultExplorerTxUrl;
+     if (!explorerTxUrl.includes('{sig}')) problems.push('VITE_EXPLORER_TX_URL must contain {sig}');
+     if (problems.length > 0 || !cluster) throw new ConfigError(problems);
+     return {

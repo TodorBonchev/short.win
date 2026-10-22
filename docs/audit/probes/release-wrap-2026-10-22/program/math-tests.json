@@ -1,0 +1,33 @@
+{
+  "label": "math-tests",
+  "cwd": "/home/todor_dev/Projects/short.win-release-devnet",
+  "argv": [
+    "cargo",
+    "test",
+    "-p",
+    "shortwin-math",
+    "-p",
+    "shortwin-math-wasm",
+    "-p",
+    "squads-v4-ix",
+    "--locked"
+  ],
+  "timeout_seconds": 1200,
+  "env": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000"
+  },
+  "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "status_before": "",
+  "start_utc": "2026-10-22T01:44:06.813662+00:00",
+  "pid": 423650,
+  "exit_code": 0,
+  "elapsed_seconds": 52.93694101499568,
+  "end_utc": "2026-10-22T01:44:59.750788+00:00",
+  "log_sha256": "8b741fd3648565229ef987ffb3e027e14fce4487192fcda10c7ba0d87e3abd80",
+  "status_after": " M apps/web/src/config/parseConfig.test.ts\n M apps/web/src/config/parseConfig.ts\n"
+}

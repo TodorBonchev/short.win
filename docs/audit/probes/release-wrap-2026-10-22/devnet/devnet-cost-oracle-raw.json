@@ -1,0 +1,265 @@
+{
+  "rpc": "https://api.devnet.solana.com",
+  "started_at": "2026-10-22T01:41:41.591613+00:00",
+  "requests": [
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": "oracle_clock",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE",
+            "SysvarC1ock11111111111111111111111111111111"
+          ],
+          {
+            "encoding": "base64",
+            "commitment": "confirmed",
+            "dataSlice": {
+              "offset": 0,
+              "length": 256
+            }
+          }
+        ]
+      },
+      "started_at": "2026-10-22T01:41:41.591627+00:00",
+      "http_status": 200,
+      "response": {
+        "jsonrpc": "2.0",
+        "result": {
+          "context": {
+            "apiVersion": "4.4.0-beta.1",
+            "slot": 513722069
+          },
+          "value": [
+            {
+              "data": [
+                "IvEjY51+9M1gMUcENA3t3zcf1CRyFI8kjp0abRpesqw6zYt/1dayQwHvDYtv2izrpB2hXUCV0do5Kg0vjtDGx7wPTPrIwoC1bZKBZnoCAAAAvtgwAAAAAAD4////TmnZagAAAABNadlqAAAAAL5HxH4CAAAAeyYyAAAAAADqxJ4eAAAAAAA=",
+                "base64"
+              ],
+              "executable": false,
+              "lamports": 5249481291,
+              "owner": "rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ",
+              "rentEpoch": 18446744073709551615,
+              "space": 134
+            },
+            {
+              "data": [
+                "1caeHgAAAADMJNlqAAAAAKUEAAAAAAAApgQAAAAAAADUadlqAAAAAA==",
+                "base64"
+              ],
+              "executable": false,
+              "lamports": 1169280,
+              "owner": "Sysvar1111111111111111111111111111111111111",
+              "rentEpoch": 18446744073709551615,
+              "space": 40
+            }
+          ]
+        },
+        "id": "oracle_clock"
+      },
+      "finished_at": "2026-10-22T01:41:41.709146+00:00"
+    },
+    {
+      "request": [
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_0",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            0,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_36",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            36,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_1644069",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            1644069,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_1644061",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            1644061,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_1448",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            1448,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_304",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            304,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_6512",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            6512,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_45",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            45,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_3104",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            3104,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_2200",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            2200,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_165",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            165,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        },
+        {
+          "jsonrpc": "2.0",
+          "id": "rent_82",
+          "method": "getMinimumBalanceForRentExemption",
+          "params": [
+            82,
+            {
+              "commitment": "confirmed"
+            }
+          ]
+        }
+      ],
+      "started_at": "2026-10-22T01:41:41.709456+00:00",
+      "http_status": 200,
+      "response": [
+        {
+          "jsonrpc": "2.0",
+          "result": 650240,
+          "id": "rent_0"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 833120,
+          "id": "rent_36"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 8352520760,
+          "id": "rent_1644069"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 8352480120,
+          "id": "rent_1644061"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 8006080,
+          "id": "rent_1448"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 2194560,
+          "id": "rent_304"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 33731200,
+          "id": "rent_6512"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 878840,
+          "id": "rent_45"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 16418560,
+          "id": "rent_3104"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 11826240,
+          "id": "rent_2200"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 1488440,
+          "id": "rent_165"
+        },
+        {
+          "jsonrpc": "2.0",
+          "result": 1066800,
+          "id": "rent_82"
+        }
+      ],
+      "finished_at": "2026-10-22T01:41:41.809945+00:00"
+    }
+  ]
+}

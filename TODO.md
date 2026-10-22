@@ -1,6 +1,7 @@
 # Pending work
 
 This file lists unfinished work only. Completed audit and release evidence is in
+[the integrated devnet preparation record](docs/audit/release-wrap-up-1.0.3-2026-10-22.md),
 [the 1.0.3 handoff](docs/audit/handoff-1.0.3-2026-10-20.md),
 [the current readiness record](docs/audit/release-readiness-1.0.3-2026-10-21.md),
 [the findings tracker](docs/audit/findings.md), and
@@ -11,6 +12,14 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 ## 1.0.3 release blockers
 
+- [ ] Qualify the integrated candidate's final bytes: the corrected module comment
+      shifts one Anchor diagnostic line-number byte in the ELF. The previous clean
+      ≥24-hour run is retained for its original hash; the new candidate needs its
+      own applicable pinned/verifiable build, final gates and final-byte fuzz.
+- [ ] Complete or explicitly disposition the [new audit checkpoint](docs/audit/2026-10-22-progress/README.md)
+      before any whole-codebase audit-complete claim. Seven independently retained
+      hypotheses require validation and 23 lack independent disposition; preserve
+      the two provider-stopped scope gaps without retrying those tasks.
 - [ ] Resolve the [current Jupiter live-pin drift](docs/audit/release-checks-1.0.3-2026-10-22.md)
       through explicit upstream/deployment configuration review before first deployment.
       Keep the failed aggregate live check recorded; do not silently repin it.
@@ -19,7 +28,19 @@ complete SHA-256 VenueGuard correction for first deployment.
       Tests establish compatibility; operating evidence is still pending.
 - [ ] Obtain owner review of the [concrete 1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
       after the remaining preflight requirements are satisfied. Final CI, frozen ≥24 h
-      fuzz, technical finding closure and preparation checks are recorded there.
+      fuzz and technical finding closure for the earlier canonical artifact are
+      recorded there; the new integrated artifact has the additional gate above.
+
+## Public-devnet test prerequisites
+
+- [ ] Fund the new devnet payer with test SOL; its public address, external key path
+      and the failed initial faucet request are in the
+      [integrated preparation record](docs/audit/release-wrap-up-1.0.3-2026-10-22.md).
+- [ ] Resolve the target-cluster profile before promising market E2E: canonical
+      Raydium/Jupiter IDs are not executable there, devnet Squads fails the supported
+      immutability check, and Pump dependency parity is unverified. Establish fresh
+      Pyth observations and actual operator/client/indexer configurations. A
+      program-only deployment does not close these requirements.
 
 The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) and
 accurately labelled [focused](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md) /

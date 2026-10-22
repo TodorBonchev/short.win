@@ -1,0 +1,22 @@
+{
+  "recorded_at_utc": "2026-10-22T01:52:22.975676+00:00",
+  "cluster": "https://api.devnet.solana.com",
+  "public_address": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "airdrop_attempts": 1,
+  "requested_sol": 2,
+  "cli_exit": 1,
+  "cli_error": "Error: airdrop request failed. This can happen when the rate limit is reached.",
+  "balance_recheck_response": {
+    "jsonrpc": "2.0",
+    "result": {
+      "context": {
+        "apiVersion": "4.4.0-beta.1",
+        "slot": 513724761
+      },
+      "value": 0
+    },
+    "id": 1
+  },
+  "deployment_attempts": 0,
+  "initialization_attempts": 0
+}

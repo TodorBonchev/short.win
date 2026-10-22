@@ -1,0 +1,35 @@
+{
+  "label": "sbf-build",
+  "cwd": "/home/todor_dev/Projects/short.win-release-devnet",
+  "argv": [
+    "anchor",
+    "build",
+    "--tools-version",
+    "v1.57",
+    "--arch",
+    "v3",
+    "--ignore-keys",
+    "--no-idl",
+    "--",
+    "--",
+    "--locked"
+  ],
+  "timeout_seconds": 1200,
+  "env": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000"
+  },
+  "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "status_before": "",
+  "start_utc": "2026-10-22T01:40:00.205130+00:00",
+  "pid": 409297,
+  "exit_code": 0,
+  "elapsed_seconds": 124.75888637400931,
+  "end_utc": "2026-10-22T01:42:04.964189+00:00",
+  "log_sha256": "90300ae0ead28add5fd26678bf89da610438e58be1149eac0d598ae2b04cdd0b",
+  "status_after": ""
+}

@@ -1,0 +1,29 @@
+{
+  "label": "fresh-disassembly",
+  "cwd": "/home/todor_dev/Projects/short.win-release-devnet",
+  "argv": [
+    "/home/todor_dev/.cache/solana/v1.57/platform-tools/llvm/bin/llvm-objdump",
+    "--disassemble",
+    "--start-address=0x100046d40",
+    "--stop-address=0x100046da0",
+    "target/program-readiness-2026-10-22/deploy/shortwin.so"
+  ],
+  "timeout_seconds": 60,
+  "env": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000"
+  },
+  "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "status_before": "",
+  "start_utc": "2026-10-22T01:43:48.295008+00:00",
+  "pid": 423472,
+  "exit_code": 0,
+  "elapsed_seconds": 0.003787319001276046,
+  "end_utc": "2026-10-22T01:43:48.298913+00:00",
+  "log_sha256": "45e5e3a766f3e997f3a4d3322604a59a06fe9027b5fbefe1b5ca4f620c3728bf",
+  "status_after": ""
+}

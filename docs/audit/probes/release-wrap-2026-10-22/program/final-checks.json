@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "scope": "Focused fresh release SBF/IDL/math verification; not full CI, completed new fuzz, or security audit closure",
+  "build_source_commit": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+  "frozen_candidate_source_commit": "bf166672efee578b6a2a1835e0dd53729c548671",
+  "build_inputs_equal_between_source_commits": true,
+  "environment": {
+    "NO_DNA": "1",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_NET_OFFLINE": "true",
+    "RUST_TEST_THREADS": "2",
+    "PROPTEST_CASES": "2000",
+    "CARGO_TARGET_DIR": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22"
+  },
+  "tools": {
+    "host_rust": "1.98.1",
+    "host_cargo": "1.98.1",
+    "agave": "4.1.2",
+    "cargo_build_sbf": "4.1.0",
+    "selected_platform_tools": "v1.57",
+    "selected_platform_rust": "1.95.0-dev ae660768afd467d131776918a1627e18920b230c",
+    "sbpf_arch": "v3",
+    "anchor_cli_version": "1.2.0",
+    "anchor_cli_sha256": "0c9c41a3292c281cc6eadb78d6e1c8224d8324a34b0736a89d640fd314db05b7",
+    "ci_anchor_source_pin": "otter-sec/anchor#84a63f9f7112b23581816436fbcf3f6c515779f9",
+    "installed_avm_receipt": "solana-foundation/anchor#2b4b2fd22a881228e02c41b26bd23addb5b8b26f",
+    "anchor_source_qualification": "AVM receipt is for router; exact downloaded CLI source commit is not established. Version match is not source-provenance proof."
+  },
+  "artifacts": {
+    "release": {
+      "path": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22/deploy/shortwin.so",
+      "bytes": 1644024,
+      "sha256": "d8d08784b3b3081d5fe1cf7aaff319e7e9e063733c308bd2e9e7ed8981bee182",
+      "trimmed_sha256": "8531f4958aaff2c5050d478ec8752a7b947e70224da3d0a08e27dedfa5107112",
+      "e_flags": 3,
+      "sections": {
+        ".rodata": {
+          "address": 0,
+          "offset": 232,
+          "size": 40032,
+          "sha256": "69b18758c11cde8abc6dcb6940f64dd153dca7a6fb611f37c1430733720b4aa6"
+        },
+        ".text": {
+          "address": 4294967296,
+          "offset": 40264,
+          "size": 1603472,
+          "sha256": "5883061b06905ffe19c48915b86f1e96b31481e9d10d6525cf087545660bd6c3"
+        },
+        ".shstrtab": {
+          "address": 0,
+          "offset": 1643736,
+          "size": 25,
+          "sha256": "d33478a1c1aa517ecac5f20b53e46e7f4c28ca5d429bf7cd69cc58adba22c9a4"
+        }
+      },
+      "test_venue_marker_absent": true,
+      "security_txt_marker_count": 1
+    },
+    "canonical_comparison": {
+      "path": "/home/todor_dev/Projects/short.win/target/deploy/shortwin.so",
+      "bytes": 1644024,
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "trimmed_sha256": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250",
+      "sections": {
+        ".rodata": {
+          "address": 0,
+          "offset": 232,
+          "size": 40032,
+          "sha256": "69b18758c11cde8abc6dcb6940f64dd153dca7a6fb611f37c1430733720b4aa6"
+        },
+        ".text": {
+          "address": 4294967296,
+          "offset": 40264,
+          "size": 1603472,
+          "sha256": "7d6877da9c6e1591cdb0f9b5210a1a00e5485dce3ebdae0adc47f9cfda63a020"
+        },
+        ".shstrtab": {
+          "address": 0,
+          "offset": 1643736,
+          "size": 25,
+          "sha256": "d33478a1c1aa517ecac5f20b53e46e7f4c28ca5d429bf7cd69cc58adba22c9a4"
+        }
+      }
+    },
+    "mock": {
+      "path": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22/deploy/mock_cpamm.so",
+      "bytes": 281240,
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9"
+    },
+    "idl": {
+      "path": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22/idl/shortwin.json",
+      "sha256": "5b94b1e98f5b32cf6d3c501d1998965bbbab80d6e2853fa6eeb8f3ba5470a003",
+      "matches_committed_idl": true
+    }
+  },
+  "byte_difference": {
+    "count": 1,
+    "differences": [
+      {
+        "offset": 330428,
+        "old": 72,
+        "new": 73
+      }
+    ],
+    "instruction_address": "0x100046d70",
+    "attribution": "Single changed immediate in .text: Anchor ZeroAmount error source line moves 72\u219273 at add_margin require!, matching comment-only source line shift. See retained disassembly and macro source. This is not canonical byte identity or a waiver of final-byte gates.",
+    "canonical_byte_identity": false,
+    "final_byte_gate_waived": false
+  },
+  "math_test_counts": {
+    "total": 427,
+    "shortwin_math": 386,
+    "shortwin_math_wasm": 28,
+    "squads_v4_ix": 13,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "label": "sbf-build",
+      "argv": [
+        "anchor",
+        "build",
+        "--tools-version",
+        "v1.57",
+        "--arch",
+        "v3",
+        "--ignore-keys",
+        "--no-idl",
+        "--",
+        "--",
+        "--locked"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 124.75888637400931,
+      "log_sha256": "90300ae0ead28add5fd26678bf89da610438e58be1149eac0d598ae2b04cdd0b"
+    },
+    {
+      "label": "idl-build",
+      "argv": [
+        "anchor",
+        "idl",
+        "build",
+        "-p",
+        "shortwin",
+        "-o",
+        "target/program-readiness-2026-10-22/idl/shortwin.json",
+        "-t",
+        "target/program-readiness-2026-10-22/types/shortwin.ts",
+        "--",
+        "--locked"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 37.30094614501286,
+      "log_sha256": "f0d8f6fb9c60b347f9231231f8af4b20f4bb86222ca1f306c83b1bf1678b0a08"
+    },
+    {
+      "label": "idl-diff",
+      "argv": [
+        "diff",
+        "-u",
+        "clients/js/idl/shortwin.json",
+        "target/program-readiness-2026-10-22/idl/shortwin.json"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0055553290003445,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "fmt-check",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 1.5172164469986456,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "math-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "shortwin-math",
+        "-p",
+        "shortwin-math-wasm",
+        "-p",
+        "squads-v4-ix",
+        "--locked"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 52.93694101499568,
+      "log_sha256": "8b741fd3648565229ef987ffb3e027e14fce4487192fcda10c7ba0d87e3abd80"
+    },
+    {
+      "label": "math-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "-p",
+        "shortwin-math",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 8.23353581999254,
+      "log_sha256": "ff76971ea13708bbd86102658d8b596856c7f699cbc35b9ffca342c147ad7fb8"
+    },
+    {
+      "label": "a49-check",
+      "argv": [
+        "python3",
+        "scripts/check-a49.py",
+        "--has-id",
+        "target/program-readiness-2026-10-22/deploy/mock_cpamm.so",
+        "--no-id",
+        "target/program-readiness-2026-10-22/deploy/shortwin.so"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 0.06432514599873684,
+      "log_sha256": "ac6a2aebba5cac40f6ab7e022d3816d9340c9721ddd3a38dc0b48b15c5be4d62"
+    },
+    {
+      "label": "security-txt-check",
+      "argv": [
+        "python3",
+        "scripts/check-security-txt.py",
+        "--forbid-placeholders",
+        "--source-release",
+        "v1.0.3",
+        "target/program-readiness-2026-10-22/deploy/shortwin.so",
+        "short.win"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0642755769949872,
+      "log_sha256": "d0ec12794a3e2d6b18ebec8674dc1b0a5fcaa15db1daf8d09b900c929740e5f1"
+    },
+    {
+      "label": "artifact-comparison",
+      "argv": [
+        "python3",
+        "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_program_readiness/compare-artifacts.py"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 0.11414240900194272,
+      "log_sha256": "f99888af9803aa7e533788c1cd3843c0900f79739e85f24881dbfa22e1ca137f"
+    },
+    {
+      "label": "fresh-disassembly",
+      "argv": [
+        "/home/todor_dev/.cache/solana/v1.57/platform-tools/llvm/bin/llvm-objdump",
+        "--disassemble",
+        "--start-address=0x100046d40",
+        "--stop-address=0x100046da0",
+        "target/program-readiness-2026-10-22/deploy/shortwin.so"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 0.003787319001276046,
+      "log_sha256": "45e5e3a766f3e997f3a4d3322604a59a06fe9027b5fbefe1b5ca4f620c3728bf"
+    },
+    {
+      "label": "canonical-disassembly",
+      "argv": [
+        "/home/todor_dev/.cache/solana/v1.57/platform-tools/llvm/bin/llvm-objdump",
+        "--disassemble",
+        "--start-address=0x100046d40",
+        "--stop-address=0x100046da0",
+        "/home/todor_dev/Projects/short.win/target/deploy/shortwin.so"
+      ],
+      "head": "b31c02a091008da18c39d7836c8e0e9d6d018973",
+      "exit_code": 0,
+      "elapsed_seconds": 0.00577032299770508,
+      "log_sha256": "19c39cd41fa9dafc99298dafc1516cb9b4e9e285db94e8e9901b1c34abffc2a3"
+    }
+  ],
+  "fuzz": {
+    "status": "preparation_running",
+    "completed_24h_gate": false,
+    "source_commit": "bf166672efee578b6a2a1835e0dd53729c548671",
+    "directory": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/fuzz-final-candidate-bf166672",
+    "no_prior_duration_credited": true
+  },
+  "pending_stable_release_gates": [
+    "Exact current-source G-full / required mutation gate",
+    "Reproducible verifier comparison against chosen fresh release artifact",
+    "Complete and independently verify new final-byte >=24h fuzz gate",
+    "Current live venue/config and actual target-cluster dependency qualification",
+    "Reviewed governance initialization and funded monitored operator/client identities",
+    "Final tag/deployment review under current user authority"
+  ],
+  "audit_progress_not_closed": {
+    "needs_validation": 7,
+    "undisposed": 23,
+    "confirmed": 0,
+    "permanently_excluded": [
+      "Public indexer API/WebSocket server security review and stopped notes/fixture",
+      "Stopped nonmonotone FV-corner review/fixture reconstruction/retry"
+    ]
+  },
+  "no_signing_deployment_or_private_key_reads": true
+}

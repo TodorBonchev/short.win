@@ -1,0 +1,38 @@
+{
+  "oracle_context": {
+    "apiVersion": "4.4.0-beta.1",
+    "slot": 513722069
+  },
+  "oracle": {
+    "verification": "Full",
+    "feed_id": "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d",
+    "price": 10643472786,
+    "conf": 3201214,
+    "exponent": -8,
+    "publish_time": 1792633166,
+    "posted_slot": 513721578,
+    "clock_unix_timestamp": 1792633300,
+    "clock_slot": 513722069,
+    "age_s": 134,
+    "full": true,
+    "expected_feed": true,
+    "confidence_bps_numerator": 32012140000,
+    "positive_price": true,
+    "note": "Schema-matched read; apply exact program parameter limits at transaction time."
+  },
+  "rent_lamports_by_size": {
+    "0": 650240,
+    "36": 833120,
+    "1644069": 8352520760,
+    "1644061": 8352480120,
+    "1448": 8006080,
+    "304": 2194560,
+    "6512": 33731200,
+    "45": 878840,
+    "3104": 16418560,
+    "2200": 11826240,
+    "165": 1488440,
+    "82": 1066800
+  },
+  "rent_errors": []
+}

@@ -1,0 +1,36 @@
+{
+  "idl": "/home/todor_dev/Projects/short.win-release-devnet/target/program-readiness-2026-10-22/idl/shortwin.json",
+  "before": [
+    {
+      "from": "codama#updateInstructionsVisitor",
+      "args": [
+        {
+          "syncLender": {
+            "accounts": {
+              "owner": {
+                "isSigner": "either"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scripts": {
+    "js": {
+      "from": "@codama/renderers-js",
+      "args": [
+        "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/release_services_readiness/generated-client",
+        {
+          "deleteFolderBeforeRendering": true,
+          "formatCode": true,
+          "generatedFolder": "src/generated",
+          "kitImportStrategy": "rootOnly",
+          "importExtension": "ts",
+          "erasableSyntax": true,
+          "syncPackageJson": false
+        }
+      ]
+    }
+  }
+}
