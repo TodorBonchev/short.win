@@ -1,0 +1,159 @@
+{
+  "checked_on": "2026-10-22",
+  "kind": "fresh bounded host-library observation only",
+  "source_head": "c89d95073f5e80323d86680c133880778b71de36",
+  "production_math_unchanged": true,
+  "root_workspace_unchanged": true,
+  "production_source_sha256": {
+    "crates/shortwin-math/Cargo.toml": "56d5e22f7fb9d5d578868c00dce10af37bd3b2a11dd207a9870b51be555c1289",
+    "crates/shortwin-math/src/bounds.rs": "40e797f8fa54c3301efa9cb97ee3ca3f2a65633cd6274862311ef9606ff3da14",
+    "crates/shortwin-math/src/caps.rs": "a80a37a04dfb788d36fec908e08da2675ebb818dbc007e58c53fc7d4eae9c44e",
+    "crates/shortwin-math/src/consts.rs": "dae8349aea3a80a1e96e9af406c283c2b286c897bef1725ae797877951671f19",
+    "crates/shortwin-math/src/error.rs": "65b2a621ef486402525c414d44ca1dc2fc81eb3af99124a68443072e9d0a635d",
+    "crates/shortwin-math/src/fees.rs": "8bdd8539ab1301e88a8e107055b59dcb87f8ba51b9ea1207b32c81b393058d3a",
+    "crates/shortwin-math/src/lib.rs": "483bc1ffa1ea37fef45f50d22f2f46ca5234d7802f05d7518226810786054ab5",
+    "crates/shortwin-math/src/num/mod.rs": "744793e997cde54aec27bdb575a759b45a55f2db9cb1725d9cad558bcd001499",
+    "crates/shortwin-math/src/num/u256.rs": "515cedb13d8cdc6be3bf4af35f50121321055d81723ef6073732b44387ae4b04",
+    "crates/shortwin-math/src/observe.rs": "31c2aefa3be7998ef5cdb65d56f5d90e8877e9551f4be4a6ce79cdaa13615072",
+    "crates/shortwin-math/src/params.rs": "29a8300c68e334ae3b0d4ad4a89904335c341583dcfcc44fd0ca9af6add7bbfb",
+    "crates/shortwin-math/src/persist.rs": "17dea600477038becded79b1bede5825089b3b540c233ff3f1a41a85fe74e424",
+    "crates/shortwin-math/src/pool.rs": "3d270b521f777b314a3e86048bb5c4396bc78129d4f47eb5898942e30ad55312",
+    "crates/shortwin-math/src/pool_select.rs": "3382076195d68f71a56b5bb3f23a29d104c1efd21e001dc9572fe8a8cce951c4",
+    "crates/shortwin-math/src/quote/cpmm.rs": "1cb330dba4f41aba56e51d1bdbae63b18aa9f49688ec628a66dcd312ba391de7",
+    "crates/shortwin-math/src/quote/mod.rs": "d22968ca64a935083d02387b078ded42c9e5756da9afa2041faec9db996c6f88",
+    "crates/shortwin-math/src/quote/pricing.rs": "0b076d98dc202deff2c0e8e7af5555308dcf3fe7deaff8630159db7fb3255361",
+    "crates/shortwin-math/src/quote/ray_v4.rs": "9a4fe01a5f69b32513091e2fef190cdd3cbe8b8cd3ae92a95c9a6791635c0d6e",
+    "crates/shortwin-math/src/quote/reprice.rs": "7a3574134c3f81c191f4aac3a34c52531637f7fce09eee3143b8f1f77f6c0304",
+    "crates/shortwin-math/src/quote/sol_leg.rs": "cf281fe8d387fc9239f9e09835f32b2bdb98db03284acca49b25b0fdbe59d2b2",
+    "crates/shortwin-math/src/quote/straddle.rs": "27c2331b5a439a2a2694fd44630bcb0441a1ea8404b14b24281bfc1086bd0f5c",
+    "crates/shortwin-math/src/rent.rs": "27c5b38c8ff1def881cc73ec9a3dd4577d76f7c474f99a0f3553a5760beeec56",
+    "crates/shortwin-math/src/risk.rs": "edf48c5343a5a71a1a0b13981bcc8ae6fd281eeef9ae739770180052ceb474c0",
+    "crates/shortwin-math/src/settle.rs": "cdc0d98e36decab61b0d03496c8f8ae55d0894e03ef7b4aef23fb47a522c6df1",
+    "crates/shortwin-math/src/tier.rs": "8ce9f02346c489ee7ce78be35ef780ff0c34f3eafac213537b335e97b4408690",
+    "crates/shortwin-math/src/waterfall.rs": "52945c647d61be4caaefed4b0e30e079e732f121b3d33a0cde06306277dcf736"
+  },
+  "root_workspace_sha256": {
+    "Cargo.toml": "1563eaebd9b000fc45ec74840517399256fbb71870a38c1c6f72504a92c0a9c0",
+    "Cargo.lock": "0732c477fe1e6b38fd74d558e23b8e3ebda8790705a6ddff1de6fdaca72b316b"
+  },
+  "fixture_sha256": "f39389ebdb93b43cb42361647f55d5c6f5d30e2922112217e532022b165eea08",
+  "manifest_sha256": "23934fef61e65ac5b3fad57e64fd71a14668bb42c230c4f5f191905b7cd91bd0",
+  "lock_sha256": "ba57fe4eb74496ee0367cda5a202b9a9d5a969debb2df38fe99c6012662042d2",
+  "original_fixture_sha256": "f39389ebdb93b43cb42361647f55d5c6f5d30e2922112217e532022b165eea08",
+  "cargo": {
+    "version": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+    "binary_sha256": "da77c8b33849312255ccde3179198ada4c8deb370488d050286146b1d1b27e14"
+  },
+  "rustc": {
+    "version": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "binary_sha256": "859254978c0a0402c32f949f6de0d99aee73be8d15f45aac00ae1448aac51e74"
+  },
+  "build": {
+    "jobs": 2,
+    "offline": true,
+    "locked": true,
+    "fresh_external_target": true,
+    "command_timeout_seconds": 120,
+    "exit": 0,
+    "command": "timeout --signal=TERM --kill-after=5s 120s env -i PATH=/usr/bin:/bin CARGO_HOME=/home/todor_dev/security-audit-skill/short.win/article-review-2026-10-22/article_protocol_economics/scratch/portable-math-production-2026-10-22-v1/cargo-home RUSTC=/home/todor_dev/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/rustc CARGO_TARGET_DIR=/home/todor_dev/security-audit-skill/short.win/article-review-2026-10-22/article_protocol_economics/scratch/portable-math-production-2026-10-22-v1/target-fresh CARGO_BUILD_JOBS=2 CARGO_NET_OFFLINE=true /home/todor_dev/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/cargo build --offline --locked --jobs 2 --manifest-path /home/todor_dev/Projects/short.win-article-review/docs/design/article-economics-2026-10-22/Cargo.toml",
+    "complete_log_bytes": 313,
+    "complete_log_sha256": "f8caf996e23523ba7b10ad32ccd71ed95cfaaea30ab8c6ddeb57e153f5090c2e"
+  },
+  "run": {
+    "exit": 0,
+    "command": "timeout --signal=TERM --kill-after=5s 120s env -i PATH=/usr/bin:/bin /home/todor_dev/security-audit-skill/short.win/article-review-2026-10-22/article_protocol_economics/scratch/portable-math-production-2026-10-22-v1/target-fresh/debug/article-current-math-observation",
+    "complete_log_bytes": 3099,
+    "complete_log_sha256": "a01efc7a533fc068f86be7c037ba187515e8917deb0d62a4caabfe2a82212fd1"
+  },
+  "rent_observation": {
+    "q": 1000000000,
+    "p_ema_wad": "1000000000000000000",
+    "locked_coefficients_bps": [
+      10000,
+      37500,
+      550000
+    ],
+    "kink_bps": 8000,
+    "r_min": 1826485,
+    "first_day_util_bps": 8000,
+    "first_day_apr_bps": 40000,
+    "first_day_due": 10958905,
+    "second_day_util_bps": 9000,
+    "second_day_apr_bps": 95000,
+    "second_day_cumulative_due": 36986302,
+    "second_day_increment": 26027397,
+    "same_position_unchanged": true
+  },
+  "expiry_observation": {
+    "b": 1000000000,
+    "r_due": 10000000,
+    "b_live": 1000000000,
+    "b_ref": 1000000000,
+    "rent_protocol_bps": 1500,
+    "expiry_fee_bps": 200,
+    "current_fixed_bps_cap": [
+      1000000,
+      10,
+      50000000
+    ],
+    "what_if_fixed_bps_cap": [
+      10000000,
+      10,
+      50000000
+    ],
+    "all_totals_conserved": true,
+    "old_copied_terms_unchanged": true,
+    "default_helper_consistent": true,
+    "cases": [
+      {
+        "v": 2000000000,
+        "current_keeper_borrower": [
+          2000000,
+          968000000
+        ],
+        "what_if_keeper_borrower": [
+          11000000,
+          959000000
+        ]
+      },
+      {
+        "v": 1035000000,
+        "current_keeper_borrower": [
+          2000000,
+          3000000
+        ],
+        "what_if_keeper_borrower": [
+          5000000,
+          0
+        ]
+      },
+      {
+        "v": 1031000000,
+        "current_keeper_borrower": [
+          1000000,
+          0
+        ],
+        "what_if_keeper_borrower": [
+          1000000,
+          0
+        ]
+      },
+      {
+        "v": 1030000000,
+        "current_keeper_borrower": [
+          0,
+          0
+        ],
+        "what_if_keeper_borrower": [
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "limits": [
+    "No program account snapshot/governance execution; only math value-copy observations.",
+    "No SBF, venue CPI, deployment, congestion or fee calibration proof.",
+    "The10m schedule is an explicit what-if; production defaults unchanged."
+  ]
+}

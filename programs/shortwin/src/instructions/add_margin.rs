@@ -13,8 +13,9 @@
 //!
 //! - every **locked** term of ARCH §2.3.5, `deadline`, `r_min`, `j_open`, `q`, `s`, `n_open`,
 //!   `fee_open`, `entry_price`, the tier and the venue at open stay as `open_short` wrote them:
-//!   rent is still owed from `j_open` at the locked rate, and the exit bounds, penalties,
-//!   keeper terms and S3 timers are the open's;
+//!   rent is still owed from `j_open` under the locked rent-curve coefficients, with APR
+//!   varying with market utilization and SOL rent following the EMA-priced token value. Exit
+//!   bounds, penalties, keeper terms and S3 timers are the open's;
 //! - the **settlement arming state** is untouched: a higher `V` can only make the S1/S2 legs
 //!   false, and `sol_settle` itself decides on the box whether that disarms (ARCH §3.8 step 2),
 //!   so `add_margin` never resets a clock that only box-robust evidence may reset (I12);
