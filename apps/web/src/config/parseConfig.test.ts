@@ -91,4 +91,34 @@ describe('parseConfig', () => {
         expect(c.priorityFeeMaxMicroLamports).toBe(250_000n);
         expect(c.enableTestVenue).toBe(true);
     });
+
+    it('defaults transaction explorer links to the selected cluster', () => {
+        const urls = {
+            VITE_RPC_URL: 'https://rpc.example',
+            VITE_RPC_WS_URL: 'wss://rpc.example',
+            VITE_INDEXER_URL: 'https://api.example',
+            VITE_INDEXER_WS_URL: 'wss://api.example/v1/ws',
+        };
+        expect(parseConfig({ ...urls, VITE_CLUSTER: 'devnet' }).explorerTxUrl).toBe(
+            'https://explorer.solana.com/tx/{sig}?cluster=devnet',
+        );
+        for (const cluster of ['mainnet', 'localnet']) {
+            expect(parseConfig({ ...urls, VITE_CLUSTER: cluster }).explorerTxUrl).toBe(
+                'https://explorer.solana.com/tx/{sig}',
+            );
+        }
+    });
+
+    it('preserves an explicitly configured transaction explorer template', () => {
+        const explorerTxUrl = 'https://explorer.example/tx/{sig}?network=custom';
+        const config = parseConfig({
+            VITE_CLUSTER: 'devnet',
+            VITE_RPC_URL: 'https://rpc.example',
+            VITE_RPC_WS_URL: 'wss://rpc.example',
+            VITE_INDEXER_URL: 'https://api.example',
+            VITE_INDEXER_WS_URL: 'wss://api.example/v1/ws',
+            VITE_EXPLORER_TX_URL: explorerTxUrl,
+        });
+        expect(config.explorerTxUrl).toBe(explorerTxUrl);
+    });
 });

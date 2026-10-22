@@ -104,7 +104,11 @@ export function parseConfig(env: Readonly<Record<string, string | boolean | unde
     else if (!(mwaText === undefined || mwaText === '' || mwaText === true || mwaText === 'true')) {
         problems.push('VITE_ENABLE_MOBILE_WALLET_ADAPTER must be true or false');
     }
-    const explorerTxUrl = s('VITE_EXPLORER_TX_URL') ?? 'https://explorer.solana.com/tx/{sig}';
+    const defaultExplorerTxUrl =
+        cluster === 'devnet'
+            ? 'https://explorer.solana.com/tx/{sig}?cluster=devnet'
+            : 'https://explorer.solana.com/tx/{sig}';
+    const explorerTxUrl = s('VITE_EXPLORER_TX_URL') ?? defaultExplorerTxUrl;
     if (!explorerTxUrl.includes('{sig}')) problems.push('VITE_EXPLORER_TX_URL must contain {sig}');
     if (problems.length > 0 || !cluster) throw new ConfigError(problems);
     return {
