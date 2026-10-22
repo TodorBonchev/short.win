@@ -58,6 +58,7 @@ const INDEXER_STATE: Readonly<Record<Freshness, string>> = {
     stale: 'Stale',
     down: 'Unavailable',
     unknown: 'Unknown',
+    idle: 'Awaiting activity',
 };
 
 /** A slot from the venue model ("449280566", or "—" when unknown) grouped with commas. */
@@ -262,7 +263,15 @@ export function ProtocolStatusPage() {
                             <div className="row" data-testid={T.statusIndexerLag} data-state={fresh.state}>
                                 <Badge
                                     className="badge-status"
-                                    tone={fresh.state === 'live' ? 'ok' : fresh.state === 'lagging' ? 'warn' : 'danger'}
+                                    tone={
+                                        fresh.state === 'live'
+                                            ? 'ok'
+                                            : fresh.state === 'lagging'
+                                              ? 'warn'
+                                              : fresh.state === 'idle'
+                                                ? 'neutral'
+                                                : 'danger'
+                                    }
                                 >
                                     {INDEXER_STATE[fresh.state]}
                                 </Badge>
@@ -288,7 +297,10 @@ export function ProtocolStatusPage() {
                                                     {formatSlot(s.finalized_slot)}
                                                 </span>,
                                             ],
-                                            ['Ingest lag', s.lag_s === null ? '—' : formatDuration(s.lag_s)],
+                                            [
+                                                'Last indexed activity',
+                                                s.lag_s === null ? '—' : `${formatDuration(s.lag_s)} ago`,
+                                            ],
                                             ['Quarantined events (24 h)', String(s.quarantined)],
                                             ['Layout warnings (24 h)', String(s.layout_warnings)],
                                             ['Missing transactions (24 h)', String(s.missing)],

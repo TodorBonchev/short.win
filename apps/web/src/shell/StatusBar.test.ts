@@ -15,6 +15,7 @@ describe('statusSummary', () => {
         [{ ws: 'closed' }, 'warn', '▲', 'Live feed reconnecting'],
         [{ mathError: true }, 'bad', '✕', 'Math unavailable'],
         [{ fresh: 'unknown', lagS: null }, 'warn', '▲', 'Indexer freshness unknown'],
+        [{ fresh: 'idle', lagS: null }, 'idle', '○', 'Indexer awaiting activity'],
         [{ ws: 'idle' }, 'ok', '●', 'All live · RPC 3,012'],
         [{ slot: null }, 'ok', '●', 'All live · RPC —'],
     ] as const)('%o → %s %s', (over, state, glyph, text) => {
