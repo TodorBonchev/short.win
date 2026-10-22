@@ -10,6 +10,7 @@
 import { Link } from '@tanstack/react-router';
 import { type Column, DataTable } from '../../components/DataTable.tsx';
 import { Panel } from '../../components/Panel.tsx';
+import { config } from '../../config/env.ts';
 import { SHORTWIN_PROGRAM } from '../../config/programs.ts';
 import { SECURITY_EMAIL, SECURITY_TXT_CANONICAL } from '../../config/securityPolicy.ts';
 import { SECURITY_TXT_PATH } from '../../config/securityTxt.ts';
@@ -17,7 +18,7 @@ import { T } from '../../config/testids.ts';
 import './security.css';
 
 const SCOPE: readonly (readonly [string, string])[] = [
-    ['short.win program (Solana mainnet)', SHORTWIN_PROGRAM],
+    [`short.win program (Solana ${config.cluster})`, SHORTWIN_PROGRAM],
     ['Web app', 'https://short.win'],
     ['Keeper, indexer and API operated by short.win', 'in scope'],
 ];

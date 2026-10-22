@@ -27,6 +27,7 @@ import { Panel } from '../../components/Panel.tsx';
 import { Scrim, SheetHead, useSheetMode } from '../../components/Sheet.tsx';
 import { ErrorState, Skeleton } from '../../components/States.tsx';
 import { type TabDef, TabPanel, Tabs } from '../../components/Tabs.tsx';
+import { config as appConfig } from '../../config/env.ts';
 import { T } from '../../config/testids.ts';
 import { shortAddress } from '../../lib/format.ts';
 import type { MarketTab } from '../../router.tsx';
@@ -95,6 +96,7 @@ export function MarketPage({ mint }: { mint: Address }) {
     const search = useSearch({ from: '/m/$mint' });
     const navigate = useNavigate({ from: '/m/$mint' });
     const data = useMarketData(mint);
+    const canCreateMarket = appConfig.cluster !== 'devnet' || data.config !== null;
     // A market that cannot be shorted opens on Lend (design pass P5-2); an explicit ?panel= still wins. The
     // default waits for the market's view (its flags): decided on the loading state's empty flags, the Short
     // panel mounted and then flipped to Lend (design pass P11). A failed read decides on what it has.
@@ -148,15 +150,21 @@ export function MarketPage({ mint }: { mint: Address }) {
                 </div>
                 <Panel title="No market" testId={T.marketNotFound}>
                     <div className="stack">
-                        <p>This token has no short.win market yet. Anyone can create one: listing is permissionless.</p>
-                        <Link
-                            to="/markets/new"
-                            search={{ mint }}
-                            className="btn mk-not-listed-cta"
-                            data-variant="primary"
-                        >
-                            Create a market for this mint
-                        </Link>
+                        <p>
+                            {canCreateMarket
+                                ? 'This token has no short.win market yet. Anyone can create one: listing is permissionless.'
+                                : 'This token has no short.win market yet. Market creation is unavailable while devnet protocol readiness cannot be confirmed.'}
+                        </p>
+                        {canCreateMarket && (
+                            <Link
+                                to="/markets/new"
+                                search={{ mint }}
+                                className="btn mk-not-listed-cta"
+                                data-variant="primary"
+                            >
+                                Create a market for this mint
+                            </Link>
+                        )}
                     </div>
                 </Panel>
             </div>

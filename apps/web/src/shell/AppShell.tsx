@@ -1,6 +1,7 @@
 /**
  * The app shell (FRONTEND.md §3.1, §7.6): skip link, header (brand, nav, search, wallet), the routed
- * page, the status bar; plus the indexer-down banner when pages fall back to RPC reads.
+ * page, the status bar; plus the indexer-down banner when pages fall back to RPC reads and a
+ * devnet preview notice while GlobalConfig is absent.
  *
  * One DOM at every width; CSS places it. On a phone the `<nav>` is the bottom tab bar (icons, with
  * Status moved into the More sheet that its fourth cell opens), the search folds into a button and
@@ -13,6 +14,7 @@ import { indexerQueries } from '../api/queries.ts';
 import { config } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import { useAppClient } from '../rpc/context.tsx';
+import { useChainConfig } from '../rpc/queries.ts';
 import { useRpcSlotTracker } from '../rpc/slot.ts';
 import { WalletButton } from '../wallet/WalletButton.tsx';
 import { NavIcon } from './icons.tsx';
@@ -32,6 +34,8 @@ export function AppShell() {
     const client = useAppClient();
     useRpcSlotTracker(client);
     const status = useQuery(indexerQueries.status());
+    const devnetConfig = useChainConfig(config.cluster === 'devnet');
+    const canCreateMarket = config.cluster !== 'devnet' || devnetConfig.data?.exists === true;
     const [more, setMore] = useState(false);
     // On a phone, Status, the security policy and How it works are reached through More: it marks
     // where you are.
@@ -86,6 +90,12 @@ export function AppShell() {
                 <WalletButton />
             </header>
             <main id="main" className="app-main" tabIndex={-1}>
+                {config.cluster === 'devnet' && devnetConfig.data?.exists === false && (
+                    <div className="banner" data-tone="warn" role="status" data-testid={T.devnetPreviewBanner}>
+                        <strong>Devnet preview — protocol not initialized.</strong> Markets cannot be created or traded
+                        until setup is complete.
+                    </div>
+                )}
                 {status.isError && (
                     <div className="banner" data-tone="warn" role="status" data-testid={T.fallbackBanner}>
                         The indexer is unavailable. Showing on-chain data only; lists, history and analytics are paused.
@@ -94,7 +104,7 @@ export function AppShell() {
                 <Outlet />
             </main>
             <StatusBar />
-            <MoreSheet open={more} onClose={() => setMore(false)} />
+            <MoreSheet open={more} onClose={() => setMore(false)} canCreateMarket={canCreateMarket} />
         </div>
     );
 }

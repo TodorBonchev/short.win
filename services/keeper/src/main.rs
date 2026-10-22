@@ -4,6 +4,8 @@
 //! shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400]
 //!                 [--metrics 127.0.0.1:9464] [--discovery-rpc <url>]
 //!                 [--coverage-keypair <file>] [--once]
+//! shortwin-keeper --rpc <url> --observe [--tick-ms 30000]
+//!                 [--metrics 127.0.0.1:9464] [--once]
 //! ```
 //!
 //! `--coverage-keypair` (or `coverage_pause.authority_keypair`) loads the `coverage_authority` key
@@ -26,28 +28,34 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::{Context, bail};
-use shortwin_keeper::{Keeper, KeeperConfig};
+use shortwin::constants::{CONFIG_VERSION, VENUE_GUARD_VERSION};
+use shortwin::state::{GlobalConfig, OracleCache, VenueGuard};
+use shortwin_keeper::{Keeper, KeeperConfig, pda, view};
+use shortwin_services_common::Chain;
 use shortwin_services_common::rpc::RpcChain;
 use solana_keypair::read_keypair_file;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 struct Args {
     rpc: String,
-    keypair: String,
+    keypair: Option<String>,
     config: Option<String>,
     tick_ms: u64,
     metrics: Option<String>,
     discovery_rpc: Option<String>,
     coverage_keypair: Option<String>,
     once: bool,
+    observe: bool,
 }
 
 fn usage() -> &'static str {
     "usage: shortwin-keeper --rpc <url> --keypair <file> [--config keeper.toml] [--tick-ms 400] \
-     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--coverage-keypair <file>] [--once]"
+     [--metrics 127.0.0.1:9464] [--discovery-rpc <url>] [--coverage-keypair <file>] [--once]\n\
+     or: shortwin-keeper --rpc <url> --observe [--tick-ms 30000] \
+     [--metrics 127.0.0.1:9464] [--once]"
 }
 
-fn parse_args() -> anyhow::Result<Args> {
+fn parse_args_from(mut it: impl Iterator<Item = String>) -> anyhow::Result<Args> {
     let mut rpc = None;
     let mut keypair = None;
     let mut config = None;
@@ -56,7 +64,8 @@ fn parse_args() -> anyhow::Result<Args> {
     let mut discovery_rpc = None;
     let mut coverage_keypair = None;
     let mut once = false;
-    let mut it = std::env::args().skip(1);
+    let mut observe = false;
+    let mut tick_ms_set = false;
     while let Some(a) = it.next() {
         let mut val = || {
             it.next()
@@ -66,7 +75,10 @@ fn parse_args() -> anyhow::Result<Args> {
             "--rpc" => rpc = Some(val()?),
             "--keypair" => keypair = Some(val()?),
             "--config" => config = Some(val()?),
-            "--tick-ms" => tick_ms = val()?.parse().context("--tick-ms")?,
+            "--tick-ms" => {
+                tick_ms = val()?.parse().context("--tick-ms")?;
+                tick_ms_set = true;
+            }
             "--metrics" => metrics = Some(val()?),
             "--discovery-rpc" => discovery_rpc = Some(val()?),
             "--block-engine" => bail!(
@@ -75,20 +87,188 @@ fn parse_args() -> anyhow::Result<Args> {
             ),
             "--coverage-keypair" => coverage_keypair = Some(val()?),
             "--once" => once = true,
+            "--observe" => observe = true,
             "-h" | "--help" => bail!("{}", usage()),
             other => bail!("unknown argument {other}\n{}", usage()),
         }
     }
+    if observe {
+        if keypair.is_some()
+            || coverage_keypair.is_some()
+            || config.is_some()
+            || discovery_rpc.is_some()
+        {
+            bail!("--observe accepts no keypair, configuration, or discovery endpoint");
+        }
+        if !tick_ms_set {
+            tick_ms = 30_000;
+        }
+    } else if keypair.is_none() {
+        bail!("--keypair is required unless --observe is set\n{}", usage());
+    }
     Ok(Args {
         rpc: rpc.with_context(|| format!("--rpc is required\n{}", usage()))?,
-        keypair: keypair.with_context(|| format!("--keypair is required\n{}", usage()))?,
+        keypair,
         config,
         tick_ms,
         metrics,
         discovery_rpc,
         coverage_keypair,
         once,
+        observe,
     })
+}
+
+fn parse_args() -> anyhow::Result<Args> {
+    parse_args_from(std::env::args().skip(1))
+}
+
+/// A read-only readiness snapshot. This path never creates a signer or transaction.
+async fn observe_tick(chain: &RpcChain) -> anyhow::Result<String> {
+    let clock = chain.clock().await?;
+    let keys = [pda::config(), pda::venue_guard(), pda::oracle_cache()];
+    let accounts = chain.accounts(&keys).await?;
+    let config = accounts[0]
+        .as_ref()
+        .and_then(view::decode_zc::<GlobalConfig>);
+    let guard = accounts[1].as_ref().and_then(view::decode_zc::<VenueGuard>);
+    let oracle = accounts[2]
+        .as_ref()
+        .and_then(view::decode_borsh::<OracleCache>);
+    if accounts[0].is_some() && config.is_none() {
+        anyhow::bail!("GlobalConfig exists but cannot be decoded");
+    }
+    if accounts[1].is_some() && guard.is_none() {
+        anyhow::bail!("VenueGuard exists but cannot be decoded");
+    }
+    if accounts[2].is_some() && oracle.is_none() {
+        anyhow::bail!("OracleCache exists but cannot be decoded");
+    }
+    if let Some(c) = &config {
+        anyhow::ensure!(
+            c.version == CONFIG_VERSION,
+            "GlobalConfig version {} is unsupported",
+            c.version
+        );
+    }
+    if let Some(g) = &guard {
+        anyhow::ensure!(
+            g.version == VENUE_GUARD_VERSION,
+            "VenueGuard version {} is unsupported",
+            g.version
+        );
+    }
+    // Before initialization there can be no markets; avoid expensive program-account scans.
+    let (markets, positions) = if config.is_some() {
+        tokio::try_join!(view::discover_markets(chain), view::open_positions(chain))?
+    } else {
+        (Vec::new(), std::collections::HashMap::new())
+    };
+    let open_positions: usize = positions.values().map(Vec::len).sum();
+    tracing::info!(
+        slot = clock.slot,
+        config = config.is_some(),
+        venue_guard = guard.is_some(),
+        oracle_cache = oracle.is_some(),
+        markets = markets.len(),
+        open_positions,
+        "keeper observe (read-only; no coverage transactions)"
+    );
+    Ok(format!(
+        "# HELP shortwin_keeper_observe_mode Read-only mode; no keeper transactions are sent.\n\
+         # TYPE shortwin_keeper_observe_mode gauge\nshortwin_keeper_observe_mode 1\n\
+         # TYPE shortwin_keeper_observe_slot gauge\nshortwin_keeper_observe_slot {}\n\
+         # TYPE shortwin_keeper_config_initialized gauge\nshortwin_keeper_config_initialized {}\n\
+         # TYPE shortwin_keeper_venue_guard_initialized gauge\nshortwin_keeper_venue_guard_initialized {}\n\
+         # TYPE shortwin_keeper_oracle_cache_initialized gauge\nshortwin_keeper_oracle_cache_initialized {}\n\
+         # TYPE shortwin_keeper_markets gauge\nshortwin_keeper_markets {}\n\
+         # TYPE shortwin_keeper_open_positions gauge\nshortwin_keeper_open_positions {}\n",
+        clock.slot,
+        u8::from(config.is_some()),
+        u8::from(guard.is_some()),
+        u8::from(oracle.is_some()),
+        markets.len(),
+        open_positions,
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_args_from;
+
+    fn args(items: &[&str]) -> anyhow::Result<super::Args> {
+        parse_args_from(items.iter().map(|s| (*s).to_string()))
+    }
+
+    #[test]
+    fn observe_requires_no_signer_and_defaults_to_thirty_second_poll() {
+        let parsed = args(&["--rpc", "https://api.devnet.solana.com", "--observe"]).unwrap();
+        assert!(parsed.observe);
+        assert!(parsed.keypair.is_none());
+        assert_eq!(parsed.tick_ms, 30_000);
+    }
+
+    #[test]
+    fn observe_rejects_signing_inputs_and_active_mode_requires_keypair() {
+        for extra in [
+            ["--keypair", "payer.json"],
+            ["--coverage-keypair", "pauser.json"],
+            ["--config", "keeper.toml"],
+            ["--discovery-rpc", "https://example.test"],
+        ] {
+            assert!(args(&["--rpc", "http://localhost", "--observe", extra[0], extra[1]]).is_err());
+        }
+        assert!(args(&["--rpc", "http://localhost"]).is_err());
+        let active = args(&["--rpc", "http://localhost", "--keypair", "payer.json"]).unwrap();
+        assert!(!active.observe);
+        assert_eq!(active.keypair.as_deref(), Some("payer.json"));
+    }
+
+    #[tokio::test]
+    async fn observe_once_returns_rpc_failure() {
+        let parsed = args(&["--rpc", "http://127.0.0.1:0", "--observe", "--once"]).unwrap();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            super::run_observer(&parsed),
+        )
+        .await
+        .expect("local invalid RPC should fail promptly");
+        assert!(result.is_err());
+    }
+}
+
+async fn run_observer(args: &Args) -> anyhow::Result<()> {
+    let chain = RpcChain::new(args.rpc.clone());
+    let text = Arc::new(Mutex::new(String::new()));
+    if let Some(addr) = args.metrics.clone() {
+        let t = text.clone();
+        tokio::spawn(async move {
+            if let Err(e) = serve_metrics(addr, t).await {
+                tracing::error!("metrics endpoint: {e:#}");
+            }
+        });
+    }
+    tracing::info!(rpc = %args.rpc, "keeper observe starting without a keypair");
+    let mut interval = tokio::time::interval(Duration::from_millis(args.tick_ms.max(50)));
+    interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        tokio::select! {
+            _ = interval.tick() => {}
+            _ = tokio::signal::ctrl_c() => return Ok(()),
+        }
+        match observe_tick(&chain).await {
+            Ok(metrics) => {
+                if let Ok(mut t) = text.lock() {
+                    *t = metrics;
+                }
+            }
+            Err(e) if args.once => return Err(e.context("observe tick")),
+            Err(e) => tracing::error!("observe tick: {e:#}"),
+        }
+        if args.once {
+            return Ok(());
+        }
+    }
 }
 
 /// Serves `text` on every request (a minimal `/metrics` endpoint).
@@ -122,14 +302,18 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
     let args = parse_args()?;
+    if args.observe {
+        return run_observer(&args).await;
+    }
     let cfg = match &args.config {
         Some(p) => KeeperConfig::from_toml(
             &std::fs::read_to_string(p).with_context(|| format!("reading {p}"))?,
         )?,
         None => KeeperConfig::default(),
     };
-    let payer = read_keypair_file(&args.keypair)
-        .map_err(|e| anyhow::anyhow!("reading {}: {e}", args.keypair))?;
+    let keypair = args.keypair.as_deref().context("--keypair is required")?;
+    let payer =
+        read_keypair_file(keypair).map_err(|e| anyhow::anyhow!("reading {keypair}: {e}"))?;
     let chain = RpcChain::new(args.rpc.clone());
     let discovery = args
         .discovery_rpc

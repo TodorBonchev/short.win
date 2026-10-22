@@ -16,7 +16,15 @@ import { T } from '../config/testids.ts';
 import { useMath } from '../math/useMath.ts';
 import { BrandIcon, NavIcon } from './icons.tsx';
 
-export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function MoreSheet({
+    open,
+    onClose,
+    canCreateMarket,
+}: {
+    open: boolean;
+    onClose: () => void;
+    canCreateMarket: boolean;
+}) {
     const stats = useQuery({ ...indexerQueries.stats(), enabled: open });
     const solUsd = stats.data?.data.sol_usd ?? null;
     const { math, error: mathError } = useMath();
@@ -42,12 +50,14 @@ export function MoreSheet({ open, onClose }: { open: boolean; onClose: () => voi
                     <span className="muted">Report a vulnerability</span>
                     <NavIcon name="chevron" className="more-chevron" />
                 </Link>
-                <Link to="/markets/new" className="more-row" data-testid={T.moreCreateMarket} onClick={onClose}>
-                    <NavIcon name="plus" className="more-icon" />
-                    Create market
-                    <span className="muted">List a token for lending and shorting</span>
-                    <NavIcon name="chevron" className="more-chevron" />
-                </Link>
+                {canCreateMarket && (
+                    <Link to="/markets/new" className="more-row" data-testid={T.moreCreateMarket} onClick={onClose}>
+                        <NavIcon name="plus" className="more-icon" />
+                        Create market
+                        <span className="muted">List a token for lending and shorting</span>
+                        <NavIcon name="chevron" className="more-chevron" />
+                    </Link>
+                )}
                 {/* The source, the community and X: other sites, so the trailing glyph is the arrow out of a box. */}
                 <a
                     href={SOURCE_URL}

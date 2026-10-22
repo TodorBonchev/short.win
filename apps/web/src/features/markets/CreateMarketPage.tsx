@@ -27,6 +27,7 @@ import { Sol } from '../../components/Num.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { ErrorState, Kv, Skeleton } from '../../components/States.tsx';
 import { useToast } from '../../components/Toast.tsx';
+import { config as appConfig } from '../../config/env.ts';
 import { PROGRAM_ERRORS, type ProgramErrorInfo } from '../../config/errors.ts';
 import { T } from '../../config/testids.ts';
 import { parseAddress } from '../../lib/address.ts';
@@ -394,6 +395,7 @@ export function CreateMarketPage() {
 
     const configQ = useChainConfig();
     const config = configQ.data?.exists ? configQ.data.data : null;
+    const devnetUninitialized = appConfig.cluster === 'devnet' && configQ.data?.exists === false;
     const program = verdict?.program ?? 'token';
     const items = venue ? creationAccounts(venue, program) : [];
     const rents = useRentMinimums(
@@ -412,21 +414,23 @@ export function CreateMarketPage() {
         }
     }, [flow.state.stage, mint, navigate, toast]);
 
-    const blocked: string | null = !connected?.signer
-        ? 'Connect a wallet that can sign to create the market.'
-        : state !== 'ok'
-          ? null
-          : detection.isError
-            ? 'Venue detection failed.'
-            : detection.data?.refusal
-              ? 'This token cannot be listed (see the venue above).'
-              : configQ.isSuccess && !config
-                ? 'The protocol configuration is not initialized on this cluster.'
-                : configQ.isError || rents.isError
-                  ? 'The creation fee or the rent could not be read from the chain. Reload to try again.'
-                  : !choice || !cost
-                    ? 'Reading the venue and the cost…'
-                    : null;
+    const blocked: string | null = devnetUninitialized
+        ? 'The devnet protocol configuration is not initialized. Market creation is unavailable.'
+        : !connected?.signer
+          ? 'Connect a wallet that can sign to create the market.'
+          : state !== 'ok'
+            ? null
+            : detection.isError
+              ? 'Venue detection failed.'
+              : detection.data?.refusal
+                ? 'This token cannot be listed (see the venue above).'
+                : configQ.isSuccess && !config
+                  ? 'The protocol configuration is not initialized on this cluster.'
+                  : configQ.isError || rents.isError
+                    ? 'The creation fee or the rent could not be read from the chain. Reload to try again.'
+                    : !choice || !cost
+                      ? 'Reading the venue and the cost…'
+                      : null;
     const canSubmit = state === 'ok' && choice !== null && cost !== null && !!connected?.signer && blocked === null;
     // The token cannot be listed: the safety filter's verdict, or the venue's refusal (D14).
     const refusal = state === 'ok' ? (detection.data?.refusal ?? null) : null;
@@ -438,15 +442,17 @@ export function CreateMarketPage() {
               ? (errorByName(refusal)?.message ?? refusal)
               : null;
     // Why Review is disabled, from the same predicates as `canSubmit` (FormFoot).
-    const reason: string | null = canSubmit
-        ? null
-        : !mint
-          ? 'Enter the token’s mint address first.'
-          : state === 'existing'
-            ? 'This token already has a market.'
-            : state === 'checking'
-              ? 'Checking the mint…'
-              : (blocked ?? 'Reading the venue and the cost…');
+    const reason: string | null = devnetUninitialized
+        ? blocked
+        : canSubmit
+          ? null
+          : !mint
+            ? 'Enter the token’s mint address first.'
+            : state === 'existing'
+              ? 'This token already has a market.'
+              : state === 'checking'
+                ? 'Checking the mint…'
+                : (blocked ?? 'Reading the venue and the cost…');
     const choiceGroup = useId();
 
     const submit = async () => {
@@ -475,7 +481,11 @@ export function CreateMarketPage() {
         <div className="page" data-testid={T.page('create-market')}>
             <div className="page-head">
                 <h1>Create market</h1>
-                <span className="muted">Listing is permissionless: any token that passes the safety filter.</span>
+                <span className="muted">
+                    {devnetUninitialized
+                        ? 'Devnet market creation is unavailable until protocol setup is complete.'
+                        : 'Listing is permissionless: any token that passes the safety filter.'}
+                </span>
             </div>
             <div className="mk-create">
                 <div className="stack">
