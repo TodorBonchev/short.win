@@ -192,51 +192,6 @@ async fn observe_tick(chain: &RpcChain) -> anyhow::Result<String> {
     ))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::parse_args_from;
-
-    fn args(items: &[&str]) -> anyhow::Result<super::Args> {
-        parse_args_from(items.iter().map(|s| (*s).to_string()))
-    }
-
-    #[test]
-    fn observe_requires_no_signer_and_defaults_to_thirty_second_poll() {
-        let parsed = args(&["--rpc", "https://api.devnet.solana.com", "--observe"]).unwrap();
-        assert!(parsed.observe);
-        assert!(parsed.keypair.is_none());
-        assert_eq!(parsed.tick_ms, 30_000);
-    }
-
-    #[test]
-    fn observe_rejects_signing_inputs_and_active_mode_requires_keypair() {
-        for extra in [
-            ["--keypair", "payer.json"],
-            ["--coverage-keypair", "pauser.json"],
-            ["--config", "keeper.toml"],
-            ["--discovery-rpc", "https://example.test"],
-        ] {
-            assert!(args(&["--rpc", "http://localhost", "--observe", extra[0], extra[1]]).is_err());
-        }
-        assert!(args(&["--rpc", "http://localhost"]).is_err());
-        let active = args(&["--rpc", "http://localhost", "--keypair", "payer.json"]).unwrap();
-        assert!(!active.observe);
-        assert_eq!(active.keypair.as_deref(), Some("payer.json"));
-    }
-
-    #[tokio::test]
-    async fn observe_once_returns_rpc_failure() {
-        let parsed = args(&["--rpc", "http://127.0.0.1:0", "--observe", "--once"]).unwrap();
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            super::run_observer(&parsed),
-        )
-        .await
-        .expect("local invalid RPC should fail promptly");
-        assert!(result.is_err());
-    }
-}
-
 async fn run_observer(args: &Args) -> anyhow::Result<()> {
     let chain = RpcChain::new(args.rpc.clone());
     let text = Arc::new(Mutex::new(String::new()));
@@ -401,5 +356,50 @@ async fn main() -> anyhow::Result<()> {
         if args.once {
             return Ok(());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_args_from;
+
+    fn args(items: &[&str]) -> anyhow::Result<super::Args> {
+        parse_args_from(items.iter().map(|s| (*s).to_string()))
+    }
+
+    #[test]
+    fn observe_requires_no_signer_and_defaults_to_thirty_second_poll() {
+        let parsed = args(&["--rpc", "https://api.devnet.solana.com", "--observe"]).unwrap();
+        assert!(parsed.observe);
+        assert!(parsed.keypair.is_none());
+        assert_eq!(parsed.tick_ms, 30_000);
+    }
+
+    #[test]
+    fn observe_rejects_signing_inputs_and_active_mode_requires_keypair() {
+        for extra in [
+            ["--keypair", "payer.json"],
+            ["--coverage-keypair", "pauser.json"],
+            ["--config", "keeper.toml"],
+            ["--discovery-rpc", "https://example.test"],
+        ] {
+            assert!(args(&["--rpc", "http://localhost", "--observe", extra[0], extra[1]]).is_err());
+        }
+        assert!(args(&["--rpc", "http://localhost"]).is_err());
+        let active = args(&["--rpc", "http://localhost", "--keypair", "payer.json"]).unwrap();
+        assert!(!active.observe);
+        assert_eq!(active.keypair.as_deref(), Some("payer.json"));
+    }
+
+    #[tokio::test]
+    async fn observe_once_returns_rpc_failure() {
+        let parsed = args(&["--rpc", "http://127.0.0.1:0", "--observe", "--once"]).unwrap();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            super::run_observer(&parsed),
+        )
+        .await
+        .expect("local invalid RPC should fail promptly");
+        assert!(result.is_err());
     }
 }
