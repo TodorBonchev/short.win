@@ -2150,8 +2150,12 @@ accounts. While the indexer is down (`fallbackBanner`): the market page renders 
 ### 6.6 Staleness
 
 `lib/staleness.ts`: lag = (RPC slot − `X-Indexer-Slot`) × 0.4 s; `live` ≤ 10 s, `lagging` ≤ 60 s,
-`stale` beyond, `down` when `/v1/status` fails, `unknown` before the first response. The status bar
-always shows it; indexer-backed panels show a `staleBadge` when not `live`, with the age in seconds
+`stale` beyond, `down` when `/v1/status` fails, `unknown` before the first response. On devnet only,
+when the chain confirms `GlobalConfig` is absent and `/v1/status` has responded recently, the
+indexer shows a neutral **awaiting activity** state: no protocol markets can emit transactions yet,
+so the last indexed slot is not a useful measure of current ingest coverage. This state is not
+labelled live and expires if status responses stop. The status bar
+always shows it; indexer-backed panels show a `staleBadge` when not `live`, with the age in seconds when applicable
 (*v1.2, M9-UX-6:* the markets page, the market header, the status page, the positions list, the
 lender dashboard and the position timeline). A preview's account reads show their slot age when it
 exceeds 2 slots behind the confirmed tip (the RPC's slot less its usual 2-slot confirmation lag;
@@ -3186,7 +3190,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `frame-guard` | `T.frameGuard` | *v1.2:* the notice rendered instead of the app inside a frame (§9.3) |
 | `slot-age-badge` | `T.slotAge` | *v1.2:* the age of a preview's chain read (§6.6); `data-state` ∈ fresh, aging, stale; `data-slots` |
 | `status-bar` | `T.statusBar` | bottom bar |
-| `status-indexer` | `T.statusIndexer` | `data-state` ∈ live, lagging, stale, down, unknown |
+| `status-indexer` | `T.statusIndexer` | `data-state` ∈ live, lagging, stale, down, unknown, idle |
 | `status-rpc` | `T.statusRpc` | `data-state` ∈ ok, bad |
 | `status-ws` | `T.statusWs` | `data-state` ∈ idle, connecting, open, reconnecting, closed |
 | `status-sol-usd` | `T.statusSolUsd` | SOL/USD from `/v1/stats` |
@@ -3196,6 +3200,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `status-x` | `T.statusX` | *2026-10-18 (owner):* the status bar's X icon (tablet and desktop) → @short_dot_win on X, a new tab |
 | `stale-badge` | `T.staleBadge` | per-panel freshness badge; `data-state` as statusIndexer |
 | `fallback-banner` | `T.fallbackBanner` | shown while the indexer is unreachable (RPC fallback) |
+| `devnet-preview-banner` | `T.devnetPreviewBanner` | shown on devnet while the protocol configuration account is absent; market creation and trading are unavailable |
 | `toast-region` | `T.toastRegion` | live regions container |
 | `toast` | `T.toast` | `data-kind` ∈ success, error, info |
 | `page-<…>` | `T.page` | `<page>` ∈ markets, create-market, market, positions, position, lend, status, security (*M10*); the page root — every track keeps it on its page |

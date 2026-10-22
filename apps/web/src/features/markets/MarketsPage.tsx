@@ -22,8 +22,10 @@ import { Price, Sol } from '../../components/Num.tsx';
 import { Panel } from '../../components/Panel.tsx';
 import { ErrorState } from '../../components/States.tsx';
 import { copy } from '../../config/copy.ts';
+import { config } from '../../config/env.ts';
 import { T } from '../../config/testids.ts';
 import { parseAddress } from '../../lib/address.ts';
+import { useChainConfig } from '../../rpc/queries.ts';
 import './markets.css';
 import { FreshnessBadge, useNow } from '../../shell/freshness.tsx';
 import { MarketsIntro } from './MarketsIntro.tsx';
@@ -242,6 +244,9 @@ export function MarketsPage() {
         limit: MARKETS_PAGE_SIZE,
     };
     const pages = useMarketPages(params);
+    const devnetConfig = useChainConfig(config.cluster === 'devnet');
+    const canCreateMarket = config.cluster !== 'devnet' || devnetConfig.data?.exists === true;
+    const devnetUninitialized = config.cluster === 'devnet' && devnetConfig.data?.exists === false;
     useLiveChannels(['markets']);
 
     const now = Math.floor(useNow(30_000) / 1000);
@@ -277,15 +282,17 @@ export function MarketsPage() {
                 </h1>
                 <FreshnessBadge />
                 <span className="grow" />
-                <Link
-                    to="/markets/new"
-                    search={mintWithoutMarket ? { mint: mintWithoutMarket } : {}}
-                    className="btn"
-                    data-variant="default"
-                    data-testid={T.marketsCreateLink}
-                >
-                    {mintWithoutMarket ? 'Create a market for this mint' : 'Create market'}
-                </Link>
+                {canCreateMarket && (
+                    <Link
+                        to="/markets/new"
+                        search={mintWithoutMarket ? { mint: mintWithoutMarket } : {}}
+                        className="btn"
+                        data-variant="default"
+                        data-testid={T.marketsCreateLink}
+                    >
+                        {mintWithoutMarket ? 'Create a market for this mint' : 'Create market'}
+                    </Link>
+                )}
             </div>
             <MarketsIntro
                 onHide={() => {
@@ -386,15 +393,19 @@ export function MarketsPage() {
                         empty={
                             <div className="mk-empty">
                                 <p data-testid={T.marketsEmpty}>
-                                    {search.q
-                                        ? mintWithoutMarket
-                                            ? 'This mint has no market yet. Anyone can create one: use “Create a market for this mint”.'
-                                            : 'No market matches this search.'
-                                        : 'No markets match these filters.'}
+                                    {devnetUninitialized
+                                        ? 'The devnet protocol is not initialized yet. No markets can be created.'
+                                        : search.q
+                                          ? mintWithoutMarket
+                                              ? canCreateMarket
+                                                  ? 'This mint has no market yet. Anyone can create one: use “Create a market for this mint”.'
+                                                  : 'This mint has no market yet. Market creation is unavailable while devnet protocol readiness cannot be confirmed.'
+                                              : 'No market matches this search.'
+                                          : 'No markets match these filters.'}
                                 </p>
                                 {/* The action the sentence names, where the sentence is (design pass P5-7);
                                     the head link reads default while this gold button shows. */}
-                                {mintWithoutMarket && (
+                                {mintWithoutMarket && canCreateMarket && (
                                     <Link
                                         to="/markets/new"
                                         search={{ mint: mintWithoutMarket }}

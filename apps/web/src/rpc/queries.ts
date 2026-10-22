@@ -26,13 +26,14 @@ export function useChainMarket(mint: Address | null) {
 }
 
 /** `GlobalConfig` (live tier terms, the creation fee, venue bits, the global pause; `qk.config`). */
-export function useChainConfig() {
+export function useChainConfig(enabled = true) {
     const { rpc } = useAppClient();
     return useQuery({
         ...DISPLAY,
         refetchInterval: 60_000,
         queryKey: qk.config(),
         queryFn: () => readGlobalConfig(rpc),
+        enabled,
     });
 }
 

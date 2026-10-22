@@ -50,6 +50,7 @@ export const T = {
     statusX: 'status-x',
     staleBadge: 'stale-badge',
     fallbackBanner: 'fallback-banner',
+    devnetPreviewBanner: 'devnet-preview-banner',
     toastRegion: 'toast-region',
     toast: 'toast',
     /** The root element of every page; tracks keep it on their page (router smoke test, E2E). */

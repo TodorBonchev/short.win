@@ -6,9 +6,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { indexerMeta, indexerQueries } from '../api/queries.ts';
+import { config } from '../config/env.ts';
 import { T } from '../config/testids.ts';
 import { type Freshness, freshness, lagSeconds } from '../lib/staleness.ts';
 import { useStore } from '../lib/store.ts';
+import { useChainConfig } from '../rpc/queries.ts';
 import { rpcSlot } from '../rpc/slot.ts';
 
 /** Wall clock in ms, re-rendering every `ms`. */
@@ -25,6 +27,7 @@ export function useIndexerFreshness(): { state: Freshness; lagS: number | null; 
     const meta = useStore(indexerMeta);
     const slot = useStore(rpcSlot);
     const status = useQuery(indexerQueries.status());
+    const devnetConfig = useChainConfig(config.cluster === 'devnet');
     const now = useNow(2_000);
     const ageMs = meta ? Math.max(0, now - meta.receivedAt) : 0;
     const state = freshness({
@@ -32,10 +35,16 @@ export function useIndexerFreshness(): { state: Freshness; lagS: number | null; 
         rpcSlot: slot.slot,
         ageMs,
         indexerReachable: !status.isError,
+        awaitingActivity:
+            config.cluster === 'devnet' &&
+            status.isSuccess &&
+            status.data !== undefined &&
+            now - status.data.meta.receivedAt <= 60_000 &&
+            devnetConfig.data?.exists === false,
     });
     return {
         state,
-        lagS: lagSeconds(meta?.indexerSlot ?? null, slot.slot),
+        lagS: state === 'idle' ? null : lagSeconds(meta?.indexerSlot ?? null, slot.slot),
         ageS: meta ? Math.round(ageMs / 1000) : null,
     };
 }
@@ -46,13 +55,14 @@ const TEXT: Record<Freshness, string> = {
     stale: 'Stale',
     down: 'Indexer unavailable',
     unknown: 'Freshness unknown',
+    idle: 'Awaiting activity',
 };
 
 /** The `stale-badge` of an indexer-backed panel; renders nothing while the data is live. */
 export function FreshnessBadge() {
     const { state, lagS, ageS } = useIndexerFreshness();
     if (state === 'live') return null;
-    const seconds = lagS ?? ageS;
+    const seconds = state === 'idle' ? null : (lagS ?? ageS);
     return (
         <span className="badge stale-badge" data-testid={T.staleBadge} data-state={state}>
             {TEXT[state]}

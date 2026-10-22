@@ -1,5 +1,5 @@
 # short.win vulnerability disclosure (RFC 9116). The policy: https://short.win/security
-# Scope: this web app and the short.win on-chain program on Solana mainnet:
+# Scope: this web app and the short.win on-chain program; the public app currently targets Solana devnet:
 #   short.win       5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK
 # The program also embeds a security.txt (query-security-txt <program id>).
 Contact: mailto:security@short.win

@@ -25,7 +25,11 @@ async function main(): Promise<number> {
             const html = await res.text();
             for (const m of html.matchAll(/src="([^"]+\.js)"/g)) {
                 const map = await fetch(new URL(`${m[1]}.map`, origin));
-                if (map.ok) problems.push(`${m[1]}.map is published (source maps belong in dist-sourcemaps/)`);
+                // Pages serves the SPA's index.html with HTTP 200 for unknown paths.
+                // Only an actual asset at this URL means the source map was published.
+                if (map.ok && (await map.text()) !== html) {
+                    problems.push(`${m[1]}.map is published (source maps belong in dist-sourcemaps/)`);
+                }
             }
         }
     }

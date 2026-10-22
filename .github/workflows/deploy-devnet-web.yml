@@ -1,0 +1,78 @@
+# Manual Cloudflare Pages upload for the devnet client. Create the Direct Upload project
+# `shortwin-devnet` with production branch `main` before running this workflow.
+name: deploy-devnet-web
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-devnet-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # A manual dispatch from another branch must not replace the devnet site's production build.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: devnet-web
+    env:
+      VITE_CLUSTER: devnet
+      VITE_RPC_URL: https://api.devnet.solana.com
+      VITE_RPC_WS_URL: wss://api.devnet.solana.com
+      VITE_INDEXER_URL: https://api-devnet.short.win
+      VITE_INDEXER_WS_URL: wss://api-devnet.short.win/v1/ws
+      VITE_PROTOCOL_ALT: ''
+      VITE_ENABLE_TEST_VENUE: 'false'
+      VITE_EXPLORER_TX_URL: https://explorer.solana.com/tx/{sig}?cluster=devnet
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: wasm-bindgen CLI (the crate's exact pin)
+        run: cargo install wasm-bindgen-cli --version =0.2.129 --locked
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - run: pnpm install --frozen-lockfile
+      - name: Build devnet client and WASM math
+        run: pnpm --filter web build
+      - name: Check public bundle and API route
+        shell: bash
+        run: |
+          test -s apps/web/dist/index.html
+          test -s apps/web/dist/_headers
+          test -s apps/web/dist/.well-known/security.txt
+          grep -q 'https://api-devnet.short.win' apps/web/dist/_headers
+          grep -q 'wss://api-devnet.short.win' apps/web/dist/_headers
+          if find apps/web/dist -type f -name '*.map' | grep -q .; then
+            echo '::error::Source maps must not be published with the client'
+            exit 1
+          fi
+          # Localnet defaults remain in the shared config module even in a devnet build.
+          # Assert the deployed endpoints are present instead of rejecting those inert literals.
+          if ! grep -R -q -F 'api-devnet.short.win' apps/web/dist/assets; then
+            echo '::error::The public client is missing the devnet indexer endpoint'
+            exit 1
+          fi
+          if ! grep -R -q -F 'api.devnet.solana.com' apps/web/dist/assets; then
+            echo '::error::The public client is missing the devnet RPC endpoint'
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 15 https://api-devnet.short.win/v1/health > /dev/null
+          curl --fail --silent --show-error --max-time 15 https://api-devnet.short.win/v1/status > /dev/null
+          curl --fail --silent --show-error --max-time 15 \
+            -H 'Origin: https://short.win' \
+            -D /tmp/shortwin-devnet-api-headers -o /dev/null \
+            https://api-devnet.short.win/v1/status
+          grep -qi '^access-control-allow-origin: https://short.win' /tmp/shortwin-devnet-api-headers
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: '4.149.0'
+          packageManager: pnpm
+          command: pages deploy apps/web/dist --project-name=shortwin-devnet --branch=main --commit-hash=${{ github.sha }}

@@ -17,4 +17,12 @@ describe('staleness', () => {
         expect(freshness({ ...base, indexerReachable: false })).toBe('down');
         expect(freshness({ ...base, indexerSlot: null, rpcSlot: null })).toBe('unknown');
     });
+
+    it('keeps an uninitialized devnet neutral only while its indexer responds', () => {
+        const quiet = { indexerSlot: 1000, rpcSlot: 2000n, ageMs: 1000, indexerReachable: true };
+        expect(freshness({ ...quiet, awaitingActivity: true })).toBe('idle');
+        expect(freshness({ ...quiet, awaitingActivity: true, ageMs: 120_000 })).toBe('stale');
+        expect(freshness(quiet)).toBe('stale');
+        expect(freshness({ ...quiet, awaitingActivity: true, indexerReachable: false })).toBe('down');
+    });
 });

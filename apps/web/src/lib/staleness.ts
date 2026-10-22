@@ -1,8 +1,9 @@
 /**
  * Data freshness (FRONTEND.md §6.6): how far the indexer is behind the RPC node, from the
- * `X-Indexer-Slot` header against the RPC's current slot (≈ 0.4 s per slot).
+ * `X-Indexer-Slot` header against the RPC's current slot (≈ 0.4 s per slot). An uninitialized
+ * devnet is a distinct neutral state while the indexer's response remains recent.
  */
-export type Freshness = 'live' | 'lagging' | 'stale' | 'down' | 'unknown';
+export type Freshness = 'live' | 'lagging' | 'stale' | 'down' | 'unknown' | 'idle';
 
 export const SLOT_MS = 400;
 export const LIVE_LAG_S = 10;
@@ -14,6 +15,8 @@ export interface FreshnessInput {
     /** ms since the indexer response arrived. */
     readonly ageMs: number;
     readonly indexerReachable: boolean;
+    /** Devnet has no GlobalConfig yet, and the indexer status request succeeded. */
+    readonly awaitingActivity?: boolean;
 }
 
 export function lagSeconds(indexerSlot: number | null, rpcSlot: bigint | null): number | null {
@@ -24,6 +27,9 @@ export function lagSeconds(indexerSlot: number | null, rpcSlot: bigint | null): 
 
 export function freshness(i: FreshnessInput): Freshness {
     if (!i.indexerReachable) return 'down';
+    // An uninitialized devnet has no market transactions to advance the indexed slot. This is
+    // neither evidence of current ingest coverage nor a reason to call the service stale.
+    if (i.awaitingActivity && i.ageMs <= STALE_LAG_S * 1000) return 'idle';
     const lag = lagSeconds(i.indexerSlot, i.rpcSlot);
     const effective = Math.max(lag ?? 0, Math.round(i.ageMs / 1000));
     if (lag === null && i.indexerSlot === null) return 'unknown';

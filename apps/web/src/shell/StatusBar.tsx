@@ -28,7 +28,7 @@ import { COMPACT, useMedia } from '../styles/breakpoints.ts';
 import { useIndexerFreshness } from './freshness.tsx';
 import { BrandIcon, NavIcon } from './icons.tsx';
 
-export type SummaryState = 'ok' | 'warn' | 'bad';
+export type SummaryState = 'ok' | 'warn' | 'bad' | 'idle';
 
 export interface StatusInputs {
     readonly rpcOk: boolean;
@@ -39,7 +39,7 @@ export interface StatusInputs {
     readonly mathError: boolean;
 }
 
-const GLYPH: Record<SummaryState, string> = { ok: '●', warn: '▲', bad: '✕' };
+const GLYPH: Record<SummaryState, string> = { ok: '●', warn: '▲', bad: '✕', idle: '○' };
 
 /** The phone strip's text: the worst state first (bad, then warn), else "All live · RPC <slot>". */
 export function statusSummary(s: StatusInputs): { state: SummaryState; glyph: string; text: string } {
@@ -51,6 +51,7 @@ export function statusSummary(s: StatusInputs): { state: SummaryState; glyph: st
     if (s.mathError) return out('bad', 'Math unavailable');
     if (s.fresh === 'lagging') return out('warn', `Indexer lagging${lag}`);
     if (s.ws === 'reconnecting' || s.ws === 'closed') return out('warn', 'Live feed reconnecting');
+    if (s.fresh === 'idle') return out('idle', 'Indexer awaiting activity');
     if (s.fresh === 'unknown') return out('warn', 'Indexer freshness unknown');
     const slot = s.slot === null ? '—' : Number(s.slot).toLocaleString('en-US');
     return out('ok', `All live · RPC ${slot}`);
@@ -132,10 +133,18 @@ export function StatusBar() {
                 <span className="statusbar-item stale-badge" data-testid={T.statusIndexer} data-state={fresh}>
                     <span
                         className="dot"
-                        data-state={fresh === 'live' ? 'ok' : fresh === 'lagging' ? 'warn' : 'bad'}
+                        data-state={
+                            fresh === 'live'
+                                ? 'ok'
+                                : fresh === 'lagging'
+                                  ? 'warn'
+                                  : fresh === 'idle'
+                                    ? undefined
+                                    : 'bad'
+                        }
                         aria-hidden="true"
                     />
-                    Indexer {fresh === 'down' ? 'unavailable' : fresh}
+                    Indexer {fresh === 'down' ? 'unavailable' : fresh === 'idle' ? 'awaiting activity' : fresh}
                     {lag !== null && fresh !== 'down' && <span className="num"> +{lag}s</span>}
                     <GlossaryTip id="indexer" />
                 </span>

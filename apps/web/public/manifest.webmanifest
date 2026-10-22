@@ -1,7 +1,7 @@
 {
-    "name": "ShortWin",
-    "short_name": "ShortWin",
-    "description": "Short any Solana token by borrowing it from lenders who earn rent.",
+    "name": "ShortWin — Devnet preview",
+    "short_name": "ShortWin Devnet",
+    "description": "ShortWin devnet preview for Solana token lending and shorting.",
     "start_url": "/markets",
     "scope": "/",
     "display": "standalone",
