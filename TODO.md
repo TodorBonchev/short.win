@@ -16,6 +16,8 @@ complete SHA-256 VenueGuard correction for first deployment.
       shifts one Anchor diagnostic line-number byte in the ELF. The previous clean
       ≥24-hour run is retained for its original hash; the new candidate needs its
       own applicable pinned/verifiable build, final gates and final-byte fuzz.
+      The new run was interrupted after a provider safety block; it does not
+      close the gate and has not been restarted.
 - [ ] Complete or explicitly disposition the [new audit checkpoint](docs/audit/2026-10-22-progress/README.md)
       before any whole-codebase audit-complete claim. Seven independently retained
       hypotheses require validation and 23 lack independent disposition; preserve

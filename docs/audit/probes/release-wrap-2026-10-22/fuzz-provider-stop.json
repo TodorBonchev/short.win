@@ -1,0 +1,17 @@
+{
+  "recorded_at_utc": "2026-10-22T01:59:09.442284+00:00",
+  "status": "interrupted_due_to_provider_safety_block",
+  "blocked_agent": "/root/release_program_readiness",
+  "new_review_interrupted": "/root/release_independent_check additive fuzz launch review",
+  "restart_or_reassignment": false,
+  "qualifying_24h_result": false,
+  "old_fuzz_duration_credited": false,
+  "details": {
+    "runner_exe": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/fuzz-final-candidate-bf166672/bin/shortwin-fuzz",
+    "runner_start_ticks": "9841689",
+    "process_group": 447197,
+    "termination": "SIGTERM sent to verified run process group",
+    "runner_state_after": "absent",
+    "supervisor_state_after": "absent"
+  }
+}

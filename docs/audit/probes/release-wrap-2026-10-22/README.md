@@ -29,6 +29,7 @@ prefixes, not complete executable data. They prove the dated observations only.
 The old completed ≥24-hour run belongs to its original `d6f4…538bc` artifact.
 The fresh `d8d0…e182` candidate differs by one diagnostic line-number byte.
 These checks neither complete its final-byte fuzz gate nor close the incomplete
-whole-repo audit. Any new run must retain its own exact launch and completion
-evidence before it can be credited. See the
+whole-repo audit. The subsequent fresh run was interrupted after a provider
+safety block, as recorded in the [root stop receipt](fuzz-provider-stop.json).
+No later launch review or completed qualification is claimed. See the
 [current readiness record](../../release-wrap-up-1.0.3-2026-10-22.md).

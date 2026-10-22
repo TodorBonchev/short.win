@@ -77,6 +77,19 @@ added to a new run. Preserve the existing failed mainnet Jupiter live-pin check;
 it requires an explicit upstream/configuration disposition before a mainnet
 release, rather than an unexplained pin update.
 
+### Fresh qualification interrupted
+
+The fresh existing-harness run started at **2026-10-22 01:56:30 UTC** against
+source `bf166672efee578b6a2a1835e0dd53729c548671`. Its program worker then returned
+an actual provider safety block. The additive launch review was interrupted,
+and the verified supervisor/runner process group was terminated at
+**01:59:09 UTC**; both processes were confirmed absent. The task has not been
+rephrased, restarted or reassigned. This is an interrupted run, with **no
+qualifying 24-hour result** and no prior-duration credit. See the
+[root interruption record](probes/release-wrap-2026-10-22/fuzz-provider-stop.json).
+The preparation checks retained above predate this stop; they do not replace the
+missing final-byte qualification or establish a complete security audit.
+
 ## Devnet and operations
 
 The dedicated devnet payer/proposed upgrade authority is

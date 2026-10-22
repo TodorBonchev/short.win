@@ -522,7 +522,15 @@
       "retained_sha256": "44873ad3bb878b39cb02972b54146c8c3e33b0ee80d41aa88dce221bf56fd3a7",
       "original_bytes": 164,
       "retained_bytes": 164
+    },
+    {
+      "original": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/fuzz-provider-stop.json",
+      "retained": "fuzz-provider-stop.json",
+      "original_sha256": "68c24f7343988e41649f338ea013b16fb7f712965a263dccab1d65adfc9542f7",
+      "retained_sha256": "68c24f7343988e41649f338ea013b16fb7f712965a263dccab1d65adfc9542f7",
+      "original_bytes": 736,
+      "retained_bytes": 736
     }
   ],
-  "updated_at_utc": "2026-10-22T01:56:48.621329+00:00"
+  "updated_at_utc": "2026-10-22T02:00:46.567942+00:00"
 }

@@ -35,6 +35,8 @@ Root subsequently produced a fresh candidate of the same **1,644,024 B**, SHA-25
 
 The actual official-verifier attempt stopped before building: the session cannot access the Docker socket, and noninteractive sudo requires a password. No daemon, permission or tool configuration was changed. Its [retained record](../audit/probes/release-wrap-2026-10-22/verifier/readiness.md) distinguishes the local candidate from an independently reproduced pinned-image build.
 
+The subsequent fresh final-byte fuzz attempt was interrupted after the program worker received a provider safety block; its runner/supervisor were stopped and its additive launch review was interrupted. No qualifying 24-hour result is claimed, and the blocked task was not restarted or reassigned. The [root stop receipt](../audit/probes/release-wrap-2026-10-22/fuzz-provider-stop.json) preserves that distinction.
+
 Before deployment, produce and retain:
 
 1. A clean exact revision and package identity, built with Anchor 1.2.0, Agave 4.1.2, platform-tools v1.57, SBPF v3 and locked dependencies. In an isolated build target use the CI split: `anchor build --tools-version v1.57 --arch v3 --ignore-keys --no-idl -- -- --locked`, followed by `anchor idl build -p shortwin -o <TARGET>/idl/shortwin.json -t <TARGET>/types/shortwin.ts -- --locked`. Do not generate/synchronize program keys as a side effect.
