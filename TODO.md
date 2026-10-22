@@ -46,7 +46,8 @@ trade adapter or remove the remaining operating and audit gates.
       before promising market E2E: canonical Raydium/Jupiter IDs are not
       executable there, devnet Squads fails the supported immutability check,
       and current Pump/PumpSwap/fees executable bytes differ from the pinned
-      mainnet fixtures without scoped adapter compatibility proof. A fresh Pyth
+      mainnet fixtures. A [bounded dispatch and published-interface probe](docs/deployment/devnet-pump-interface-probe-2026-10-22.md)
+      passed, but full account-populated CPI compatibility remains unproven. A fresh Pyth
       sample passed at the dated read, but must pass again at execution. Confirm
       a real market, governance member identities and installation of the
       [staged coverage key](docs/deployment/devnet-operator-plan-2026-10-22.md#selected-topology-and-identities),

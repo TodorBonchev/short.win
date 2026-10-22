@@ -53,6 +53,15 @@ trade semantics required by the pinned
 [`pump_curve`](../../programs/shortwin/src/venues/pump_curve.rs) and
 [`pump_amm`](../../programs/shortwin/src/venues/pump_amm.rs) adapters.
 
+A later [bounded Pump/PumpSwap interface probe](devnet-pump-interface-probe-2026-10-22.md)
+found current canonical configuration accounts with expected owners, sizes and
+discriminators; pinned published IDLs matched the adapters' fixed trade
+account lists and argument shapes. Four unsigned, deliberately account-empty
+devnet simulations dispatched the expected trade instructions and failed at
+the first missing account. This narrows the uncertainty but does not test
+conditional remaining accounts, a complete CPI, pricing or a real market;
+the market hold remains in force.
+
 A coherent `getMultipleAccounts` read of the Clock sysvar and the configured
 Pyth `PriceUpdateV2` at slot **513925489** found a `Full` SOL/USD update with
 the configured feed ID `ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d`.
