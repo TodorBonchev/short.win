@@ -1,0 +1,47 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": "genesis",
+    "method": "getGenesisHash",
+    "params": []
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "accounts",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+        "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+        "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+        "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "program_rent",
+    "method": "getMinimumBalanceForRentExemption",
+    "params": [
+      36,
+      {
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": "programdata_rent",
+    "method": "getMinimumBalanceForRentExemption",
+    "params": [
+      1644069,
+      {
+        "commitment": "confirmed"
+      }
+    ]
+  }
+]

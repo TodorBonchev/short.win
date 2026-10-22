@@ -1,0 +1,77 @@
+{
+  "observed_at_utc": "2026-10-22T09:08:30.055147+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "responses": [
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513834223
+        },
+        "value": 5000
+      },
+      "id": "write_fee"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513834223
+        },
+        "value": 10000
+      },
+      "id": "final_fee"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513834223
+        },
+        "value": {
+          "accounts": null,
+          "err": null,
+          "fee": 5000,
+          "innerInstructions": null,
+          "loadedAccountsDataSize": 1644376,
+          "loadedAddresses": {
+            "readonly": [],
+            "writable": []
+          },
+          "logs": [
+            "Program BPFLoaderUpgradeab1e11111111111111111111111 invoke [1]",
+            "Program BPFLoaderUpgradeab1e11111111111111111111111 success",
+            "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+            "Program ComputeBudget111111111111111111111111111111 success",
+            "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+            "Program ComputeBudget111111111111111111111111111111 success"
+          ],
+          "postBalances": [
+            16647394240,
+            8352520760,
+            1,
+            1
+          ],
+          "postTokenBalances": [],
+          "preBalances": [
+            16647399240,
+            8352520760,
+            1,
+            1
+          ],
+          "preTokenBalances": [],
+          "replacementBlockhash": {
+            "blockhash": "22dxzZxdETHY2d8CWFgTGNa1YoauQzmC9LAVo6y69NjX",
+            "lastValidBlockHeight": 501040611
+          },
+          "returnData": null,
+          "unitsConsumed": 2670
+        }
+      },
+      "id": "write_simulation"
+    }
+  ]
+}

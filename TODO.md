@@ -34,9 +34,12 @@ complete SHA-256 VenueGuard correction for first deployment.
       review, then record actual signatures, loader/ProgramData, upgrade authority
       and executable hash. Scope, version, authority and budget choices are
       [selected](docs/deployment/devnet-decisions-2026-10-22.md); funding, Docker
-      access and canonical artifact reproduction are complete. No deployment has
-      been sent. The separate stopped fuzz task remains stopped and contributes
-      no result.
+      access and canonical artifact reproduction are complete. The first approved
+      attempt created the buffer and confirmed 14 upload writes, then stopped at
+      a client `Max retries exceeded` error; the program remains absent. The
+      [recovery proposal](docs/audit/probes/release-wrap-2026-10-22/deployment-packet/recovery-packet.md)
+      reuses the buffer and needs separate transaction approval. The stopped
+      fuzz task remains stopped and contributes no result.
 
 - [ ] Resolve the target-cluster profile before promising market E2E: canonical
       Raydium/Jupiter IDs are not executable there, devnet Squads fails the supported

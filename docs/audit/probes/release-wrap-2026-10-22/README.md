@@ -42,12 +42,22 @@ recorded in `byte-comparison.json`, not a compiled artifact checked into Git.
   fuzz or re-reviewing its cases.
 - [Concrete deployment packet](deployment-packet/deployment-packet.md), prepared
   after canonical artifact acceptance: exact addresses, allocation, costs,
-  command and successful unsigned buffer preparation. No signing or deployment
-  occurred. Its [retained-file list](deployment-packet/retained-files.json) excludes
+  command and successful unsigned buffer preparation. At packet preparation no
+  signing had occurred; the subsequent first attempt is recorded separately
+  below. Its [retained-file list](deployment-packet/retained-files.json) excludes
   the ELF and keys; the copied report's ELF link and original SHA256SUMS refer to
   the external packet directory in `deployment-packet.json`.
   CLI help is gzip-compressed to preserve its exact original whitespace; its
   retained-file entry includes both compressed and original checksums.
+- [First approved upload attempt receipts](deployment-packet/failed-attempt-retained-files.json):
+  the CLI stopped at `Max retries exceeded` after buffer creation and 14 confirmed
+  writes. The program remains absent. No second upload or buffer-close transaction
+  is claimed.
+- [Same-buffer recovery proposal](deployment-packet/recovery-packet.md) and
+  [retained public evidence](deployment-packet/recovery-retained-files.json):
+  an unsigned simulation of the first missing write passed. The exact second
+  command and its changed transport/retry flags are prepared but unexecuted.
+  The full buffer response, ELF and all keys remain outside Git.
 - [Final documentation/provenance review](independent/final-doc-review.json)
   checks the current claims against the retained build and historical fuzz evidence.
 

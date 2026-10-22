@@ -1,0 +1,71 @@
+{
+  "created_at": "2026-10-22T09:14:42.770806+00:00",
+  "scope": "Same-buffer read-only recovery plan and unsigned first-missing-write simulation. Full 2.2MB buffer response, ELF and keypairs remain outside Git.",
+  "files": [
+    {
+      "path": "recovery-packet.md",
+      "bytes": 6657,
+      "sha256": "6564e2b8f6bbdf99cd8bab283d13a5b4b6d8f3e0685902c3d714dddcb04f0282"
+    },
+    {
+      "path": "recovery.json",
+      "bytes": 11218,
+      "sha256": "93a101bd905f4e891e2abda85e7075eb9f7c57136e1eeccd8009deca44d94aec"
+    },
+    {
+      "path": "recovery-command.review-only.txt",
+      "bytes": 1209,
+      "sha256": "5321fc0ef7fcfeb6f150c1bc9bf86ae97a3d5c9087715184aee15888bf8080c7"
+    },
+    {
+      "path": "recovery-readonly.py",
+      "bytes": 6899,
+      "sha256": "96dc820467a03345b5e02dcbcc770aff1d4c39025b5532cdc9e5795c7765304f"
+    },
+    {
+      "path": "recovery-unsigned-simulation.py",
+      "bytes": 6965,
+      "sha256": "0292584e10c8b947e1f986e7c874e7c4b0dbc656336e9f73434732021a0829d8"
+    },
+    {
+      "path": "recovery-simulation-summary.json",
+      "bytes": 1459,
+      "sha256": "06859272ad134bb761fca4d5a0b25d1e60d499933eedb8b40f52b1595f069ce6"
+    },
+    {
+      "path": "recovery-simulation-context-request.json",
+      "bytes": 266,
+      "sha256": "ba4af5fe29a7dfe124b49aee3a956ddfb1f57fc45cfb2b670c318be3889503a5"
+    },
+    {
+      "path": "recovery-simulation-context-raw.json",
+      "bytes": 578,
+      "sha256": "74a4fce5d79eec4c14bd86b7fa9e7cd6a6a79810be2af6d3649a524dbaf354ee"
+    },
+    {
+      "path": "recovery-unsigned-simulation-request.json",
+      "bytes": 4426,
+      "sha256": "c9b420d3004c0788a1e259f62fc232aa0e3faa2e0f9a69b6cf5b6894a37b33de"
+    },
+    {
+      "path": "recovery-unsigned-simulation-raw.json",
+      "bytes": 2050,
+      "sha256": "928920b771de843a95b609c70b3654dd0a2f6d89319925dc72b3ab2334014049"
+    },
+    {
+      "path": "recovery-state-request.json",
+      "bytes": 925,
+      "sha256": "78c231b57d8ee46ccfabcfc3cad3e623c88618d2d9f01402e5aa2d06d08b2cc3"
+    },
+    {
+      "path": "recovery-public-summary.json",
+      "bytes": 2264,
+      "sha256": "f8247fa4147055ee7efe7105a3b6e9855ab7f0dbcd41360eba708497eb4857cd"
+    },
+    {
+      "path": "upload-routing-research.md",
+      "bytes": 6844,
+      "sha256": "eb0d56c1628d14618d019f531f8360bef9715f1c10aaad146f4c8f7914676f50"
+    }
+  ]
+}

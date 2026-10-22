@@ -1,6 +1,6 @@
 # Devnet 1.0.3 preparation (2026-10-22)
 
-**A program deployment rehearsal is being prepared. Full devnet market readiness is not established.** No deployment, initialization, governance transaction or market transaction was executed by this review. The owner separately authorized creating a fresh devnet CLI wallet outside the repository; the wallet is not authority to change the compiled program address or to deploy before the concrete transaction review.
+**The first program deployment attempt is incomplete; full devnet market readiness is not established.** The owner approved one program-only devnet upload after concrete transaction review. It created a funded buffer and wrote 14 chunks, then the CLI stopped; no executable program, initialization, governance or market transaction resulted. The owner separately authorized fresh devnet CLI wallets outside the repository. Their creation did not change the compiled program address.
 
 The inspected integrated source is `b31c02a091008da18c39d7836c8e0e9d6d018973`. Existing technical release evidence is attributed in [the October 22 release record](../audit/release-checks-1.0.3-2026-10-22.md). That record's mainnet Jupiter drift and final mainnet operating gates remain separate from the actual devnet observations below. A devnet rehearsal or prerelease tag does not certify a stable release.
 
@@ -91,8 +91,34 @@ deployment accounts were absent. Expected net debit for one upload pass is
 The stock CLI does not enforce a total-spend cap; the operator checks the 20-SOL
 ceiling and 5-SOL reserve before one approved invocation. Full final deployment
 simulation requires the populated buffer and is performed by the CLI before
-that stage is signed. No transaction has been signed or sent; the skill's
-explicit transaction-summary confirmation is the remaining loader-phase step.
+that stage is signed.
+
+**First approved attempt, 09:02–09:04 UTC:** the one authorized CLI invocation
+returned `Data writes to account failed: Custom error: Max retries exceeded`
+after about 88 seconds. It created the approved buffer and confirmed 14 of
+1,713 upload writes. The program and ProgramData remain absent. Read-only RPC
+at slot 513,833,429 found the buffer owned by the upgradeable loader, controlled
+by the selected payer, funded with 8.352520760 SOL and containing the 14 matching
+chunks. The payer held 16.647399240 SOL; 80,000 lamports in fees had been spent.
+All 15 recorded buffer transactions succeeded on chain. The failure occurred
+in the client upload/retry path, without a reported on-chain program error. The
+[attempt and public-state receipts](../audit/probes/release-wrap-2026-10-22/deployment-packet/failed-attempt-retained-files.json)
+retain the evidence. No second upload, buffer close, initialization or market
+transaction has been sent. The one-attempt approval is spent; any recovery
+transaction requires a new concrete review.
+
+**Recovery proposal:** keep the same funded buffer, artifact and signer identities.
+Agave 4.1.2 reads the buffer and writes only chunks that differ; 1,699 of 1,713
+chunks remain. An unsigned simulation of the first missing write at offset
+13,440 passed at slot 513,834,223 (`err=null`, 2,670 CU, 5,000-lamport fee).
+Estimated incremental cost for one successful resume pass is **0.009338120 SOL**,
+including remaining writes, final fee and Program rent. A proposed **0.05-SOL
+additional spending ceiling** allows up to five signing cycles while preserving
+the 5-SOL reserve. The [routing research](../audit/probes/release-wrap-2026-10-22/deployment-packet/upload-routing-research.md)
+recommends omitting `--use-rpc` to try the CLI's QUIC TPU route and setting
+`--max-sign-attempts 5`. Public RPC throttling is a strong explanation for the
+first failure, not a proven cause; TPU reachability from this host is unverified.
+No resume or buffer-close transaction has been authorized or sent.
 
 The [owner-delegated decision](devnet-decisions-2026-10-22.md) selects the first option below, retaining version 1.0.3 and upgradeability, with a 20-SOL deployment ceiling and at least 5 SOL reserved. These policy choices are complete; no further generic policy approval is needed. The concrete transaction review remains the final step before signing.
 

@@ -1,0 +1,31 @@
+{
+  "observed_at_utc": "2026-10-22T09:08:30.055302+00:00",
+  "scope": "Unsigned simulation of exactly the first remaining loader Write; no buffer creation, final deploy, signing or broadcast.",
+  "rpc": "https://api.devnet.solana.com",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+  "payer_and_buffer_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "chunk_index": 14,
+  "offset": 13440,
+  "chunk_bytes": 960,
+  "legacy_transaction_wire_bytes": 1232,
+  "signature": "one zero 64-byte placeholder; no signing",
+  "sigVerify": false,
+  "replaceRecentBlockhash": true,
+  "context": {
+    "apiVersion": "4.4.0-beta.1",
+    "slot": 513834223
+  },
+  "simulation_error": null,
+  "units_consumed": 2670,
+  "simulation_fee_lamports": 5000,
+  "fresh_quoted_write_fee_lamports": 5000,
+  "fresh_quoted_final_fee_lamports": 10000,
+  "remaining_write_count_at_progress_snapshot": 1699,
+  "estimated_one_pass_remaining_fees_lamports": 8505000,
+  "estimated_additional_payer_debit_lamports": 9338120,
+  "estimated_payer_balance_after_success_lamports": 16638061120,
+  "final_deployment_simulated": false,
+  "simulation_limit": "This verifies one loader write against present devnet state. The incomplete buffer prevents a meaningful successful final deployment simulation; remaining writes must land before the CLI's final stage simulation.",
+  "signed_sent_retried_reclaimed": false
+}

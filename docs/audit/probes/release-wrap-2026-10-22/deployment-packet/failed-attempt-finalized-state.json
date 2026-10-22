@@ -1,0 +1,11 @@
+{
+  "observed_at_utc": "2026-10-22T09:08:24.795519+00:00",
+  "commitment": "finalized",
+  "slot": 513834200,
+  "program_present": false,
+  "programdata_present": false,
+  "buffer_present": true,
+  "buffer_lamports": 8352520760,
+  "payer_lamports": 16647399240,
+  "signed_or_sent_by_this_check": false
+}

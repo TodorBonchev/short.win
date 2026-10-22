@@ -1,0 +1,33 @@
+{
+  "observed_at_utc": "2026-10-22T09:02:19.091320+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "payer_balance_lamports": 25000000000,
+  "account_context_slot": 513832671,
+  "expected_accounts_absent": [
+    "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+    "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL"
+  ],
+  "rent_lamports": {
+    "36": 833120,
+    "1644069": 8352520760,
+    "1644061": 8352480120
+  },
+  "one_pass_fees_max_lamports": 8585000,
+  "expected_net_debit_lamports": 8361938880,
+  "conservative_envelope_lamports": 16714459640,
+  "ceiling_lamports": 20000000000,
+  "reserve_lamports": 5000000000,
+  "artifact_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+  "artifact_bytes": 1644024,
+  "artifact_trimmed_hash": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250",
+  "validated_public_signers": [
+    "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL"
+  ],
+  "checks_passed": true,
+  "signed_or_sent": false
+}

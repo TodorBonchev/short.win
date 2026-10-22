@@ -1,0 +1,222 @@
+{
+  "prepared_at_utc": "2026-10-22T09:11:35.541387+00:00",
+  "status": "Read-only recovery review complete. The previous single-attempt authorization is exhausted. No second attempt or reclaim is authorized or performed.",
+  "failed_attempt": {
+    "start_utc": "2026-10-22T09:02:41.516408+00:00",
+    "end_utc": "2026-10-22T09:04:09.504785+00:00",
+    "elapsed_seconds": 87.988377,
+    "exit_code": 1,
+    "error": "Data writes to account failed: Custom error: Max retries exceeded",
+    "original_max_sign_attempts": 1,
+    "original_use_rpc": true,
+    "root_independently_confirmed_successful_signatures": 15,
+    "root_independently_confirmed_fees_lamports": 80000
+  },
+  "public_snapshot": {
+    "observed_at_utc": "2026-10-22T09:06:51.874114+00:00",
+    "rpc": "https://api.devnet.solana.com",
+    "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "context": {
+      "apiVersion": "4.4.0-beta.1",
+      "slot": 513833813
+    },
+    "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "payer_balance_lamports": 16647399240,
+    "program": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "programdata": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+    "program_absent": true,
+    "programdata_absent": true,
+    "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+    "buffer_owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "buffer_executable": false,
+    "buffer_space_bytes": 1644061,
+    "buffer_payload_bytes": 1644024,
+    "buffer_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "buffer_lamports": 8352520760,
+    "buffer_payload_sha256": "3ee36fa842510b78a4129dff01072b6b9c9feac6e4be2e358d647f15fd0e4801",
+    "accepted_artifact_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+    "whole_payload_equals_artifact": false,
+    "upload_progress_basis": "CLI-shaped 960-byte chunk comparison against the accepted ELF; equality counts include untouched all-zero chunks.",
+    "maximum_total_chunks": 1713,
+    "equal_chunks": 14,
+    "matching_nonzero_chunks": 14,
+    "already_zero_equal_chunks": 0,
+    "remaining_write_chunks": 1699,
+    "unexpected_nonzero_mismatch_chunks": [],
+    "matching_payload_bytes": 966038,
+    "total_payload_bytes": 1644024,
+    "program_rent_lamports": 833120,
+    "programdata_rent_lamports": 8352520760,
+    "buffer_fully_funds_current_programdata_rent": true,
+    "original_payer_balance_lamports": 25000000000,
+    "payer_debit_so_far_lamports": 8352600760,
+    "debit_minus_buffer_balance_lamports": 80000,
+    "balance_delta_limit": "Residual is consistent with transaction fees only if no unrelated payer activity occurred; it is not a signature-by-signature fee audit.",
+    "signed_sent_retried_reclaimed": false,
+    "first_remaining_chunk_index": 14,
+    "first_remaining_byte_offset": 13440,
+    "raw_receipt_sha256": "feab5e5b99ad31d704e157fa09aeeaae606d369acbc75310871086ab546d130b",
+    "raw_receipt_bytes": 2193377,
+    "raw_receipt_retention": "External only; do not commit the full buffer response."
+  },
+  "root_finalized_state_confirmation": {
+    "observed_at_utc": "2026-10-22T09:08:24Z",
+    "slot": 513834200,
+    "commitment": "finalized",
+    "reported_by": "root",
+    "payer_balance_lamports": 16647399240,
+    "buffer_lamports": 8352520760,
+    "program_absent": true,
+    "programdata_absent": true
+  },
+  "resume_semantics": {
+    "source": "https://github.com/anza-xyz/agave/blob/v4.1.2/cli/src/program.rs",
+    "functions": [
+      "process_program_deploy",
+      "fetch_buffer_program_data",
+      "do_process_program_deploy"
+    ],
+    "existing_buffer_reused": true,
+    "checks": [
+      "upgradeable-loader owner",
+      "Buffer state",
+      "mutable authority equals selected upgrade authority",
+      "data size sufficient for accepted ELF"
+    ],
+    "new_buffer_creation_if_existing_valid": false,
+    "new_buffer_rent_funding_if_existing_valid": false,
+    "writes_only_differing_chunks": true,
+    "same_artifact_same_public_roles_required": true,
+    "remaining_write_count_at_snapshot": 1699,
+    "new_program_account_rent_still_needed_lamports": 833120
+  },
+  "unsigned_first_missing_write_simulation": {
+    "observed_at_utc": "2026-10-22T09:08:30.055302+00:00",
+    "scope": "Unsigned simulation of exactly the first remaining loader Write; no buffer creation, final deploy, signing or broadcast.",
+    "rpc": "https://api.devnet.solana.com",
+    "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+    "payer_and_buffer_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "chunk_index": 14,
+    "offset": 13440,
+    "chunk_bytes": 960,
+    "legacy_transaction_wire_bytes": 1232,
+    "signature": "one zero 64-byte placeholder; no signing",
+    "sigVerify": false,
+    "replaceRecentBlockhash": true,
+    "context": {
+      "apiVersion": "4.4.0-beta.1",
+      "slot": 513834223
+    },
+    "simulation_error": null,
+    "units_consumed": 2670,
+    "simulation_fee_lamports": 5000,
+    "fresh_quoted_write_fee_lamports": 5000,
+    "fresh_quoted_final_fee_lamports": 10000,
+    "remaining_write_count_at_progress_snapshot": 1699,
+    "estimated_one_pass_remaining_fees_lamports": 8505000,
+    "estimated_additional_payer_debit_lamports": 9338120,
+    "estimated_payer_balance_after_success_lamports": 16638061120,
+    "final_deployment_simulated": false,
+    "simulation_limit": "This verifies one loader write against present devnet state. The incomplete buffer prevents a meaningful successful final deployment simulation; remaining writes must land before the CLI's final stage simulation.",
+    "signed_sent_retried_reclaimed": false
+  },
+  "root_cause": {
+    "classification": "inference; unproven",
+    "observed": "The one allowed write signing cycle finished with transactions unconfirmed; the retained log reports Max retries exceeded.",
+    "likely_bottleneck": "Original --use-rpc path schedules about 100 write submissions/second. Official public devnet limits document 40 requests per 10 seconds for one RPC method, so public RPC capacity is a likely bottleneck. The log alone does not prove throttling or exclude network/confirmation issues.",
+    "rate_limit_reference": "https://solana.com/docs/references/clusters#devnet-rate-limits",
+    "sender_reference": "https://github.com/anza-xyz/agave/blob/v4.1.2/client/src/send_and_confirm_transactions_in_parallel.rs"
+  },
+  "recommended_proposal": {
+    "status": "Fresh explicit user consent required; not executed",
+    "scope": "One program-only same-buffer resume invocation",
+    "artifact_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+    "program": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "programdata": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+    "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+    "payer_buffer_authority_upgrade_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "cluster": "devnet",
+    "rpc": "https://api.devnet.solana.com",
+    "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "changed_flags": {
+      "omit": "--use-rpc",
+      "max_sign_attempts": 5
+    },
+    "compute_unit_price_micro_lamports": 0,
+    "max_len_bytes": 1644024,
+    "no_auto_extend": true,
+    "retain_upgradeability": true,
+    "transport": "Default QUIC TPU write path, still using RPC/WS control and confirmation, with possible RPC fallback",
+    "transport_reachability_proven": false,
+    "command_file": "recovery-command.review-only.txt",
+    "command_validated_via_help_without_signer_loading": true
+  },
+  "costs": {
+    "units": "lamports",
+    "buffer_funding_already_locked": 8352520760,
+    "new_buffer_rent_expected": 0,
+    "program_rent": 833120,
+    "fresh_write_fee": 5000,
+    "fresh_final_fee": 10000,
+    "remaining_writes": 1699,
+    "one_pass_remaining_fees": 8505000,
+    "one_pass_additional_debit": 9338120,
+    "one_pass_estimated_remaining_balance": 16638061120,
+    "five_full_write_cycles_fee_envelope": 42485000,
+    "five_full_write_cycles_additional_debit_envelope": 43318120,
+    "five_cycle_envelope_remaining_balance": 16604081120,
+    "provisional_additional_operator_ceiling": 50000000,
+    "original_aggregate_ceiling": 20000000000,
+    "minimum_payer_reserve": 5000000000,
+    "aggregate_debit_if_five_cycle_envelope_used": 8395918880,
+    "native_cli_hard_total_cap": false,
+    "estimate_limit": "Envelope assumes unchanged current base-fee quotes, no priority fee, unchanged valid funded buffer, the same 1699-or-fewer remaining chunks and one final deploy. The CLI does not enforce the operator ceiling. It may fail again; quoted charges are not a guarantee of successful delivery."
+  },
+  "recovery_options": [
+    {
+      "option": "Hold",
+      "effect": "Leave the funded partial buffer under the established authority. No new transaction or spend."
+    },
+    {
+      "option": "Resume existing buffer",
+      "effect": "After fresh explicit approval and state/cost refresh, one reviewed QUIC TPU/default-path invocation with up to five write signing cycles; do not recreate or refund the buffer first."
+    },
+    {
+      "option": "Abandon and reclaim",
+      "effect": "Prepare a separate explicit close-buffer/refund transaction review if the owner chooses to abandon. Nothing is closed or reclaimed by this packet."
+    }
+  ],
+  "before_any_new_signature": [
+    "Obtain fresh explicit approval for the changed one-invocation proposal, public roles, transport uncertainty, current cost envelope and operator ceilings.",
+    "Immediately refresh expected devnet genesis, Program/ProgramData absence, valid funded buffer/authority, remaining chunks, payer balance and artifact hash; recalculate if any changed.",
+    "Keep price zero, exact max length, no-auto-extend and all fee/feature/preflight checks enabled. Stop on stage simulation failure.",
+    "No subsequent retry, top-up, authority change, initialization or buffer reclamation is included."
+  ],
+  "approval_rule": {
+    "skill": "/home/todor_dev/.codex/skills/solana-dev/SKILL.md",
+    "rule": "Transaction review (W009)",
+    "quote": "Never sign or send transactions without explicit user approval.",
+    "application": "Original confirmation covered one upload attempt. A second invocation and changed routing/retry flags need fresh confirmation."
+  },
+  "git_retention_whitelist": [
+    "recovery-packet.md",
+    "recovery.json",
+    "recovery-command.review-only.txt",
+    "recovery-readonly.py",
+    "recovery-unsigned-simulation.py",
+    "recovery-simulation-summary.json",
+    "recovery-simulation-context-request.json",
+    "recovery-simulation-context-raw.json",
+    "recovery-unsigned-simulation-request.json",
+    "recovery-unsigned-simulation-raw.json",
+    "recovery-state-request.json",
+    "recovery-public-summary.json"
+  ],
+  "external_only": [
+    "recovery-state-raw.json",
+    "shortwin-d6f4e092.so",
+    "all keypair files (never copy/commit)"
+  ],
+  "performed": "Public reads, unsigned simulation and external review packet only; no private key access, signing, sending, retry, reclaim, project edits, Git writes, service changes, security review or stopped work."
+}

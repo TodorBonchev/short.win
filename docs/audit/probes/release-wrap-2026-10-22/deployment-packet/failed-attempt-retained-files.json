@@ -1,0 +1,41 @@
+{
+  "created_at": "2026-10-22T09:09:02.529041+00:00",
+  "scope": "First approved devnet deployment attempt failed; metadata/public state only. No private keys or ELF retained in Git.",
+  "files": [
+    {
+      "path": "approval-preflight.json",
+      "bytes": 1250,
+      "sha256": "0cc6857be6f9d3bace864ab226ec7e179daed3a7b6eb4084e4e9b57848d65acf"
+    },
+    {
+      "path": "deployment-execution-start.json",
+      "bytes": 1516,
+      "sha256": "0d10d74e9129a4cb76e40d7ff775356257778f9b381684dde1467f6ae80d4e31"
+    },
+    {
+      "path": "deployment-execution.log",
+      "bytes": 167,
+      "sha256": "25ccd5385c02d71a302d12643bbd21e25dce2afcc924977fa4e19d2a59551b21"
+    },
+    {
+      "path": "deployment-execution-result.json",
+      "bytes": 1699,
+      "sha256": "ee086f4dcfaa6fa78e9a0cc6cdec6c2f6250ba5925929b007418d8ba3ab7d89d"
+    },
+    {
+      "path": "failed-upload-buffer-state.json",
+      "bytes": 1126,
+      "sha256": "707d22cefb9c0a28efe94078d26fc2c9dd990443c12a450230c0e688d18bfe77"
+    },
+    {
+      "path": "failed-upload-signature-observation.json",
+      "bytes": 1815,
+      "sha256": "abca3e4ab994029884e0f32f1ad865f5e7a73325f8147fcccb14eb0b6540d45e"
+    },
+    {
+      "path": "failed-attempt-finalized-state.json",
+      "bytes": 303,
+      "sha256": "9c8f826344c901bd91461288b2e2285400132d1a0fb49aba46aa286e4fd930bf"
+    }
+  ]
+}

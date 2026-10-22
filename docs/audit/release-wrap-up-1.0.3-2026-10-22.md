@@ -131,9 +131,26 @@ successful unsigned buffer-preparation simulation. Current estimated net debit
 is 8.361938880 devnet SOL; the conservative envelope is 16.714459640 SOL, below
 the selected 20-SOL ceiling. The CLI has no aggregate spending-cap option; keep
 the packet's pre-execution checks and single-attempt scope. Final loader simulation
-requires the populated buffer and runs before that stage is signed. No signing
-or deployment has occurred. The final transaction-summary confirmation required
-by the applied skill remains; all generic policy choices are already selected.
+requires the populated buffer and runs before that stage is signed. At packet
+preparation no signing had occurred; the approved initial attempt and unapproved
+recovery proposal are recorded below. All generic policy choices are selected.
+
+**Execution update:** the first approved devnet CLI attempt failed while writing
+the program, reporting `Max retries exceeded`. The approved buffer exists with
+8.352520760 SOL and 14 matching upload chunks; the payer has 16.647399240 SOL,
+and the program/ProgramData are still absent. Fifteen transactions were confirmed
+successful; 80,000 lamports in fees were spent. The [failure receipts](probes/release-wrap-2026-10-22/deployment-packet/failed-attempt-retained-files.json)
+record the bounded result. No retry has been signed; read-only recovery planning
+is underway, and the original one-attempt authorization does not cover another
+write or buffer-close transaction.
+
+The [read-only recovery proposal](probes/release-wrap-2026-10-22/deployment-packet/recovery-packet.md)
+retains the existing buffer and verified artifact. The first missing write
+simulated successfully. Agave's resume path would send only the 1,699 remaining
+chunks; one successful pass is estimated to debit 0.009338120 SOL. The proposed route
+tries QUIC TPU with five signing cycles, subject to a fresh 0.05-SOL additional
+operator ceiling and separate explicit transaction approval. No recovery write
+has been sent, and TPU reachability remains unproved.
 
 The dedicated devnet payer/proposed upgrade authority is
 `3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14`. Its private key is stored outside
