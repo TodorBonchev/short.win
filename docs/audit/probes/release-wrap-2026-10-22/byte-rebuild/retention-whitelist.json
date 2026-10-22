@@ -1,0 +1,33 @@
+{
+  "retain_top_level_files": [
+    "README.md",
+    "SUMMARY.md",
+    "build-checkout-identity.json",
+    "byte-comparison.json",
+    "docker-image-identity.json",
+    "docker-pull.log",
+    "docker-pull.receipt.json",
+    "docker-verifier.log",
+    "docker-verifier.receipt.json",
+    "host-release.log",
+    "host-release.receipt.json",
+    "host-test-venue.log",
+    "host-test-venue.receipt.json",
+    "host-tool-identity.json",
+    "manifest.json",
+    "retention-whitelist.json",
+    "source-input-diff.txt",
+    "source-input-identity.json"
+  ],
+  "artifact_copies_optional_external_only": [
+    "artifacts/release/shortwin.so",
+    "artifacts/verifier/shortwin.so",
+    "artifacts/test-only/shortwin.so",
+    "artifacts/test-only/mock_cpamm.so"
+  ],
+  "exclude_directories": [
+    "host-source",
+    "docker-source"
+  ],
+  "note": "Retain only this whitelist or listed SO artifact copies. Do not recursively copy clones/targets or generated keys."
+}

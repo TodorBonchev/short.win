@@ -1,0 +1,105 @@
+{
+  "created_at": "2026-10-22T08:01:30.624052+00:00",
+  "scope": "Metadata, unsigned public simulation and review-only command. The ELF mentioned in copied report/SHA256SUMS stays at original external packet path from deployment-packet.json; no keypair files or ELF copied into Git.",
+  "files": [
+    {
+      "path": "deployment-packet.md",
+      "bytes": 7831,
+      "sha256": "2ebdaa49a0b8898ec338f5ce34e1e7bf05b94351bc92e066d07187d152884e3a"
+    },
+    {
+      "path": "deployment-packet.json",
+      "bytes": 8814,
+      "sha256": "49bfa26c3fdedc9f654156ddfc6bb9a77506ac0888a7432705b0461e977b3b46"
+    },
+    {
+      "path": "deploy-command.review-only.txt",
+      "bytes": 1075,
+      "sha256": "baea6c4a937381f9ceee52652c6f4bc53ed8558a58d64c5ea3b993d3ee96dd6f"
+    },
+    {
+      "path": "artifact-identity.json",
+      "bytes": 804,
+      "sha256": "fcb95ffea54ac790891c2a6e8eaf2d01b3a7b63f1edf51a808f54e07dc412e64"
+    },
+    {
+      "path": "buffer-public-identity.json",
+      "bytes": 439,
+      "sha256": "fe31747ee903a5437b8cb8d4ae988d7671cba736dc91b9d9c2e64e8d5ef9e59a"
+    },
+    {
+      "path": "final-public-state-request.json",
+      "bytes": 615,
+      "sha256": "5f0b462df0a4fe1a9fad4b42bfa9a703ce5a458f39811ab7110e024249ac3d48"
+    },
+    {
+      "path": "final-public-state-raw.json",
+      "bytes": 1321,
+      "sha256": "0b06ca35df82e60bd740401bb5f6c1d89b3e3efb972afc1fb5fb6c1d851673c2"
+    },
+    {
+      "path": "public-state-request.json",
+      "bytes": 1613,
+      "sha256": "696ee9c0d5ed7126ad3aa8b8ed3553df1ab07e5833062c79a10a89f05685efde"
+    },
+    {
+      "path": "public-state-raw.json",
+      "bytes": 1780,
+      "sha256": "50b19fcd092457a7354aab7cabf57f809f2099d1c886606d5adc4ed9308c1e78"
+    },
+    {
+      "path": "public-state-summary.json",
+      "bytes": 964,
+      "sha256": "dc646e0cefb76d1bf304aa37fe326f50b1d223424f71fc425337994eada5e120"
+    },
+    {
+      "path": "simulation-context-request.json",
+      "bytes": 1110,
+      "sha256": "84acb19afe852fface8bf67d3f7605c275e4c238fd47f7da789cf02f0841141e"
+    },
+    {
+      "path": "simulation-context-raw.json",
+      "bytes": 1025,
+      "sha256": "ab1a419e798935bec7c07a7b647236e7e7346e81ed514f2e92ced59cebcc7bc2"
+    },
+    {
+      "path": "unsigned-simulation-request.json",
+      "bytes": 2608,
+      "sha256": "b548ed49f4a9b38542535e05a8171bd697044dd86d775bdb45f46ee919643380"
+    },
+    {
+      "path": "unsigned-simulation-raw.json",
+      "bytes": 2414,
+      "sha256": "509220d6c35c3bbf559fbd7fb67d02b14fcde4e19c2ee98e4395e9fcf9d030fd"
+    },
+    {
+      "path": "unsigned-simulation-summary.json",
+      "bytes": 1753,
+      "sha256": "a5c823184267f261efa602feeff7d2c0d6444df5ab48ecc9890fd96e8b99f694"
+    },
+    {
+      "path": "unsigned-initial-transaction.base64",
+      "bytes": 553,
+      "sha256": "fc19eae9b51c442b29a5d4e04f80a02dc6e0cd9ff2d2825d6e63e4dc71d96deb"
+    },
+    {
+      "path": "unsigned-buffer-simulation.py",
+      "bytes": 9078,
+      "sha256": "b4da0095a776752ce12f157f94359a170a3e832a33e60c0edc9b0c0656b7afc9"
+    },
+    {
+      "path": "solana-program-deploy-help.txt.gz",
+      "bytes": 1785,
+      "sha256": "7798245d00f4118a185db1e09ef51125c8eb3889d0c89a142e3ca9261656f43f",
+      "original_path": "solana-program-deploy-help.txt",
+      "original_bytes": 4315,
+      "original_sha256": "1c12a5bf01047e007d2ecab15056ee528107b543f18bcd4c24c3a3f49b107dde",
+      "encoding": "gzip"
+    },
+    {
+      "path": "SHA256SUMS",
+      "bytes": 1787,
+      "sha256": "fecef6cc4c2c0a20113c4608f15a04909c7dfd4d19f5f6eb8b74b9e2f8cbbda4"
+    }
+  ]
+}

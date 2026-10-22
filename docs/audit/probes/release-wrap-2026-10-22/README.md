@@ -1,16 +1,24 @@
 # Integrated release-preparation evidence
 
 These are retained copies of the actual October 22 checks and read-only public
-devnet observations. The selected runtime/client source is
+devnet observations. The earlier integration-check source is
 `bf166672efee578b6a2a1835e0dd53729c548671`; program checks ran on initial merge
 `b31c02a091008da18c39d7836c8e0e9d6d018973`, and the later commit changes only the
 independently reviewed web configuration fix. The reports state their exact
 scope, output identities and qualifications.
 
+The selected program source is now `7b11cc7f85503474c6b87e0ee8b2fedd51bbc249`;
+the additive byte-rebuild evidence below documents its comment correction and
+canonical artifact equality. Copied build reports retain their original wording:
+references to `artifacts/` inside that evidence folder mean the external directory
+recorded in `byte-comparison.json`, not a compiled artifact checked into Git.
+
 - [Program build, IDL, host tests and byte comparison](program/FRESH_RESULTS.md).
 - [Install, client, focused browser, keeper, WASM and web build checks](services/focused-checks.md).
-- [Actual official-verifier setup blocker](verifier/readiness.md): Docker socket
-  access denied and noninteractive sudo requires a password; no verifier build ran.
+- [Initial official-verifier setup failure](verifier/readiness.md): Docker socket
+  access was denied; no verifier build ran in that attempt. The later
+  [Docker access receipt](verifier/docker-access.json) records the authorized group
+  and daemon repair and successful server access; the environment blocker is closed.
 - [Actual devnet account observations](devnet/devnet-rpc-summary.json) and
   [rent/oracle observations](devnet/devnet-cost-oracle-summary.json).
 - [Proposed program-only command packet](devnet/devnet-config-runbook-proposal.md).
@@ -23,16 +31,36 @@ scope, output identities and qualifications.
 - [Retention manifest](retention-manifest.json) records exact original and
   retained hashes and sizes. Original `.log` files are retained here as `.log.gz`;
   decompress them to compare the report's original log hash.
+- [Later exact-byte rebuild](byte-rebuild/SUMMARY.md): commit `7b11cc7` returns to
+  canonical release bytes in fresh native and pinned-Docker builds. Test artifacts
+  and unchanged fuzzer/harness/fixture source inputs are compared explicitly.
+  Its own manifest/whitelist covers the additive evidence; compiled SO copies and
+  isolated build checkouts remain outside Git at the recorded external paths.
+  [Retained-file checksums](byte-rebuild/retained-files.json) list exactly what
+  is stored in Git. The separate [prior-fuzz receipt review](byte-rebuild/prior-fuzz-receipt-review.json)
+  verifies the completed run's retained evidence and attribution without running
+  fuzz or re-reviewing its cases.
+- [Concrete deployment packet](deployment-packet/deployment-packet.md), prepared
+  after canonical artifact acceptance: exact addresses, allocation, costs,
+  command and successful unsigned buffer preparation. No signing or deployment
+  occurred. Its [retained-file list](deployment-packet/retained-files.json) excludes
+  the ELF and keys; the copied report's ELF link and original SHA256SUMS refer to
+  the external packet directory in `deployment-packet.json`.
+  CLI help is gzip-compressed to preserve its exact original whitespace; its
+  retained-file entry includes both compressed and original checksums.
+- [Final documentation/provenance review](independent/final-doc-review.json)
+  checks the current claims against the retained build and historical fuzz evidence.
 
 Commands, source paths and public addresses are metadata. Private keys, seeds,
 credential-bearing endpoint files, compiled target caches and excluded audit
 fixtures are not included. The raw devnet responses contain public account
 prefixes, not complete executable data. They prove the dated observations only.
 
-The old completed ≥24-hour run belongs to its original `d6f4…538bc` artifact.
-The fresh `d8d0…e182` candidate differs by one diagnostic line-number byte.
-These checks neither complete its final-byte fuzz gate nor close the incomplete
-whole-repo audit. The subsequent fresh run was interrupted after a provider
-safety block, as recorded in the [root stop receipt](fuzz-provider-stop.json).
-No later launch review or completed qualification is claimed. See the
+The completed ≥24-hour run retains its original `d6f4…538bc` artifact attribution.
+The intermediate `d8d0…e182` build was superseded by the line-count-preserving
+comment correction: fresh `7b11cc7` builds exactly reproduce the canonical bytes,
+so the old result applies to the same runtime inputs. The separate fresh fuzz
+attempt was interrupted after a provider safety block, as recorded in the
+[root stop receipt](fuzz-provider-stop.json). It remains stopped and contributes
+no result. No broader audit completion is claimed. See the
 [current readiness record](../../release-wrap-up-1.0.3-2026-10-22.md).

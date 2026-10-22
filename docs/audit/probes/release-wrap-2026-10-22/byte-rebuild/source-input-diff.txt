@@ -1,0 +1,3 @@
+M	crates/shortwin-math/tests/ai2_accounting.rs
+M	programs/shortwin/src/instructions/add_margin.rs
+M	scripts/build-test-venue.sh

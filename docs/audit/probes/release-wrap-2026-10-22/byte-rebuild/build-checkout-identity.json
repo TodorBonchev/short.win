@@ -1,0 +1,24 @@
+{
+  "host-source": {
+    "head": "7b11cc7f85503474c6b87e0ee8b2fedd51bbc249",
+    "tracked_diff": "",
+    "tracked_status": "",
+    "cargo_lock": {
+      "sha256": "0732c477fe1e6b38fd74d558e23b8e3ebda8790705a6ddff1de6fdaca72b316b",
+      "working_file_git_blob": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "committed_git_blob": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "working_equals_committed": true
+    }
+  },
+  "docker-source": {
+    "head": "7b11cc7f85503474c6b87e0ee8b2fedd51bbc249",
+    "tracked_diff": "",
+    "tracked_status": "",
+    "cargo_lock": {
+      "sha256": "0732c477fe1e6b38fd74d558e23b8e3ebda8790705a6ddff1de6fdaca72b316b",
+      "working_file_git_blob": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "committed_git_blob": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "working_equals_committed": true
+    }
+  }
+}

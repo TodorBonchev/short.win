@@ -1,0 +1,109 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 653,
+      "sha256": "96b17b64c57f9e5e9fa72053b3a5a0863beee212bb73e5934f3264308cf317cd"
+    },
+    {
+      "path": "SUMMARY.md",
+      "bytes": 5152,
+      "sha256": "952343658c74db20695abcdf6bda3d9ac9022e42bea344676009d9d4cefbaad1"
+    },
+    {
+      "path": "artifacts/release/shortwin.so",
+      "bytes": 1644024,
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc"
+    },
+    {
+      "path": "artifacts/test-only/mock_cpamm.so",
+      "bytes": 281240,
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9"
+    },
+    {
+      "path": "artifacts/test-only/shortwin.so",
+      "bytes": 1675056,
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01"
+    },
+    {
+      "path": "artifacts/verifier/shortwin.so",
+      "bytes": 1644024,
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc"
+    },
+    {
+      "path": "build-checkout-identity.json",
+      "bytes": 857,
+      "sha256": "7dd3f2eaefefb0202e66f54d9c8c712e9f5d86f68b4b719e3e5bb9f3d44d0330"
+    },
+    {
+      "path": "byte-comparison.json",
+      "bytes": 3333,
+      "sha256": "06a83e59fd942348579125dac5e5fee7f3c49ab9d2ea2cb64f63cf299901bd37"
+    },
+    {
+      "path": "docker-image-identity.json",
+      "bytes": 341,
+      "sha256": "11b00b21b073b756ba43038b71bc7572b9d0d40b4e5301a18a3a44b56258f183"
+    },
+    {
+      "path": "docker-pull.log",
+      "bytes": 1348,
+      "sha256": "5308c5d061835fce0eb5f92ef2bc46bc7ce742801a301a1d91dff073d451e395"
+    },
+    {
+      "path": "docker-pull.receipt.json",
+      "bytes": 486,
+      "sha256": "7e9107c279a1cea9b0a75957bbea3a6d69f4f7122c95fd9da908978f550d963d"
+    },
+    {
+      "path": "docker-verifier.log",
+      "bytes": 6493,
+      "sha256": "cb4ecf3af55c73fa7548cdea118668ab429bcba760524e29b3b7344a88484d46"
+    },
+    {
+      "path": "docker-verifier.receipt.json",
+      "bytes": 606,
+      "sha256": "58127bb92cf325210652ad44347316b293c196d13f30dae739018b95e163fb03"
+    },
+    {
+      "path": "host-release.log",
+      "bytes": 6906,
+      "sha256": "4e24884f8e3c120c698cbae932da6eeb0d604e5a79520cbd5af59440444708a4"
+    },
+    {
+      "path": "host-release.receipt.json",
+      "bytes": 451,
+      "sha256": "98b7842130a568ea64a3431ee7c378bfcb07fb132df84ea4dfe5122675246242"
+    },
+    {
+      "path": "host-test-venue.log",
+      "bytes": 6231,
+      "sha256": "91b2373dc7b96a1ca28958ab28c000d6cd0e2fa3f9c605bca8a3b8fabf41f013"
+    },
+    {
+      "path": "host-test-venue.receipt.json",
+      "bytes": 343,
+      "sha256": "1a5db347355c60b99db9f6be99969e142de8a67a69b78e9b2062ba7efc90a452"
+    },
+    {
+      "path": "host-tool-identity.json",
+      "bytes": 2203,
+      "sha256": "b0a539e03f409225652e784e8a110efcbf9ce13acabbc0885201a417d6d89174"
+    },
+    {
+      "path": "retention-whitelist.json",
+      "bytes": 959,
+      "sha256": "f7d6ce02cc23673f35c863c2a1a7704f4c07f5a03ef0b7def1ede2a1c5a612f9"
+    },
+    {
+      "path": "source-input-diff.txt",
+      "bytes": 128,
+      "sha256": "da09b218e3bd0520f2eeab8159b72972c08170070bf35097e1f80f2bc038b372"
+    },
+    {
+      "path": "source-input-identity.json",
+      "bytes": 2710,
+      "sha256": "000d77d81c1ed985ab33b4f5dae0a9d970f847db2a1dc4554bfdf55b51c2a149"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "cmd": [
+    "anchor",
+    "build",
+    "--tools-version",
+    "v1.57",
+    "--arch",
+    "v3",
+    "--ignore-keys",
+    "--no-idl",
+    "--",
+    "--",
+    "--locked"
+  ],
+  "cwd": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/host-source",
+  "start_utc": "2026-10-22T07:47:45.758075+00:00",
+  "end_utc": "2026-10-22T07:49:08.779659+00:00",
+  "elapsed_seconds": 83.0215825310006,
+  "exit_code": 0
+}

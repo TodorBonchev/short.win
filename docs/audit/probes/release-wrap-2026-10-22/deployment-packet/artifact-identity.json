@@ -1,0 +1,9 @@
+{
+  "snapshot_path": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/deployment-packet-2026-10-22/shortwin-d6f4e092.so",
+  "copied_from": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/artifacts/release/shortwin.so",
+  "size_bytes": 1644024,
+  "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+  "trimmed_executable_hash_from_existing_readiness_record": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250",
+  "acceptance": "Root reports accepted host + Docker release rebuild and test/mock variant evidence. This operational task independently checked only the accepted file size/hash and copied it into this packet.",
+  "exact_source_revision": "7b11cc7f85503474c6b87e0ee8b2fedd51bbc249"
+}

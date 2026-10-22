@@ -1,0 +1,12 @@
+{
+  "cmd": [
+    "/usr/bin/newgrp",
+    "docker"
+  ],
+  "stdin": "exec /usr/bin/docker pull solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f\n",
+  "cwd": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/docker-source",
+  "start_utc": "2026-10-22T07:47:45.758452+00:00",
+  "end_utc": "2026-10-22T07:48:22.586065+00:00",
+  "elapsed_seconds": 36.82763270000578,
+  "exit_code": 0
+}

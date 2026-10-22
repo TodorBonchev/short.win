@@ -1,0 +1,40 @@
+{
+  "observed_at": "2026-10-22T07:47:20.071981+00:00",
+  "purpose": "Verify owner-authorized Docker access repair; existing login still needs newgrp or restart",
+  "changes": [
+    "Added todor_dev to docker group using OS polkit",
+    "Started docker.service using OS polkit"
+  ],
+  "boot_enablement_changed": false,
+  "socket_mode_changed": false,
+  "checks": [
+    {
+      "argv": [
+        "id",
+        "todor_dev"
+      ],
+      "exit_code": 0,
+      "stdout": "uid=1000(todor_dev) gid=1000(todor_dev) groups=1000(todor_dev),998(wheel),966(docker),960(chrome-remote-desktop)",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "systemctl",
+        "is-active",
+        "docker.service"
+      ],
+      "exit_code": 0,
+      "stdout": "active",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "/usr/bin/newgrp",
+        "docker"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"Platform\":{\"Name\":\"\"},\"Version\":\"29.9.1\",\"ApiVersion\":\"1.56\",\"MinAPIVersion\":\"1.40\",\"Os\":\"linux\",\"Arch\":\"amd64\",\"Components\":[{\"Name\":\"Engine\",\"Version\":\"29.9.1\",\"Details\":{\"ApiVersion\":\"1.56\",\"Arch\":\"amd64\",\"BuildTime\":\"Thu Oct 15 13:58:57 2026\",\"Experimental\":\"false\",\"GitCommit\":\"b26fb77d3e\",\"GoVersion\":\"go1.27.2-X:nodwarf5\",\"KernelVersion\":\"7.2.8-9-omarchy\",\"MinAPIVersion\":\"1.40\",\"Module\":\"github.com/moby/moby/v2\",\"ModuleVersion\":\"v2.0.0+unknown\",\"Os\":\"linux\"}},{\"Name\":\"containerd\",\"Version\":\"v2.4.2\",\"Details\":{\"GitCommit\":\"b7a25261e029d68978bbf290df0a62fc819b3c51.m\"}},{\"Name\":\"runc\",\"Version\":\"1.5.2\",\"Details\":{\"GitCommit\":\"\"}},{\"Name\":\"docker-init\",\"Version\":\"0.19.0\",\"Details\":{\"GitCommit\":\"de40ad0\"}}],\"GitCommit\":\"b26fb77d3e\",\"GoVersion\":\"go1.27.2-X:nodwarf5\",\"KernelVersion\":\"7.2.8-9-omarchy\",\"BuildTime\":\"2026-10-15T13:58:57.000000000+00:00\"}",
+      "stderr": ""
+    }
+  ]
+}

@@ -12,28 +12,31 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 ## 1.0.3 release blockers
 
-- [ ] Qualify the integrated candidate's final bytes: the corrected module comment
-      shifts one Anchor diagnostic line-number byte in the ELF. The previous clean
-      ≥24-hour run is retained for its original hash; the new candidate needs its
-      own applicable pinned/verifiable build, final gates and final-byte fuzz.
-      The new run was interrupted after a provider safety block; it does not
-      close the gate and has not been restarted.
 - [ ] Complete or explicitly disposition the [new audit checkpoint](docs/audit/2026-10-22-progress/README.md)
       before any whole-codebase audit-complete claim. Seven independently retained
       hypotheses require validation and 23 lack independent disposition; preserve
       the two provider-stopped scope gaps without retrying those tasks.
 - [ ] Resolve the [current Jupiter live-pin drift](docs/audit/release-checks-1.0.3-2026-10-22.md)
-      through explicit upstream/deployment configuration review before first deployment.
-      Keep the failed aggregate live check recorded; do not silently repin it.
+      through explicit upstream/deployment configuration review before a mainnet
+      release. Jupiter is excluded from the selected uninitialized devnet rehearsal;
+      keep the failed aggregate live check recorded and do not silently repin it.
 - [ ] Verify actual funded/monitored keeper operation, covered markets, payer top-ups and
       alerts, plus running indexer destination `3` and 304-byte client artifact identities.
       Tests establish compatibility; operating evidence is still pending.
 - [ ] Obtain owner review of the [concrete 1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
-      after the remaining preflight requirements are satisfied. Final CI, frozen ≥24 h
-      fuzz and technical finding closure for the earlier canonical artifact are
-      recorded there; the new integrated artifact has the additional gate above.
+      after its remaining preflight requirements are satisfied. The final canonical
+      runtime bytes and prior ≥24 h fuzz attribution are now established for `7b11cc7`
+      by fresh native/pinned-Docker builds and source-input equivalence.
 
 ## Public-devnet test prerequisites
+
+- [ ] Execute the [concrete program-only devnet deployment](docs/audit/probes/release-wrap-2026-10-22/deployment-packet/deployment-packet.md) after its transaction
+      review, then record actual signatures, loader/ProgramData, upgrade authority
+      and executable hash. Scope, version, authority and budget choices are
+      [selected](docs/deployment/devnet-decisions-2026-10-22.md); funding, Docker
+      access and canonical artifact reproduction are complete. No deployment has
+      been sent. The separate stopped fuzz task remains stopped and contributes
+      no result.
 
 - [ ] Resolve the target-cluster profile before promising market E2E: canonical
       Raydium/Jupiter IDs are not executable there, devnet Squads fails the supported

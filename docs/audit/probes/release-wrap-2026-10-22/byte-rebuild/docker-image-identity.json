@@ -1,0 +1,10 @@
+{
+  "Id": "sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f",
+  "RepoDigests": [
+    "solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f"
+  ],
+  "Created": "2026-09-08T15:37:24.90437466Z",
+  "Architecture": "amd64",
+  "Os": "linux",
+  "Size": 4903817132
+}

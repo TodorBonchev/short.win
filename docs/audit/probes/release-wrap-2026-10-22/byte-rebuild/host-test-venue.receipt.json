@@ -1,0 +1,11 @@
+{
+  "command": [
+    "bash",
+    "scripts/build-test-venue.sh"
+  ],
+  "cwd": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/host-source",
+  "start_utc": "2026-10-22T07:49:33.243168+00:00",
+  "end_utc": "2026-10-22T07:50:48.008177+00:00",
+  "elapsed_seconds": 74.76501209600247,
+  "exit_code": 0
+}

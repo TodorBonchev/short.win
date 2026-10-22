@@ -1,0 +1,34 @@
+{
+  "observed_at_utc": "2026-10-22T07:49:31.967400+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "api_version": {
+    "feature-set": 3993424257,
+    "solana-core": "4.4.0-beta.1"
+  },
+  "account_context": {
+    "apiVersion": "4.4.0-beta.1",
+    "slot": 513814375
+  },
+  "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "payer_balance_lamports": 25000000000,
+  "program": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+  "programdata": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+  "program_absent": true,
+  "programdata_absent": true,
+  "rent_lamports": {
+    "program": 833120,
+    "programdata": 8352520760,
+    "buffer": 8352480120
+  },
+  "latest_blockhash": {
+    "context": {
+      "apiVersion": "4.4.0-beta.1",
+      "slot": 513814375
+    },
+    "value": {
+      "blockhash": "7mGhs16W35g7JHs8Gjjn6mPhhCp7bkMjn7MxX8RUMyA2",
+      "lastValidBlockHeight": 501020845
+    }
+  }
+}

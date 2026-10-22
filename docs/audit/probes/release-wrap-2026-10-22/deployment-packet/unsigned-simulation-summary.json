@@ -1,0 +1,37 @@
+{
+  "observed_at_utc": "2026-10-22T07:55:59.527314+00:00",
+  "scope": "unsigned create-buffer and initialize-buffer only; no ELF upload, final deploy, or program invocation",
+  "rpc": "https://api.devnet.solana.com",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "transaction_version": "legacy (mirrors stock solana-cli 4.1.2)",
+  "signatures": "two 64-byte zero placeholders; no signing",
+  "sigVerify": false,
+  "replaceRecentBlockhash": true,
+  "simulation_buffer_public_key": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+  "buffer_is_placeholder": false,
+  "buffer_signer_verified_by_this_script": false,
+  "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "buffer_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "buffer_space_bytes": 1644061,
+  "buffer_funding_lamports": 8352520760,
+  "initial_transaction_wire_bytes": 412,
+  "simulation_context": {
+    "apiVersion": "4.4.0-beta.1",
+    "slot": 513816000
+  },
+  "simulation_error": null,
+  "simulation_units_consumed": 2820,
+  "simulation_fee_lamports": 10000,
+  "quoted_fees_lamports": {
+    "initial": 10000,
+    "write": 5000,
+    "final": 10000
+  },
+  "write_baseline_transaction_bytes": 271,
+  "cli_maximum_write_chunk_bytes": 960,
+  "maximum_upload_write_transactions_before_any_resigning": 1713,
+  "one_pass_maximum_fees_lamports": 8585000,
+  "final_deployment_simulated": false,
+  "final_simulation_limitation": "No populated real buffer exists on chain. Full final loader deployment cannot be simulated against current devnet state before uploading it. Explicit compute price 0 causes the selected CLI to simulate initial preparation, the first write, and final deploy during a later approved deployment.",
+  "broadcast_or_key_access": false
+}

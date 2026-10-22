@@ -1,0 +1,71 @@
+{
+  "commit": "7b11cc7f85503474c6b87e0ee8b2fedd51bbc249",
+  "finished_utc": "2026-10-22T07:51:25.667737+00:00",
+  "artifacts": {
+    "host_release": {
+      "path": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/host-source/target/deploy/shortwin.so",
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "bytes": 1644024,
+      "sbpf_elf_flags": 3,
+      "trimmed_sha256": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250"
+    },
+    "docker_release": {
+      "path": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/docker-source/target/deploy/shortwin.so",
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "bytes": 1644024,
+      "sbpf_elf_flags": 3,
+      "trimmed_sha256": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250"
+    },
+    "host_test_venue": {
+      "path": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/host-source/target/test-venue/deploy/shortwin.so",
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "bytes": 1675056,
+      "sbpf_elf_flags": 3,
+      "trimmed_sha256": "e016b8712080ef08d0b9dc1546eeda8bc62fada891623ad9f52fb90b19de042a"
+    },
+    "host_mock": {
+      "path": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/host-source/target/deploy/mock_cpamm.so",
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "bytes": 281240,
+      "sbpf_elf_flags": 3,
+      "trimmed_sha256": "8116d1ed17242f99851ded711877a6b114a12134dfe7a043d77f4c762262fb83"
+    },
+    "prior_release": {
+      "path": "/home/todor_dev/Projects/short.win/target/deploy/shortwin.so",
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "bytes": 1644024,
+      "sbpf_elf_flags": 3,
+      "trimmed_sha256": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250"
+    },
+    "prior_test_venue": {
+      "path": "/home/todor_dev/Projects/short.win/target/test-venue/deploy/shortwin.so",
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "bytes": 1675056,
+      "sbpf_elf_flags": 3,
+      "trimmed_sha256": "e016b8712080ef08d0b9dc1546eeda8bc62fada891623ad9f52fb90b19de042a"
+    },
+    "prior_mock": {
+      "path": "/home/todor_dev/Projects/short.win/target/deploy/mock_cpamm.so",
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "bytes": 281240,
+      "sbpf_elf_flags": 3,
+      "trimmed_sha256": "8116d1ed17242f99851ded711877a6b114a12134dfe7a043d77f4c762262fb83"
+    }
+  },
+  "checks": {
+    "host_release_matches_canonical": true,
+    "docker_equals_host_release": true,
+    "host_equals_prior_release": true,
+    "host_test_matches_canonical": true,
+    "host_test_equals_prior": true,
+    "host_mock_matches_canonical": true,
+    "host_mock_equals_prior": true,
+    "docker_version_log": true,
+    "verifier_printed_hash_matches_trimmed": true,
+    "verifier_get_hash_matches_trimmed": true,
+    "all_artifacts_sbpfv3": true
+  },
+  "all_checks_pass": true,
+  "fuzz_execution_performed": false,
+  "security_review_performed": false
+}

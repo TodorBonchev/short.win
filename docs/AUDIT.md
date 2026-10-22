@@ -5,11 +5,14 @@ to build and test the code, what the code relies on, and what we already know ab
 
 **Status:**
 - **Integrated devnet preparation (2026-10-22):** the unreleased version remains
-  1.0.3. The article comment correction changes one Anchor diagnostic line-number
-  byte in a fresh ELF, so the prior final-byte fuzz result must retain its original
-  artifact attribution. New candidate qualification and actual devnet dependency,
-  governance and funding prerequisites remain open. The newer whole-repo audit
-  checkpoint is incomplete. See the
+  1.0.3. Formatting the corrected article comment at `7b11cc7` preserves diagnostic
+  locations: fresh native and pinned-Docker builds exactly reproduce the canonical
+  release bytes, and the test artifacts also match. The completed ≥24-hour fuzz
+  record applies to the unchanged runtime/fuzzer/fixture inputs with its original
+  attribution; the later interrupted run contributes no result. Docker access,
+  payer funding and initial phase choices are complete. Actual deployment and
+  devnet governance, dependency and operating requirements remain open, and the
+  newer whole-repo audit checkpoint is incomplete. See the
   [integrated preparation record](audit/release-wrap-up-1.0.3-2026-10-22.md).
 - **Pre-integration 1.0.3 gate snapshot (2026-10-22 local):** owner-selected policy decisions and an
   accurately attributed AI-assisted fix review are recorded. The program has never

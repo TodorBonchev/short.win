@@ -1,0 +1,112 @@
+{
+  "schema": "shortwin.final-devnet-documentation-review.v1",
+  "reviewed_date": "2026-10-22",
+  "reviewer": "devnet_policy_choices AI agent",
+  "result": "provenance_claims_supported_clarifications_resolved_or_reported_applied",
+  "scope": {
+    "kind": "Independent documentation and retained-receipt provenance review only",
+    "repository": "/home/todor_dev/Projects/short.win-release-devnet",
+    "documents": [
+      "TODO.md",
+      "docs/AUDIT.md newest status and its historical attribution context",
+      "docs/audit/release-wrap-up-1.0.3-2026-10-22.md",
+      "docs/deployment/DEVNET_1_0_3_READINESS_2026_10_22.md",
+      "docs/deployment/devnet-decisions-2026-10-22.md",
+      "docs/deployment/devnet-operator-plan-2026-10-22.md",
+      "docs/audit/probes/release-wrap-2026-10-22/README.md",
+      "docs/audit/probes/release-wrap-2026-10-22/byte-rebuild/SUMMARY.md",
+      "docs/audit/probes/release-wrap-2026-10-22/byte-rebuild/README.md"
+    ],
+    "evidence": [
+      "byte-rebuild source-input-identity.json and source-input-diff.txt (path/status metadata only)",
+      "byte-rebuild build-checkout-identity.json and byte-comparison.json",
+      "byte-rebuild host/Docker/test-only command receipts and build-log completion lines",
+      "byte-rebuild Docker image identity and pull receipt",
+      "byte-rebuild prior-fuzz-receipt-review.json (retained provenance receipt, not cases)",
+      "byte-rebuild retained-files.json and all 19 listed metadata/log files",
+      "historically attributed release-checks-1.0.3-2026-10-22.md and focused program/services result records"
+    ],
+    "not_performed": [
+      "Source-security or whole-codebase review",
+      "New tests, fuzz, builds or program execution",
+      "Inspection of stopped-worker cases or reconstruction of stopped tasks",
+      "Raw program/fuzzer binary rehashing by this reviewer",
+      "Live RPC or service verification, signing, deployment or initialization",
+      "Repository edits"
+    ]
+  },
+  "independent_metadata_integrity_check": {
+    "retained_files_checked": 19,
+    "all_recorded_file_sizes_match": true,
+    "all_recorded_file_sha256_values_match": true,
+    "mismatches": [],
+    "recorded_byte_comparison_checks": 11,
+    "all_recorded_byte_comparison_checks_true": true,
+    "recorded_prior_fuzz_receipt_checks": 23,
+    "all_recorded_prior_fuzz_receipt_checks_true": true,
+    "limit": "Rehashing retained metadata/logs verifies their local integrity, not independent observation of original builds or historical fuzz execution."
+  },
+  "supported_conclusions": [
+    "Selected source is 7b11cc7f85503474c6b87e0ee8b2fedd51bbc249; both isolated build checkouts record clean tracked files and unchanged committed Cargo.lock after builds.",
+    "Native release, real-Docker verifier and host test-venue receipts record exit 0. Logs record successful optimized builds; Docker image metadata and verifier log agree on the documented pinned image/Agave profile.",
+    "Recorded fresh host and Docker release artifacts match canonical SHA-256 d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc, length 1644024, trimmed hash f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250. Test-venue and mock identities also match their historical canonical records.",
+    "Git-object receipts record unchanged fuzz/harness, LiteSVM/fixture, mock, runtime math, lockfile and relevant root tool/build inputs. Program and test-build-script source differences are disclosed rather than mislabeled unchanged; actual artifact comparisons establish runtime identity.",
+    "The historical completed run retains frozen source e04a6776, original runner/profile/dates and 86426.897880876 runner seconds. Its receipt review records zero invariant failures/anomalies and distinguishes expected failed transaction counts. No new duration or coverage is claimed.",
+    "Completed original fuzz evidence is attributed to identical runtime artifacts and unchanged fuzz/harness/fixture inputs. It is not represented as a new run or validation of changed services.",
+    "Version 1.0.3 remains unreleased and no stable tag, deployment, governance initialization, live market operation, funded running service, complete audit or universal safety result is claimed.",
+    "The selected first phase is uninitialized loader-only rehearsal; the decision and operator documents correctly separate its prerequisites from initialized-market and stable/mainnet operating requirements.",
+    "Docker failure and intermediate d8d0 artifact are historical, while current canonical byte qualification is complete. The interrupted fresh fuzz task remains stopped and contributes no result or current missing-duration requirement for the re-established canonical runtime."
+  ],
+  "clarifications": [
+    {
+      "id": "DOC-01",
+      "status": "resolved_by_root_and_reread",
+      "path": "docs/audit/release-wrap-up-1.0.3-2026-10-22.md",
+      "issue": "The one-byte-difference paragraph previously did not name the superseded intermediate pair clearly.",
+      "resolution": "Now explicitly says canonical versus superseded intermediate files, after the table showing selected 7b11cc7 exactly canonical."
+    },
+    {
+      "id": "DOC-02",
+      "status": "resolved_by_root_and_reread",
+      "path": "docs/audit/release-wrap-up-1.0.3-2026-10-22.md",
+      "issue": "The earlier phrase current utilization and its EMA could imply an EMA of utilization.",
+      "resolution": "Now explicitly says current utilization and the token-price EMA."
+    },
+    {
+      "id": "DOC-03",
+      "status": "root_reported_applied_after_review",
+      "severity": "scope_clarity",
+      "path": "docs/deployment/DEVNET_1_0_3_READINESS_2026_10_22.md",
+      "locator": "Paragraph beginning After any approved rehearsal",
+      "issue": "It applies config/fee/market accounting and actual keeper/reader/UI checks to any rehearsal, although those states/services do not exist in the selected uninitialized loader-only phase.",
+      "suggested_text": "After a loader-only rehearsal, verify loader, ProgramData, deployed hash and exact upgrade authority, and confirm configuration remains uninitialized. After later initialized/market rehearsals, additionally verify VenueGuard/full digests, config/fee destination, pending proposals, market/vault accounting and actual keeper/reader/UI behavior. Keep stable release gates separate.",
+      "resolution": "Root reports applying phase-specific postchecks. This final follow-up was not independently reread."
+    },
+    {
+      "id": "DOC-04",
+      "status": "root_reported_applied_after_review",
+      "severity": "source_attribution_clarity",
+      "path": "docs/audit/probes/release-wrap-2026-10-22/README.md",
+      "locator": "Opening paragraph names bf166672 as selected runtime/client source",
+      "issue": "The opening still presents the earlier integration-check source as selected, while the later additive section and final documents select 7b11cc7 for the program.",
+      "suggested_text": "Label bf166672 the earlier integration-check source, retain b31c02a as the original program-check source, and explicitly identify 7b11cc7 as the selected final program build source.",
+      "resolution": "Root reports correcting the parent evidence README selected-source attribution. This final follow-up was not independently reread."
+    },
+    {
+      "id": "DOC-05",
+      "status": "root_reported_parent_clarification_applied_after_review",
+      "severity": "retained_path_clarity",
+      "path": "docs/audit/probes/release-wrap-2026-10-22/byte-rebuild/SUMMARY.md",
+      "locator": "The deployment candidate is artifacts/release/shortwin.so in this evidence folder",
+      "issue": "The copied repository folder intentionally retains metadata only. The unqualified relative artifact path describes the original external evidence folder, not this Git directory.",
+      "suggested_text": "Qualify these paths as located in the original external evidence folder recorded by byte-comparison.json and manifest.json; point readers to retained-files.json for the exact Git-retained metadata list.",
+      "resolution": "Root preserved the copied SUMMARY exact bytes and reports adding a prominent parent evidence README clarification that artifacts paths refer to the original external evidence folder and SO files are not in Git. This preserves original manifest integrity. This final follow-up was not independently reread."
+    }
+  ],
+  "limits": [
+    "The deployment packet is being finalized separately; its not-yet-retained link was not treated as a failed deployment prerequisite in this review.",
+    "Historical reports retain their original source/hash/test boundaries. This review did not recertify their implementation, fixtures or security findings.",
+    "Host Anchor source-revision provenance remains unproved as disclosed. Separate pinned Docker reproduction and matching bytes supply the claimed artifact reproducibility evidence.",
+    "All five documentation clarifications were either independently reread as resolved or reported applied by root after review. No contradictory canonical hash, false completed deployment/service claim, or whole-audit/stable-release completion claim was found."
+  ]
+}

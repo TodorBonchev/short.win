@@ -1,0 +1,79 @@
+{
+  "prior_commit": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+  "current_commit": "7b11cc7f85503474c6b87e0ee8b2fedd51bbc249",
+  "inputs": [
+    {
+      "path": "Cargo.toml",
+      "prior_git_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "current_git_object": "f1954d09f3ae7a53bdc723fa8fe5f686ff707d2b",
+      "identical": true
+    },
+    {
+      "path": "Cargo.lock",
+      "prior_git_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "current_git_object": "7555b7517bdbe26f4c51935ad70b0d85276a2ee2",
+      "identical": true
+    },
+    {
+      "path": "Anchor.toml",
+      "prior_git_object": "15b1c2c82b97bd21777dffc89242b70b1e907452",
+      "current_git_object": "15b1c2c82b97bd21777dffc89242b70b1e907452",
+      "identical": true
+    },
+    {
+      "path": "rust-toolchain.toml",
+      "prior_git_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "current_git_object": "6863058cb6cdd74a63f9de93f5636f89456169a2",
+      "identical": true
+    },
+    {
+      "path": ".cargo",
+      "prior_git_object": null,
+      "current_git_object": null,
+      "identical": null
+    },
+    {
+      "path": "programs/shortwin",
+      "prior_git_object": "9f592efa66d6840387dae00a70bb4b9484058e83",
+      "current_git_object": "021f1368e3566e02c0c140b635ed61e4e1bb1392",
+      "identical": false
+    },
+    {
+      "path": "crates/shortwin-math/src",
+      "prior_git_object": "a97d7e3ff3c4366cfd8447519068a7edb07aeece",
+      "current_git_object": "a97d7e3ff3c4366cfd8447519068a7edb07aeece",
+      "identical": true
+    },
+    {
+      "path": "crates/shortwin-math/Cargo.toml",
+      "prior_git_object": "6176c976293d8d234319e20a70f133ecc12ffdf6",
+      "current_git_object": "6176c976293d8d234319e20a70f133ecc12ffdf6",
+      "identical": true
+    },
+    {
+      "path": "tests/fuzz",
+      "prior_git_object": "52e5234a90796f51a27818348c9f880562546d8a",
+      "current_git_object": "52e5234a90796f51a27818348c9f880562546d8a",
+      "identical": true
+    },
+    {
+      "path": "tests/litesvm",
+      "prior_git_object": "1cbcd4d1b3aa0d0221a3ffa479ca8fb767ba3e02",
+      "current_git_object": "1cbcd4d1b3aa0d0221a3ffa479ca8fb767ba3e02",
+      "identical": true
+    },
+    {
+      "path": "tests/mock_cpamm",
+      "prior_git_object": "aee182b9e33fac372addd98febb01f64e2e8d252",
+      "current_git_object": "aee182b9e33fac372addd98febb01f64e2e8d252",
+      "identical": true
+    },
+    {
+      "path": "scripts/build-test-venue.sh",
+      "prior_git_object": "56841f39e29881d208f60b59890973a2f725093e",
+      "current_git_object": "b14c77906e93dd51e577a40945dbc3659b318829",
+      "identical": false
+    }
+  ],
+  "scope": "Git object identity only; no tests or security reviews executed."
+}

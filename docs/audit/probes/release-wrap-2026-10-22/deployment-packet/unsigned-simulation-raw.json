@@ -1,0 +1,92 @@
+{
+  "observed_at_utc": "2026-10-22T07:55:59.527142+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "responses": [
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513816000
+        },
+        "value": 10000
+      },
+      "id": "initial_fee"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513816000
+        },
+        "value": 5000
+      },
+      "id": "write_fee"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513816000
+        },
+        "value": 10000
+      },
+      "id": "final_fee"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513816000
+        },
+        "value": {
+          "accounts": null,
+          "err": null,
+          "fee": 10000,
+          "innerInstructions": null,
+          "loadedAccountsDataSize": 329,
+          "loadedAddresses": {
+            "readonly": [],
+            "writable": []
+          },
+          "logs": [
+            "Program 11111111111111111111111111111111 invoke [1]",
+            "Program 11111111111111111111111111111111 success",
+            "Program BPFLoaderUpgradeab1e11111111111111111111111 invoke [1]",
+            "Program BPFLoaderUpgradeab1e11111111111111111111111 success",
+            "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+            "Program ComputeBudget111111111111111111111111111111 success",
+            "Program ComputeBudget111111111111111111111111111111 invoke [1]",
+            "Program ComputeBudget111111111111111111111111111111 success"
+          ],
+          "postBalances": [
+            16647469240,
+            8352520760,
+            1,
+            1,
+            1
+          ],
+          "postTokenBalances": [],
+          "preBalances": [
+            25000000000,
+            0,
+            1,
+            1,
+            1
+          ],
+          "preTokenBalances": [],
+          "replacementBlockhash": {
+            "blockhash": "4PuQjuz8V5fXRn822aeujKzKASzi53bP1XK5mwBD4mpk",
+            "lastValidBlockHeight": 501022458
+          },
+          "returnData": null,
+          "unitsConsumed": 2820
+        }
+      },
+      "id": "initial_simulation"
+    }
+  ]
+}

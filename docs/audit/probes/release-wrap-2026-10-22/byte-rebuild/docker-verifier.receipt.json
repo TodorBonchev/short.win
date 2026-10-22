@@ -1,0 +1,16 @@
+{
+  "commit": "7b11cc7f85503474c6b87e0ee8b2fedd51bbc249",
+  "unique_manifest": [
+    "programs/shortwin/Cargo.toml"
+  ],
+  "command": [
+    "/usr/bin/newgrp",
+    "docker"
+  ],
+  "stdin": "exec /home/todor_dev/.cargo/bin/solana-verify build --library-name shortwin --arch v3 --cargo-build-sbf-args=\"--tools-version v1.57\"\n",
+  "cwd": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/docker-source",
+  "start_utc": "2026-10-22T07:48:42.855322+00:00",
+  "end_utc": "2026-10-22T07:51:01.028695+00:00",
+  "elapsed_seconds": 138.17337660300836,
+  "exit_code": 0
+}

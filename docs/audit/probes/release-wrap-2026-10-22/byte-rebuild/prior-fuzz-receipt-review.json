@@ -1,0 +1,300 @@
+{
+  "canonical_artifact_records": {
+    "mock": {
+      "bytes": 281240,
+      "matches_launch_inflight_final_and_release_note": true,
+      "raw_binary_rehashed_by_this_review": false,
+      "recorded_path": "/root/fuzz/ready-103-20261021-e04a6776/bin/mock_cpamm.so",
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9"
+    },
+    "release": {
+      "bytes": 1644024,
+      "matches_launch_inflight_final_and_release_note": true,
+      "raw_binary_rehashed_by_this_review": false,
+      "recorded_path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-release.so",
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc"
+    },
+    "runner": {
+      "bytes": 11686272,
+      "matches_launch_inflight_final_and_release_note": true,
+      "raw_binary_rehashed_by_this_review": false,
+      "recorded_path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-fuzz",
+      "sha256": "5b6971e3fd11f8c8d3166d010631b40e0dd57b797f311ba97a348a35e1036b48"
+    },
+    "test_venue": {
+      "bytes": 1675056,
+      "matches_launch_inflight_final_and_release_note": true,
+      "raw_binary_rehashed_by_this_review": false,
+      "recorded_path": "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-test-venue.so",
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01"
+    }
+  },
+  "checked_utc": "2026-10-22T07:54:37.820989+00:00",
+  "checks": {
+    "all_available_core_retention_hashes_and_sizes_match": true,
+    "all_core_files_match_commit_30ba1f5": true,
+    "all_manifested_core_hashes_match": true,
+    "all_progress_lines_record_zero_failures_and_anomalies": true,
+    "canonical_artifact_identity_records_agree": true,
+    "completion_matches_original_final_receipt": true,
+    "completion_timestamps_span_at_least_24h": true,
+    "empty_recorded_anomalies": true,
+    "empty_recorded_failure_counts": true,
+    "empty_recorded_failures": true,
+    "inflight_loaded_runner_hash_matches_launch_record": true,
+    "log_final_aggregate_matches_summary": true,
+    "log_final_anomalies_block_none": true,
+    "log_final_failures_block_none": true,
+    "metadata_matches_pinned_launch_anchor": true,
+    "positive_final_work": true,
+    "recorded_exit_zero": true,
+    "run_log_hash_matches_completion": true,
+    "runner_recorded_elapsed_at_least_24h": true,
+    "running_and_completion_start_agree": true,
+    "source_attribution_records_agree": true,
+    "summary_hash_matches_completion": true,
+    "supervisor_recorded_elapsed_at_least_24h": true
+  },
+  "completed_run": {
+    "exit_code": 0,
+    "finished_utc": "2026-10-21T22:21:37.094749+00:00",
+    "last_progress_aggregate": {
+      "actions": 7330060,
+      "anomalies": 0,
+      "elapsed_seconds": 86416,
+      "failures": 0,
+      "runs": 38561,
+      "transactions": 87621813
+    },
+    "log_final_aggregate": {
+      "actions": 7330667,
+      "hook_checkpoints": 158970339,
+      "rounded_wall_seconds": 86427,
+      "runs": 38563,
+      "skipped": 2298122,
+      "transactions": 87632843,
+      "transactions_failed": 9919675,
+      "wind_downs": 38563
+    },
+    "log_progress_lines_checked": 1439,
+    "recorded_stats": {
+      "actions": 7330667,
+      "anomalies": {},
+      "failure_counts": {},
+      "failures": [],
+      "hook_checkpoints": 158970339,
+      "runs": 38563,
+      "transactions": 87632843,
+      "transactions_failed": 9919675,
+      "wall_seconds": 86426.897880876,
+      "wind_downs": 38563
+    },
+    "runner_elapsed_seconds": 86426.897880876,
+    "started_utc": "2026-10-20T22:21:09.024380+00:00",
+    "supervisor_elapsed_seconds": 86428.07371771798,
+    "timestamp_elapsed_seconds": 86428.070369
+  },
+  "file_checks": {
+    "README.md": {
+      "bytes": 3001,
+      "commit_blob_sha256": "aa4b7b82e4a9dfca5035097366226b1a57c4fc0467f328c257e3a3337ce6e0d6",
+      "manifest_expected_sha256": "aa4b7b82e4a9dfca5035097366226b1a57c4fc0467f328c257e3a3337ce6e0d6",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 3001,
+        "sha256": "aa4b7b82e4a9dfca5035097366226b1a57c4fc0467f328c257e3a3337ce6e0d6"
+      },
+      "sha256": "aa4b7b82e4a9dfca5035097366226b1a57c4fc0467f328c257e3a3337ce6e0d6"
+    },
+    "SHA256SUMS": {
+      "bytes": 5847,
+      "commit_blob_sha256": "da0a5861649f4a72acf695cfaf984b9da101f02dffd0744eefe494685bea81e5",
+      "manifest_expected_sha256": null,
+      "matches_commit_blob": true,
+      "matches_manifest": null,
+      "matches_retention": null,
+      "retention_expected": null,
+      "sha256": "da0a5861649f4a72acf695cfaf984b9da101f02dffd0744eefe494685bea81e5"
+    },
+    "completion.json": {
+      "bytes": 340,
+      "commit_blob_sha256": "1846fcc8f9fc1ea7baf8b520dd5d8b5ebdd2cb80a1259f367829aff2ab3ac704",
+      "manifest_expected_sha256": "1846fcc8f9fc1ea7baf8b520dd5d8b5ebdd2cb80a1259f367829aff2ab3ac704",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 340,
+        "sha256": "1846fcc8f9fc1ea7baf8b520dd5d8b5ebdd2cb80a1259f367829aff2ab3ac704"
+      },
+      "sha256": "1846fcc8f9fc1ea7baf8b520dd5d8b5ebdd2cb80a1259f367829aff2ab3ac704"
+    },
+    "independent-final-verification.json": {
+      "bytes": 23061,
+      "commit_blob_sha256": "805192ea4f4cb77f44092f4d683d302b2e0a227b134c7aee46f3fdd7e6b4775f",
+      "manifest_expected_sha256": "805192ea4f4cb77f44092f4d683d302b2e0a227b134c7aee46f3fdd7e6b4775f",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 23061,
+        "sha256": "805192ea4f4cb77f44092f4d683d302b2e0a227b134c7aee46f3fdd7e6b4775f"
+      },
+      "sha256": "805192ea4f4cb77f44092f4d683d302b2e0a227b134c7aee46f3fdd7e6b4775f"
+    },
+    "metadata.json": {
+      "bytes": 3272,
+      "commit_blob_sha256": "3cb472ecc4a911394e4e6cbe40299ca6486a9f780c6790d87bf8ff57bc772e4c",
+      "manifest_expected_sha256": "3cb472ecc4a911394e4e6cbe40299ca6486a9f780c6790d87bf8ff57bc772e4c",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 3272,
+        "sha256": "3cb472ecc4a911394e4e6cbe40299ca6486a9f780c6790d87bf8ff57bc772e4c"
+      },
+      "sha256": "3cb472ecc4a911394e4e6cbe40299ca6486a9f780c6790d87bf8ff57bc772e4c"
+    },
+    "monitor-verification-notes.md": {
+      "bytes": 8497,
+      "commit_blob_sha256": "cbb1073351a8fe0b17e72f55a3a5fd17ce806354cdd64e97404373b16b8d6858",
+      "manifest_expected_sha256": "cbb1073351a8fe0b17e72f55a3a5fd17ce806354cdd64e97404373b16b8d6858",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 8497,
+        "sha256": "cbb1073351a8fe0b17e72f55a3a5fd17ce806354cdd64e97404373b16b8d6858"
+      },
+      "sha256": "cbb1073351a8fe0b17e72f55a3a5fd17ce806354cdd64e97404373b16b8d6858"
+    },
+    "retention.json": {
+      "bytes": 9741,
+      "commit_blob_sha256": "16ef16b3aca2a2b947dd7f5104add4e948b58aa42f99bfd48cacd4f018f6ffcb",
+      "manifest_expected_sha256": "16ef16b3aca2a2b947dd7f5104add4e948b58aa42f99bfd48cacd4f018f6ffcb",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": null,
+      "retention_expected": null,
+      "sha256": "16ef16b3aca2a2b947dd7f5104add4e948b58aa42f99bfd48cacd4f018f6ffcb"
+    },
+    "run.log": {
+      "bytes": 130462,
+      "commit_blob_sha256": "fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b",
+      "manifest_expected_sha256": "fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 130462,
+        "sha256": "fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b"
+      },
+      "sha256": "fa22b82bc39de18aa02a5e2d70a63ae4ccbc29145149b9cb197c1f659728555b"
+    },
+    "running-identity-witness.json": {
+      "bytes": 7855,
+      "commit_blob_sha256": "e29da8b6df03dc530402d0e9071ab83b21311cc3f2f21dc151177e169033c171",
+      "manifest_expected_sha256": "e29da8b6df03dc530402d0e9071ab83b21311cc3f2f21dc151177e169033c171",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 7855,
+        "sha256": "e29da8b6df03dc530402d0e9071ab83b21311cc3f2f21dc151177e169033c171"
+      },
+      "sha256": "e29da8b6df03dc530402d0e9071ab83b21311cc3f2f21dc151177e169033c171"
+    },
+    "running.json": {
+      "bytes": 108,
+      "commit_blob_sha256": "85f3347ab8931f629d1cd2c14b6af461f0adb0f2c09638724ec7d5fb917e3aec",
+      "manifest_expected_sha256": "85f3347ab8931f629d1cd2c14b6af461f0adb0f2c09638724ec7d5fb917e3aec",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 108,
+        "sha256": "85f3347ab8931f629d1cd2c14b6af461f0adb0f2c09638724ec7d5fb917e3aec"
+      },
+      "sha256": "85f3347ab8931f629d1cd2c14b6af461f0adb0f2c09638724ec7d5fb917e3aec"
+    },
+    "summary.json": {
+      "bytes": 22292,
+      "commit_blob_sha256": "09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e",
+      "manifest_expected_sha256": "09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 22292,
+        "sha256": "09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e"
+      },
+      "sha256": "09bc7f8ce64bbcb7d070da518f405be14ec847d207bdf12f18a28b1acf5fd42e"
+    },
+    "supervisor.log": {
+      "bytes": 0,
+      "commit_blob_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "manifest_expected_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches_commit_blob": true,
+      "matches_manifest": true,
+      "matches_retention": true,
+      "retention_expected": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "limits": [
+    "This validates retained local Git blobs and internal receipt/content-hash consistency. It is not an authenticated independent observation of the original execution, a newly run fuzz campaign, or a security review.",
+    "Original release/test/mock/fuzzer binary paths are copied attribution only; this review did not open or rehash those binaries. All four canonical identities agree across launch, in-flight witness, final receipt and the release note.",
+    "No runtime/fuzzer/harness source, fixture contents, individual cases, minimizations or failure scenarios were reviewed or executed. The source archive and 334 actual fixture files were not rechecked.",
+    "The 24-hour interval belongs to the completed all-selected-profile run, not 24 hours per profile; no durations from earlier or stopped runs were combined. Profile scheduling proofs and coverage completeness were not independently reconstructed.",
+    "The 9,919,675 recorded failed transactions are a separate expected-refusal counter in the original records; invariant failures/failure_counts/anomalies are separately empty. This review does not reinterpret individual refusals.",
+    "The result does not establish current 7b11cc7 source equivalence or fresh release/test/mock/fuzzer byte identity, Docker verification, final test proof, deployment readiness, service operation or unchanged live venue compatibility. The separate ordinary byte rebuild must supply its own evidence.",
+    "The newer provider-stopped candidate directory was not accessed; no stopped task was restarted, reassigned or reconstructed. No repository document was changed and no commit was created.",
+    "The release note retains acknowledged economic/operating limitations and coverage limits. A clean recorded fuzz result is not a guarantee of future behavior or funded operation."
+  ],
+  "original_attribution": {
+    "earlier_manual_ci_source_commit_as_recorded": "ff85a1b0c8452cb9fad32767f7083d22377e90a3",
+    "frozen_source_commit": "e04a6776f1c2f5e02e581d76dd1255c416270275",
+    "later_incoming_code_commit_as_recorded": "56f660027f88ee60a33b9d2b5da516daccc9c9b9",
+    "metadata_prepared_utc": "2026-10-20T22:21:08.458057+00:00",
+    "original_run_directory_as_recorded": "/root/fuzz/ready-103-20261021-e04a6776",
+    "recorded_fixture_file_count": 334,
+    "recorded_launch_command": [
+      "/root/fuzz/ready-103-20261021-e04a6776/bin/shortwin-fuzz",
+      "run",
+      "--profile",
+      "all",
+      "--duration",
+      "24h",
+      "--jobs",
+      "2",
+      "--actions",
+      "400",
+      "--seed",
+      "103410000",
+      "--out",
+      "/root/fuzz/ready-103-20261021-e04a6776/results",
+      "--minimize"
+    ],
+    "recorded_source_archive_sha256": "caf9ce12131db852fea0e21b179fb997e1a731ed89933957c31a3e2715770840",
+    "source_archive_and_fixture_contents_rechecked": false
+  },
+  "provenance_checks_pass": true,
+  "result": "consistent_completed_run_receipts",
+  "reviewer": "operator_rollout_choices AI agent, independent retained-receipt/content-hash validation only",
+  "schema": "shortwin.prior-fuzz-receipt-provenance-review.v1",
+  "scope": {
+    "core_files_checked": 12,
+    "manifest_entries_rehashed": 11,
+    "manifest_remainder": "Not rehashed: preflight, remote service/API review/build records, fixture identity list and source-equivalence reports are outside this receipt-only check. No full-retention-manifest pass is claimed.",
+    "manifest_total_entries": 61,
+    "retained_directory": "/home/todor_dev/Projects/short.win-release-devnet/docs/audit/probes/fuzz-final-1.0.3-2026-10-22",
+    "source_note_commit": "30ba1f54b09bb0fae5a01072c1b5750e8251b76d",
+    "source_note_path": "docs/audit/release-checks-1.0.3-2026-10-22.md",
+    "source_note_sha256": "3a1100545ae9eeda83a16de5c86ef3895133acaa955aa0c36891bf79fa741b65"
+  }
+}

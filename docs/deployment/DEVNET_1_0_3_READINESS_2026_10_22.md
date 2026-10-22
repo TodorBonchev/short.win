@@ -31,18 +31,20 @@ The configured Pyth account `7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE` was r
 
 The earlier canonical release ELF is **1,644,024 B**, SHA-256 `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc`, trimmed executable hash `f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250`, SBPF v3. It was found in the existing primary checkout; it is not automatically a fresh integrated-source build. The article wording edit adds a net source line in `add_margin.rs`; [the build rule](../DEVELOPMENT.md#the-build-rule) explains that error-origin line changes can affect ELF bytes.
 
-Root subsequently produced a fresh candidate of the same **1,644,024 B**, SHA-256 `d8d08784b3b3081d5fe1cf7aaff319e7e9e063733c308bd2e9e7ed8981bee182`. Root attributes the byte change to one diagnostic immediate, source line 72 to 73. This is a new artifact identity; its verifier comparison and relevant new gates remain required. The rent estimates below apply unchanged because the size is unchanged.
+Root subsequently produced an intermediate candidate of the same **1,644,024 B**, SHA-256 `d8d08784b3b3081d5fe1cf7aaff319e7e9e063733c308bd2e9e7ed8981bee182`. Its one changed diagnostic immediate, source line 72 to 73, gave it a different identity. **That intermediate artifact is superseded and is not selected for deployment.**
 
-The actual official-verifier attempt stopped before building: the session cannot access the Docker socket, and noninteractive sudo requires a password. No daemon, permission or tool configuration was changed. Its [retained record](../audit/probes/release-wrap-2026-10-22/verifier/readiness.md) distinguishes the local candidate from an independently reproduced pinned-image build.
+The first official-verifier attempt stopped before building because this session lacked Docker socket access. That failure remains in its [dated record](../audit/probes/release-wrap-2026-10-22/verifier/readiness.md). **Docker access is now repaired:** the owner authorized adding `todor_dev` to the Docker group and starting `docker.service`; both succeeded through the OS authentication dialog. A fresh group shell can reach Docker Engine 29.9.1. Existing login processes need `newgrp docker` or a new login to acquire the group. Socket permissions and boot enablement were not changed. See the [access receipt](../audit/probes/release-wrap-2026-10-22/verifier/docker-access.json).
 
-The subsequent fresh final-byte fuzz attempt was interrupted after the program worker received a provider safety block; its runner/supervisor were stopped and its additive launch review was interrupted. No qualifying 24-hour result is claimed, and the blocked task was not restarted or reassigned. The [root stop receipt](../audit/probes/release-wrap-2026-10-22/fuzz-provider-stop.json) preserves that distinction.
+Commit `7b11cc7f85503474c6b87e0ee8b2fedd51bbc249` reformats the corrected comment into its original number of lines, preserving the corrected rent description. **Exact-source native and real pinned-image builds both passed and reproduce the canonical release `d6f4…538bc`, including its trimmed hash and 1,644,024-byte length.** The test-venue and mock builds also match their canonical bytes. Git object comparisons establish unchanged fuzzer/harness, fixtures, runtime math, lockfile and toolchain inputs. The owner's completed ≥24-hour fuzz record therefore applies to these same runtime inputs, retaining its original source, runner, dates and coverage limits. No new fuzz run is claimed; the interrupted task remains stopped. See [build and input-equivalence evidence](../audit/probes/release-wrap-2026-10-22/byte-rebuild/SUMMARY.md).
 
-Before deployment, produce and retain:
+The earlier fresh final-byte fuzz attempt was interrupted after the program worker received a provider safety block; its runner/supervisor were stopped and its additive launch review was interrupted. No qualifying 24-hour result is claimed for that interrupted attempt, and the blocked task was not restarted or reassigned. The [root stop receipt](../audit/probes/release-wrap-2026-10-22/fuzz-provider-stop.json) preserves that distinction.
 
-1. A clean exact revision and package identity, built with Anchor 1.2.0, Agave 4.1.2, platform-tools v1.57, SBPF v3 and locked dependencies. In an isolated build target use the CI split: `anchor build --tools-version v1.57 --arch v3 --ignore-keys --no-idl -- -- --locked`, followed by `anchor idl build -p shortwin -o <TARGET>/idl/shortwin.json -t <TARGET>/types/shortwin.ts -- --locked`. Do not generate/synchronize program keys as a side effect.
-2. A byte-identical solana-verify 0.5.2 build using the pinned image and [verifiable build procedure](../DEVELOPMENT.md#the-build-rule). Record full file hash, trimmed executable hash, size and exact source ref. Use a dedicated cache/output for concurrent checkouts.
-3. Passing release security.txt/A49 checks and actual IDL/client equality. The `test-venue` ELF and `mock_cpamm` are test artifacts and must not be deployed. A bare `anchor deploy` would also deploy the mock; deploy only the reviewed shortwin artifact.
-4. Appropriately attributed gates for relevant changes. Prior frozen-runtime fuzz and earlier CI do not silently become evidence for newly compiled bytes.
+Artifact preparation checklist:
+
+1. **Done:** isolated builds of exact `7b11cc7`, package 1.0.3, Agave 4.1.2/platform-tools v1.57/SBPF v3. Native Anchor 1.2.0 used `--locked`; Docker's post-build lockfile and tracked tree are unchanged. Installed Anchor's source-revision provenance is unproved; the separately pinned Docker reproduction establishes executable identity.
+2. **Done:** solana-verify 0.5.2 and the pinned image reproduce the exact canonical release, with full and trimmed hashes retained. Both build checkouts were isolated from primary target/key files.
+3. **Done with original attribution:** release security.txt/A49 and IDL/client equality passed on the integration; the final comment formatting changes no interface and returns the already checked canonical bytes. The `test-venue` ELF and `mock_cpamm` remain local test artifacts. A bare `anchor deploy` would also deploy the mock; deploy only the selected shortwin artifact.
+4. **Done for canonical runtime evidence:** the completed frozen-runtime fuzz applies through demonstrated artifact/source-input equivalence. The services and browser retain their separate CI/focused evidence. Full audit completion, operating readiness and deployment execution remain separate requirements.
 
 Draft 1.0.3 is unreleased in the inspected records. Fixing that draft does not itself require 1.0.4. If 1.0.3 has shipped elsewhere, or a new patch candidate is deliberately chosen, use 1.0.4 with accurate evidence attribution. A possible prerelease is `v1.0.3-devnet.1` or `v1.0.4-devnet.1`; it is separate from stable release approval. The ELF embeds `source_release = v + CARGO_PKG_VERSION`, so a version change alters artifact bytes and must align with generated metadata and its claimed tag. No version or tag was changed by this preparation.
 
@@ -73,13 +75,28 @@ Read-only devnet rent queries returned:
 
 Initialization account rents total **146,004,280 lamports (0.14600428 SOL)**. A conservative reserve covering Program, ProgramData and a complete buffer concurrently is **16.705834 SOL** for the earlier ELF. This is a planning reserve, not a measured CLI minimum. Recalculate size-dependent rent after the exact candidate is built, and include write/deploy network fees, governance/proposal rents, the tool-required fee-vault prefund of 890,880 lamports, the 5,000,000-lamport market creation fee, seed liquidity/margin and operating reserve. The initial upgrade authority pays initialization rents in the existing ops path. No payer balance is inferred from wallet creation. Root reports the new devnet payer/proposed initial upgrade authority is `3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14`, initially 0 SOL. One 2-SOL CLI airdrop attempt failed with a faucet/rate-limit error; it was not repeatedly retried. A **20 devnet SOL** funding target covers the conservative program/buffer reserve, initialization rents and a working margin; it is a planning target, not an exact fee quote or a claim that initialization/markets are ready. An approximately 10-SOL balance may cover the final deployed rent, but is below the conservative simultaneous-buffer reserve and must not be promised sufficient without the CLI's exact funding calculation.
 
-A fresh wallet may not obtain the required balance in one faucet request. The authorized bounded CLI airdrop probe for **2 devnet SOL** has already failed, as recorded above. The next funding step is owner-provided test SOL, not another automated request loop. On rate limiting or failure, stop rather than run repeated requests, rotate endpoints or create extra wallets. The official [funding guide](https://solana.com/developers/cookbook/development/airdrops-and-faucets) lists other sources. The [Foundation faucet](https://faucet.solana.com/) currently advertises at most two web requests per eight hours and a GitHub-based higher limit; its agent guidance points to programmatic methods. A human can fund the supplied public address or use their authorized faucet access. A developer-controlled existing devnet balance is another option. No faucet request or transfer was made by this review, and no mining tool was installed or run.
+The failed initial faucet request is retained as historical evidence. The owner has since funded the payer with 25 SOL, and no further funding request is currently needed. The original [funding guide](https://solana.com/developers/cookbook/development/airdrops-and-faucets) and [Foundation faucet](https://faucet.solana.com/) links remain available for later owner-managed test funding. No automated faucet retry loop or alternate-wallet rotation was run.
 
 ## Review packet and allowed rehearsal scope
 
 The concrete signing packet must identify cluster/genesis, exact RPC and artifact hash/size, fixed program ID, matching program signer public key, payer and initial upgrade-authority public keys, chosen max length, fee/rent estimate and a spending ceiling. The root operator has now verified the existing canonical program signer public key equals `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`; its key material was not read by this review. This closes the earlier public signer-identity question. The new payer wallet is a separate signer. No program address was replaced.
 
-The current honest options are:
+**Concrete packet complete:** the [deployment packet](../audit/probes/release-wrap-2026-10-22/deployment-packet/deployment-packet.md)
+binds canonical artifact `d6f4…538bc`, max length 1,644,024, the existing payer/upgrade
+authority and actual upload buffer `2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL`.
+Unsigned buffer preparation passed at slot 513,816,000 (`err=null`, 2,820 CU,
+10,000-lamport fee). At slot 513,816,163 the payer still held 25 SOL and all three
+deployment accounts were absent. Expected net debit for one upload pass is
+**8.361938880 SOL**; a conservative funding/fee envelope is **16.714459640 SOL**.
+The stock CLI does not enforce a total-spend cap; the operator checks the 20-SOL
+ceiling and 5-SOL reserve before one approved invocation. Full final deployment
+simulation requires the populated buffer and is performed by the CLI before
+that stage is signed. No transaction has been signed or sent; the skill's
+explicit transaction-summary confirmation is the remaining loader-phase step.
+
+The [owner-delegated decision](devnet-decisions-2026-10-22.md) selects the first option below, retaining version 1.0.3 and upgradeability, with a 20-SOL deployment ceiling and at least 5 SOL reserved. These policy choices are complete; no further generic policy approval is needed. The concrete transaction review remains the final step before signing.
+
+Phases:
 
 - **Deploy-only rehearsal:** after artifact, signer, funding and transaction approval, deploy only shortwin and verify its loader, ProgramData, authority and executable hash. This proves loader deployment, not initialized governance or functional markets.
 - **Disabled-venue initialization rehearsal:** additionally needs an explicit public authority layout and a disposition for mutable devnet Squads. Existing immutability checks remain intact and cannot be recorded as passing. A config-only success cannot establish trade readiness.
@@ -94,7 +111,7 @@ Keeper public configuration must name the exact covered market set, protocol ALT
 
 Use source-matched indexer/database setup, migrate, backfill, then one live ingest writer and its readers. Record compatible running artifact identities and devnet RPC/WS/first-deployment boundary before any market smoke. Only documented startup compatibility is in this preparation; the previously stopped public API/WebSocket server review and fixtures remain stopped.
 
-After any approved rehearsal, recheck deployed hash, exact authorities, 304-byte VenueGuard/full digest fields, config/fee destination, pending proposals, market/vault accounting and actual keeper/reader/UI behavior. Keep the stable release gate pending until its independently documented requirements pass.
+After the approved loader-only rehearsal, check the deployed hash, Program/ProgramData and exact upgrade authority. In later initialized/market phases, additionally check 304-byte VenueGuard/full digest fields, config/fee destination, pending proposals, market/vault accounting and actual keeper/reader/UI behavior. Keep the stable release gate pending until its independently documented requirements pass.
 
 ## Retained evidence
 

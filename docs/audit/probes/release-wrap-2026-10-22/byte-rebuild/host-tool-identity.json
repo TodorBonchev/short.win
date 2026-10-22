@@ -1,0 +1,47 @@
+{
+  "tools": [
+    {
+      "tool": "anchor",
+      "invoked_path": "/home/todor_dev/.cargo/bin/anchor",
+      "resolved_path": "/home/todor_dev/.avm/bin/avm",
+      "version_stdout": "anchor-cli 1.2.0",
+      "binary_sha256": "f53377785c9c51627db7a605b6d3a16afe3c8e70a423483e8e866183b9ac7a57",
+      "version_exit_code": 0,
+      "version_cwd": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/host-source",
+      "metadata_observation_note": "Earlier version invocation from primary checkout was stopped after hanging; this version is measured from build checkout with NO_DNA=1.",
+      "anchor_version_binary": {
+        "path": "/home/todor_dev/.avm/bin/anchor-1.2.0",
+        "sha256": "0c9c41a3292c281cc6eadb78d6e1c8224d8324a34b0736a89d640fd314db05b7"
+      }
+    },
+    {
+      "tool": "solana",
+      "invoked_path": "/home/todor_dev/.local/share/solana/install/active_release/bin/solana",
+      "resolved_path": "/home/todor_dev/.local/share/solana/install/releases/4.1.2/solana-release/bin/solana",
+      "version_stdout": "solana-cli 4.1.2 (src:182084b8; feat:c763ae0a, client:Agave)",
+      "binary_sha256": "7de6a75174c99840b76d39857504ecdff291ba88f631203b1a2168ec82a1cb55"
+    },
+    {
+      "tool": "solana-verify",
+      "invoked_path": "/home/todor_dev/.cargo/bin/solana-verify",
+      "resolved_path": "/home/todor_dev/.cargo/bin/solana-verify",
+      "version_stdout": "solana-verify 0.5.2",
+      "binary_sha256": "8494a8feb2e3de0d9e4fa089dd1c208d5aa51a2db5c9ae062964fbbb61ee5ab9"
+    },
+    {
+      "tool": "cargo",
+      "invoked_path": "/home/todor_dev/.cargo/bin/cargo",
+      "resolved_path": "/home/todor_dev/.cargo/bin/rustup",
+      "version_stdout": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+      "binary_sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+    },
+    {
+      "tool": "rustc",
+      "invoked_path": "/home/todor_dev/.cargo/bin/rustc",
+      "resolved_path": "/home/todor_dev/.cargo/bin/rustup",
+      "version_stdout": "rustc 1.98.1 (48a229cea 2026-09-01)",
+      "binary_sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+    }
+  ],
+  "anchor_install_receipts": []
+}

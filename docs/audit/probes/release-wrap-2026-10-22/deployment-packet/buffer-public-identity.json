@@ -1,0 +1,11 @@
+{
+  "prepared_at_utc": "2026-10-22T07:55:50.880740+00:00",
+  "public_key": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+  "keypair_path": "/home/todor_dev/.config/shortwin/devnet/release-buffer-2026-10-22.json",
+  "created_new": true,
+  "directory_mode": "0700",
+  "file_mode": "0600",
+  "secret_or_seed_output": "discarded; never printed or copied",
+  "identity_obtained_via": "solana-keygen pubkey",
+  "sign_or_send_or_fund": false
+}

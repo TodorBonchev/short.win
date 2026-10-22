@@ -1,0 +1,50 @@
+{
+  "observed_at_utc": "2026-10-22T07:55:59.421464+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "responses": [
+    {
+      "jsonrpc": "2.0",
+      "result": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+      "id": "genesis"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513815999
+        },
+        "value": {
+          "blockhash": "3L8neLwEvMH3eWshsU6N7kEFKi19RCwSd7pDfHhW13Ya",
+          "lastValidBlockHeight": 501022457
+        }
+      },
+      "id": "blockhash"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513815999
+        },
+        "value": [
+          null,
+          null,
+          null
+        ]
+      },
+      "id": "accounts"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": 833120,
+      "id": "rent_program"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": 8352520760,
+      "id": "rent_programdata"
+    }
+  ]
+}

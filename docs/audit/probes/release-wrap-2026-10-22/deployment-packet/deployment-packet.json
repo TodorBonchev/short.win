@@ -1,0 +1,150 @@
+{
+  "prepared_at_utc": "2026-10-22T07:57:18.819924+00:00",
+  "status": "Concrete program-only operational packet prepared. Only explicit user transaction approval remains before signing or sending; no deployment sent.",
+  "scope": "shortwin-only uninitialized upgradeable loader rehearsal",
+  "release": "1.0.3 remains unreleased; no stable tag",
+  "cluster": {
+    "name": "devnet",
+    "rpc": "https://api.devnet.solana.com",
+    "ws": "wss://api.devnet.solana.com",
+    "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "commitment": "confirmed"
+  },
+  "program": {
+    "address": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "programdata": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+    "loader": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "program_signer_public_key": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "program_signer_identity_basis": "root previously verified matching public key; no key material read by this task",
+    "program_signer_path": "/home/todor_dev/Projects/short.win/target/deploy/shortwin-keypair.json",
+    "max_len_bytes": 1644024,
+    "no_auto_extend": true,
+    "retain_upgradeability": true
+  },
+  "artifact": {
+    "snapshot_path": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/deployment-packet-2026-10-22/shortwin-d6f4e092.so",
+    "copied_from": "/home/todor_dev/security-audit-skill/short.win/release-wrap-2026-10-22/byte-rebuild-7b11cc7/artifacts/release/shortwin.so",
+    "size_bytes": 1644024,
+    "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+    "trimmed_executable_hash_from_existing_readiness_record": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250",
+    "acceptance": "Root reports accepted host + Docker release rebuild and test/mock variant evidence. This operational task independently checked only the accepted file size/hash and copied it into this packet.",
+    "exact_source_revision": "7b11cc7f85503474c6b87e0ee8b2fedd51bbc249"
+  },
+  "signer_roles": {
+    "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "initial_upgrade_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "buffer_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "payer_path": "/home/todor_dev/.config/shortwin/devnet/release-testing-2026-10-22.json",
+    "real_buffer_public_key": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+    "real_buffer_key_created_by_this_task": true,
+    "real_buffer_keypair_path": "/home/todor_dev/.config/shortwin/devnet/release-buffer-2026-10-22.json",
+    "buffer_identity_receipt": "buffer-public-identity.json"
+  },
+  "money": {
+    "denomination": "devnet SOL / lamports",
+    "payer_balance_lamports": 25000000000,
+    "ceiling_lamports": 20000000000,
+    "minimum_reserve_lamports": 5000000000,
+    "rent_lamports": {
+      "program": 833120,
+      "programdata": 8352520760,
+      "buffer": 8352480120
+    },
+    "cli_initial_buffer_funding_lamports": 8352520760,
+    "one_pass_maximum_fees_lamports": 8585000,
+    "expected_net_debit_lamports_with_one_upload_pass": 8361938880,
+    "expected_balance_after_one_upload_pass_lamports": 16638061120,
+    "conservative_two_programdata_rent_envelope_lamports_including_one_pass_fees": 16714459640,
+    "balance_after_conservative_envelope_lamports": 8285540360,
+    "native_cli_hard_total_spend_cap": false,
+    "ceiling_enforcement_limit": "The stock CLI has no max-total-fee/spend option. Max length, no extension, zero priority price and one write signing cycle constrain this action; quoted estimates are not a native 20-SOL balance reservation or universal fee cap. No manual rerun/top-up/extra transaction is included.",
+    "budget_scope": "One selected CLI invocation only, max-sign-attempts 1. Operator ceiling 20 SOL; minimum payer reserve 5 SOL. A second manual attempt requires a fresh cost/state packet."
+  },
+  "cli": {
+    "version": "4.1.2",
+    "max_sign_attempts": 1,
+    "compute_unit_price_micro_lamports": 0,
+    "skip_preflight": false,
+    "skip_feature_verify": false,
+    "skip_fee_check": false,
+    "use_rpc": true,
+    "dry_run_supported": false,
+    "deploy_sign_only_supported": false
+  },
+  "unsigned_simulation": {
+    "observed_at_utc": "2026-10-22T07:55:59.527314+00:00",
+    "scope": "unsigned create-buffer and initialize-buffer only; no ELF upload, final deploy, or program invocation",
+    "rpc": "https://api.devnet.solana.com",
+    "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "transaction_version": "legacy (mirrors stock solana-cli 4.1.2)",
+    "signatures": "two 64-byte zero placeholders; no signing",
+    "sigVerify": false,
+    "replaceRecentBlockhash": true,
+    "simulation_buffer_public_key": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+    "buffer_is_placeholder": false,
+    "buffer_signer_verified_by_this_script": false,
+    "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "buffer_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "buffer_space_bytes": 1644061,
+    "buffer_funding_lamports": 8352520760,
+    "initial_transaction_wire_bytes": 412,
+    "simulation_context": {
+      "apiVersion": "4.4.0-beta.1",
+      "slot": 513816000
+    },
+    "simulation_error": null,
+    "simulation_units_consumed": 2820,
+    "simulation_fee_lamports": 10000,
+    "quoted_fees_lamports": {
+      "initial": 10000,
+      "write": 5000,
+      "final": 10000
+    },
+    "write_baseline_transaction_bytes": 271,
+    "cli_maximum_write_chunk_bytes": 960,
+    "maximum_upload_write_transactions_before_any_resigning": 1713,
+    "one_pass_maximum_fees_lamports": 8585000,
+    "final_deployment_simulated": false,
+    "final_simulation_limitation": "No populated real buffer exists on chain. Full final loader deployment cannot be simulated against current devnet state before uploading it. Explicit compute price 0 causes the selected CLI to simulate initial preparation, the first write, and final deploy during a later approved deployment.",
+    "broadcast_or_key_access": false
+  },
+  "before_signature_request": [
+    "Display the concrete deployment transaction summary and unsigned simulation result; obtain explicit user confirmation under solana-dev W009."
+  ],
+  "post_deploy_checks": [
+    "Retain transaction signatures and actual payer balance change.",
+    "Program owner/executable/state and exact ProgramData pointer match packet.",
+    "ProgramData length is 1644069 bytes, upgrade authority equals payer, and ELF bytes at offset 45 match reviewed full-file SHA-256.",
+    "Retain actual deployed slot; confirm buffer closure or remaining balance and disposition without an unreviewed cleanup transaction.",
+    "Confirm reserve is at least 5 SOL and leave initialization/markets for separate authorized work."
+  ],
+  "excluded_work": "No signing/broadcast, funding, deployment, program initialization, governance changes, markets, project source/security review, artifact qualification, blocked-task restart, repo edits, Git writes or service changes performed. One upload buffer keypair was generated outside Git with user authorization; secret/seed output was discarded and only CLI-derived public identity was retained.",
+  "skill": {
+    "path": "/home/todor_dev/.codex/skills/solana-dev/SKILL.md",
+    "rule": "Transaction review (W009)",
+    "explicit_approval_quote": "Never sign or send transactions without explicit user approval.",
+    "simulation_quote": "Simulate before sending. Always run simulateTransaction and surface the result to the user before requesting a signature."
+  },
+  "final_public_state": {
+    "observed_at_utc": "2026-10-22T07:56:38.575613+00:00",
+    "rpc": "https://api.devnet.solana.com",
+    "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "account_context": {
+      "apiVersion": "4.4.0-beta.1",
+      "slot": 513816163
+    },
+    "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "payer_balance_lamports": 25000000000,
+    "program": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "programdata": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+    "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+    "program_absent": true,
+    "programdata_absent": true,
+    "buffer_absent": true
+  },
+  "after_approval_before_cli_execution": [
+    "Refresh public cluster/genesis, account absence, payer balance, artifact size/hash, rent and fee quotes. Stop on unexpected state or a conservative envelope above 20 SOL or remaining reserve below 5 SOL.",
+    "Execute only the retained command with the real pinned buffer keypair. Keep preflight/feature/fee checks enabled. Explicit compute price zero enables CLI stage simulations; stop on their failure.",
+    "No manual retry, top-up, changed authority, initialization or cleanup transaction is included in this packet."
+  ]
+}

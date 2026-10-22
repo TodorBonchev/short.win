@@ -1,0 +1,84 @@
+{
+  "observed_at_utc": "2026-10-22T07:49:31.967400+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "responses": [
+    {
+      "jsonrpc": "2.0",
+      "result": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+      "id": "genesis"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "feature-set": 3993424257,
+        "solana-core": "4.4.0-beta.1"
+      },
+      "id": "version"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513814375
+        },
+        "value": 25000000000
+      },
+      "id": "payer_balance"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513814375
+        },
+        "value": [
+          {
+            "data": [
+              "",
+              "base64"
+            ],
+            "executable": false,
+            "lamports": 25000000000,
+            "owner": "11111111111111111111111111111111",
+            "rentEpoch": 18446744073709551615,
+            "space": 0
+          },
+          null,
+          null
+        ]
+      },
+      "id": "accounts"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": 833120,
+      "id": "rent_program"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": 8352520760,
+      "id": "rent_programdata"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": 8352480120,
+      "id": "rent_buffer"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513814375
+        },
+        "value": {
+          "blockhash": "7mGhs16W35g7JHs8Gjjn6mPhhCp7bkMjn7MxX8RUMyA2",
+          "lastValidBlockHeight": 501020845
+        }
+      },
+      "id": "blockhash"
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "observed_at_utc": "2026-10-22T07:56:38.575613+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "account_context": {
+    "apiVersion": "4.4.0-beta.1",
+    "slot": 513816163
+  },
+  "payer": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+  "payer_balance_lamports": 25000000000,
+  "program": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+  "programdata": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+  "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+  "program_absent": true,
+  "programdata_absent": true,
+  "buffer_absent": true,
+  "responses": [
+    {
+      "jsonrpc": "2.0",
+      "result": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+      "id": "genesis"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513816163
+        },
+        "value": [
+          {
+            "data": [
+              "",
+              "base64"
+            ],
+            "executable": false,
+            "lamports": 25000000000,
+            "owner": "11111111111111111111111111111111",
+            "rentEpoch": 18446744073709551615,
+            "space": 0
+          },
+          null,
+          null,
+          null
+        ]
+      },
+      "id": "accounts"
+    }
+  ]
+}
