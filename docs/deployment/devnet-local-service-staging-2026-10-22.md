@@ -70,4 +70,17 @@ empty `trusted_proxies` warning is expected for the direct loopback setup.
 This checks startup, connectivity and finality for an uninitialized program;
 it does not establish sustained ingest, market events, rollups or alerting.
 
+## Keeper startup boundary
+
+A subsequent source inspection stopped the planned local keeper smoke **before
+launch**. The staged `keeper-staged.toml` still has `dry_run=true`, an empty
+market allowlist and `coverage_pause.enabled=false`, but its default oracle
+and venue-watch duties remain enabled. In
+[`Keeper::simulate_signed`](../../services/keeper/src/keeper.rs),
+`tx::build` creates a signed transaction for simulation before the `dry_run`
+guard prevents `chain.send`. Thus `dry_run` is not an unsigned startup mode.
+The staged keeper key was not opened, no keeper process ran, and no
+transaction was signed or sent. A later keeper rehearsal needs a concrete
+reviewed transaction scope and the `solana-dev` signing approval gate.
+
 The next market-phase work remains: settle a compatible governance/coverage authority layout and venue/oracle evidence, select a real market and capital ceiling, fund the separately staged keeper and smoke identities, prove ALT selection if v0 fallback needs it, run and monitor one sustained live writer and rollups, demonstrate fresh reader/UI results with real market data, exercise keeper coverage and zero-reward exits, and verify an actual alert recipient and pause drill. The bounded deployment-only backfill and brief live smoke do not establish those market behaviors. Keep public trading and the stable 1.0.3 tag held until those receipts and the broader release gates are complete.

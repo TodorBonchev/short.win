@@ -19,13 +19,13 @@ Use one operator workstation for the bounded rehearsal. Service listeners stay o
 | Browser/client | Devnet-configured web build and loopback preview at `http://127.0.0.1:4173` passed, then stopped. Reader URLs are `http://127.0.0.1:8080` and `ws://127.0.0.1:8080/v1/ws`; no live chain data or wallet trade was shown. |
 | Smoke participants | Separate lender `APCRy7175QKaNK7YM8QcvxTFd7npQQPjwfKpnzqRdfN2` and borrower `5HXuXQvF2iqDqT2VjCWwk2J6gNXg5CNeob4DdabaYqBZ` test wallets, with no protocol authority. Both are unfunded. |
 
-Use the documented database-role separation rather than the combined `run` command. A direct local reader needs no reverse proxy, load balancer, second replica or trusted-proxy entry. Do not use the reference compose gateway address in a direct-host configuration. Database passwords and all key material must remain outside Git. The four devnet-only keypair files above were generated under `/home/todor_dev/.local/state/shortwin-devnet-1.0.3/secrets/` with a `0700` directory and `0600` files; their public keys were verified with `solana-keygen pubkey`, and all are distinct from the deployment payer. No existing deployment key was opened, and no funding or transaction occurred. The keeper remains stopped and its staged configuration remains simulation-only with an empty market allowlist.
+Use the documented database-role separation rather than the combined `run` command. A direct local reader needs no reverse proxy, load balancer, second replica or trusted-proxy entry. Do not use the reference compose gateway address in a direct-host configuration. Database passwords and all key material must remain outside Git. The four devnet-only keypair files above were generated under `/home/todor_dev/.local/state/shortwin-devnet-1.0.3/secrets/` with a `0700` directory and `0600` files; their public keys were verified with `solana-keygen pubkey`, and all are distinct from the deployment payer. No existing deployment key was opened, and no funding or transaction occurred. The keeper remains stopped with an empty market allowlist. Its `dry_run=true` setting blocks sends only after a possible signed simulation; it does not authorize an unsigned startup smoke.
 
 ## Public configuration templates
 
 These are TOML fragments for later operator-owned files, not files written into service configuration. Unspecified values inherit the matching checked-out example's defaults. Runtime/configuration acceptance has not been exercised.
 
-The staged keeper stays stopped with an empty allowlist, simulation only, and no coverage key loaded:
+The staged keeper stays stopped with an empty allowlist, `dry_run=true`, and no coverage key loaded. As [source inspection confirmed](devnet-local-service-staging-2026-10-22.md#keeper-startup-boundary), dry-run still has a signed-simulation path:
 
 ```toml
 markets = { only = [] }
