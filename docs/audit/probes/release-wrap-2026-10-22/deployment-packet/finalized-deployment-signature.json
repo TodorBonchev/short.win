@@ -1,0 +1,15 @@
+{
+  "observed_at_utc": "2026-10-22T14:51:06.174701+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "commitment": "finalized",
+  "signature": "2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j",
+  "status_slot": 513919880,
+  "transaction_slot": 513919880,
+  "signature_err": null,
+  "transaction_err": null,
+  "confirmation_status": "finalized",
+  "transaction_fee_lamports": 10000,
+  "transaction_version": "legacy",
+  "block_time": 1792680561,
+  "signed_or_sent_by_this_read": false
+}

@@ -1,5 +1,9 @@
 # Devnet upload recovery review — 2026-10-22
 
+> Historical recovery proposal. The owner later approved its same-buffer
+> continuation and the deployment succeeded; see the
+> [finalized outcome and receipts](README.md).
+
 The approved single attempt stopped during upload after 87.99 seconds with `Max retries exceeded`. **shortwin is not deployed. No second attempt or reclamation has been made or approved.** The original approval covered one upload attempt; a second invocation needs fresh explicit confirmation under [solana-dev W009](/home/todor_dev/.codex/skills/solana-dev/SKILL.md): “Never sign or send transactions without explicit user approval.”
 
 The confirmed public read at **09:06:51 UTC, slot 513,833,813**, and root's subsequent finalized read at **09:08:24 UTC, slot 513,834,200**, agree on the following state. Devnet genesis remains `EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG`.

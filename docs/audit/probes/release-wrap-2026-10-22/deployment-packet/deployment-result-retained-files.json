@@ -1,0 +1,53 @@
+{
+  "scope": "Successful user-approved same-buffer devnet program deployment; identities and compact public observations only",
+  "files": {
+    "approved-resume-preflight.json": {
+      "bytes": 807,
+      "sha256": "a03001ea337c3b2ebe9d29641e21b21960650c26e04c43a6535bf037b4e5e108"
+    },
+    "approved-resume-simulation-summary.json": {
+      "bytes": 1459,
+      "sha256": "4c297400f3f5a3250f5eecf206353fe13c9a1c15695e469e9d0f251a7ab2da20"
+    },
+    "approved-resume-simulation-context-request.json": {
+      "bytes": 266,
+      "sha256": "ba4af5fe29a7dfe124b49aee3a956ddfb1f57fc45cfb2b670c318be3889503a5"
+    },
+    "approved-resume-simulation-context-raw.json": {
+      "bytes": 578,
+      "sha256": "2ed9369a9381443bec842094f4266d7b64297c0fb3573cbbe9471dcf30a0d558"
+    },
+    "approved-resume-unsigned-simulation-request.json": {
+      "bytes": 4426,
+      "sha256": "0da2640ff4a761765a0db72db8b81e32251714e3e835d928e506a0ef243293bf"
+    },
+    "approved-resume-unsigned-simulation-raw.json": {
+      "bytes": 2050,
+      "sha256": "2924b2c59d25839f0731ee754505834d316fa737dac4277f7038295f6f42ba4a"
+    },
+    "approved-resume-execution-start.json": {
+      "bytes": 1683,
+      "sha256": "b84310b98c106a6fab8b5e7f3ae81e54d09c305c5ea370f3a71771c822344484"
+    },
+    "approved-resume-execution.log": {
+      "bytes": 289,
+      "sha256": "711872b197d266438d04eb507c6b58c06849defaa1a4aca04527e92a4f899fbc"
+    },
+    "approved-resume-execution-result.json": {
+      "bytes": 1866,
+      "sha256": "009653601d5538ca77beb458ba8e3d433f12049a89b724f9c3bfaff418e8c170"
+    },
+    "post-deploy-onchain-verification.json": {
+      "bytes": 1458,
+      "sha256": "ef510fbb9a1687138512c59e89dd43236597f11d3a3ed9c96fafb9768a16e307"
+    },
+    "finalized-deployment-signature.json": {
+      "bytes": 529,
+      "sha256": "f934b89bf676241b2fb23c1115e5f5de92b2ddbe6d3293b90a473bbb12ec17cd"
+    },
+    "independent-deploy-verification.json": {
+      "bytes": 2862,
+      "sha256": "861b1f4ec48810c94582c4e3db69a3454a02b3550282fed4992bd4ead5345683"
+    }
+  }
+}

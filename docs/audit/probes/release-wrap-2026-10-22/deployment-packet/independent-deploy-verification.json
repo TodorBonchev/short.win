@@ -1,0 +1,71 @@
+{
+  "verified_at_utc": "2026-10-22T14:52:41.581025+00:00",
+  "verification": "Independent fresh public RPC reads; no reuse of root deployment account dump.",
+  "rpc": "https://api.devnet.solana.com",
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "commitment": "finalized",
+  "account_context": {
+    "apiVersion": "4.4.0-beta.1",
+    "slot": 513920719
+  },
+  "signature_status_context": {
+    "apiVersion": "4.4.0-beta.1",
+    "slot": 513920720
+  },
+  "signature": "2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j",
+  "signature_status": {
+    "confirmationStatus": "finalized",
+    "confirmations": null,
+    "err": null,
+    "slot": 513919880,
+    "status": {
+      "Ok": null
+    }
+  },
+  "program": {
+    "address": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "executable": true,
+    "data_bytes": 36,
+    "loader_state": 2,
+    "programdata_pointer": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+    "lamports": 833120
+  },
+  "programdata": {
+    "address": "5UUu4yttKrtDNegGbUgZBxubJPaoPrsuiybeCJ8BnqcF",
+    "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "executable": false,
+    "data_bytes": 1644069,
+    "loader_state": 3,
+    "deployed_slot": 513919880,
+    "upgrade_authority_option": 1,
+    "upgrade_authority": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "metadata_bytes": 45,
+    "elf_bytes": 1644024,
+    "elf_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+    "trimmed_elf_sha256": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250",
+    "trimmed_elf_bytes": 1644009,
+    "trim_method": "SHA-256 after removing trailing zero bytes from ProgramData ELF payload",
+    "lamports": 8352520760
+  },
+  "payer": {
+    "address": "3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14",
+    "balance_lamports": 16638061120,
+    "resume_start_balance_lamports": 16647399240,
+    "observed_resume_debit_lamports": 9338120,
+    "minimum_reserve_lamports": 5000000000,
+    "reserve_preserved": true
+  },
+  "absent_accounts": {
+    "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+    "config": "ALyVdw8YE71nVstrmqnn4Preww99ZDbvAtYfxDbcQRuW",
+    "venue_guard": "DZJN1doY9r5BUSybJz4NibiLQfMKtGvhrxxME4QY2Sfp",
+    "oracle_cache": "HfeS818hsgNEC2TZ8SYN3PEcUsmyMLrwszDKUYitdZzP"
+  },
+  "state_conclusion": "Approved canonical program deployed and finalized, upgrade authority retained as reviewed, buffer gone, protocol remains uninitialized. This receipt does not establish functional market readiness.",
+  "rpc_response_sha256": "f854bc358eafe0a738270b3542915beb7aa08477651abb3a156ddf733ce0c0cc",
+  "rpc_response_bytes": 2193052,
+  "full_account_bytes_printed_or_retained_in_this_compact_receipt": false,
+  "all_checks_passed": true,
+  "signed_or_sent": false
+}

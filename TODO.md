@@ -6,7 +6,10 @@ This file lists unfinished work only. Completed audit and release evidence is in
 [the current readiness record](docs/audit/release-readiness-1.0.3-2026-10-21.md),
 [the findings tracker](docs/audit/findings.md), and
 [the validation record](docs/audit/ai-review-3/validation-1.0.3.md).
-The 1.0.3 candidate is unreleased; do not tag or deploy it from this checklist.
+The 1.0.3 candidate is unreleased as a stable tag. Its
+[program-only devnet deployment](docs/deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
+is complete; do not infer initialization, functional market readiness, or
+mainnet release approval from that deployment.
 The final candidate also includes the AI3-FR01 quarantine and the owner-selected
 complete SHA-256 VenueGuard correction for first deployment.
 
@@ -30,17 +33,6 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 ## Public-devnet test prerequisites
 
-- [ ] Execute the [concrete program-only devnet deployment](docs/audit/probes/release-wrap-2026-10-22/deployment-packet/deployment-packet.md) after its transaction
-      review, then record actual signatures, loader/ProgramData, upgrade authority
-      and executable hash. Scope, version, authority and budget choices are
-      [selected](docs/deployment/devnet-decisions-2026-10-22.md); funding, Docker
-      access and canonical artifact reproduction are complete. The first approved
-      attempt created the buffer and confirmed 14 upload writes, then stopped at
-      a client `Max retries exceeded` error; the program remains absent. The
-      [recovery proposal](docs/audit/probes/release-wrap-2026-10-22/deployment-packet/recovery-packet.md)
-      reuses the buffer and needs separate transaction approval. The stopped
-      fuzz task remains stopped and contributes no result.
-
 - [ ] Resolve the target-cluster profile before promising market E2E: canonical
       Raydium/Jupiter IDs are not executable there, devnet Squads fails the supported
       immutability check, and Pump dependency parity is unverified. Establish fresh
@@ -51,7 +43,8 @@ The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) an
 accurately labelled [focused](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md) /
 [integration](docs/audit/independent-integration-review-1.0.3-2026-10-21.md) /
 [AIR2](docs/audit/independent-air2-fix-review-1.0.3-2026-10-21.md) AI fix reviews
-are recorded. The program has never been deployed; old-account migration is not needed.
+are recorded. The first program-only devnet deployment is complete; no old
+accounts required migration for that deployment.
 The batch-specific review route does not waive CI or final-profile fuzz. The live venue
 refresh and legacy keeper cleanup are complete in the source candidate.
 

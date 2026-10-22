@@ -1,0 +1,25 @@
+{
+  "observed_at_utc": "2026-10-22T14:48:41.165604+00:00",
+  "rpc": "https://api.devnet.solana.com",
+  "responses": [
+    {
+      "jsonrpc": "2.0",
+      "result": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+      "id": "genesis"
+    },
+    {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.4.0-beta.1",
+          "slot": 513919705
+        },
+        "value": {
+          "blockhash": "DGve8v4qEiFvrksaTf8BTYVtXRryvX9sDHFsZNBfyKdX",
+          "lastValidBlockHeight": 501125660
+        }
+      },
+      "id": "blockhash"
+    }
+  ]
+}

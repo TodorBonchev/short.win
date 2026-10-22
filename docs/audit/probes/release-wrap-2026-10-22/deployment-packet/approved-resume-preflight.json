@@ -1,0 +1,22 @@
+{
+  "observed_at_utc": "2026-10-22T14:48:38.220687+00:00",
+  "slot": 513919691,
+  "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "program_absent": true,
+  "programdata_absent": true,
+  "buffer": "2JGjQoiGyDLTsqy9186Ct7kN4zdG2ULb8nARjN7ddgcL",
+  "buffer_lamports": 8352520760,
+  "buffer_len": 1644061,
+  "buffer_authority_matches_payer": true,
+  "matched_chunks": 14,
+  "remaining_chunks": 1699,
+  "payer_balance_lamports": 16647399240,
+  "rent_programdata_lamports": 8352520760,
+  "rent_program_lamports": 833120,
+  "artifact_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+  "keypair_public_addresses_verified": true,
+  "approved_additional_ceiling_lamports": 50000000,
+  "minimum_reserve_lamports": 5000000000,
+  "checks_pass": true,
+  "signed_or_sent": false
+}

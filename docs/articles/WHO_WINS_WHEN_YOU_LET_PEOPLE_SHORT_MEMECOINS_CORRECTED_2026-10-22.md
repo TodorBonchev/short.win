@@ -6,7 +6,7 @@ By Todor Bonchev, founder of ShortWin
 
 I’m building ShortWin, a Solana protocol that lets people lend and short memecoins, including tokens still on the pump.fun bonding curve.
 
-ShortWin is pre-audit and not deployed. Nobody can use it today. This is a design essay, not an offer or investment advice. The numbers below come from specified examples in my own economic model. They can be wrong, and they are not forecasts of live returns.
+ShortWin is pre-audit. An uninitialized version of its program is deployed on Solana devnet for testing, but no ShortWin market is available to users. This is a design essay, not an offer or investment advice. The numbers below come from specified examples in my own economic model. They can be wrong, and they are not forecasts of live returns.
 
 The hardest bugs in a lending protocol aren’t necessarily in the code. They can be in the incentives. A program can follow its specification and still move money from the naive to the clever.
 

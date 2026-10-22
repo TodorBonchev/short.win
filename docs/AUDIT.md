@@ -4,19 +4,29 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
+- **Program-only devnet deployment (2026-10-22):** the unreleased 1.0.3
+  `shortwin` ELF is executable at
+  [`5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`](https://explorer.solana.com/address/5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK?cluster=devnet).
+  Transaction [`2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j`](https://explorer.solana.com/tx/2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j?cluster=devnet)
+  finalized at slot `513919880`; independent on-chain ELF byte comparison yielded full
+  SHA-256 `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc`.
+  This is an uninitialized loader deployment. Devnet governance and supported
+  market end-to-end operation, the incomplete broader audit, and the stable
+  release tag remain open. See the [deployment result](deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
+  and [retained deployment evidence](audit/probes/release-wrap-2026-10-22/deployment-packet/README.md).
 - **Integrated devnet preparation (2026-10-22):** the unreleased version remains
   1.0.3. Formatting the corrected article comment at `7b11cc7` preserves diagnostic
   locations: fresh native and pinned-Docker builds exactly reproduce the canonical
   release bytes, and the test artifacts also match. The completed ≥24-hour fuzz
   record applies to the unchanged runtime/fuzzer/fixture inputs with its original
   attribution; the later interrupted run contributes no result. Docker access,
-  payer funding and initial phase choices are complete. Actual deployment and
-  devnet governance, dependency and operating requirements remain open, and the
-  newer whole-repo audit checkpoint is incomplete. See the
+  payer funding and initial phase choices were complete at that checkpoint.
+  Deployment was still pending then; devnet governance, dependency and operating
+  requirements remain open, and the newer whole-repo audit checkpoint is incomplete. See the
   [integrated preparation record](audit/release-wrap-up-1.0.3-2026-10-22.md).
 - **Pre-integration 1.0.3 gate snapshot (2026-10-22 local):** owner-selected policy decisions and an
-  accurately attributed AI-assisted fix review are recorded. The program has never
-  been deployed. Complete-digest VenueGuard artifacts supersede earlier program
+  accurately attributed AI-assisted fix review are recorded. At that checkpoint,
+  the program had never been deployed. Complete-digest VenueGuard artifacts supersede earlier program
   hashes; exact-ref full CI and final-byte ≥24 h fuzz passed. Jupiter live-pin drift
   and funded-service preflight remain pending. See
   [current readiness](audit/release-readiness-1.0.3-2026-10-21.md) and §0 below.
@@ -111,7 +121,7 @@ to build and test the code, what the code relies on, and what we already know ab
 | Item | Value |
 |---|---|
 | Audit commit / tag | **`e4895c2`, tagged `audit-1` / `v1.0.0`** (2026-10-11), the head of `m1-core` at the tag: the M10 tree (`98b1181`, batch 3 from `391aed3`, the doc sync and this package; program batch 4 — the program change `1e4a273`, `3b33ab7` bytecode-neutral — with its docs and gate up to `4f4849e`), then the final tree's fuzz fixes `997c730` and `945d45a` (`tests/fuzz` and one test-harness doc comment only) and this evidence sync; then the **KI-65 program batch** (branch `m10/ki65`, 2026-10-07: `ShareEpoch.conv_rem`, cumulative conversion rounding; its program commit `3c7c689` on `m10/ki65`), then the **KI-65 follow-up** (branch `m10/ki65b`, 2026-10-07: owner-signed conversions through a rebase record, `sync_lender`'s `owner` account and `RebaseNeedsOwner`, KI65-REV-SEC1; its program commit `79cacd9` on `m10/ki65b`), then the **KI-66 batch** (branch `m10/ki66`, 2026-10-07/08: the pot-only touch, `pool::touch_pot` and `sync_lender`'s path selection, owner decision of 2026-10-07, seventh round; its math and program commits `e639558` and `e19e0c8` on `m10/ki66`), then the **KI-66 full / KI-67 batch** (branch `m10/ki67`, 2026-10-08: the forward chain, `claim_sol`'s close, owner decisions of the eighth round; its math and program commits `6aad5a5` and `f47b0d8` on `m10/ki67`; the ids change if the branches are rebased at integration), then the **FE-30 batch** (branch `m10/fe30`, 2026-10-08: the web and the indexer only, owner decisions of the ninth round; the program bytes unchanged), then the fuzzer fix `9861c5a` (run D's two oracle findings, FUZZ-24D-A and FUZZ-M10-24H-D-B: `tests/fuzz` and docs), then the **M10-RESP batch** (m1-core `acbe323`, 2026-10-09/10: phone and tablet layouts, the desktop terminal's fixes; the owner's twelfth round; approved as built in the thirteenth round, 2026-10-10) and the **round-13 UX batch** (m1-core `7a64dcd`, 2026-10-11: O-1 lend order, O-2 coverage notice once, O-3 newcomer help, O-4 12 px floor, O-5 Claim wording; its 143 new strings and the `borrower.liquidation` ¶3 amendment approved by the owner on 2026-10-11) — the web only; then the evidence sync `04c5236` (docs), the lint fix `7b2121d` (the web's lint configuration, M10-CI-LINT) and the CI record `e4895c2` (docs). The program bytes are those of the KI-66 full / KI-67 batch. **Tagged on 2026-10-11** (the owner's decision of that day; owner decision of 2026-10-02: release 1.0.0 at the audit tag; post-audit fixes are 1.0.x); its program hashes are the table below (CI run 38125079869's verifiable build on `7b2121d`; `e4895c2` changes only docs) |
-| Package version | At the tag `shortwin` and `complete_curve` were both 1.0.0. The released source since 2026-10-16 is `shortwin` 1.0.1 (§13); `complete_curve` is retired. AI review 3 scanned the 1.0.2 candidate at `b815269`; the current unreleased gate candidate is **1.0.3** (`source_release` `v1.0.3`), with no release tag or deployment |
+| Package version | At the tag `shortwin` and `complete_curve` were both 1.0.0. The released source since 2026-10-16 is `shortwin` 1.0.1 (§13); `complete_curve` is retired. AI review 3 scanned the 1.0.2 candidate at `b815269`; the current unreleased gate candidate is **1.0.3** (`source_release` `v1.0.3`), deployed program-only to devnet on 2026-10-22 but without a stable release tag or initialized market |
 | `shortwin` program id | `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`programs/shortwin/src/lib.rs` `declare_id!`) |
 | `complete_curve` program id | `4B5mGykX9EWwaYdbTvsp8qXCUTbc7caQourz16Gat6LJ` (`programs/complete_curve/src/lib.rs`) |
 | TEST-ONLY mock venue | `BPAZFPkmVtYEWEZHCzFUns7oybh1VWfAvmu3ofM2mQi7` (`tests/mock_cpamm`; never deployed; out of scope, §2) |
@@ -325,10 +335,10 @@ FR01 hashes above. Its [13h13m fuzz run](audit/fuzz-1.0.3-fr01.md) was intention
 superseded when the complete-digest correction changed the program bytes; it is partial
 evidence, not a completed ≥24-hour gate.
 
-**Current 2026-10-21 candidate:** the [readiness record](audit/release-readiness-1.0.3-2026-10-21.md)
+**2026-10-21 candidate snapshot:** the [readiness record](audit/release-readiness-1.0.3-2026-10-21.md)
 records full 32-byte SHA-256 VenueGuard storage/comparison, regenerated 304-byte readers,
 keeper/browser recovery fixes, signed regressions and the integrated source identity.
-The owner confirmed the program has never been deployed and explicitly delegated the
+At that checkpoint, the owner confirmed the program had never been deployed and explicitly delegated the
 [documented policy choices](audit/owner-decisions-1.0.3-2026-10-21.md). Old-account migration
 is therefore not a first-deployment prerequisite. Economic acknowledgements retain their
 stated consequences; they are not findings proved harmless by tests.
@@ -376,9 +386,21 @@ Independent checks matched final summary/log hashes, every frozen input and the
 source-pinned six-profile witness. [Final retained evidence](audit/probes/fuzz-final-1.0.3-2026-10-22/README.md).
 Previous-program/profile durations remain historical. The
 [October 22 release checks and plan](audit/release-checks-1.0.3-2026-10-22.md)
-record Jupiter live-pin drift and unavailable funded-service evidence; no tag or
-deployment is approved by this record. Technical finding closure preserves the
+record Jupiter live-pin drift and unavailable funded-service evidence; that
+record did not authorize a tag or deployment. Technical finding closure preserves the
 owner's acknowledged economic risks and deferred broader review scope.
+
+**2026-10-22 devnet deployment update:** the owner separately approved the
+program-only upload. After the first attempt stopped with a partially written
+buffer, a separately approved same-buffer resume completed and the transaction
+above finalized. A full on-chain ProgramData read matched the 1.0.3 canonical
+ELF byte for byte, including the full SHA-256 in the current artifact table.
+The [deployment result](deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
+and [attempt receipts](audit/probes/release-wrap-2026-10-22/deployment-packet/README.md)
+record the signatures, authority, balances and evidence boundary. GlobalConfig,
+VenueGuard and OracleCache are absent, so this confirms a loader deployment only;
+it does not complete operational devnet testing or close the remaining audit and
+stable-tag gates.
 
 ## 1. The protocol on one page
 

@@ -20,7 +20,10 @@ Status: milestones M0–M10 built (the ≥ 24-hour fuzz criterion met for M7 by 
 run 4 and on the final program bytes by run E, [`tests/fuzz/README.md`](tests/fuzz/README.md)):
 the program with every venue (pump.fun curve, PumpSwap, Raydium AMM v4 and CPMM), the keeper, the
 indexer and API, and the web frontend (`apps/web`, with its Playwright E2E on a local validator).
-Pending: M10's external audit (`docs/AUDIT.md`). Not deployed.
+Pending: M10's external audit ([`docs/AUDIT.md`](docs/AUDIT.md)) and stable release
+gates. The unreleased 1.0.3 program was [deployed to devnet on 2026-10-22](docs/deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
+for loader and artifact verification; it is uninitialized, with no tested
+devnet market or mainnet deployment.
 
 ## Layout
 

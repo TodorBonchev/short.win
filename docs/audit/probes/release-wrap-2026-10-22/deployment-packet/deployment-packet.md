@@ -1,5 +1,8 @@
 # Program-only devnet deployment packet — 2026-10-22
 
+> Historical pre-approval state. The deployment later succeeded; see the
+> [finalized outcome and receipts](README.md).
+
 Concrete preparation is complete. The accepted artifact and real upload buffer signer are bound below. **No transaction has been signed or sent. Explicit user approval of this transaction summary is the remaining step.**
 
 The selected operation is one shortwin-only, uninitialized, upgradeable loader deployment rehearsal. Version 1.0.3 remains unreleased; this operation creates no stable release tag. Governance initialization and functional markets are outside this operation.
@@ -21,7 +24,7 @@ The selected operation is one shortwin-only, uninitialized, upgradeable loader d
 | Exact source revision | `7b11cc7f85503474c6b87e0ee8b2fedd51bbc249` |
 | Reviewed ceiling / minimum reserve | 20 devnet SOL / 5 devnet SOL |
 
-Root reports acceptance of the host and Docker release rebuilds and test/mock variant evidence. This operational task checked only the accepted ELF's size and full-file hash, then retained an identical [deployment snapshot](shortwin-d6f4e092.so). The [artifact identity receipt](artifact-identity.json) identifies the accepted source file. Artifact qualification was performed separately by root.
+Root reports acceptance of the host and Docker release rebuilds and test/mock variant evidence. This operational task checked only the accepted ELF's size and full-file hash, then retained an identical external deployment snapshot, `shortwin-d6f4e092.so`, outside Git. The [artifact identity receipt](artifact-identity.json) identifies the accepted source file. Artifact qualification was performed separately by root.
 
 The upload keypair was generated under the owner's existing authorization at `/home/todor_dev/.config/shortwin/devnet/release-buffer-2026-10-22.json`, without overwriting an existing key. Its directory is mode 0700 and file mode 0600. Secret and seed output was discarded; only `solana-keygen pubkey` output is retained in the [public identity receipt](buffer-public-identity.json). The payer and canonical program signer keypair contents were not inspected by this task.
 

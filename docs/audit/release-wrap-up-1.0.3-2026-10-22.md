@@ -1,7 +1,8 @@
 # 1.0.3 integration and devnet readiness, 2026-10-22
 
-**Keep the version at unreleased 1.0.3. Stable tagging and full public-devnet
-market testing are not ready.** No 1.0.3 release tag exists; further preparation
+**The program-only devnet deployment succeeded. Keep the version at unreleased
+1.0.3; stable tagging and full public-devnet market testing are not ready.**
+No 1.0.3 release tag exists; further preparation
 does not require calling the same unreleased candidate 1.0.4. A version change
 would also change the program's embedded `source_release` and artifact identity.
 
@@ -126,59 +127,72 @@ records selected service settings for later initialized/market testing; those
 services are not prerequisites to the loader-only rehearsal.
 
 The [concrete deployment packet](probes/release-wrap-2026-10-22/deployment-packet/deployment-packet.md)
-is prepared, including a real upload-buffer signer stored outside Git and a
-successful unsigned buffer-preparation simulation. Current estimated net debit
-is 8.361938880 devnet SOL; the conservative envelope is 16.714459640 SOL, below
-the selected 20-SOL ceiling. The CLI has no aggregate spending-cap option; keep
-the packet's pre-execution checks and single-attempt scope. Final loader simulation
-requires the populated buffer and runs before that stage is signed. At packet
-preparation no signing had occurred; the approved initial attempt and unapproved
-recovery proposal are recorded below. All generic policy choices are selected.
+bound the program identity, external upload-buffer signer and successful unsigned
+buffer-preparation simulation. Its estimated net debit was 8.361938880 devnet
+SOL; the conservative envelope was 16.714459640 SOL, below the selected 20-SOL
+ceiling. The CLI has no aggregate spending-cap option. All generic policy
+choices were selected before either signed attempt.
 
-**Execution update:** the first approved devnet CLI attempt failed while writing
-the program, reporting `Max retries exceeded`. The approved buffer exists with
-8.352520760 SOL and 14 matching upload chunks; the payer has 16.647399240 SOL,
-and the program/ProgramData are still absent. Fifteen transactions were confirmed
-successful; 80,000 lamports in fees were spent. The [failure receipts](probes/release-wrap-2026-10-22/deployment-packet/failed-attempt-retained-files.json)
-record the bounded result. No retry has been signed; read-only recovery planning
-is underway, and the original one-attempt authorization does not cover another
-write or buffer-close transaction.
+**Current deployment result:** the owner separately approved a same-buffer
+resume. It finalized successfully in transaction
+[`2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j`](https://explorer.solana.com/tx/2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j?cluster=devnet)
+at slot **513919880**. Program
+`5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` is executable; its
+ProgramData contains the exact 1,644,024-byte canonical ELF (full SHA-256
+`d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc`).
+The temporary upgrade authority is payer
+`3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14`; the upload buffer was
+consumed and the payer held **16.638061120 SOL** after deployment. GlobalConfig,
+VenueGuard and OracleCache remain absent: this is an **uninitialized,
+program-only** deployment. The total debit from the initial 25 SOL was
+8.361938880 SOL. See the [deployment receipt](../deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
+and [retained transaction evidence](probes/release-wrap-2026-10-22/deployment-packet/README.md).
 
-The [read-only recovery proposal](probes/release-wrap-2026-10-22/deployment-packet/recovery-packet.md)
-retains the existing buffer and verified artifact. The first missing write
+**Historical first attempt:** the first approved devnet CLI invocation failed
+while writing the program, reporting `Max retries exceeded`. At that time, the
+approved buffer held 8.352520760 SOL and 14 matching upload chunks; the payer
+held 16.647399240 SOL, and the program/ProgramData were absent. Fifteen
+transactions were confirmed successful; 80,000 lamports in fees were spent.
+The [failure receipts](probes/release-wrap-2026-10-22/deployment-packet/failed-attempt-retained-files.json)
+record its bounded result. At that point, the original one-attempt
+authorization had been spent; the later resume required and received separate
+owner approval.
+
+The [historical read-only recovery proposal](probes/release-wrap-2026-10-22/deployment-packet/recovery-packet.md)
+retained the existing buffer and verified artifact. The first missing write
 simulated successfully. Agave's resume path would send only the 1,699 remaining
-chunks; one successful pass is estimated to debit 0.009338120 SOL. The proposed route
-tries QUIC TPU with five signing cycles, subject to a fresh 0.05-SOL additional
-operator ceiling and separate explicit transaction approval. No recovery write
-has been sent, and TPU reachability remains unproved.
+chunks; one successful pass was estimated to debit 0.009338120 SOL. The proposed route
+tried the CLI's default QUIC TPU route with five signing cycles, subject to a
+fresh 0.05-SOL additional operator ceiling and separate explicit transaction
+approval. That approval was given and the resume succeeded; this does not prove
+which network route sent each write or the cause of the first failure.
 
-The dedicated devnet payer/proposed upgrade authority is
+The dedicated devnet payer and actual temporary upgrade authority is
 `3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14`. Its private key is stored outside
 Git at `/home/todor_dev/.config/shortwin/devnet/release-testing-2026-10-22.json`,
 with directory mode 0700 and key mode 0600. No seed or private key is included in
 this record. The first two-SOL faucet request failed; the initial balance was zero.
 **Funding update, 07:20:41 UTC:** a fresh confirmed devnet RPC check at slot
 513,807,141 shows **25 SOL**, exceeding the 20-SOL planning target. Funding is
-complete for the planned reserve; actual deployment fees and test spending still
-need the concrete transaction estimate. The canonical program remains absent.
+complete for the planned reserve. This funding observation predates deployment;
+the current post-deployment balance is recorded above.
 [Public funding observation](probes/release-wrap-2026-10-22/devnet/funding-2026-10-22.json).
 The existing program signer has the canonical program address
 `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`; it is distinct from the payer.
 
-Actual public-devnet observations found the short.win program/config absent,
+Initial public-devnet observations found the short.win program/config absent,
 different Raydium devnet program IDs, mutable devnet Squads where supported
 governance tooling requires immutability, and different pump deployment slots
 and allocations from the retained mainnet fixture profile. RPC selection alone
 does not establish adapter or governance compatibility. A sampled Pyth update
 was stale for the compiled maximum age; freshness must pass when testing occurs.
 The [devnet readiness record](../deployment/DEVNET_1_0_3_READINESS_2026_10_22.md)
-retains concrete public addresses, slots, size-based rent estimates and the
-separate remaining test/deployment requirements. The planning funding target is
-20 devnet SOL, allowing for a concurrent upload buffer, same-size ProgramData
-allocation, initialization and margin; it is not a measured fee quote.
+retains concrete public addresses, slots, size-based rent estimates, the
+completed loader-only deployment and remaining market requirements. The
+20-devnet-SOL planning target was an upload reserve, not a measured fee quote.
 
-A program-only deployment can verify loader address, ELF hash and upgrade
-authority, but cannot demonstrate lending, borrowing, settlement or keeper
+A program-only deployment verified loader address, ELF hash and upgrade
+authority, but did not demonstrate lending, borrowing, settlement or keeper
 operation. Initialization requires the current program upgrade authority's
 signature; public callers cannot initialize the config merely because a program
 has been deployed. Do not remove that authority before initialization. Full
@@ -204,6 +218,6 @@ retried. These are review gaps and unresolved hypotheses, not 36 confirmed bugs.
 The 19 earlier technical tracker closures and earlier AI-assisted fix-review
 route do not close the new checkpoint or establish whole-codebase safety.
 
-Tagging, deployment, initialized market testing and stable/mainnet release must
-be reported separately. This preparation record is not a tag, deployment receipt
-or security approval.
+Tagging, program deployment, initialized market testing and stable/mainnet release
+are separate milestones. This record links the program-only deployment receipt;
+it is not a stable tag, market-test result or security approval.

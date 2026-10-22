@@ -1,7 +1,8 @@
 # Integrated release-preparation evidence
 
-These are retained copies of the actual October 22 checks and read-only public
-devnet observations. The earlier integration-check source is
+These are retained copies of the actual October 22 checks, public devnet
+observations and authorized program-only deployment. The earlier
+integration-check source is
 `bf166672efee578b6a2a1835e0dd53729c548671`; program checks ran on initial merge
 `b31c02a091008da18c39d7836c8e0e9d6d018973`, and the later commit changes only the
 independently reviewed web configuration fix. The reports state their exact
@@ -22,7 +23,7 @@ recorded in `byte-comparison.json`, not a compiled artifact checked into Git.
 - [Actual devnet account observations](devnet/devnet-rpc-summary.json) and
   [rent/oracle observations](devnet/devnet-cost-oracle-summary.json).
 - [Proposed program-only command packet](devnet/devnet-config-runbook-proposal.md).
-  This is not an executed transaction or an authorization request.
+  This was not an executed transaction or an authorization request when prepared.
 - [Devnet wallet public metadata](devnet/devnet-wallet-metadata.json) and
   [failed faucet request plus zero-balance recheck](devnet/faucet-attempt.json).
 - [Later confirmed funding update](devnet/funding-2026-10-22.json): 25 SOL at
@@ -51,20 +52,29 @@ recorded in `byte-comparison.json`, not a compiled artifact checked into Git.
   retained-file entry includes both compressed and original checksums.
 - [First approved upload attempt receipts](deployment-packet/failed-attempt-retained-files.json):
   the CLI stopped at `Max retries exceeded` after buffer creation and 14 confirmed
-  writes. The program remains absent. No second upload or buffer-close transaction
-  is claimed.
+  writes. The program was still absent after that attempt; its original receipt
+  does not claim a second upload or buffer-close transaction.
 - [Same-buffer recovery proposal](deployment-packet/recovery-packet.md) and
   [retained public evidence](deployment-packet/recovery-retained-files.json):
   an unsigned simulation of the first missing write passed. The exact second
-  command and its changed transport/retry flags are prepared but unexecuted.
+  command and its changed transport/retry flags were prepared but unexecuted at
+  that checkpoint; the approved execution is recorded below.
   The full buffer response, ELF and all keys remain outside Git.
+- [Completed devnet deployment and evidence index](deployment-packet/README.md):
+  the separately approved same-buffer resume finalized transaction
+  [`2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j`](https://explorer.solana.com/tx/2twpM5sUnQeAJLVTeKo9gHeDPfpU3iNitPZNg9UVm7At6zMyQCn6DATh9azQRk9rd1DzCi315W8HKZLbDpGhVm4j?cluster=devnet)
+  at slot `513919880`. The on-chain ELF exactly matches full SHA-256
+  `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc`.
+  The program is executable but uninitialized; see the
+  [deployment result](../../../deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md).
 - [Final documentation/provenance review](independent/final-doc-review.json)
   checks the current claims against the retained build and historical fuzz evidence.
 
 Commands, source paths and public addresses are metadata. Private keys, seeds,
 credential-bearing endpoint files, compiled target caches and excluded audit
-fixtures are not included. The raw devnet responses contain public account
-prefixes, not complete executable data. They prove the dated observations only.
+fixtures are not included. Earlier raw devnet responses contain public account
+prefixes, not complete executable data. The later deployment evidence verifies
+the full on-chain ELF hash without storing that executable in Git.
 
 The completed ≥24-hour run retains its original `d6f4…538bc` artifact attribution.
 The intermediate `d8d0…e182` build was superseded by the line-count-preserving
