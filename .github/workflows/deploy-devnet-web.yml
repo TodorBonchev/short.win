@@ -73,6 +73,6 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: '4.152.0'
+          wranglerVersion: '4.149.0'
           packageManager: pnpm
           command: pages deploy apps/web/dist --project-name=shortwin-devnet --branch=main --commit-hash=${{ github.sha }}
