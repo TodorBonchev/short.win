@@ -3196,6 +3196,7 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `status-x` | `T.statusX` | *2026-10-18 (owner):* the status bar's X icon (tablet and desktop) → @short_dot_win on X, a new tab |
 | `stale-badge` | `T.staleBadge` | per-panel freshness badge; `data-state` as statusIndexer |
 | `fallback-banner` | `T.fallbackBanner` | shown while the indexer is unreachable (RPC fallback) |
+| `devnet-preview-banner` | `T.devnetPreviewBanner` | shown on devnet while the protocol configuration account is absent; market creation and trading are unavailable |
 | `toast-region` | `T.toastRegion` | live regions container |
 | `toast` | `T.toast` | `data-kind` ∈ success, error, info |
 | `page-<…>` | `T.page` | `<page>` ∈ markets, create-market, market, positions, position, lend, status, security (*M10*); the page root — every track keeps it on its page |
