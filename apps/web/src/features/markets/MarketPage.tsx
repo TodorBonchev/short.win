@@ -202,10 +202,18 @@ export function MarketPage({ mint }: { mint: Address }) {
                                 <Link to="/m/$mint" params={{ mint: DEEPER_DEVNET_TEST_MINT }}>
                                     deeper Pump devnet market (2isJ…pump)
                                 </Link>
-                                . Opens there still depend on live price coverage and RPC availability.
+                                . It is used for supervised tests; check its live open status before trading.
                             </span>
                         </div>
                     )}
+                    {appConfig.cluster === 'devnet' &&
+                        mint === DEEPER_DEVNET_TEST_MINT &&
+                        data.flags.includes('paused-opens') && (
+                            <div className="banner" data-tone="warn" role="status" data-testid="devnet-trading-pause">
+                                <strong>Supervised devnet trading is paused.</strong> New shorts are unavailable while
+                                keeper coverage and RPC capacity are checked. Existing positions can still exit.
+                            </div>
+                        )}
                     <ActionBar label={`Trade ${symbol}`}>
                         <button
                             type="button"
