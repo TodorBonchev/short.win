@@ -51,6 +51,7 @@ const TOKEN_PROGRAM = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address;
 const WSOL = 'So11111111111111111111111111111111111111112' as Address;
 const UPGRADEABLE_LOADER = 'BPFLoaderUpgradeab1e11111111111111111111111' as Address;
 const EXPECTED_PUMP_DEPLOY_SLOT = 510_657_843n;
+const EXPECTED_PUMP_FEES_DEPLOY_SLOT = 508_659_783n;
 const BUY_V3_DISCRIMINATOR = Uint8Array.of(7, 5, 29, 196, 245, 23, 101, 80);
 const GLOBAL_DISCRIMINATOR = Uint8Array.of(0xa7, 0xe8, 0xe8, 0xb1, 0xc8, 0x6c, 0x72, 0x7f);
 const CURVE_DISCRIMINATOR = Uint8Array.of(0x17, 0xb7, 0xf8, 0x37, 0x60, 0xd8, 0xac, 0x60);
@@ -194,8 +195,12 @@ async function main(): Promise<void> {
         programAddress: UPGRADEABLE_LOADER,
         seeds: [getAddressEncoder().encode(PUMP)],
     });
+    const [feesProgramData] = await getProgramDerivedAddress({
+        programAddress: UPGRADEABLE_LOADER,
+        seeds: [getAddressEncoder().encode(PUMP_FEES)],
+    });
     const checked = await rpc
-        .getMultipleAccounts([PUMP, GLOBAL, opts.mint, curve, baseCurveAta, FEE_CONFIG, programData], {
+        .getMultipleAccounts([PUMP, GLOBAL, opts.mint, curve, baseCurveAta, FEE_CONFIG, programData, feesProgramData], {
             encoding: 'base64',
             commitment: 'confirmed',
         })
@@ -208,6 +213,7 @@ async function main(): Promise<void> {
         curveAtaAccount,
         feeConfigAccount,
         programDataAccount,
+        feesProgramDataAccount,
     ] = checked.value;
     if (
         !pumpProgram?.executable ||
@@ -219,12 +225,24 @@ async function main(): Promise<void> {
     if (curveAccount?.owner !== PUMP || curveAtaAccount?.owner !== TOKEN_2022_PROGRAM_ADDRESS) {
         throw new Error('Pump curve or its Token-2022 ATA missing');
     }
-    if (feeConfigAccount?.owner !== PUMP_FEES || programDataAccount?.owner !== UPGRADEABLE_LOADER) {
+    if (
+        feeConfigAccount?.owner !== PUMP_FEES ||
+        programDataAccount?.owner !== UPGRADEABLE_LOADER ||
+        feesProgramDataAccount?.owner !== UPGRADEABLE_LOADER
+    ) {
         throw new Error('Pump fee config or ProgramData owner mismatch');
     }
     const pd = bytes(programDataAccount);
     if (pd.length < 45 || pd.readUInt32LE(0) !== 3 || pd.readBigUInt64LE(4) !== EXPECTED_PUMP_DEPLOY_SLOT) {
         throw new Error('Pump devnet deployment changed; revalidate BuyV3 before proceeding');
+    }
+    const feesPd = bytes(feesProgramDataAccount);
+    if (
+        feesPd.length < 45 ||
+        feesPd.readUInt32LE(0) !== 3 ||
+        feesPd.readBigUInt64LE(4) !== EXPECTED_PUMP_FEES_DEPLOY_SLOT
+    ) {
+        throw new Error('Pump-fees devnet deployment changed; revalidate BuyV3 before proceeding');
     }
     const global = bytes(globalAccount);
     const curveData = bytes(curveAccount);
@@ -254,6 +272,18 @@ async function main(): Promise<void> {
         await rpc.getAccountInfo(buybackRecipient, { encoding: 'base64', commitment: 'confirmed' }).send()
     ).value;
     if (!buybackAccount || buybackAccount.executable) throw new Error('Pump buyback recipient is absent or executable');
+    const existingBuyerAta = (
+        await rpc.getAccountInfo(baseBuyerAta, { encoding: 'base64', commitment: 'confirmed' }).send()
+    ).value;
+    if (existingBuyerAta) {
+        const ataData = bytes(existingBuyerAta);
+        if (existingBuyerAta.owner !== TOKEN_2022_PROGRAM_ADDRESS || ataData.length < 72) {
+            throw new Error('existing buyer token account has an unexpected owner or layout');
+        }
+        if (ataData.readBigUInt64LE(64) > 0n) {
+            throw new Error('buyer already holds this token; this first-inventory packet cannot be repeated');
+        }
+    }
 
     const createBuyerAta = await getCreateAssociatedTokenIdempotentInstructionAsync({
         payer: buyer,
