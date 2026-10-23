@@ -242,8 +242,24 @@ async function getRaw(rpc, key) {
     };
 }
 
-async function clock(rpc) {
-    const raw = await getRaw(rpc, CLOCK);
+async function getRaws(rpc, keys) {
+    if (keys.length === 0) return [];
+    const { value } = await rpc.getMultipleAccounts(keys, { encoding: 'base64', commitment: 'confirmed' }).send();
+    if (value.length !== keys.length) throw new Error('RPC returned an incomplete account batch');
+    return value.map((account, i) =>
+        account
+            ? {
+                  address: keys[i],
+                  owner: account.owner,
+                  lamports: BigInt(account.lamports),
+                  executable: account.executable,
+                  data: new Uint8Array(encoder.encode(account.data[0])),
+              }
+            : null,
+    );
+}
+
+function decodeClock(raw) {
     if (!raw || raw.data.length < 40) throw new Error('Clock sysvar unavailable');
     const d = new DataView(raw.data.buffer, raw.data.byteOffset);
     return { slot: d.getBigUint64(0, true), unix: d.getBigInt64(32, true) };
@@ -260,39 +276,46 @@ async function eventAuthority() {
 async function preflight(rpc, opts) {
     const genesis = await rpc.getGenesisHash().send();
     if (genesis !== DEVNET_GENESIS) throw new Error('refusing non-devnet genesis ' + genesis);
-    const program = await getRaw(rpc, SHORTWIN_PROGRAM_ADDRESS);
-    if (!program?.executable || program.owner !== UPGRADEABLE_LOADER)
-        throw new Error('deployed ShortWin program is unavailable');
-    if (opts.phase === 'fund') return { now: await clock(rpc) };
+    if (opts.phase === 'fund') {
+        const [program, clockRaw] = await getRaws(rpc, [SHORTWIN_PROGRAM_ADDRESS, CLOCK]);
+        if (!program?.executable || program.owner !== UPGRADEABLE_LOADER)
+            throw new Error('deployed ShortWin program is unavailable');
+        return { now: decodeClock(clockRaw) };
+    }
     const [configKey] = await findConfigPda();
     const [guardKey] = await findVenueGuardPda();
     const [oracleKey] = await findOracleCachePda();
+    const mint = opts.phase === 'crank-oracle' ? null : address(opts.mint);
+    const marketKey = mint ? (await findMarketPda({ mint }))[0] : null;
+    const curveKey = mint ? await bondingCurve(mint) : null;
+    const authority = mint ? await poolAuthority(mint) : null;
+    const poolKey = mint ? await canonicalPool(mint, authority) : null;
+    const coreKeys = [SHORTWIN_PROGRAM_ADDRESS, configKey, guardKey, oracleKey, CLOCK];
+    const keys = mint ? [...coreKeys, mint, marketKey, curveKey] : coreKeys;
+    const [program, configRaw, guardRaw, oracleRaw, clockRaw, mintRaw, marketRaw, curve] = await getRaws(rpc, keys);
+    if (!program?.executable || program.owner !== UPGRADEABLE_LOADER)
+        throw new Error('deployed ShortWin program is unavailable');
     const config = decodeOwned(
-        await getRaw(rpc, configKey),
+        configRaw,
         SHORTWIN_PROGRAM,
         GLOBAL_CONFIG_DISCRIMINATOR,
         getGlobalConfigDecoder(),
         'GlobalConfig',
     );
     const guard = decodeOwned(
-        await getRaw(rpc, guardKey),
+        guardRaw,
         SHORTWIN_PROGRAM,
         VENUE_GUARD_DISCRIMINATOR,
         getVenueGuardDecoder(),
         'VenueGuard',
     );
-    const oracleRaw = await getRaw(rpc, oracleKey);
     const oracle = oracleRaw
         ? decodeOwned(oracleRaw, SHORTWIN_PROGRAM, ORACLE_CACHE_DISCRIMINATOR, getOracleCacheDecoder(), 'OracleCache')
         : null;
-    const now = await clock(rpc);
+    const now = decodeClock(clockRaw);
     if (opts.phase === 'crank-oracle') return { config, guard, oracle, now };
-    const mint = address(opts.mint);
-    const mintRaw = await getRaw(rpc, mint);
     if (!mintRaw || mintRaw.owner !== TOKEN_2022_PROGRAM)
         throw new Error('controlled Pump mint must be a Token-2022 account');
-    const [marketKey] = await findMarketPda({ mint });
-    const marketRaw = await getRaw(rpc, marketKey);
     const market = marketRaw
         ? decodeOwned(marketRaw, SHORTWIN_PROGRAM, MARKET_DISCRIMINATOR, getMarketDecoder(), 'Market')
         : null;
@@ -304,10 +327,6 @@ async function preflight(rpc, opts) {
     if ((config.venueEnabled & (VENUE_BIT.pump_curve ?? 0)) === 0) throw new Error('Pump curve venue is disabled');
     if ((guard.upgraded & (GUARD_MASK.pump_curve ?? 0)) !== 0) throw new Error('Pump venue guard is flagged');
     if (market && market.venue !== 1) throw new Error('this smoke accepts only a live Pump curve market');
-    const curveKey = await bondingCurve(mint);
-    const authority = await poolAuthority(mint);
-    const poolKey = await canonicalPool(mint, authority);
-    const curve = await getRaw(rpc, curveKey);
     if (!curve || curve.owner !== PUMP_PROGRAM) throw new Error('Pump bonding curve missing');
     if (market && (market.tier !== 3 || market.bondingCurve !== curveKey || market.canonicalPool !== poolKey)) {
         throw new Error('market is not bound to the expected Tier D Pump curve');
@@ -334,7 +353,7 @@ async function controlledCurve(rpc, state, signer) {
 async function marketReadSet(rpc, state) {
     if (!state.market) throw new Error('market missing');
     const keys = await readSet('pump_curve', state.market);
-    const read = await Promise.all(keys.map((key) => getRaw(rpc, key)));
+    const read = await getRaws(rpc, keys);
     return { keys, read };
 }
 
@@ -687,7 +706,10 @@ async function simulatePhase(rpc, signer, opts, plan) {
     const result = simulation.value;
     if (result.err !== null) {
         throw new Error(
-            'simulation failed: ' + JSON.stringify(result.err) + '\n' + (result.logs ?? []).slice(-20).join('\n'),
+            'simulation failed: ' +
+                JSON.stringify(result.err, (_, value) => (typeof value === 'bigint' ? value.toString() : value)) +
+                '\n' +
+                (result.logs ?? []).slice(-20).join('\n'),
         );
     }
     const simulatedPayer = result.accounts?.[0];
