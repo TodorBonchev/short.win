@@ -10,6 +10,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { qk } from '../../api/keys.ts';
 import { indexerQueries } from '../../api/queries.ts';
+import { displayTokenMetadata } from '../../config/devnetSmokeToken.ts';
+import { config } from '../../config/env.ts';
 import { cleanName, cleanSymbol, tokenLabel } from '../../lib/displayText.ts';
 import { shortAddress } from '../../lib/format.ts';
 import { useMath } from '../../math/useMath.ts';
@@ -107,10 +109,11 @@ export function usePositionAccount(position: Address) {
 export function useTokenLabel(mint: Address | null): { symbol: string; name: string | null; label: string } {
     const q = useQuery({ ...indexerQueries.market(mint ?? 'none'), retry: false, enabled: !!mint });
     const d = q.data?.data && q.data.data.mint === mint ? q.data.data : null;
-    const sym = cleanSymbol(d?.symbol);
+    const label = displayTokenMetadata(config.cluster, mint ?? '', cleanSymbol(d?.symbol), cleanName(d?.name));
+    const sym = label.symbol;
     return {
         symbol: sym ?? (mint ? shortAddress(mint, 4, 4) : '—'),
-        name: cleanName(d?.name),
+        name: label.name,
         label: mint ? tokenLabel(sym, mint) : '—',
     };
 }

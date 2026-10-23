@@ -55,6 +55,21 @@ describe('devnet before protocol initialization', () => {
         queryClient.clear();
     });
 
+    it('uses the reconciled chain watermark when initialized but no program transaction is recent', async () => {
+        mockIndexer({ '/v1/status': { ...INGEST_OK, lag_s: 300 } });
+        vi.mocked(accounts.readGlobalConfig).mockResolvedValue(exists(MINT_A, globalConfig()));
+        const { queryClient } = await renderAt('/status');
+        await screen.findByTestId(T.statusIndexerHealth);
+        await act(async () => {
+            indexerMeta.set({ indexerSlot: 1000, finalizedSlot: 1995, receivedAt: Date.now() });
+            rpcSlot.set({ slot: 2000n, at: Date.now(), ok: true });
+        });
+        await waitFor(() => expect(screen.getByTestId(T.statusIndexer).dataset.state).toBe('live'));
+        expect(screen.getByTestId(T.statusIndexerLag).textContent).toContain('2 s behind the RPC node');
+        expect(screen.getByTestId(T.statusIndexerHealth).textContent).toContain('Last indexed activity');
+        queryClient.clear();
+    });
+
     it('marks the indexer down when status fails even before initialization', async () => {
         mockIndexer({ '/v1/status': problem(500, 'internal') });
         const { queryClient } = await renderAt('/status');

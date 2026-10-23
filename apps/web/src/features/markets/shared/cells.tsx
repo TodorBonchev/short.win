@@ -6,7 +6,8 @@
 import type { ReactNode } from 'react';
 import { Badge } from '../../../components/Badge.tsx';
 import { Term } from '../../../components/Glossary.tsx';
-import { explorerTx } from '../../../config/env.ts';
+import { displayTokenMetadata } from '../../../config/devnetSmokeToken.ts';
+import { config, explorerTx } from '../../../config/env.ts';
 import { glossaryFor } from '../../../config/glossary.ts';
 import { formatAge, formatBps, formatCompact, formatFixed, shortAddress } from '../../../lib/format.ts';
 import { formatUtc } from '../../../lib/time.ts';
@@ -93,20 +94,23 @@ export function TokenLabel({
     name?: string | null;
     duplicate?: boolean;
 }) {
+    const display = displayTokenMetadata(config.cluster, mint, symbol, name);
+    const displaySymbol = display.symbol;
+    const displayName = display.name;
     return (
-        <span className="mk-token" title={`${name ? `${name} · ` : ''}${mint}`}>
-            {symbol ? (
-                <bdi className="mk-token-symbol">{symbol}</bdi>
+        <span className="mk-token" title={`${displayName ? `${displayName} · ` : ''}${mint}`}>
+            {displaySymbol ? (
+                <bdi className="mk-token-symbol">{displaySymbol}</bdi>
             ) : (
                 <span className="mk-token-symbol num">{shortAddress(mint)}</span>
             )}
-            {duplicate && symbol && (
+            {duplicate && displaySymbol && (
                 <span className="badge mk-dup" data-tone="warn" title="Another market uses this symbol">
                     {mint.slice(-4)}
                 </span>
             )}
             {/* Without a symbol the short mint already is the label; it is not repeated. */}
-            {symbol && <span className="muted num mk-token-mint">{shortAddress(mint)}</span>}
+            {displaySymbol && <span className="muted num mk-token-mint">{shortAddress(mint)}</span>}
         </span>
     );
 }

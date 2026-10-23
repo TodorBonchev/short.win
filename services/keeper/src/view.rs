@@ -209,6 +209,38 @@ pub async fn discover_markets<C: Chain>(chain: &C) -> anyhow::Result<Vec<Pubkey>
     Ok(keys)
 }
 
+/// Discover an explicit market allowlist with one batched account read instead of scanning every
+/// program account. Match `discover_markets`' owner and discriminator filter here; the full
+/// market load still checks the layout version and reports unsupported accounts as skipped.
+/// Missing keys are silently excluded, as they are when intersecting the global discovery.
+pub async fn discover_selected_markets<C: Chain>(
+    chain: &C,
+    selected: &[Pubkey],
+) -> anyhow::Result<Vec<Pubkey>> {
+    let mut keys = selected.to_vec();
+    keys.sort_unstable();
+    keys.dedup();
+    if keys.is_empty() {
+        return Ok(keys);
+    }
+    let accounts = chain.accounts(&keys).await?;
+    anyhow::ensure!(
+        accounts.len() == keys.len(),
+        "incomplete selected-market discovery: {} accounts for {} keys",
+        accounts.len(),
+        keys.len()
+    );
+    Ok(keys
+        .into_iter()
+        .zip(accounts)
+        .filter_map(|(key, account)| {
+            account
+                .filter(|a| a.owner == shortwin::ID && a.data.starts_with(Market::DISCRIMINATOR))
+                .map(|_| key)
+        })
+        .collect())
+}
+
 /// Every open `ShortPosition`, grouped by market (`getProgramAccounts` on its discriminator).
 pub async fn open_positions<C: Chain>(
     chain: &C,
@@ -404,4 +436,119 @@ pub async fn load_with_positions<C: Chain>(
         list_only,
         skipped,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use super::*;
+    use shortwin_services_common::TxOutcome;
+    use solana_hash::Hash;
+    use solana_transaction::versioned::VersionedTransaction;
+
+    struct DiscoveryChain {
+        accounts: HashMap<Pubkey, AccountData>,
+        reads: RefCell<Vec<Vec<Pubkey>>>,
+    }
+
+    impl Chain for DiscoveryChain {
+        async fn clock(&self) -> anyhow::Result<ChainClock> {
+            unreachable!("selected discovery needs no clock")
+        }
+
+        async fn accounts(&self, keys: &[Pubkey]) -> anyhow::Result<Vec<Option<AccountData>>> {
+            self.reads.borrow_mut().push(keys.to_vec());
+            Ok(keys.iter().map(|k| self.accounts.get(k).cloned()).collect())
+        }
+
+        async fn program_accounts(
+            &self,
+            _program: &Pubkey,
+            _filters: &[Memcmp],
+        ) -> anyhow::Result<Vec<(Pubkey, AccountData)>> {
+            panic!("explicit selection must not scan all program accounts")
+        }
+
+        async fn latest_blockhash(&self) -> anyhow::Result<Hash> {
+            unreachable!("selected discovery needs no blockhash")
+        }
+
+        async fn simulate(&self, _tx: &VersionedTransaction) -> anyhow::Result<TxOutcome> {
+            unreachable!("selected discovery needs no simulation")
+        }
+
+        async fn send(&self, _tx: &VersionedTransaction) -> anyhow::Result<TxOutcome> {
+            unreachable!("selected discovery sends no transaction")
+        }
+
+        async fn recent_priority_fees(&self, _writable: &[Pubkey]) -> anyhow::Result<Vec<u64>> {
+            unreachable!("selected discovery needs no fee quote")
+        }
+    }
+
+    fn market_account(owner: Pubkey, discriminator: bool, version: u16) -> AccountData {
+        let mut data = vec![0u8; 8 + std::mem::size_of::<Market>()];
+        if discriminator {
+            data[..8].copy_from_slice(Market::DISCRIMINATOR);
+        }
+        data[8..10].copy_from_slice(&version.to_le_bytes());
+        AccountData {
+            lamports: 1,
+            owner,
+            executable: false,
+            data,
+        }
+    }
+
+    #[tokio::test]
+    async fn selected_discovery_reads_only_allowlisted_market_accounts() {
+        let valid = Pubkey::new_unique();
+        let old_version = Pubkey::new_unique();
+        let wrong_owner = Pubkey::new_unique();
+        let wrong_discriminator = Pubkey::new_unique();
+        let missing = Pubkey::new_unique();
+        let chain = DiscoveryChain {
+            accounts: HashMap::from([
+                (valid, market_account(shortwin::ID, true, MARKET_VERSION)),
+                (old_version, market_account(shortwin::ID, true, 0)),
+                (
+                    wrong_owner,
+                    market_account(Pubkey::new_unique(), true, MARKET_VERSION),
+                ),
+                (
+                    wrong_discriminator,
+                    market_account(shortwin::ID, false, MARKET_VERSION),
+                ),
+            ]),
+            reads: RefCell::new(Vec::new()),
+        };
+        let chosen = discover_selected_markets(
+            &chain,
+            &[
+                missing,
+                valid,
+                wrong_discriminator,
+                old_version,
+                wrong_owner,
+                valid,
+            ],
+        )
+        .await
+        .unwrap();
+        let mut expected = vec![valid, old_version];
+        expected.sort();
+        assert_eq!(chosen, expected);
+        let reads = chain.reads.borrow();
+        assert_eq!(reads.len(), 1, "one batched account read");
+        assert_eq!(reads[0].len(), 5, "duplicate allowlist key read once");
+        assert!(reads[0].windows(2).all(|w| w[0] < w[1]));
+        // The old layout remains discoverable so the full loader can report its version error.
+        assert_ne!(
+            decode_zc::<Market>(chain.accounts.get(&old_version).unwrap())
+                .unwrap()
+                .version,
+            MARKET_VERSION
+        );
+    }
 }

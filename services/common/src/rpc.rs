@@ -233,18 +233,15 @@ fn inner_of(
 
 impl Chain for RpcChain {
     async fn clock(&self) -> anyhow::Result<ChainClock> {
-        let slot = self
-            .client
-            .get_slot_with_commitment(self.commitment)
-            .await
-            .context("getSlot")?;
-        let clock = self
+        let response = self
             .client
             .get_account_with_commitment(&solana_sdk_ids_clock(), self.commitment)
             .await
-            .context("Clock sysvar")?
-            .value
-            .context("no Clock sysvar")?;
+            .context("Clock sysvar")?;
+        // The account response's context slot is the bank that supplied the timestamp.
+        // A separate getSlot call can be newer than that bank and costs another RPC.
+        let slot = response.context.slot;
+        let clock = response.value.context("no Clock sysvar")?;
         // Clock sysvar: slot u64, epoch_start_timestamp i64, epoch u64, leader_schedule_epoch
         // u64, unix_timestamp i64.
         let ts = clock
@@ -572,7 +569,57 @@ fn solana_sdk_ids_clock() -> Pubkey {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use solana_rpc_client::mock_sender::{MockSender, Mocks};
+    use solana_rpc_client::rpc_client::RpcClientConfig;
     use solana_transaction_status_client_types::UiCompiledInstruction;
+
+    fn clock_mock(value: serde_json::Value) -> RpcChain {
+        let mut mocks = Mocks::default();
+        mocks.insert(
+            RpcRequest::GetAccountInfo,
+            serde_json::json!({ "context": { "slot": 77 }, "value": value }),
+        );
+        // An accidental second request for getSlot must fail this test.
+        mocks.insert(RpcRequest::GetSlot, serde_json::Value::Null);
+        let mut chain = RpcChain::new("mock");
+        chain.client = RpcClient::new_sender(
+            MockSender::new_with_mocks("fails", mocks),
+            RpcClientConfig::with_commitment(chain.commitment),
+        );
+        chain
+    }
+
+    #[tokio::test]
+    async fn clock_uses_account_context_slot_and_rejects_missing_sysvar() {
+        use base64::Engine;
+        let mut data = [0u8; 40];
+        data[32..40].copy_from_slice(&1_700_000_123i64.to_le_bytes());
+        let encoded = base64::engine::general_purpose::STANDARD.encode(data);
+        let chain = clock_mock(serde_json::json!({
+            "data": [encoded, "base64"],
+            "executable": false,
+            "lamports": 1,
+            "owner": solana_sdk_ids_clock().to_string(),
+            "rentEpoch": 0
+        }));
+        assert_eq!(
+            chain.clock().await.unwrap(),
+            ChainClock {
+                slot: 77,
+                unix_timestamp: 1_700_000_123,
+            }
+        );
+
+        let missing = clock_mock(serde_json::Value::Null);
+        assert!(
+            missing
+                .clock()
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("no Clock sysvar")
+        );
+    }
 
     #[test]
     fn inner_instructions_resolve_programs_and_decode_data() {

@@ -30,8 +30,14 @@ export function useIndexerFreshness(): { state: Freshness; lagS: number | null; 
     const devnetConfig = useChainConfig(config.cluster === 'devnet');
     const now = useNow(2_000);
     const ageMs = meta ? Math.max(0, now - meta.receivedAt) : 0;
+    // The applied-event slot stays fixed when nobody trades. The finalized watermark advances
+    // only after reconciliation, so use the newer of those heads to judge service progress.
+    const progressSlot =
+        meta?.finalizedSlot === null || meta?.finalizedSlot === undefined
+            ? (meta?.indexerSlot ?? null)
+            : Math.max(meta.finalizedSlot, meta.indexerSlot ?? 0);
     const state = freshness({
-        indexerSlot: meta?.indexerSlot ?? null,
+        indexerSlot: progressSlot,
         rpcSlot: slot.slot,
         ageMs,
         indexerReachable: !status.isError,
@@ -44,7 +50,7 @@ export function useIndexerFreshness(): { state: Freshness; lagS: number | null; 
     });
     return {
         state,
-        lagS: state === 'idle' ? null : lagSeconds(meta?.indexerSlot ?? null, slot.slot),
+        lagS: state === 'idle' ? null : lagSeconds(progressSlot, slot.slot),
         ageS: meta ? Math.round(ageMs / 1000) : null,
     };
 }

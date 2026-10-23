@@ -243,7 +243,9 @@ jobs:
           "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
       - name: Install Anchor CLI ${{ env.ANCHOR_VERSION }}
         if: steps.tools.outputs.cache-hit != 'true'
-        run: cargo install --git https://github.com/otter-sec/anchor --rev "$ANCHOR_REV" anchor-cli --locked
+        # rust-cache can restore a pre-existing anchor binary even when the tools cache misses.
+        # Force this exact revision to replace it instead of failing with "binary already exists".
+        run: cargo install --force --git https://github.com/otter-sec/anchor --rev "$ANCHOR_REV" anchor-cli --locked
       - name: Versions
         run: |
           solana --version

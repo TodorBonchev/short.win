@@ -27,6 +27,7 @@ import { Panel } from '../../components/Panel.tsx';
 import { Scrim, SheetHead, useSheetMode } from '../../components/Sheet.tsx';
 import { ErrorState, Skeleton } from '../../components/States.tsx';
 import { type TabDef, TabPanel, Tabs } from '../../components/Tabs.tsx';
+import { isControlledDevnetSmokeMint } from '../../config/devnetSmokeToken.ts';
 import { config as appConfig } from '../../config/env.ts';
 import { T } from '../../config/testids.ts';
 import { shortAddress } from '../../lib/format.ts';
@@ -54,6 +55,8 @@ const TABS: readonly TabDef<MarketTab>[] = [
     { key: 'coverage', label: 'Coverage', testId: T.marketTab('coverage') },
     { key: 'events', label: 'Events', testId: T.marketTab('events') },
 ];
+
+const DEEPER_DEVNET_TEST_MINT = '2isJ4phZS9Nv1fVHRLnjGkgvrFW4cb13qa8Y6kknpump' as Address;
 
 function MarketTabs({
     mint,
@@ -190,6 +193,27 @@ export function MarketPage({ mint }: { mint: Address }) {
                             {data.status === 'loading' && <Skeleton width={160} />}
                         </div>
                     )}
+                    {isControlledDevnetSmokeMint(appConfig.cluster, mint) && (
+                        <div className="banner" data-tone="warn" role="status" data-testid="devnet-smoke-market-limit">
+                            <span>
+                                <strong>SWTEST cannot support a short on this devnet curve.</strong> Its 3% position
+                                impact cap permits less than the protocol’s 0.1 SOL minimum notional. For shorting
+                                tests, see the{' '}
+                                <Link to="/m/$mint" params={{ mint: DEEPER_DEVNET_TEST_MINT }}>
+                                    deeper Pump devnet market (2isJ…pump)
+                                </Link>
+                                . It is used for supervised tests; check its live open status before trading.
+                            </span>
+                        </div>
+                    )}
+                    {appConfig.cluster === 'devnet' &&
+                        mint === DEEPER_DEVNET_TEST_MINT &&
+                        data.flags.includes('paused-opens') && (
+                            <div className="banner" data-tone="warn" role="status" data-testid="devnet-trading-pause">
+                                <strong>Supervised devnet trading is paused.</strong> New shorts are unavailable while
+                                keeper coverage and RPC capacity are checked. Existing positions can still exit.
+                            </div>
+                        )}
                     <ActionBar label={`Trade ${symbol}`}>
                         <button
                             type="button"

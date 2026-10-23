@@ -25,7 +25,7 @@ jobs:
       VITE_RPC_WS_URL: wss://api.devnet.solana.com
       VITE_INDEXER_URL: https://api-devnet.short.win
       VITE_INDEXER_WS_URL: wss://api-devnet.short.win/v1/ws
-      VITE_PROTOCOL_ALT: ''
+      VITE_PROTOCOL_ALT: F9VQX1wvHjzthd3BaQQQ2d22WLJxogAbPRKMZEnCuNna
       VITE_ENABLE_TEST_VENUE: 'false'
       VITE_EXPLORER_TX_URL: https://explorer.solana.com/tx/{sig}?cluster=devnet
     steps:
@@ -59,6 +59,10 @@ jobs:
           fi
           if ! grep -R -q -F 'api.devnet.solana.com' apps/web/dist/assets; then
             echo '::error::The public client is missing the devnet RPC endpoint'
+            exit 1
+          fi
+          if ! grep -R -q -F 'F9VQX1wvHjzthd3BaQQQ2d22WLJxogAbPRKMZEnCuNna' apps/web/dist/assets; then
+            echo '::error::The public client is missing the verified protocol lookup table'
             exit 1
           fi
           curl --fail --silent --show-error --max-time 15 https://api-devnet.short.win/v1/health > /dev/null

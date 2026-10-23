@@ -51,6 +51,14 @@ const USAGE: &str = "usage: shortwin-build-alt <print|create|extend|check|market
      [--protocol-table <protocol alt>] [--freeze] \
      [--priority-price <µlamports/CU>] [--static-only]";
 
+/// A finalized slot returned by one public RPC backend can still be ahead of the bank that
+/// simulates or forwards the create transaction. Keep a margin within SlotHashes' 512 entries.
+const RECENT_SLOT_MARGIN: u64 = 128;
+
+fn alt_recent_slot(finalized_slot: u64) -> u64 {
+    finalized_slot.saturating_sub(RECENT_SLOT_MARGIN)
+}
+
 #[derive(Default)]
 struct Args {
     cmd: String,
@@ -154,7 +162,7 @@ async fn main() -> anyhow::Result<()> {
             let c = need_rpc()?;
             let (payer, authority) = signers(&a)?;
             let list = entries(Some(c), a.static_only).await?;
-            let slot = c.finalized_slot().await?;
+            let slot = alt_recent_slot(c.finalized_slot().await?);
             let table = alt::create(
                 c,
                 &payer,
@@ -228,7 +236,7 @@ async fn main() -> anyhow::Result<()> {
             );
             if a.keypair.is_some() {
                 let (payer, authority) = signers(&a)?;
-                let slot = c.finalized_slot().await?;
+                let slot = alt_recent_slot(c.finalized_slot().await?);
                 let table = alt::create(
                     c,
                     &payer,
@@ -306,5 +314,11 @@ mod tests {
             ])
             .is_err()
         );
+    }
+
+    #[test]
+    fn recent_slot_keeps_a_margin_for_public_rpc_backend_skew() {
+        assert_eq!(alt_recent_slot(512), 384);
+        assert_eq!(alt_recent_slot(0), 0);
     }
 }
