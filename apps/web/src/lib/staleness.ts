@@ -1,7 +1,7 @@
 /**
- * Data freshness (FRONTEND.md §6.6): how far the indexer is behind the RPC node, from the
- * `X-Indexer-Slot` header against the RPC's current slot (≈ 0.4 s per slot). An uninitialized
- * devnet is a distinct neutral state while the indexer's response remains recent.
+ * Data freshness (FRONTEND.md §6.6): how far the indexer's reconciled chain watermark is behind
+ * the RPC node (≈ 0.4 s per slot). The most recently applied event can be old on a quiet market.
+ * An uninitialized devnet is a distinct neutral state while its response remains recent.
  */
 export type Freshness = 'live' | 'lagging' | 'stale' | 'down' | 'unknown' | 'idle';
 
