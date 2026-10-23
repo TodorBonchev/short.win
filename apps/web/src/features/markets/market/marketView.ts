@@ -11,6 +11,8 @@
 import { type Market, podU128ToBigInt } from '@shortwin/client';
 import type { Address } from '@solana/kit';
 import { big, type MarketDetail, type MarketFlags, type TierName, type VenueName } from '../../../api/types.ts';
+import { displayTokenMetadata } from '../../../config/devnetSmokeToken.ts';
+import { config } from '../../../config/env.ts';
 import { flagsFromBits, venueName } from '../shared/marketFlags.ts';
 
 export interface MarketView {
@@ -59,11 +61,12 @@ const pos = (v: bigint): number | null => (v > 0n ? Number(v) : null);
 
 export function viewFromChain(mint: Address, m: Market): MarketView {
     const ema = podU128ToBigInt(m.emaPrice);
+    const label = displayTokenMetadata(config.cluster, mint, null, null);
     return {
         source: 'chain',
         mint,
-        symbol: null,
-        name: null,
+        symbol: label.symbol,
+        name: label.name,
         decimals: m.decimals,
         venue: venueName(m.venue),
         tier: tierName(m.tier),
@@ -92,11 +95,12 @@ export function viewFromChain(mint: Address, m: Market): MarketView {
 }
 
 export function viewFromIndexer(d: MarketDetail, chain: Market | null, mint: Address): MarketView {
+    const label = displayTokenMetadata(config.cluster, mint, d.symbol, d.name);
     return {
         source: 'indexer',
         mint,
-        symbol: d.symbol,
-        name: d.name,
+        symbol: label.symbol,
+        name: label.name,
         decimals: chain ? chain.decimals : (d.decimals ?? null),
         venue: chain ? venueName(chain.venue) : d.venue,
         tier: chain ? tierName(chain.tier) : d.tier,

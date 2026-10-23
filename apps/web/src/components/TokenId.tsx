@@ -4,7 +4,8 @@
  * With `reveal` the short mint is a button that shows the full mint, Copy and Explorer (a touch
  * screen has no `title`; FRONTEND.md §7.6) — not inside a row that opens on a tap.
  */
-import { explorerAddress } from '../config/env.ts';
+import { displayTokenMetadata } from '../config/devnetSmokeToken.ts';
+import { config, explorerAddress } from '../config/env.ts';
 import { cleanSymbol } from '../lib/displayText.ts';
 import { shortAddress } from '../lib/format.ts';
 import { Reveal } from './Reveal.tsx';
@@ -22,7 +23,7 @@ export function TokenId({
     className?: string;
     reveal?: boolean;
 }) {
-    const sym = cleanSymbol(symbol);
+    const sym = cleanSymbol(displayTokenMetadata(config.cluster, mint, symbol, null).symbol);
     const short = shortAddress(mint, 4, 4);
     return (
         <span className={`token-id ${className ?? ''}`.trim()} title={mint} data-testid={testId} data-value={mint}>
