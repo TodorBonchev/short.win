@@ -4380,6 +4380,7 @@ dependencies = [
  "solana-pubkey 4.2.1",
  "solana-sha256-hasher",
  "solana-signer",
+ "solana-transaction",
  "tokio",
  "toml",
  "tracing",

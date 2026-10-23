@@ -1266,10 +1266,9 @@ impl<C: Chain> Keeper<C> {
         if !due {
             return Ok(());
         }
-        let all = view::discover_markets(&self.chain).await?;
         self.markets = match &self.selection {
-            None => all,
-            Some(sel) => all.into_iter().filter(|k| sel.contains(k)).collect(),
+            None => view::discover_markets(&self.chain).await?,
+            Some(sel) => view::discover_selected_markets(&self.chain, sel).await?,
         };
         self.last_discovery = Some(now);
         Ok(())

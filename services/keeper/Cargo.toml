@@ -39,6 +39,7 @@ solana-signer.workspace = true
 [dev-dependencies]
 # The discriminator checks of the unit tests (the version the program uses).
 solana-sha256-hasher = "3"
+solana-transaction = { workspace = true, features = ["wincode"] }
 
 [[bin]]
 name = "shortwin-keeper"
