@@ -119,3 +119,48 @@ The release operator owns service funding, process supervision, local metric/log
 5. Prove actual keeper coverage, funded zero-reward exits, reader/UI operation, alert receipt and manual top-up ownership in the bounded smoke. Exercise the documented coverage-pause drill only in that separately approved smoke. Keep new listings/ordinary test access held until those receipts exist.
 
 Missing inputs are actual live writer/reader and monitored keeper operation, public governance member identities and installation of the selected coverage authority, a selected market with venue/oracle evidence, ALT addresses if needed, available keeper and participant funds, a scoped capital ceiling, and a reachable alert recipient/emergency contact. The program-only deployment and local service staging close their narrow artifact and schema checks, but not these operator or market gates.
+
+## Devnet-only direct-key initialization planner
+
+For a bounded public-devnet trading rehearsal where the canonical devnet Squads
+program is mutable, `apps/web/scripts/devnet-init-config.ts` can install **direct,
+distinct devnet-only keys** instead of pretending that the production Squads
+governance topology has been verified. This does not change the release program,
+its 24-hour minimum config timelock, or `shortwin-gov verify`'s immutable-Squads
+requirement. The direct governance and pause keys must be retained outside Git;
+the normal `shortwin-gov` staging flow does not administer this layout. Use a
+separate direct-key admin flow for later governance actions.
+
+The command validates the devnet genesis, the deployed ShortWin program's
+ProgramData and upgrade authority, all seven absent configuration PDAs, current
+venue ProgramData slots and the exact full, fresh Pyth SOL/USD update. It builds
+a 1,198-byte legacy `initialize_config` transaction with the compiled ECON
+defaults, simulates it **without reading a keypair**, reports the seven rent
+recipients and payer debit, and caps that debit at 0.2 devnet SOL by default.
+It sets all venue bits to zero by default. Enabling Pump curve (`--venue-bits
+1`) or Pump curve plus PumpSwap (`--venue-bits 3`) is an explicit operator
+choice after venue, market, keeper and alert checks; enabling later through
+governance takes the protocol timelock. Raydium/Jupiter bits are unavailable
+through this devnet planner.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter @shortwin/math-wasm build
+cd apps/web
+node scripts/devnet-init-config.ts \
+  --upgrade-authority 3JfrUHa1RihL7rgJDWSmdV9DNGXkwKAUAcRDBh75cS14 \
+  --governance REPLACE_WITH_DEVNET_GOVERNANCE_PUBLIC_KEY \
+  --pause-authority REPLACE_WITH_DEVNET_PAUSE_PUBLIC_KEY \
+  --coverage-authority 52oLAneAy9CUhtAnSjfjxMX7fqYnbCuG4Nd9hKvmKQpS \
+  --fee-recipient REPLACE_WITH_DEVNET_FEE_RECIPIENT_PUBLIC_KEY \
+  --venue-bits 0
+```
+
+The unsigned output includes `planSha256`. Only after reviewing that summary
+and its successful simulation, run the same command with `--send
+--expected-plan-sha256 <printed-hash> --authority-keypair
+<outside-repo-devnet-upgrade-authority-keypair>`. The command then checks the
+keypair's public key without printing secret bytes, runs a signed simulation,
+sends once and waits for finality. If finality times out, inspect its signature
+before any retry. It refuses a non-devnet genesis even when `--rpc-url`
+overrides the default public endpoint.
