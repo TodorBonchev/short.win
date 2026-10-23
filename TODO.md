@@ -9,8 +9,13 @@ This file lists unfinished work only. Completed audit and release evidence is in
 [the validation record](docs/audit/ai-review-3/validation-1.0.3.md).
 The 1.0.3 candidate is unreleased as a stable tag. Its
 [program-only devnet deployment](docs/deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
-is complete; do not infer initialization, functional market readiness, or
-mainnet release approval from that deployment.
+is complete. Since that deployment, GlobalConfig and two Pump markets with
+lender deposits were initialized. A supervised short open, close and restored
+market pause were finalized on the deeper market; see the
+[trading receipt](docs/deployment/devnet-trading-bootstrap-2026-10-23.md).
+The [keeper, indexer and devnet website](docs/deployment/devnet-web-publish-2026-10-23.md)
+are running. These bounded devnet results do not establish unattended trading
+readiness or mainnet release approval.
 The final candidate also includes the AI3-FR01 quarantine and the owner-selected
 complete SHA-256 VenueGuard correction for first deployment.
 
@@ -22,11 +27,11 @@ complete SHA-256 VenueGuard correction for first deployment.
       the two provider-stopped scope gaps without retrying those tasks.
 - [ ] Verify actual funded/monitored keeper operation, covered markets, payer top-ups and
       alerts, plus running indexer destination `3` and 304-byte client artifact identities.
-      [Local service staging](docs/deployment/devnet-local-service-staging-2026-10-22.md)
-      established source-matched builds, PostgreSQL migrations and a bounded
-      deployment-only backfill and brief live connectivity/finality smoke with
-      a loopback reader; sustained ingest with market events, funded keeper and
-      alert delivery remain pending.
+      [Current devnet operation](docs/deployment/devnet-active-keeper-2026-10-23.md)
+      establishes funded, market-limited keeper activity, indexed market/trade
+      events and a live client. Sustained one-second coverage with an active
+      position, payer top-up operation, independent alert delivery and final
+      running-artifact checks remain pending.
 - [ ] Complete the objective gates and final exact-revision checks in the
       [1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
       before any stable tag or mainnet deployment. The
@@ -42,17 +47,16 @@ trade adapter or remove the remaining operating and audit gates.
 
 ## Public-devnet test prerequisites
 
-- [ ] Resolve the [devnet market feasibility gates](docs/deployment/devnet-market-feasibility-2026-10-22.md)
-      before promising market E2E: canonical Raydium/Jupiter IDs are not
+- [ ] Resolve the remaining
+      [devnet market feasibility gates](docs/deployment/devnet-market-feasibility-2026-10-22.md)
+      before promising broader market E2E: canonical Raydium/Jupiter IDs are not
       executable there, devnet Squads fails the supported immutability check,
       and current Pump/PumpSwap/fees executable bytes differ from the pinned
-      mainnet fixtures. A [bounded dispatch and published-interface probe](docs/deployment/devnet-pump-interface-probe-2026-10-22.md)
-      passed, but full account-populated CPI compatibility remains unproven. A fresh Pyth
-      sample passed at the dated read, but must pass again at execution. Confirm
-      a real market, governance member identities and installation of the
-      [staged coverage key](docs/deployment/devnet-operator-plan-2026-10-22.md#selected-topology-and-identities),
-      and funded live operators;
-      the program-only deployment and local service build do not close these.
+      mainnet fixtures. A bounded account-populated Pump open/close now passed
+      on one deeper devnet market; it does not prove graduation,
+      liquidation, fallback settlement, other venues or sustained oracle
+      coverage. The newly created controlled Pump coin remains too shallow to
+      admit a legal short under the deployed limits.
 
 The [owner-selected policies](docs/audit/owner-decisions-1.0.3-2026-10-21.md) and
 accurately labelled [focused](docs/audit/independent-ai-fix-review-1.0.3-2026-10-21.md) /
