@@ -708,7 +708,7 @@ async function simulatePhase(rpc, signer, opts, plan) {
     const report = {
         ...plan.summary,
         mode: opts.send ? 'send after successful simulation' : 'simulation only',
-        program: SHORTWIN_PROGRAM_ADDRESS,
+        program: opts.phase === 'fund' ? SYSTEM_PROGRAM : SHORTWIN_PROGRAM_ADDRESS,
         genesis: DEVNET_GENESIS,
         lookupTable: opts.phase === 'fund' ? null : PROTOCOL_ALT,
         packetBytes: size,
