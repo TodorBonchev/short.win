@@ -8,13 +8,17 @@ import type { Cluster } from './parseConfig.ts';
 
 const SMOKE_MINT = 'GCLN3PspeYrV3U9BZeGbmn7VVf7kabW23h2gBHvoKRXD';
 
+export function isControlledDevnetSmokeMint(cluster: Cluster, mint: string): boolean {
+    return cluster === 'devnet' && mint === SMOKE_MINT;
+}
+
 export function displayTokenMetadata(
     cluster: Cluster,
     mint: string,
     symbol: string | null | undefined,
     name: string | null | undefined,
 ): { symbol: string | null; name: string | null } {
-    if (cluster === 'devnet' && mint === SMOKE_MINT) {
+    if (isControlledDevnetSmokeMint(cluster, mint)) {
         return {
             symbol: symbol?.trim() ? symbol : 'SWTEST',
             name: name?.trim() ? name : 'ShortWin Devnet Test',

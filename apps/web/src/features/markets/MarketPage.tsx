@@ -27,6 +27,7 @@ import { Panel } from '../../components/Panel.tsx';
 import { Scrim, SheetHead, useSheetMode } from '../../components/Sheet.tsx';
 import { ErrorState, Skeleton } from '../../components/States.tsx';
 import { type TabDef, TabPanel, Tabs } from '../../components/Tabs.tsx';
+import { isControlledDevnetSmokeMint } from '../../config/devnetSmokeToken.ts';
 import { config as appConfig } from '../../config/env.ts';
 import { T } from '../../config/testids.ts';
 import { shortAddress } from '../../lib/format.ts';
@@ -54,6 +55,8 @@ const TABS: readonly TabDef<MarketTab>[] = [
     { key: 'coverage', label: 'Coverage', testId: T.marketTab('coverage') },
     { key: 'events', label: 'Events', testId: T.marketTab('events') },
 ];
+
+const DEEPER_DEVNET_TEST_MINT = '2isJ4phZS9Nv1fVHRLnjGkgvrFW4cb13qa8Y6kknpump' as Address;
 
 function MarketTabs({
     mint,
@@ -188,6 +191,19 @@ export function MarketPage({ mint }: { mint: Address }) {
                                 {mint}
                             </h1>
                             {data.status === 'loading' && <Skeleton width={160} />}
+                        </div>
+                    )}
+                    {isControlledDevnetSmokeMint(appConfig.cluster, mint) && (
+                        <div className="banner" data-tone="warn" role="status" data-testid="devnet-smoke-market-limit">
+                            <span>
+                                <strong>SWTEST cannot support a short on this devnet curve.</strong> Its 3% position
+                                impact cap permits less than the protocol’s 0.1 SOL minimum notional. For shorting
+                                tests, see the{' '}
+                                <Link to="/m/$mint" params={{ mint: DEEPER_DEVNET_TEST_MINT }}>
+                                    deeper Pump devnet market (2isJ…pump)
+                                </Link>
+                                . Opens there still depend on live price coverage and RPC availability.
+                            </span>
                         </div>
                     )}
                     <ActionBar label={`Trade ${symbol}`}>
