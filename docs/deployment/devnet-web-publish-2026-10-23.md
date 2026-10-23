@@ -29,12 +29,12 @@ VITE_RPC_URL=https://api.devnet.solana.com
 VITE_RPC_WS_URL=wss://api.devnet.solana.com
 VITE_INDEXER_URL=https://api-devnet.short.win
 VITE_INDEXER_WS_URL=wss://api-devnet.short.win/v1/ws
-VITE_PROTOCOL_ALT=
+VITE_PROTOCOL_ALT=F9VQX1wvHjzthd3BaQQQ2d22WLJxogAbPRKMZEnCuNna
 VITE_ENABLE_TEST_VENUE=false
 VITE_EXPLORER_TX_URL='https://explorer.solana.com/tx/{sig}?cluster=devnet'
 ```
 
-The 2026-10-23 local `pnpm --filter web build` with these values passed. Its `dist/` directory includes the generated Cloudflare Pages `_headers`, `/.well-known/security.txt`, and no published source maps. Cloudflare Pages serves this bundle as the production deployment for main merge commit `591db1a988aa1da247ca96addb941f82bb27fe75`: `https://34e66540.shortwin-devnet.pages.dev` (project `shortwin-devnet`, default host `https://shortwin-devnet.pages.dev`).
+The 2026-10-23 local `pnpm --filter web build` with these values passed. Its `dist/` directory includes the generated Cloudflare Pages `_headers`, `/.well-known/security.txt`, and no published source maps. The protocol ALT was added after the initial publish and must be present in the next production bundle. The initial production deployment was main merge commit `591db1a988aa1da247ca96addb941f82bb27fe75`: `https://34e66540.shortwin-devnet.pages.dev` (project `shortwin-devnet`, default host `https://shortwin-devnet.pages.dev`).
 
 Cloudflare Pages serves the static `apps/web/dist` bundle. The `shortwin-devnet` Direct Upload project and remote-managed `shortwin-devnet-indexer` Tunnel belong to the account that owns the zone. The Tunnel's ingress points only `api-devnet.short.win` to `http://127.0.0.1:8080` and otherwise returns 404. Its connector is running and reported healthy. The reader's direct tunnel peer is trusted as `127.0.0.1`; verify that public `X-Forwarded-For` produces distinct client rate-limit buckets during operations. The zone's sole Free-plan rate-limit rule blocks an IP for 10 seconds after more than 100 requests in 10 seconds to `/v1/health`, `/v1/status` or the `/v1/ws` handshake. Keep the origin allowlist exact. Recheck HTTPS, WSS, deep links, CORS and security headers after future deployments:
 
