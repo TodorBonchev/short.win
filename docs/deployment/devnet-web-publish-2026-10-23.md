@@ -2,20 +2,20 @@
 
 ## Current state
 
-The 1.0.3 program is deployed on devnet, and the devnet client is published at `https://short.win` and `https://www.short.win`. Its `GlobalConfig`, `VenueGuard` and `OracleCache` accounts have not been initialized and no market exists. The website shows the protocol status, a visible devnet badge and an uninitialized notice; lending and shorting cannot work until a separately reviewed initialization and market smoke succeeds. Market-creation prompts are hidden while `GlobalConfig` is absent.
+The 1.0.3 program is deployed on devnet, and the devnet client is published at `https://short.win` and `https://www.short.win`. Its `GlobalConfig` is initialized, two Pump curve markets and lender deposits exist, and a bounded short open/close round trip has landed on the deeper market. The site shows a visible DEVNET badge and both markets. The first controlled coin is too shallow for a legal short under the deployed limits; new opens on the deeper market are currently **paused for supervised operation** while keeper coverage and RPC capacity are checked. See [the landed trading receipt](devnet-trading-bootstrap-2026-10-23.md).
 
-On the operator workstation, PostgreSQL, the indexer `live` writer, read-only `serve` API, rollups, and the keeper's new read-only `--observe` mode run as enabled systemd **user** services with linger. The database, API, and observer metrics listen only on `127.0.0.1:5432`, `127.0.0.1:8080`, and `127.0.0.1:9464`. The API is read-only and its CORS origins include `https://devnet.short.win`, `https://short.win` and `https://www.short.win`. The keeper's existing `dry_run` mode signs a transaction before suppressing the send; the new observer does not load any keypair or enter the signing path. Observation is not active price coverage or liquidation service. The public API depends on this workstation staying awake, online and connected to Cloudflare Tunnel.
+On the operator workstation, PostgreSQL, the indexer `live` writer, read-only `serve` API, rollups, active keeper, and bounded local RPC relay run as enabled systemd **user** services with linger. The database, API, keeper metrics and relay listen only on loopback. The API is read-only and its CORS origins include `https://devnet.short.win`, `https://short.win` and `https://www.short.win`. The active keeper is limited to the deeper market, uses 300-second ticks while the market is paused and empty, and is not yet a proven unattended one-second coverage service. The public API depends on this workstation staying awake, online and connected to Cloudflare Tunnel.
 
 Verify the local services without printing credentials:
 
 ```sh
-systemctl --user show shortwin-devnet-db.service shortwin-devnet-indexer-live.service shortwin-devnet-indexer-api.service shortwin-devnet-indexer-rollups.service shortwin-devnet-keeper-observe.service -p Id -p ActiveState -p SubState -p MainPID -p NRestarts --no-pager
+systemctl --user show shortwin-devnet-db.service shortwin-devnet-indexer-live.service shortwin-devnet-indexer-api.service shortwin-devnet-indexer-rollups.service shortwin-devnet-keeper-active.service shortwin-devnet-helius-relay.service -p Id -p ActiveState -p SubState -p MainPID -p NRestarts --no-pager
 curl -fsS http://127.0.0.1:8080/v1/health
 curl -fsS http://127.0.0.1:8080/v1/status
 curl -fsS http://127.0.0.1:9464/metrics
 ```
 
-The private database URLs and passwords are in mode-`0600` files under `/home/todor_dev/.local/state/shortwin-devnet-1.0.3/config/`, outside Git. The service units are under `~/.config/systemd/user/`. Do not copy either into a deployment artifact.
+The private database URLs and passwords are in mode-`0600` files under `/home/todor_dev/.local/state/shortwin-devnet-1.0.3/config/`, outside Git. The Helius RPC credential is also outside Git and mode `0600`. The service units are under `~/.config/systemd/user/`. Do not copy private configuration into a deployment artifact.
 
 ## Publication topology
 
@@ -34,7 +34,7 @@ VITE_ENABLE_TEST_VENUE=false
 VITE_EXPLORER_TX_URL='https://explorer.solana.com/tx/{sig}?cluster=devnet'
 ```
 
-The 2026-10-23 local `pnpm --filter web build` with these values passed. Its `dist/` directory includes the generated Cloudflare Pages `_headers`, `/.well-known/security.txt`, and no published source maps. The protocol ALT was added after the initial publish and must be present in the next production bundle. The initial production deployment was main merge commit `591db1a988aa1da247ca96addb941f82bb27fe75`: `https://34e66540.shortwin-devnet.pages.dev` (project `shortwin-devnet`, default host `https://shortwin-devnet.pages.dev`).
+The 2026-10-23 local `pnpm --filter web build` with these values passed. Its `dist/` directory includes the generated Cloudflare Pages `_headers`, `/.well-known/security.txt`, and no published source maps. The protocol ALT was added after the initial publish and is present in the current production bundle. The initial production deployment was main merge commit `591db1a988aa1da247ca96addb941f82bb27fe75`: `https://34e66540.shortwin-devnet.pages.dev` (project `shortwin-devnet`, default host `https://shortwin-devnet.pages.dev`).
 
 Cloudflare Pages serves the static `apps/web/dist` bundle. The `shortwin-devnet` Direct Upload project and remote-managed `shortwin-devnet-indexer` Tunnel belong to the account that owns the zone. The Tunnel's ingress points only `api-devnet.short.win` to `http://127.0.0.1:8080` and otherwise returns 404. Its connector is running and reported healthy. The reader's direct tunnel peer is trusted as `127.0.0.1`; verify that public `X-Forwarded-For` produces distinct client rate-limit buckets during operations. The zone's sole Free-plan rate-limit rule blocks an IP for 10 seconds after more than 100 requests in 10 seconds to `/v1/health`, `/v1/status` or the `/v1/ws` handshake. Keep the origin allowlist exact. Recheck HTTPS, WSS, deep links, CORS and security headers after future deployments:
 

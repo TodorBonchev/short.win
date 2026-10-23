@@ -34,6 +34,8 @@ The unsigned close preflight passed at 120,222 CU, with a 0.2-SOL maximum buybac
 
 After the close, the operator restored `paused_opens=true` for the deeper market via [market pause transaction](https://explorer.solana.com/tx/53di3QZuFgYYTDuTLfHrTbNnxNfQaeudjDHEcBRTr2Y2Ls4ArvH4wotgRaKnrcuy29nP3xLkoEtNquXzDMeyyy4N?cluster=devnet) at slot 514176814. Its preflight passed at 8,067 CU with a 15,000-lamport simulated payer debit, under the 0.001-SOL cap. The keeper and relay remain running, with the keeper back at 300-second ticks for the paused empty market. This is a successful bounded devnet trade test; opening a new position requires an operator to restore fast coverage and clear the market pause after checks.
 
+The open, close and final pause signatures all subsequently reported `finalized` with no transaction error.
+
 ## Unattended trading gate
 
 This smoke does **not** establish continuous one-second oracle coverage. At a requested 400 ms tick interval, the keeper completed roughly nine ticks in 20 seconds during an empty-market sample, and the indexer recorded 11 observations by the end of the position smoke. The metrics reported no coverage misses or failed keeper transactions in that short window, but that is not evidence of sustained 1 Hz service. The externally created coin can also change independently. Keep the market paused for new opens until keeper throughput, cost budget and an alert route are verified for sustained active positions. The free Helius plan and current measured tick work do not yet support an unattended trading claim.
