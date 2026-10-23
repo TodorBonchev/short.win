@@ -16,6 +16,19 @@ After the test position closed, a market-scoped pause for new opens was confirme
 
 After the optimized release binary was installed at 10:57 EEST, one clean paused/empty 300-second tick forwarded **16 RPC calls**: two `getAccountInfo`, six `getMultipleAccounts`, one `getProgramAccounts`, and one each of `getLatestBlockhash`, `getRecentPrioritizationFees`, `getTransaction`, `sendTransaction`, `simulateTransaction`, plus two `getSignatureStatuses`. It made zero `getSlot` calls. Keeper metrics stayed at zero misses, degraded markets, failed simulations and failed transactions; the relay reported zero local or upstream 429s. This is 4,608 calls and 288 sends per day if each idle tick has the same shape, under the local 10,000-call daily relay cap. Under [Helius's detailed credit table](https://www.helius.dev/docs/billing/credits), the measured mix is 25 credits/tick, or about **216,000 credits per 30 days** before other clients or operations. The one-tick projection does not establish sustained active-position coverage.
 
+At 17:21 EEST, an on-chain market read and the indexer both confirmed `paused_opens=true` and zero positions. The operator copied the unchanged active config to `/home/todor_dev/.local/state/shortwin-devnet-1.0.3/config/keeper-paused-idle.toml` (mode `0600`) and set only `[oracle] enabled=false` in that copy. The 300-second systemd drop-in now selects this idle config; the original drop-in is saved at `/home/todor_dev/.local/state/shortwin-devnet-1.0.3/backup/50-zero-position-throttle.pre-idle-oracle-2026-10-23.conf.bak` (mode `0600`). The restarted service was active and its first tick made zero oracle reads, zero sends and zero failed transactions. This reduces idle oracle traffic while the market remains paused and empty; it does **not** pass the unattended coverage or alert gates.
+
+Restore the active config before preparing any unpause:
+
+```sh
+install -m 644 /home/todor_dev/.local/state/shortwin-devnet-1.0.3/backup/50-zero-position-throttle.pre-idle-oracle-2026-10-23.conf.bak \
+  /home/todor_dev/.config/systemd/user/shortwin-devnet-keeper-active.service.d/50-zero-position-throttle.conf
+systemctl --user daemon-reload
+systemctl --user restart shortwin-devnet-keeper-active.service
+```
+
+Verify its `ExecStart` selects `keeper-active.toml` with the default `oracle.enabled=true`, then restore fast coverage and prove fresh oracle and price observations before clearing `paused_opens`.
+
 Operator checks:
 
 ```sh
