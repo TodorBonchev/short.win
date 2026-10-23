@@ -372,20 +372,62 @@ async function main(): Promise<void> {
     }
     const signed = await signTransactionMessageWithSigners(message);
     const signature = getSignatureFromTransaction(signed);
-    const sent = await rpc
-        .sendTransaction(getBase64EncodedWireTransaction(signed), {
-            encoding: 'base64',
-            skipPreflight: false,
-            preflightCommitment: 'confirmed',
-            maxRetries: 3n,
-        })
-        .send();
-    if (sent !== signature) throw new Error(`RPC returned ${sent} for signed transaction ${signature}`);
-    console.log(`sent ${signature}`);
+    const signedWire = getBase64EncodedWireTransaction(signed);
+    const statusOnce = async () =>
+        (await rpc.getSignatureStatuses([signature], { searchTransactionHistory: true }).send()).value[0];
+    const rateLimited = (error: unknown) => /\b429\b|Too Many Requests/i.test(String(error));
+    console.log(`signed transaction ${signature}; submitting to devnet`);
+    let accepted = false;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+            const sent = await rpc
+                .sendTransaction(signedWire, {
+                    encoding: 'base64',
+                    skipPreflight: false,
+                    preflightCommitment: 'confirmed',
+                    maxRetries: 3n,
+                })
+                .send();
+            if (sent !== signature) throw new Error(`RPC returned ${sent} for signed transaction ${signature}`);
+            console.log(`sent ${signature}`);
+            accepted = true;
+            break;
+        } catch (error) {
+            if (!rateLimited(error)) {
+                throw new Error(
+                    `submission outcome unknown for ${signature}; check its on-chain status before retrying: ${String(error)}`,
+                );
+            }
+            await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+            const status = await statusOnce().catch((statusError: unknown) => {
+                if (!rateLimited(statusError)) {
+                    throw new Error(
+                        `status outcome unknown for ${signature}; check its on-chain status before retrying: ${String(statusError)}`,
+                    );
+                }
+                return null;
+            });
+            if (status?.err) throw new Error(`transaction ${signature} failed: ${JSON.stringify(status.err)}`);
+            if (status) {
+                console.log(`observed ${signature} after a rate-limited submission`);
+                accepted = true;
+                break;
+            }
+            if (attempt === 3) {
+                throw new Error(
+                    `three rate-limited submissions of the same signed transaction ${signature}; check its on-chain status before creating a new transaction`,
+                );
+            }
+        }
+    }
+    if (!accepted) throw new Error(`submission outcome unknown for ${signature}; check its on-chain status`);
     for (let i = 0; i < 45; i += 1) {
-        const status = (await rpc.getSignatureStatuses([signature], { searchTransactionHistory: true }).send())
-            .value[0];
-        if (status?.err) throw new Error(`transaction failed: ${JSON.stringify(status.err)}`);
+        const status = await statusOnce().catch((error: unknown) => {
+            throw new Error(
+                `confirmation outcome unknown for ${signature}; check its on-chain status before retrying: ${String(error)}`,
+            );
+        });
+        if (status?.err) throw new Error(`transaction ${signature} failed: ${JSON.stringify(status.err)}`);
         if (status?.confirmationStatus === 'confirmed' || status?.confirmationStatus === 'finalized') {
             console.log(`confirmed ${signature} at slot ${status.slot}`);
             return;
