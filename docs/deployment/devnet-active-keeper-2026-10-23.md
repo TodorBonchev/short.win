@@ -1,0 +1,21 @@
+# Devnet active keeper: controlled Pump market
+
+On 2026-10-23 the read-only `shortwin-devnet-keeper-observe.service` was disabled and stopped after the first controlled Pump market `GhLuvCJEJWpCK2rzQvCo4EB5BnvKEEhykCC4idkKtmB7` was created. The `shortwin-devnet-keeper-active.service` user unit was then enabled and started. Both units bind keeper metrics to loopback port `9464`, so only one may run at a time. The first curve was too shallow to admit a short under the unchanged minimum-notional and price-impact checks. A deeper market, `tmRs5cmSphuftivEwfKr3QMRVdGynZMHqWwki2qnD3H`, was subsequently created.
+
+The active keeper uses the release binary copied to `~/.local/state/shortwin-devnet-1.0.3/bin/shortwin-keeper-active` (SHA-256 `b9142b9e034aaf5ffeeb62a18ecf03a6ed6d9783000ac003f79810c9b0afb106`). Its private local TOML config now allows **only the deeper market** `tmRs5cmSphuftivEwfKr3QMRVdGynZMHqWwki2qnD3H`, has `dry_run=false`, `tx_format="auto"`, and uses protocol lookup table `F9VQX1wvHjzthd3BaQQQ2d22WLJxogAbPRKMZEnCuNna`. The observation budget is 1 SOL per UTC day with zero value-at-risk floor; the priority ceiling is 100,000 microlamports/CU. Automatic coverage pause is enabled with the separate designated authority `52oLAneAy9CUhtAnSjfjxMX7fqYnbCuG4Nd9hKvmKQpS`. Its fee payer is `35DeTJZZKgHzbLfWe9yiM1EwFfVUTcPCFSizLd8crDbc`, funded with 2 devnet SOL. Both signing files remain outside Git with mode `0600`.
+
+The first active ticks found the market and landed a `crank_sol_usd` transaction. After seven ticks, metrics showed one landed transaction, zero failed transactions, zero failed simulations, zero missed required observation seconds, zero coverage-pause failures, and market degraded/paused gauges both zero. This is a startup check, not evidence of sustained coverage under open positions. Raydium AMM v4, CPMM, and Jupiter ProgramData were unreadable on devnet; their warnings are expected for this Pump-only market. The selected Pump venue produced no ProgramData warning.
+
+During zero-position operator setup, the shared public devnet RPC returned HTTP 429 to trade simulations. At 10:16 EEST a reversible systemd drop-in changed the keeper tick from 400 ms to 30 s. At 10:24 EEST the allowlist moved to the deeper market and the base 400-ms cadence was restored for a 60-second check. Metrics after 29 completed ticks showed four landed oracle cranks, four full market reads and 25 cold-market skips; failed transactions, failed simulations, missed required observations, and degraded/paused coverage were all zero. The keeper journal had no 429, but the operator's unsigned open preflight received HTTP 429 during this check. No short was signed or opened. A Pump curve without positions does not require automatic `crank_price`, so the zero price observations over this minute are expected and **do not prove per-second coverage after an open**.
+
+At 10:27 EEST the 30-second zero-position throttle was restored. The base unit still contains the 400-ms setting. Remove `~/.config/systemd/user/shortwin-devnet-keeper-active.service.d/50-zero-position-throttle.conf`, reload systemd, and restart the unit only after an authenticated devnet RPC with adequate capacity is configured; then verify actual per-second observations and zero misses during a bounded open-position test. The slower setup cadence is only for an empty market. No authenticated alternate RPC is configured locally. The public endpoint has demonstrated insufficient capacity for the keeper plus operator preflight and must not be treated as ready for an open short.
+
+Operator checks:
+
+```sh
+systemctl --user status shortwin-devnet-keeper-active.service --no-pager
+curl -fsS http://127.0.0.1:9464/metrics
+journalctl --user -u shortwin-devnet-keeper-active.service -n 100 --no-pager
+```
+
+Monitor `shortwin_keeper_market_degraded`, `shortwin_keeper_market_paused_coverage`, `shortwin_keeper_market_misses`, `shortwin_keeper_tx_failed_total`, and `shortwin_keeper_coverage_pause_failures_total` during the trade smoke. A running systemd unit alone does not establish a working price-coverage service. No independent alert-delivery route has yet been verified.
