@@ -1,0 +1,9 @@
+{
+  "name": "ShortWin Devnet Test",
+  "symbol": "SWTEST",
+  "description": "A devnet-only test token for ShortWin protocol integration. It has no monetary value and is not a mainnet asset.",
+  "image": "https://short.win/icon-192.png",
+  "showName": true,
+  "createdOn": "https://short.win",
+  "website": "https://short.win"
+}
