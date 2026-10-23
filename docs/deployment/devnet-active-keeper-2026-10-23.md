@@ -10,6 +10,8 @@ During zero-position operator setup, the shared public devnet RPC returned HTTP 
 
 At 10:27 EEST the 30-second zero-position throttle was restored. The base unit still contains the 400-ms setting. Remove `~/.config/systemd/user/shortwin-devnet-keeper-active.service.d/50-zero-position-throttle.conf`, reload systemd, and restart the unit only after an authenticated devnet RPC with adequate capacity is configured; then verify actual per-second observations and zero misses during a bounded open-position test. The slower setup cadence is only for an empty market. No authenticated alternate RPC is configured locally. The public endpoint has demonstrated insufficient capacity for the keeper plus operator preflight and must not be treated as ready for an open short.
 
+At 10:30 EEST the operator ran a second bounded check with the 400-ms keeper and a fresh, landed manual price crank. The unsigned open simulation again received HTTP 429. The pre-agreed condition for signing therefore failed: **no open-short transaction was signed or submitted**. At 10:31 EEST the 30-second zero-position throttle was restored, and the active keeper remained enabled against only the deeper market. This repeated result is an RPC capacity blocker, independent of the now-passing protocol-level open simulation at the slower setup cadence.
+
 Operator checks:
 
 ```sh
