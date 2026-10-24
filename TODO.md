@@ -5,6 +5,7 @@ This file lists unfinished work only. Completed audit and release evidence is in
 [the 1.0.3 handoff](docs/audit/handoff-1.0.3-2026-10-20.md),
 [the current readiness record](docs/audit/release-readiness-1.0.3-2026-10-21.md),
 [the owner-delegated release decision](docs/audit/owner-delegated-release-decision-1.0.3-2026-10-22.md),
+[the finalization review](docs/audit/release-final-review-1.0.3-2026-10-24.md),
 [the findings tracker](docs/audit/findings.md), and
 [the validation record](docs/audit/ai-review-3/validation-1.0.3.md).
 The 1.0.3 candidate is unreleased as a stable tag. Its
@@ -24,7 +25,10 @@ complete SHA-256 VenueGuard correction for first deployment.
 - [ ] Complete or explicitly disposition the [new audit checkpoint](docs/audit/2026-10-22-progress/README.md)
       before any whole-codebase audit-complete claim. Seven independently retained
       hypotheses require validation and 23 lack independent disposition; preserve
-      the two provider-stopped scope gaps without retrying those tasks.
+      the two provider-stopped scope gaps without retrying those tasks. The focused
+      PumpSwap readiness-cache recovery in the 2026-10-24 finalization branch addresses
+      one source mechanism, but does not rewrite the checkpoint's formal record without
+      fresh independent reconciliation.
 - [ ] Verify actual funded/monitored keeper operation, covered markets, payer top-ups and
       alerts, plus running indexer destination `3` and 304-byte client artifact identities.
       [Current devnet operation](docs/deployment/devnet-active-keeper-2026-10-23.md)
@@ -36,7 +40,8 @@ complete SHA-256 VenueGuard correction for first deployment.
       [1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
       before any stable tag or mainnet deployment. The
       [owner-delegated decision](docs/audit/owner-delegated-release-decision-1.0.3-2026-10-22.md)
-      is recorded as **no-go now**; no further generic policy choice is pending.
+      and the [finalization review](docs/audit/release-final-review-1.0.3-2026-10-24.md)
+      are recorded as **no-go now**; no further generic policy choice is pending.
       The canonical runtime bytes and prior ≥24 h fuzz attribution are established
       for `7b11cc7` by fresh native/pinned-Docker builds and source-input equivalence.
 

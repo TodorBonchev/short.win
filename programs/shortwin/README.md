@@ -5,16 +5,18 @@ for shorting Solana memecoins. Use this crate with the `cpi` feature to invoke s
 from your own on-chain program, or with `no-entrypoint` to use its account types,
 instruction definitions, events and error codes off-chain.
 
-> **Not deployed yet.** The declared program id
-> `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`shortwin::ID`) is not live on any
-> cluster today. Until it is, CPI calls against it will fail; test against your own
-> deployment on a local validator. The interface may change before the mainnet launch.
+> **Devnet preview only.** The declared program id
+> `5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK` (`shortwin::ID`) is deployed on Solana
+> devnet as the guarded 1.0.3 preview. It is not deployed on mainnet, and new opens on the
+> supervised devnet market remain paused. See the
+> [deployment record](../../docs/deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md) and use
+> an explicit cluster/RPC when testing CPI calls.
 
 ## CPI usage
 
 ```toml
 [dependencies]
-shortwin = { version = "1.0.2", features = ["cpi"] }
+shortwin = { version = "1.0.3", features = ["cpi"] }
 anchor-lang = "=1.2.0"
 ```
 

@@ -608,6 +608,22 @@ fn is(code: Option<u32>, e: ShortwinError) -> bool {
     code == Some(u32::from(e))
 }
 
+/// A PumpSwap fixed-account refusal can mean that an account which previously existed was
+/// closed without changing the derived account list. Forget the process-local readiness cache
+/// so the next tick runs [`Keeper::missing_pamm`] and recreates any missing account. Other venues
+/// and other refusal codes do not invalidate this cache.
+fn pamm_readiness_stale(kind: VenueKind, result: &ExitResult) -> bool {
+    if kind != VenueKind::PumpSwap {
+        return false;
+    }
+    let code = match result {
+        ExitResult::Refused { code, .. } => *code,
+        ExitResult::Failed { outcome } => outcome.err.as_ref().and_then(TxError::custom_code),
+        _ => None,
+    };
+    is(code, ShortwinError::VenueAccountMismatch)
+}
+
 /// The keeper (module docs).
 pub struct Keeper<C: Chain> {
     chain: C,
@@ -2118,9 +2134,10 @@ impl<C: Chain> Keeper<C> {
     /// Duty 6 (M6): the pool accounts `view.markets[idx]`'s PumpSwap trades require (the trader's
     /// base ATA, and ARCH §3.12's existence requirement: the trader's pAMM UVA, the coin-creator
     /// vault's WSOL ATA, the two recipients' WSOL ATAs, on a cashback coin the trader's cashback
-    /// ATA) are read once per list
-    /// (a coin-creator change makes a new list); the missing ones are created (at most one attempt
-    /// a second), and the list is marked ready when every account exists.
+    /// ATA) are read once per list (a coin-creator change makes a new list); the missing ones are
+    /// created (at most one attempt a second), and the list is marked ready when every account
+    /// exists. A later fixed-account mismatch invalidates that readiness in [`Self::account_exit`]
+    /// so an unchanged list is re-read and repaired on the next tick.
     async fn prepare_pamm_trader(
         &mut self,
         view: &ChainView,
@@ -2447,6 +2464,9 @@ impl<C: Chain> Keeper<C> {
     ) -> bool {
         let key = mv.key;
         let mut landed = false;
+        if pamm_readiness_stale(mv.kind, &result) {
+            self.pamm_ready.remove(&key);
+        }
         match &result {
             ExitResult::Landed {
                 outcome,
@@ -4826,6 +4846,46 @@ impl<C: Chain> Keeper<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn refused(code: ShortwinError) -> ExitResult {
+        let code = u32::from(code);
+        ExitResult::Refused {
+            code: Some(code),
+            outcome: TxOutcome {
+                err: Some(TxError::Custom { index: 0, code }),
+                ..TxOutcome::default()
+            },
+        }
+    }
+
+    /// A disappeared PumpSwap account must force the next tick through `missing_pamm`; unrelated
+    /// refusal codes and venues retain their readiness state. The same recovery applies when the
+    /// mismatch reached the bank instead of being caught by simulation.
+    #[test]
+    fn a_pumpswap_account_mismatch_invalidates_cached_readiness() {
+        let mismatch = refused(ShortwinError::VenueAccountMismatch);
+        assert!(pamm_readiness_stale(VenueKind::PumpSwap, &mismatch));
+        assert!(!pamm_readiness_stale(VenueKind::PumpCurve, &mismatch));
+        assert!(!pamm_readiness_stale(
+            VenueKind::PumpSwap,
+            &refused(ShortwinError::BadRemainingAccounts)
+        ));
+
+        let code = u32::from(ShortwinError::VenueAccountMismatch);
+        let failed = ExitResult::Failed {
+            outcome: TxOutcome {
+                err: Some(TxError::Custom { index: 0, code }),
+                ..TxOutcome::default()
+            },
+        };
+        assert!(pamm_readiness_stale(VenueKind::PumpSwap, &failed));
+        assert!(!pamm_readiness_stale(
+            VenueKind::PumpSwap,
+            &ExitResult::DryRun {
+                outcome: TxOutcome::default()
+            }
+        ));
+    }
 
     /// An `ExitRefused` alert's detail: a refusal's error and the program's own error line
     /// (its source line tells which parser refused), never the whole outcome — no slot, no logs,

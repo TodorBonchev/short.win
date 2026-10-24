@@ -1,5 +1,9 @@
 # 1.0.3 release gate assessment — 2026-10-23
 
+> Follow-up: the [2026-10-24 finalization review](release-final-review-1.0.3-2026-10-24.md)
+> retains this stable-tag no-go and records the focused PumpSwap keeper recovery completed after
+> this assessment.
+
 This is an evidence review for a possible tag, not a claim that an external or whole-repository audit finished. The user's new request can authorize a transparent change to release policy; it cannot turn missing reviews or operating evidence into completed checks. No stable tag or mainnet deployment is implied by this record.
 
 | Gate | Evidence and current disposition |

@@ -18,13 +18,15 @@ deployed (design pump-final §10–§11, owner decision D2), and its IDL left wi
 1.0.0 copy stays in git history (`git show v1.0.0:clients/js/idl/complete_curve.json`).
 
 
-## Status: pre-release, program not deployed
+## Status: pre-release, guarded devnet preview
 
 This package is published as a pre-release (`0.x.y-next.N`, npm dist-tag `next`). **The
-short.win program is not deployed on any cluster yet.** `SHORTWIN_PROGRAM_ADDRESS`
-(`5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`) is the program's declared id, but nothing
-lives at that address today. Pass `programAddress` (below) to talk to your own deployment, for
-example on a local validator. The API can change before 1.0.
+short.win program is deployed only on Solana devnet as a guarded 1.0.3 preview; it is not
+deployed on mainnet.** `SHORTWIN_PROGRAM_ADDRESS`
+(`5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`) points to that devnet program when the
+client uses a devnet RPC. New opens on the supervised devnet market remain paused. Pass
+`programAddress` (below) to talk to your own local deployment. The client API can change
+before its 1.0 release.
 
 ## Install
 
