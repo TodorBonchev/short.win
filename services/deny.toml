@@ -19,6 +19,11 @@ ignore = [
     { id = "RUSTSEC-2024-0388", reason = "derivative via ark-* via solana-syscalls 4.2 (keeper scenario tests only)" },
     { id = "RUSTSEC-2024-0436", reason = "paste via ark-ff via solana-syscalls 4.2 (keeper scenario tests only)" },
     { id = "RUSTSEC-2025-0161", reason = "libsecp256k1 via solana-syscalls 4.2 (keeper scenario tests only)" },
+    # Vulnerable constant-time operations in crypto-bigint 0.5.5. This version is reachable only
+    # through k256 -> solana-secp256k1-recover -> solana-syscalls in the LiteSVM scenario-test
+    # graph, not the keeper or indexer release graphs. RustCrypto patched only the incompatible
+    # 0.7 line; remove this exception when the Solana test stack moves to it.
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5.5 via Solana LiteSVM scenario tests only; no compatible upstream fix" },
 ]
 
 [licenses]

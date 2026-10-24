@@ -169,18 +169,20 @@ cargo build -p shortwin-math-wasm --target wasm32-unknown-unknown --release
 cargo check -p shortwin --target wasm32-unknown-unknown   # T-LAYOUT wasm32 leg
 cargo test -p squads-v4-ix                           # M10: the Squads v4 encoders against the vendored IDL
 anchor build --tools-version v1.57 --arch v3
-python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.1 \
-  target/deploy/shortwin.so "short.win"              # M10 SECTXT-1: the release gate (1.0.1)
+python3 scripts/check-security-txt.py --forbid-placeholders --source-release v1.0.3 \
+  target/deploy/shortwin.so "short.win"              # M10 SECTXT-1: the 1.0.3 release gate
 python3 scripts/test_check_security_txt.py           # the checker's own tests
 cargo deny check
 cargo audit --deny warnings --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 \
-  --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
+  --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161 \
+  --ignore RUSTSEC-2026-0387
 ```
 
 (The `test` job runs `shortwin-math` at `PROPTEST_CASES=2000`; the M2 gate also runs the
-whole workspace at that count.) The ignored advisories are the ones in `deny.toml`: all
-"unmaintained", none a vulnerability;
-bincode comes with anchor-lang 1.2.0, the other four only with the LiteSVM test harness.
+whole workspace at that count.) The ignored advisories and their scope are documented in
+`deny.toml`. Five unmaintained crates come from Anchor or the LiteSVM test harness. The one
+vulnerability exception, `RUSTSEC-2026-0387`, is an incompatible `crypto-bigint` line confined
+to the Solana test stack; release graphs do not contain it.
 
 **security.txt (M10, ARCH §8.5).** The deployed program embeds a
 neodyme security.txt (`solana-security-txt =1.1.3`, `security_txt!` in

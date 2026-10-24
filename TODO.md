@@ -74,6 +74,9 @@ refresh and legacy keeper cleanup are complete in the source candidate.
 
 ## Later or conditional follow-ups
 
+- [ ] Remove the narrow `RUSTSEC-2026-0387` exception when the Solana LiteSVM / CU test stack
+      can move from `crypto-bigint` 0.5.5 to the patched 0.7 line. The vulnerable crate is absent
+      from the program, keeper and indexer release graphs.
 - [ ] Upload the [local-validator demo](apps/web/e2e/demo/README.md)'s desktop
       or portrait phone MP4 (or the [56-second promo](tools/promo/README.md)) as
       an unlisted video, add its URL to the site/pinned post and share the

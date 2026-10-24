@@ -153,11 +153,12 @@ jobs:
             cargo deny --manifest-path "$manifest" --config deny.toml --locked check
             echo "::endgroup::"
           done
-      # Same exceptions as deny.toml (unmaintained, not vulnerable): bincode 1.3.3 via
-      # anchor-lang 1.2.0; ansi_term, derivative, paste, libsecp256k1 via the LiteSVM test harness.
+      # Same exceptions as deny.toml: the unmaintained crates are inherited from Anchor or the
+      # LiteSVM test harness; vulnerable crypto-bigint 0.5.5 is confined to the Solana test stack
+      # and has no compatible patched release on that dependency line.
       - name: cargo audit (workspace and the standalone bench lockfiles)
         run: |
-          ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161"
+          ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161 --ignore RUSTSEC-2026-0387"
           for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock tests/bench/m3_cu/Cargo.lock tests/bench/m5_cu/Cargo.lock tests/bench/m6_cu/Cargo.lock; do
             echo "::group::$lock"; cargo audit -f "$lock" --deny warnings $ignore; echo "::endgroup::"
           done
@@ -871,7 +872,7 @@ jobs:
         run: >-
           cargo audit -f services/Cargo.lock --deny warnings
           --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388
-          --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
+          --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161 --ignore RUSTSEC-2026-0387
       - name: Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`)
         env:
           SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so
