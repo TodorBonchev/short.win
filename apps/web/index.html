@@ -9,7 +9,22 @@
         <!-- --bg-1 (styles/tokens.css), hard-coded: a meta cannot read a CSS variable. -->
         <meta name="theme-color" content="#12161b" />
         <meta name="referrer" content="no-referrer" />
-        <meta name="description" content="ShortWin devnet preview for Solana token lending and shorting." />
+        <meta name="description" content="ShortWin is an open-source Solana protocol: holders stake or rent out any Solana token, traders borrow it to short. Devnet only, not audited." />
+        <link rel="canonical" href="https://short.win/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="ShortWin" />
+        <meta property="og:url" content="https://short.win/" />
+        <meta property="og:title" content="ShortWin — Stake, lend and short any Solana token" />
+        <meta property="og:description" content="Open-source Solana protocol: rent out any Solana token or borrow it to short. Devnet only, not audited." />
+        <meta property="og:image" content="https://short.win/og.png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:image:alt" content="ShortWin logo — stake, lend and short any Solana token" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@short_dot_win" />
+        <meta name="twitter:title" content="ShortWin — Stake, lend and short any Solana token" />
+        <meta name="twitter:description" content="Rent out any Solana token or borrow it to short. Devnet only, not audited." />
+        <meta name="twitter:image" content="https://short.win/og.png" />
         <!-- The brand mark on its tile (src/shell/Logo.tsx): the SVG favicon, PNG fallbacks for Safari and
              legacy browsers (plus /favicon.ico), the iOS home-screen icon and the web app manifest's
              "any" / "maskable" icons (public/manifest.webmanifest). -->
@@ -18,11 +33,23 @@
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.webmanifest" />
-        <title>ShortWin — Devnet preview</title>
+        <title>ShortWin — Stake, lend and short any Solana token (devnet)</title>
+        <!-- JSON-LD is a non-executed data block, so CSP script-src 'self' does not apply to it. -->
+        <script type="application/ld+json">
+            {"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"ShortWin","url":"https://short.win/","logo":"https://short.win/icon-512-any.png","sameAs":["https://x.com/short_dot_win","https://github.com/TodorBonchev/short.win"]},{"@type":"WebSite","name":"ShortWin","url":"https://short.win/"},{"@type":"SoftwareApplication","name":"ShortWin","url":"https://short.win/","applicationCategory":"FinanceApplication","operatingSystem":"Web","description":"Open-source Solana protocol where holders stake or rent out any Solana token and traders borrow it to short. Devnet only, not audited.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}]}
+        </script>
     </head>
     <body>
         <noscript>ShortWin needs JavaScript.</noscript>
-        <div id="root"></div>
+        <!-- Static fallback for crawlers and no-JS clients; React replaces it on mount. -->
+        <div id="root">
+            <main>
+                <h1>ShortWin — stake, lend and short any Solana token</h1>
+                <p>ShortWin is an open-source Solana protocol. Holders stake or rent out any Solana token and earn rent; traders borrow those tokens to short them.</p>
+                <p>Devnet only · not audited</p>
+                <p><a href="https://github.com/TodorBonchev/short.win">GitHub</a> · <a href="https://x.com/short_dot_win">X @short_dot_win</a></p>
+            </main>
+        </div>
         <script type="module" src="/src/main.tsx"></script>
     </body>
 </html>
