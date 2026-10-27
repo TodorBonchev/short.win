@@ -1,5 +1,14 @@
 # services
 
+**Current mainnet preparation (owner, 2026-10-27):** launch with existing
+per-market borrowing caps before an external audit and a funded bug bounty;
+deposits and market count remain uncapped. Use earned protocol fees to accumulate
+later security funding. The [release plan](../docs/release/MAINNET-1.0.3.md) and
+[production VPS runbook](../docs/deployment/MAINNET_OPERATIONS.md) govern current
+operator preparation. Devnet receipts and its paused/empty idle profile are not
+mainnet operating evidence. Keeper/indexer funding, active coverage, independent
+alerts and exact artifact identities remain required.
+
 The off-chain services of short.win (ARCHITECTURE §7). A **host** Cargo workspace with its own
 `Cargo.lock` (ARCH §1.2): the Agave client crates and tokio never enter the on-chain
 workspace's lockfile.

@@ -20,8 +20,16 @@ Status: milestones M0–M10 built (the ≥ 24-hour fuzz criterion met for M7 by 
 run 4 and on the final program bytes by run E, [`tests/fuzz/README.md`](tests/fuzz/README.md)):
 the program with every venue (pump.fun curve, PumpSwap, Raydium AMM v4 and CPMM), the keeper, the
 indexer and API, and the web frontend (`apps/web`, with its Playwright E2E on a local validator).
-Pending: M10's external audit ([`docs/AUDIT.md`](docs/AUDIT.md)) and stable release
-gates. The unreleased 1.0.3 program was [deployed to devnet on 2026-10-22](docs/deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md).
+**Launch policy (owner decision, 2026-10-27): capped mainnet before an external audit
+and a funded bug bounty.** Protocol fees are intended to accumulate funding for the
+bounty and audit; neither is required before this initial launch phase. Here capped
+means the existing **25 SOL aggregate opening-notional limit per market**; deposits
+and the number of markets remain uncapped. It is not a TVL or protocol-wide cap. The
+[1.0.3 mainnet plan](docs/release/MAINNET-1.0.3.md) records the exposure controls,
+remaining release gates and operator preflight. The repository's AI-assisted reviews
+are not an external security audit.
+
+The unreleased 1.0.3 program was [deployed to devnet on 2026-10-22](docs/deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md).
 Its configuration is initialized, two Pump markets have lender deposits, and a
 [supervised short opened and closed](docs/deployment/devnet-trading-bootstrap-2026-10-23.md).
 New opens on the deeper market remain paused pending sustained keeper coverage

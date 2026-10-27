@@ -1,5 +1,9 @@
 # Owner-delegated 1.0.3 release decision — 2026-10-22
 
+> **2026-10-27 policy update:** The owner’s direct October 27 decision supersedes the delegated no-go and audit-first release timing below. Devnet approvals/receipts retain their original scope. See the
+> [current mainnet plan](../release/MAINNET-1.0.3.md) and
+> [owner decision](owner-mainnet-decision-1.0.3-2026-10-27.md).
+
 The owner instructed the agent to perform remaining owner-side work, choose the
 recommended answers and mark delegated decisions complete. This records those
 choices under that authorization. It does not attribute implementation or

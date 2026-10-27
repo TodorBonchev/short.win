@@ -922,7 +922,7 @@ are historical: where they disagree with ARCH §12 or the code, ARCH §12 and th
 | U2, U3, U6, U7, U9, U11, U24 | Non-ATA WSOL, `disable_flags` bits, rent debits, ATA depth, unsigned `claim_cashback`, CPMM exact-out creator fee, trailing accounts | VERIFIED / RESOLVED (M3–M6) | — |
 | U4 | Whole-instruction CU, trace and size figures | **VERIFIED (measured)** for every instruction class (`m1_cu`, `m2_cu`, `m3_cu`, `m5_cu`, `m6_cu`, `m7_keeper`), within the PROPOSED limits, re-baselined after each M10 batch and for pump v3 (the curve and PumpSwap benches on `b3130ae2…`, pump-final P3; `m7_keeper` / `m7_cascade` on 1.0.1, P8; §13) | — |
 | U5 | Copying a 10 MiB ProgramData | VERIFIED for CU (not metered). Latency and fee are unmeasured. Since AIR-01 a flag or a revalidation after an extension also hashes the trimmed ELF: ≤ 0.44 M CU measured on pump-fees, CPMM and AMM v4 (`latch_raydium_it`, `latch_pump_it` `air01_*`; pump-fees and CPMM after one 10 KiB extension), and ≈ 0.48 M estimated for pump-fees grown near the 10 MiB cap, so its sender requests ≥ 0.6 M CU or sizes the limit by simulation; Jupiter's is not measured and is sized by simulation (KI-69) | M11 (mainnet) |
-| U8, U22, U25 | The straddle bundle's pre-flight and a live block engine; Jito semantics; v1 transactions landing | Fork parts VERIFIED; the live parts **UNVERIFIED**: no mainnet spend before the audit (owner default Q6). **Since 1.0.1 (pump-final, D2) no exit uses a bundle** (a position past `rT` exits in one `buy_v3`): U8 and U22 gate nothing any more; U25 stays for the keeper's v1 crank batches (KI-51) | M11 probes (U25) |
+| U8, U22, U25 | The straddle bundle's pre-flight and a live block engine; Jito semantics; v1 transactions landing | Fork parts VERIFIED; the live parts **UNVERIFIED**: historical owner default Q6 prohibited mainnet spend before audit; the initial-mainnet timing is superseded by the owner’s 2026-10-27 decision (§12). **Since 1.0.1 (pump-final, D2) no exit uses a bundle** (a position past `rT` exits in one `buy_v3`): U8 and U22 gate nothing any more; U25 stays for the keeper's v1 crank batches (KI-51) | M11 probes (U25) |
 | U10 | Delegated `pool_vault` sell; direct delivery for Token-2022 CPMM | **VERIFIED** on the dumped ELFs, re-run on the 452,376,460 CPMM ELF | a mainnet example in M11 |
 | U12 | Raydium deployed binaries vs public source | **CPMM closed:** the redeploy is `raydium-cp-swap@bdeee23`, rebuilt byte for byte (the manifest's `source.status` text still says UNVERIFIED; ARCH §12 is normative). **AMM v4:** a behavioural match only | — |
 | U13, U14 | Raydium admin history; the `open_time` clamp deploy | Keeper monitor; a conservative constant | — |
@@ -1683,6 +1683,26 @@ These are where we would look first. They are not limits on the scope.
 ---
 
 ## 12. Logistics and change policy
+
+**Current initial-mainnet policy (owner, 2026-10-27):** launch with existing
+per-market borrowing limits before an external audit and a funded bug bounty;
+accumulate earned protocol fee revenue toward those later engagements. The owner
+explicitly accepts uncapped deposits and market count. The compiled 25-SOL
+opening-notional cap is per market and is not a global TVL, margin or loss cap.
+See the [decision](audit/owner-mainnet-decision-1.0.3-2026-10-27.md) and
+[current release plan](release/MAINNET-1.0.3.md).
+
+This supersedes earlier audit-first/mainnet-spend prohibitions and the delegated
+October 22 no-go timing. It waives external/whole-repository audit completion,
+contest and funded-bounty timing as prerequisites for initial mainnet release;
+it does not report those activities as completed. The newer checkpoint's open
+hypotheses, independent dispositions and blocked/stopped scopes remain open.
+Preserve accurately attributed AI-assisted fix reviews and all historical records.
+Regression/CI, final-runtime qualification, reproducible bytes, current dependency
+compatibility and funded monitored operation remain required. A final source tag
+identifies code; enabling mainnet opens requires real operator commissioning.
+Do not fund security engagements from lender assets or claim a funded bounty from
+future expected fees.
 
 **Freeze:**
 - The audit commit is the tag named in §0.

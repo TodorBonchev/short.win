@@ -1,5 +1,9 @@
 # 1.0.3 release checks and owner-review plan (2026-10-22 Europe/Kyiv)
 
+> **2026-10-27 policy update:** The owner’s October 27 mainnet decision supersedes audit-first/no-tag timing in this historical record. Initial launch uses existing per-market borrowing caps; deposits and market count remain uncapped. Actual operating prerequisites still require evidence. See the
+> [current mainnet plan](../release/MAINNET-1.0.3.md) and
+> [owner decision](owner-mainnet-decision-1.0.3-2026-10-27.md).
+
 > Historical predeployment snapshot. The program-only devnet deployment later
 > [completed](../deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md), and the
 > [Jupiter administrative pin drift](probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md)

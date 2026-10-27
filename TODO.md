@@ -15,35 +15,54 @@ market pause were finalized on the deeper market; see the
 [trading receipt](docs/deployment/devnet-trading-bootstrap-2026-10-23.md).
 The [keeper, indexer and devnet website](docs/deployment/devnet-web-publish-2026-10-23.md)
 are running. These bounded devnet results do not establish unattended trading
-readiness or mainnet release approval.
+readiness. The owner subsequently selected the mainnet preparation policy below.
 The final candidate also includes the AI3-FR01 quarantine and the owner-selected
 complete SHA-256 VenueGuard correction for first deployment.
 
-## 1.0.3 release blockers
+## 1.0.3 mainnet preparation
 
-- [ ] Complete or explicitly disposition the [new audit checkpoint](docs/audit/2026-10-22-progress/README.md)
-      before any whole-codebase audit-complete claim. Seven independently retained
-      hypotheses require validation and 23 lack independent disposition; preserve
-      the two provider-stopped scope gaps without retrying those tasks.
-- [ ] Verify actual funded/monitored keeper operation, covered markets, payer top-ups and
-      alerts, plus running indexer destination `3` and 304-byte client artifact identities.
-      [Current devnet operation](docs/deployment/devnet-active-keeper-2026-10-23.md)
-      establishes funded, market-limited keeper activity, indexed market/trade
-      events and a live client. Sustained one-second coverage with an active
-      position, payer top-up operation, independent alert delivery and final
-      running-artifact checks remain pending.
-- [ ] Complete the objective gates and final exact-revision checks in the
-      [1.0.3 tag/deployment plan](docs/audit/release-checks-1.0.3-2026-10-22.md)
-      before any stable tag or mainnet deployment. The
-      [owner-delegated decision](docs/audit/owner-delegated-release-decision-1.0.3-2026-10-22.md)
-      is recorded as **no-go now**; no further generic policy choice is pending.
-      The canonical runtime bytes and prior ≥24 h fuzz attribution are established
-      for `7b11cc7` by fresh native/pinned-Docker builds and source-input equivalence.
+The owner selected **mainnet before an external audit and a funded bug bounty**,
+funded later from protocol fees, and explicitly accepted **existing per-market
+borrowing caps with uncapped deposits and market count**. The compiled default
+opening-notional cap is 25 SOL per market, not a global TVL or loss cap. See the
+[current release plan](docs/release/MAINNET-1.0.3.md) and
+[dated decision](docs/audit/owner-mainnet-decision-1.0.3-2026-10-27.md).
 
-The dated [Jupiter mainnet pin disposition](docs/audit/probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md)
-closed the observed configuration drift with a passing fresh live check. Recheck
-the live identities at the final release revision; this does not add a Jupiter
-trade adapter or remove the remaining operating and audit gates.
+- [ ] Review and qualify the newly changed Token-2022 executable (deploy slot
+      460,497,271; live check failed on October 27), preserving the old fixture and
+      frozen evidence. [Current diagnostic evidence](docs/audit/probes/mainnet-preparation-2026-10-27/README.md).
+      Do not tag a mainnet-ready release by silently repinning this dependency.
+- [ ] Finish current exact-revision CI and focused checks, repeat scope/static/live
+      fixture preflight, verify canonical bytes and retain all results. Integrate
+      the selected main revision and create final `v1.0.3`; the tag does not prove
+      mainnet deployment or operating readiness.
+- [ ] Commission the [VPS operator stack](docs/deployment/MAINNET_OPERATIONS.md):
+      actual mainnet RPC, covered markets, payer funding/top-ups, active keeper
+      coverage and oracle, independently delivered alerts, private database,
+      off-host backup/restore, and exact indexer/client artifact identities.
+      Devnet's paused/empty idle profile is unsuitable for active mainnet.
+- [ ] Supply real mainnet governance/emergency public identities, derived treasury,
+      coverage authority, program/deployment payer and exact configuration. Prepare
+      and simulate a bounded mainnet transaction packet before signing; no key or
+      concrete financial transaction is supplied by the policy decision alone.
+- [ ] Verify current live dependencies, deploy canonical bytes, verify actual chain
+      state and commission the keeper/readers before enabling new shorts. Disclose
+      unaudited status, current bounty status and uncapped deposits/market count.
+
+External audit/contest and funded bounty are **post-launch funding work**, not
+prelaunch requirements. Obtain quotes/targets and account for earned protocol-fee
+security reserves without diverting lender funds or exit operating reserves.
+The [new audit checkpoint](docs/audit/2026-10-22-progress/README.md) remains
+incomplete: seven hypotheses need validation, 23 independent dispositions remain,
+and blocked/stopped scopes remain disclosed. No audit-complete claim follows
+from the owner's timing waiver; preserve provider-stopped scopes without retrying.
+
+The [Jupiter pin disposition](docs/audit/probes/release-wrap-2026-10-22/jupiter-mainnet-pin-2026-10-22.md)
+closed its dated configuration drift. Repeat the full live check at release time;
+this does not enable a Jupiter trade adapter. The
+[October 23 assessment](docs/audit/release-gate-assessment-1.0.3-2026-10-23.md)
+and [earlier delegated no-go](docs/audit/owner-delegated-release-decision-1.0.3-2026-10-22.md)
+are historical timing decisions superseded by the owner's October 27 instruction.
 
 ## Public-devnet test prerequisites
 

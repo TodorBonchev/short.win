@@ -1,0 +1,1 @@
+ok: scope.txt matches git ls-files at HEAD; every watched file is classified

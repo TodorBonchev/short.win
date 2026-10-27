@@ -1,0 +1,51 @@
+[
+  {
+    "command": [
+      "python3",
+      "scripts/audit_scope.py",
+      "check"
+    ],
+    "started_utc": "2026-10-27T01:03:49.743902+00:00",
+    "finished_utc": "2026-10-27T01:03:49.867048+00:00",
+    "exit_code": 0,
+    "output_sha256": "eddeb5c812f6d5c07a6aaf83648868a2f8d2aee6b52b6fc16fafd13d4d24f1dd",
+    "output_file": "00.log"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "started_utc": "2026-10-27T01:03:49.867194+00:00",
+    "finished_utc": "2026-10-27T01:03:49.894400+00:00",
+    "exit_code": 0,
+    "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "output_file": "01.log"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/dump-fixtures.py",
+      "check"
+    ],
+    "started_utc": "2026-10-27T01:03:49.894519+00:00",
+    "finished_utc": "2026-10-27T01:03:50.311400+00:00",
+    "exit_code": 0,
+    "output_sha256": "63d1fc8c9c0450c27899942a10ed0557bf735a6617b65dffacd6b7ec7bae6294",
+    "output_file": "02.log"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/dump-fixtures.py",
+      "check",
+      "--live"
+    ],
+    "started_utc": "2026-10-27T01:03:50.311535+00:00",
+    "finished_utc": "2026-10-27T01:04:01.999392+00:00",
+    "exit_code": 1,
+    "output_sha256": "c93cfcce4e8c45f5f48fc5c40a760f93ef80123f1ef36dad612175915c3e407a",
+    "output_file": "03.log"
+  }
+]

@@ -108,7 +108,9 @@ export function SecurityPolicyPage() {
                             they ask otherwise.
                         </li>
                         <li>
-                            <strong>Rewards:</strong> no bug bounty yet.
+                            <strong>Rewards:</strong> no funded bug bounty and no guaranteed reward. Protocol fees from
+                            the planned capped mainnet phase are intended to fund a later bounty and external audit.
+                            Funded bounty terms will be published before the bounty becomes active.
                         </li>
                     </ul>
                 </Panel>
@@ -134,10 +136,19 @@ export function SecurityPolicyPage() {
 
                 <Panel title="Audits" label="Audits">
                     <p>
-                        The repository includes AI-assisted code reviews and validation records. These are not an audit
-                        by an independent security firm. No professional audit has been published yet; a private audit
-                        and a public audit contest are planned before mainnet. Reports will be listed here once
-                        published.
+                        No external security audit has been completed or published. The repository includes AI-assisted
+                        code reviews and validation records, with their scope and authorship limits disclosed. These are
+                        not an audit by an independent security firm.
+                    </p>
+                    <p>
+                        A capped mainnet launch is planned before an external audit and a funded bug bounty. Protocol
+                        fees are intended to accumulate funding for both. Audit reports and funded bounty terms will be
+                        published here when available.
+                    </p>
+                    <p>
+                        The launch plan uses the existing 25 SOL cap on aggregate opening notional per market. Deposits
+                        and the number of markets are uncapped. This is not a cap on total deposited funds, borrower
+                        margin, current marked exposure or protocol-wide exposure.
                     </p>
                 </Panel>
 

@@ -1,5 +1,9 @@
 # 1.0.3 release gate assessment — 2026-10-23
 
+> **2026-10-27 policy update:** The owner subsequently selected mainnet before external audit/funded bounty, with existing per-market borrowing caps and uncapped deposits/market count. The audit-timing gate below is waived for initial launch; missing operating evidence is still missing. See the
+> [current mainnet plan](../release/MAINNET-1.0.3.md) and
+> [owner decision](owner-mainnet-decision-1.0.3-2026-10-27.md).
+
 This is an evidence review for a possible tag, not a claim that an external or whole-repository audit finished. The user's new request can authorize a transparent change to release policy; it cannot turn missing reviews or operating evidence into completed checks. No stable tag or mainnet deployment is implied by this record.
 
 | Gate | Evidence and current disposition |

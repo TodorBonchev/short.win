@@ -55,7 +55,10 @@ Please include:
   funds or pause exits.
 - **Disclosure:** coordinated, on a best-effort timeline agreed with the reporter. We publish
   an advisory after the fix is deployed, crediting the reporter unless they ask otherwise.
-- **Rewards:** no bug bounty yet.
+- **Rewards:** no funded bug bounty and no guaranteed reward. Under the owner's
+  2026-10-27 decision, the capped mainnet phase comes first; protocol fees are intended
+  to accumulate funding for a later bounty and external audit. Publish the funded
+  bounty's scope, eligibility and reward terms before representing it as active.
 - **Safe harbour:** we will not pursue or support legal action against research done in good
   faith under this policy: research that avoids privacy violations, the loss or destruction of
   data and the interruption or degradation of the service; that never moves or puts at risk
@@ -65,7 +68,21 @@ Please include:
 
 ## Audits
 
-No audit has been published yet: a full private audit, then a public audit contest, is
-planned before mainnet (M10 owner decision Q2). Reports will be listed on
-`https://short.win/security` once published, and short.win's `security.txt` will gain its
-`auditors` field then. The audit package for reviewers is [`docs/AUDIT.md`](docs/AUDIT.md).
+No external security audit has been completed or published. The repository includes
+AI-assisted reviews and validation records, with their scope and authorship limits
+disclosed; these do not constitute an external firm's audit.
+
+**Launch policy (owner decision, 2026-10-27): capped mainnet before an external audit
+and a funded bug bounty**, using protocol fees to accumulate funding for both. This
+supersedes the 2026-10-02 Q2 requirement to audit before mainnet. The
+[1.0.3 mainnet plan](docs/release/MAINNET-1.0.3.md) records required exposure controls
+and release/operating checks. This decision alone does not establish deployment,
+effective deployment configuration, funding, an audit booking or a bounty reward
+commitment. The owner selected the existing `market_max_notional` default of
+**25 SOL of aggregate opening notional per market**. Deposits and market count are
+uncapped; this is not a TVL, borrower-margin, current-marked-exposure or protocol-wide
+cap. No external audit or funded bounty is required before this initial phase.
+
+Reports will be listed on `https://short.win/security` once published. Add the
+program's `auditors` field only when an actual auditor and applicable report can be
+identified. The review package remains [`docs/AUDIT.md`](docs/AUDIT.md).

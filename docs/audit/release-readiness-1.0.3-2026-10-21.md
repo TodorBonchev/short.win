@@ -1,5 +1,9 @@
 # Draft 1.0.3 release readiness (2026-10-21)
 
+> **2026-10-27 policy update:** Historical readiness snapshot. Devnet has since deployed, and the owner selected initial mainnet before external audit/funded bounty on October 27. Original evidence and then-pending gates below are dated observations. See the
+> [current mainnet plan](../release/MAINNET-1.0.3.md) and
+> [owner decision](owner-mainnet-decision-1.0.3-2026-10-27.md).
+
 **Current tested code candidate:** `56f660027f88ee60a33b9d2b5da516daccc9c9b9`, integrated from
 `audit-1.0.3-gates`. **Full CI and final-profile ≥24 h fuzz passed; deployment preflight remains.**
 No 1.0.3 tag or deployment has been made by this work.

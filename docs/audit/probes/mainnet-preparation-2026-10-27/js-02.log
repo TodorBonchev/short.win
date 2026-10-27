@@ -1,0 +1,41 @@
+$ pnpm run typecheck && pnpm run test
+$ tsc -p tsconfig.json
+$ node --test test/*.test.ts
+✔ program address is declare_id! (0.83038ms)
+✔ every #[program] instruction has builders and its Anchor discriminator (2.313916ms)
+✔ error codes follow errors.rs declaration order from 6000 (0.768821ms)
+✔ crank_sol_usd: PDA defaults, roles and data (14.616982ms)
+✔ sync_lender (KI65-REV-SEC1): the owner is an either-signer, the lender PDA defaults from it (11.835039ms)
+✔ set_coverage_pause (O17): the keeper key signs, the config PDA defaults, the market is writable (4.95087ms)
+✔ OracleCache (Borsh, 45 B): price @8, conf @16, expo @24, publish_time @28, updated_slot @36, bump @44 (0.556385ms)
+✔ account discriminators are Anchor’s (2.196091ms)
+✔ ShareEpoch: field order, size 143 and discriminator follow epoch.rs (5.313752ms)
+✔ findShareEpochPda and the remaining-account metas (26.66651ms)
+✔ PodU128 / PodI128 conversions round-trip (2.426004ms)
+✔ LenderPosition (Borsh, 241 B): the decoder follows lender.rs field by field (1.367072ms)
+✔ layout_asserts.rs parses (0.958286ms)
+✔ GlobalConfig: size 1448 and 20 field offsets (17.422212ms)
+✔ Params: size 264 and 58 field offsets (6.727ms)
+✔ TierParams: size 48 and 12 field offsets (1.162262ms)
+✔ EmaConfig: size 32 and 8 field offsets (0.620505ms)
+✔ KinkConfig: size 8 and 2 field offsets (0.193617ms)
+✔ PendingChange: size 472 and 4 field offsets (0.408472ms)
+✔ VenueGuard: size 304 and 9 field offsets (1.429102ms)
+✔ VenueExtras: size 6512 and 6 field offsets (11.537716ms)
+✔ SeedPart: size 34 and 3 field offsets (0.417526ms)
+✔ ExtraEntry: size 176 and 6 field offsets (0.656561ms)
+✔ ExtrasSet: size 712 and 4 field offsets (0.819283ms)
+✔ IxExtras: size 2144 and 4 field offsets (1.721063ms)
+✔ Market: size 3104 and 107 field offsets (34.172287ms)
+✔ RingEntry: size 136 and 9 field offsets (0.692203ms)
+✔ MarketVault: size 2200 and 12 field offsets (1.354844ms)
+✔ every asserted account size matches the client (0.182865ms)
+✔ VenueGuard retains all four full SHA-256 digests through byte 303 (1.318391ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 492.216277

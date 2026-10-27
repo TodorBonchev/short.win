@@ -1,0 +1,7 @@
+{
+  "readable_file": "js-00.log",
+  "original_preserved_as": "js-00.log.original.gz",
+  "original_sha256": "c56f5faae8196672f061cbfd47a14ac5eb8ec98912163bcc111cb757873860a5",
+  "normalized_sha256": "6349a1f2ba266b56c1f8c00e572faa90c2b570b17d241c1d7d2b1552cae30400",
+  "normalization": "trim console trailing whitespace and blank final lines; exact original bytes retained in gzip"
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "original": "observed-token-2022.so",
+    "original_bytes": 611056,
+    "original_sha256": "3dde54d202caa2d10514fd58a154df5f26f07643f9f5fd0402ff08084f0cb954",
+    "retained": "observed-token-2022.so.gz",
+    "retained_sha256": "d6d910c54838c7637f02cc9017037eb51ac9a98df1e354a0845ca79b40f61815"
+  },
+  {
+    "original": "getMultipleAccounts.json",
+    "original_bytes": 1843218,
+    "original_sha256": "b25d85c34b7011bfa705a1e110cc38038dc4b683d655800a57ba1c33b09082b1",
+    "retained": "getMultipleAccounts.json.gz",
+    "retained_sha256": "142e4ac6e171e26dc8e9e0f80a355d9ad56f5f26e60a4e1b18d84249f9d30f40"
+  }
+]

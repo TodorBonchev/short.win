@@ -24,9 +24,23 @@ the specified economic and availability policies. The 2026-10-22
 [final-byte checks](release-wrap-up-1.0.3-2026-10-22.md) and
 [program-only devnet deployment](../deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md)
 close the stated implementation and first-deployment evidence for AIR2-07 and
-AI3-FR01; they do not close the broader audit or operating gates. Other leads retain their individual open or deferred
+AI3-FR01; they do not complete a broader audit or prove funded/monitored operation.
+The broader external review remains incomplete and is deferred under the owner's
+2026-10-27 launch decision. Other leads retain their individual open or deferred
 status. Inclusion alone does not supply owner sign-off or extend an older acceptance
 to a new trigger or larger bound.
+
+**Launch policy (owner, 2026-10-27): capped mainnet before an external audit and a
+funded bug bounty**, using protocol fees to accumulate funding for both. The owner
+explicitly selected the existing `market_max_notional` default of **25 SOL of
+aggregate opening notional per market**, with **uncapped deposits and market count**.
+That cap does not bound TVL, borrower margin, current marked exposure or protocol-wide
+exposure. No external audit or funded bounty is required before this initial phase. The
+[1.0.3 mainnet plan](../release/MAINNET-1.0.3.md) preserves required exposure controls,
+release checks and funded/monitored operator prerequisites. This changes launch
+sequence; it supplies no additional security review, proven cap enforcement or
+closure of unresolved findings. The historical no-mainnet-spend-before-audit
+default is superseded for the capped launch; unperformed live probes remain open.
 
 The register merges these sources:
 
@@ -165,7 +179,7 @@ Abbreviations:
 | KI-48 | `CoverageGap` and the exit-path `MintSafetyTripped` are `emit!` log events, which are lost if the logs truncate (A69, IX-3) | Flagged per transaction by the indexer | A69 | by design |
 | KI-49 | `withdraw` to a memo-required Token-2022 account relies on the memo instruction right before `transfer_checked` (U17). Any CPI added between the two would break memo-required withdrawals | Pinned by `security::sec_7_*` and `t_memo_control_top_level_sibling_check`, on the mainnet Token-2022 (`7ea94a02…`, v11.0.0) and spl-memo v3 ELFs since M10 (ARCH §12 U17) | T-MEMO | by design; verified on the mainnet build (M10 WP-3); a mainnet transaction is M11's (TMEMO-10) |
 | KI-50 | The pump adapter relies on pump's undocumented trailing cap byte on buys: no byte means a revert above `rT` (U29). **Since 1.0.1 (pump-final) short.win trades v3:** it sends exactly 24 bytes, never the optional `partial_fill` byte (pump ignores it on non-mayhem coins, and short.win lists none), and a `buy_v3` past `rT` completes the curve by synthetic migration instead of reverting (PUMP-2026-10-13-3). The v2 cap byte still governs third parties' v2 buys | Pinned 0 / 1 / 2 / none on the dumped ELF (`pump_math_it`), and v3's synthetic path and its absence on the 2026-10-02 build (T-PUMP-MATH-V3 (b), (g): 6021 there). Re-checked on every pump upgrade (the latch) | ARCH §12 U29 | disclosed |
-| KI-51 | Keeper batches are v1 transactions, and v1 landing on mainnet is unverified (U25). Jito bundle semantics against a live block engine are unverified too (U22, U8). **Since pump-final (short.win 1.0.1) no exit uses a bundle:** a position past the curve's `rT` exits in one `buy_v3` (PUMP-2026-10-13-3; the straddle bundle and `complete_curve` are retired, D2), so U8 / U22 gate no exit any more (the keeper's block-engine transport stays, unused); U25 remains for the keeper's crank batches | v0 fallback: 3 / 4 / 4 / 5 cranks (PumpSwap / AMM v4 / CPMM / curve) per transaction | SPEC §14 Q5/Q6 (2026-10-02, defaults): no mainnet spend before the audit | open until M11's probes |
+| KI-51 | Keeper batches are v1 transactions, and v1 landing on mainnet is unverified (U25). Jito bundle semantics against a live block engine are unverified too (U22, U8). **Since pump-final (short.win 1.0.1) no exit uses a bundle:** a position past the curve's `rT` exits in one `buy_v3` (PUMP-2026-10-13-3; the straddle bundle and `complete_curve` are retired, D2), so U8 / U22 gate no exit any more (the keeper's block-engine transport stays, unused); U25 remains for the keeper's crank batches | v0 fallback: 3 / 4 / 4 / 5 cranks (PumpSwap / AMM v4 / CPMM / curve) per transaction | Historical SPEC §14 Q5/Q6 (2026-10-02) no-mainnet-spend-before-audit default; launch timing superseded by owner decision of 2026-10-27. Capped-mainnet probes and the validated v0 fallback are governed by the [mainnet plan](../release/MAINNET-1.0.3.md) | open until M11's probes |
 
 ## 6. M10 findings and their resolution
 

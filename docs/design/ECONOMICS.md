@@ -1,5 +1,14 @@
 # short.win — Economic & Risk Model
 
+**Launch policy update (owner, 2026-10-27):** initial mainnet precedes external
+audit and a funded bounty, with earned protocol fees accumulated toward later
+security funding. Existing per-market borrowing limits remain; the compiled
+opening-notional limit is 25 SOL per market, while deposits and market count are
+uncapped. This changes no fee split, lender entitlement, solvency assumption or
+model calibration. See the [current mainnet plan](../release/MAINNET-1.0.3.md).
+Future income is not secured audit/bounty funding; reserve actual protocol-owned
+receipts separately from lender assets and necessary operator/exit expenses.
+
 **Working-tree candidate, 2026-10-18 (v1.0.2; not released):** AIR2 adds fresh EMA and
 completed-observation gates for opens, excludes the initial PumpSwap sample from warm-up,
 and invalidates pre-restart settlement arms. Locked depth uses the raw burned-LP ratio;

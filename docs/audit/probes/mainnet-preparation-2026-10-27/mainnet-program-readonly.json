@@ -1,0 +1,33 @@
+{
+  "observed_utc": "2026-10-27T01:09:52.502950+00:00",
+  "rpc": "https://api.mainnet-beta.solana.com",
+  "program_id": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+  "responses": {
+    "program_account": {
+      "jsonrpc": "2.0",
+      "result": {
+        "context": {
+          "apiVersion": "4.3.2",
+          "slot": 461879034
+        },
+        "value": null
+      },
+      "id": "program_account"
+    },
+    "genesis": {
+      "jsonrpc": "2.0",
+      "result": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "id": "genesis"
+    },
+    "programdata_rent": {
+      "jsonrpc": "2.0",
+      "result": 8352520760,
+      "id": "programdata_rent"
+    },
+    "buffer_rent": {
+      "jsonrpc": "2.0",
+      "result": 8352480120,
+      "id": "buffer_rent"
+    }
+  }
+}

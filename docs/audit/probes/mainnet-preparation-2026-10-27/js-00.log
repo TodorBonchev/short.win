@@ -1,0 +1,53 @@
+src/features/security/SecurityPolicyPage.tsx format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+
+    109 109 │                           </li>
+    110 110 │                           <li>
+    111     │ - ····························<strong>Rewards:</strong>·no·funded·bug·bounty·and·no·guaranteed·reward.·Protocol·fees
+    112     │ - ····························from·the·planned·capped·mainnet·phase·are·intended·to·fund·a·later·bounty·and·external
+    113     │ - ····························audit.·Funded·bounty·terms·will·be·published·before·the·bounty·becomes·active.
+        111 │ + ····························<strong>Rewards:</strong>·no·funded·bug·bounty·and·no·guaranteed·reward.·Protocol·fees·from
+        112 │ + ····························the·planned·capped·mainnet·phase·are·intended·to·fund·a·later·bounty·and·external·audit.
+        113 │ + ····························Funded·bounty·terms·will·be·published·before·the·bounty·becomes·active.
+    114 114 │                           </li>
+    115 115 │                       </ul>
+    ······· │
+    137 137 │                   <Panel title="Audits" label="Audits">
+    138 138 │                       <p>
+    139     │ - ························No·external·security·audit·has·been·completed·or·published.·The·repository·includes
+    140     │ - ························AI-assisted·code·reviews·and·validation·records,·with·their·scope·and·authorship·limits
+    141     │ - ························disclosed.·These·are·not·an·audit·by·an·independent·security·firm.
+        139 │ + ························No·external·security·audit·has·been·completed·or·published.·The·repository·includes·AI-assisted
+        140 │ + ························code·reviews·and·validation·records,·with·their·scope·and·authorship·limits·disclosed.·These·are
+        141 │ + ························not·an·audit·by·an·independent·security·firm.
+    142 142 │                       </p>
+    143 143 │                       <p>
+    144     │ - ························A·capped·mainnet·launch·is·planned·before·an·external·audit·and·a·funded·bug·bounty.
+    145     │ - ························Protocol·fees·are·intended·to·accumulate·funding·for·both.·Audit·reports·and·funded·bounty
+    146     │ - ························terms·will·be·published·here·when·available.
+        144 │ + ························A·capped·mainnet·launch·is·planned·before·an·external·audit·and·a·funded·bug·bounty.·Protocol
+        145 │ + ························fees·are·intended·to·accumulate·funding·for·both.·Audit·reports·and·funded·bounty·terms·will·be
+        146 │ + ························published·here·when·available.
+    147 147 │                       </p>
+    148 148 │                       <p>
+    149     │ - ························The·launch·plan·uses·the·existing·25·SOL·cap·on·aggregate·opening·notional·per·market.
+    150     │ - ························Deposits·and·the·number·of·markets·are·uncapped.·This·is·not·a·cap·on·total·deposited
+    151     │ - ························funds,·borrower·margin,·current·marked·exposure·or·protocol-wide·exposure.
+        149 │ + ························The·launch·plan·uses·the·existing·25·SOL·cap·on·aggregate·opening·notional·per·market.·Deposits
+        150 │ + ························and·the·number·of·markets·are·uncapped.·This·is·not·a·cap·on·total·deposited·funds,·borrower
+        151 │ + ························margin,·current·marked·exposure·or·protocol-wide·exposure.
+    152 152 │                       </p>
+    153 153 │                   </Panel>
+
+
+Checked 1 file in 49ms. No fixes applied.
+Found 1 error.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+
+
+Error: ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL
+
+  × "pnpm recursive exec" failed in /root/short.win-audit-review/apps/web

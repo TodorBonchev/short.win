@@ -1,5 +1,9 @@
 # Owner decisions for draft 1.0.3 (2026-10-21)
 
+> **2026-10-27 policy update:** The October 27 owner decision supersedes deployment/tag timing below while retaining these mechanism-specific economic acknowledgements and honest AI-review attribution. The earlier never-deployed statement predates the recorded devnet deployment. See the
+> [current mainnet plan](../release/MAINNET-1.0.3.md) and
+> [owner decision](owner-mainnet-decision-1.0.3-2026-10-27.md).
+
 The owner confirmed that **the program has never been deployed** and explicitly
 authorized the implementing agent to choose the recommended answers and record them
 as the owner's decisions: “I sign off what you recommend.” The selections below were

@@ -1,0 +1,17 @@
+{
+  "checked_utc": "2026-10-27T01:13:16.305673+00:00",
+  "unchanged_runtime_fuzzer_fixture_pathspecs": [
+    "programs/shortwin",
+    "crates/shortwin-math",
+    "crates/shortwin-venue-state",
+    "tests/fuzz",
+    "tests/fixtures",
+    "Cargo.lock",
+    "rust-toolchain.toml"
+  ],
+  "working_tree_delta_for_these_paths": "",
+  "canonical_release_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+  "primary_user_test_sha256": "96518cdd9950c24b5e27ca5bf361d40a9dc80b6dd2e7debf33ad55c8d7539ef9",
+  "program_baseline_commit": "7f2af5b5787d62978c79e7630f5b0e1a3310d94e",
+  "new_token_2022_promoted": false
+}

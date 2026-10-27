@@ -1,5 +1,9 @@
 # 1.0.3 integration and devnet readiness, 2026-10-22
 
+> **2026-10-27 policy update:** The owner subsequently authorized preparing final 1.0.3 for mainnet before external audit/funded bounty. The no-tag timing below is historical; technical and operating evidence remains scoped as recorded. See the
+> [current mainnet plan](../release/MAINNET-1.0.3.md) and
+> [owner decision](owner-mainnet-decision-1.0.3-2026-10-27.md).
+
 **The program-only devnet deployment succeeded. Keep the version at unreleased
 1.0.3; stable tagging and full public-devnet market testing are not ready.**
 No 1.0.3 release tag exists; further preparation
