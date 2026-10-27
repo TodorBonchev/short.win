@@ -1,9 +1,10 @@
 //! The launch guard and the notional floor at their exact boundaries (ADOPTED Q11, Q21; ARCH §3.4
-//! step 9, §4.6 "`N_open ≥ min_notional`; `Σ N_open ≤ market_max_notional` (beta 25 SOL)"; ECON
+//! step 9, §4.6 "`N_open ≥ min_notional`; `Σ N_cap ≤ market_max_notional` (beta 25 SOL)"; ECON
 //! §6.1, §15): an open is refused `MarketNotionalCap` when the market's open notional plus its own
-//! `N_open` would exceed `market_max_notional` (25 SOL) and `BelowMinNotional` when `N_open` is
-//! under `min_notional` (0.1 SOL); `N_open = B̂_spot(q)` is the buyback of `q` quoted on the
-//! post-open reserves.
+//! `N_cap = max(N_open, B̂_ema)` would exceed `market_max_notional` (25 SOL) and `BelowMinNotional`
+//! when `N_open` is under `min_notional` (0.1 SOL); `N_open = B̂_spot(q)` is the buyback of `q`
+//! quoted on the post-open reserves. (KI-12 erratum, 2026-10-27: the cap gate uses `N_cap` so a
+//! sale wrap cannot understate it; stored `total_notional_open` still accumulates `N_open`.)
 //!
 //! On the mock, `N_open(q)` is recomputed here from `shortwin_math::quote::cpmm` (the sale
 //! `sell_exact_in(q)` on the pool's pricing reserves gives the post-open reserves, the buyback
@@ -80,15 +81,19 @@ mod n {
         fixtures::set_zc(&mut env.svm, &key, &c, extra);
     }
 
-    /// The program's own `N_open` of an open of `q` by `b` now, measured on a copy of the VM
-    /// with the launch guard lifted (the VM restored afterwards); `None` if a cap refuses it.
+    /// The program's own launch-cap notional `N_cap = max(N_open, B̂_ema)` of an open of `q`
+    /// by `b` now, measured on a copy of the VM with the launch guard lifted (the VM restored
+    /// afterwards); `None` if a non-cap refusal blocks it.
     pub fn probe(env: &mut Env, mm: &impl VenueMarket, b: &mut Borrower, q: u64) -> Option<u64> {
         let saved = env.svm.clone();
         let nonce = b.next_nonce;
         env.check_invariants = false;
         lift_guard(env);
         let (res, _) = env.open(mm, b, q);
-        let n = res.ok().map(|m| events::one::<Open>(&m).n_open);
+        let n = res.ok().map(|m| {
+            let o: Open = events::one(&m);
+            o.n_open.max(o.b_ema)
+        });
         env.svm = saved;
         env.check_invariants = true;
         b.next_nonce = nonce;
@@ -100,7 +105,7 @@ mod n {
 mod mock {
     use shortwin::errors::ShortwinError as E;
     use shortwin::events::Open;
-    use shortwin_litesvm_tests::engine::MarketSpec;
+    use shortwin_litesvm_tests::engine::{Borrower, MarketSpec};
 
     use crate::ecommon::*;
     use crate::n;
@@ -123,43 +128,61 @@ mod mock {
         (env, mm)
     }
 
-    /// `market_max_notional` (25 SOL): one position of exactly 10 SOL, then one bringing the
-    /// market to exactly 25 SOL lands; one raw token more is refused; the full market refuses
-    /// even the smallest open.
+    /// `market_max_notional` (25 SOL): the largest open whose `N_cap = max(N_open, B̂_ema)`
+    /// fits the remaining room lands; one raw token more is refused `MarketNotionalCap`. The
+    /// market's stored `total_notional_open` (sum of spot `N_open`) stays ≤ 25 SOL; a full
+    /// market refuses even the smallest open. (Since the KI-12 erratum the gate is on `N_cap`,
+    /// so an honest open near the cap may stop a few basis points short of filling stored
+    /// total to exactly 25 SOL.)
     #[test]
     fn exactly_25_sol() {
         let (mut env, mm) = deep();
         let max = env.config().params.market_max_notional;
         assert_eq!(max, 25 * SOL, "the beta launch guard (ADOPTED Q21)");
         let hi = 100_000_000_000_000;
-        // 10 SOL exactly.
+        // First open: ~10 SOL of spot N_open (N_cap is a hair higher from the open's impact).
         let q1 = n::least_q(|q| n::n_open(&env, &mm, q).unwrap(), 10 * SOL, hi);
-        assert_eq!(
-            n::n_open(&env, &mm, q1),
-            Some(10 * SOL),
-            "N_open hits 10 SOL"
-        );
         let mut b1 = env.borrower();
         let (o1, _, _) = open_ok(&mut env, &mm, &mut b1, q1);
-        assert_eq!(o1.n_open, 10 * SOL);
-        assert_eq!(env.market(&mm.market()).total_notional_open, 10 * SOL);
-        // The rest: 15 SOL exactly. `N_open` moves by less than a lamport per raw token, so the
-        // boundary is the largest `q` with `N_open ≤ room`: one below the least `q` over it.
-        let room = max - 10 * SOL;
-        let q2 = n::least_q(|q| n::n_open(&env, &mm, q).unwrap(), room + 1, hi) - 1;
-        assert_eq!(n::n_open(&env, &mm, q2), Some(room));
-        assert!(n::n_open(&env, &mm, q2 + 1).unwrap() > room);
+        let cap1 = o1.n_open.max(o1.b_ema);
+        assert!(o1.n_open >= 10 * SOL);
+        assert!(cap1 >= o1.n_open);
+        assert_eq!(env.market(&mm.market()).total_notional_open, o1.n_open);
+        let total = o1.n_open;
+        let room = max - total;
+        // Largest q whose N_cap fits the remaining room (probe with the guard lifted).
         let mut b2 = env.borrower();
-        let (res, _) = env.open(&mm, &mut b2, q2 + 1);
-        assert_err(&res, E::MarketNotionalCap);
-        let (res, _) = env.open(&mm, &mut b2, q2);
-        let o2: Open = events::one(&ok(res));
-        assert_eq!(o2.n_open, room);
-        assert_eq!(
-            env.market(&mm.market()).total_notional_open,
-            max,
-            "exactly 25 SOL open"
+        let fits = |env: &mut Env, b: &mut Borrower, q: u64| {
+            n::probe(env, &mm, b, q).is_some_and(|n_cap| n_cap <= room)
+        };
+        let q_lo = n::least_q(
+            |q| n::n_open(&env, &mm, q).unwrap_or(0),
+            env.config().params.min_notional,
+            hi,
         );
+        assert!(fits(&mut env, &mut b2, q_lo));
+        assert!(!fits(&mut env, &mut b2, hi));
+        let (mut lo, mut up) = (q_lo, hi);
+        while up - lo > 1 {
+            let mid = lo + (up - lo) / 2;
+            if fits(&mut env, &mut b2, mid) {
+                lo = mid;
+            } else {
+                up = mid;
+            }
+        }
+        let over =
+            n::probe(&mut env, &mm, &mut b2, lo + 1).expect("no non-cap refusal at boundary");
+        assert!(over > room);
+        let (res, _) = env.open(&mm, &mut b2, lo + 1);
+        assert_err(&res, E::MarketNotionalCap);
+        let (res, _) = env.open(&mm, &mut b2, lo);
+        let o2: Open = events::one(&ok(res));
+        let cap2 = o2.n_open.max(o2.b_ema);
+        assert!(cap2 <= room);
+        let after = env.market(&mm.market()).total_notional_open;
+        assert_eq!(after, total + o2.n_open);
+        assert!(after <= max);
         // Full: the smallest open above the floor is refused.
         let q_min = n::least_q(
             |q| n::n_open(&env, &mm, q).unwrap_or(0),
@@ -169,11 +192,11 @@ mod mock {
         let mut b3 = env.borrower();
         let (res, _) = env.open(&mm, &mut b3, q_min);
         assert_err(&res, E::MarketNotionalCap);
-        // A close frees its notional.
+        // A close frees its stored notional.
         env.warp(1);
         env.crank(&mm);
         close_ok(&mut env, &mm, &b1, 0);
-        assert_eq!(env.market(&mm.market()).total_notional_open, room);
+        assert_eq!(env.market(&mm.market()).total_notional_open, o2.n_open);
         n::next_second(&mut env, &mm);
         let (o, _, _) = open_ok(&mut env, &mm, &mut b3, q_min);
         assert!(o.n_open >= env.config().params.min_notional);
@@ -211,19 +234,19 @@ mod venues {
 
     use crate::n;
 
-    /// On `mm` now: the largest `q` whose `N_open` fits the remaining room lands, one more raw
-    /// token is refused `MarketNotionalCap`; the market is then at most 25 SOL open, and the
-    /// refused open's own `N_open` would have exceeded it.
+    /// On `mm` now: the largest `q` whose `N_cap = max(N_open, B̂_ema)` fits the remaining
+    /// room lands, one more raw token is refused `MarketNotionalCap`; the market's stored
+    /// total stays ≤ 25 SOL, and the refused open's own `N_cap` would have exceeded the room.
     fn exact_guard(env: &mut Env, mm: &impl VenueMarket, lo: u64, hi: u64) {
         let max = env.config().params.market_max_notional;
         let total = env.market(&mm.market()).total_notional_open;
         let room = max - total;
         let mut b: Borrower = env.borrower();
         env.fund(&b.key(), 50_000_000_000_000);
-        // The largest q with N_open(q) ≤ room (a q a cap refuses counts as too large; the
-        // refusal below then shows the guard, not a cap, sits at the boundary).
+        // The largest q with N_cap(q) ≤ room (a q a non-cap refusal blocks counts as too large;
+        // the refusal below then shows the launch guard sits at the boundary).
         let fits = |env: &mut Env, b: &mut Borrower, q: u64| {
-            n::probe(env, mm, b, q).is_some_and(|n| n <= room)
+            n::probe(env, mm, b, q).is_some_and(|n_cap| n_cap <= room)
         };
         let (mut lo, mut up) = (lo, hi);
         assert!(fits(env, &mut b, lo));
@@ -236,7 +259,7 @@ mod venues {
                 up = mid;
             }
         }
-        let over = n::probe(env, mm, &mut b, lo + 1).expect("no cap at the boundary");
+        let over = n::probe(env, mm, &mut b, lo + 1).expect("no non-cap refusal at the boundary");
         assert!(over > room);
         let (res, _) = env.open(mm, &mut b, lo + 1);
         assert_err(&res, E::MarketNotionalCap);
@@ -246,8 +269,9 @@ mod venues {
         assert_eq!(after, total + o.n_open);
         assert!(after <= max && total + over > max);
         eprintln!(
-            "launch guard: q {lo} → N_open {} (room {room}); q + 1 → {over}",
-            o.n_open
+            "launch guard: q {lo} → N_open {} N_cap {} (room {room}); q + 1 → N_cap {over}",
+            o.n_open,
+            o.n_open.max(o.b_ema)
         );
     }
 

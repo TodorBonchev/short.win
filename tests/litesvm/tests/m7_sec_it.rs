@@ -9,12 +9,14 @@
 //!   2026-10-01 (★OWNER-M7-3 (b)) the Emergency vault may clear the flag too: its clear starts the
 //!   same delay, so `[Emergency clear, open_short]` — and the bracket with the key's re-set — is
 //!   refused at its open as well.
-//! - **M7-SEC-4** (owner item OWNER-M7-11, as built): `N_open` — the launch guard, `min_notional`,
-//!   the open fee — is quoted on the post-open live reserves, so a sale in the open's own
-//!   transaction (down to the spot–EMA guard's −10 %) records ≈ 0.91 of the honest quote. The
-//!   residual is pinned here at its bound, and the review's fix (`max(B̂_spot, B̂_ema)`) is
-//!   measured on honest opens: it raises every honest `N_open` (and fee) by the open's own
-//!   price impact.
+//! - **M7-SEC-4** (owner item OWNER-M7-11; launch-cap half fixed 2026-10-27): `N_open` —
+//!   `min_notional` and the open fee — is quoted on the post-open live reserves, so a sale in
+//!   the open's own transaction (down to the spot–EMA guard's −10 %) records ≈ 0.91 of the
+//!   honest quote when the sale starts at the EMA. The launch / market notional cap now uses
+//!   `max(N_open, B̂_ema)` (see `ki12_launch_cap_it`); the residual of understated fee /
+//!   stored `N_open` when s0 > EMA is disclosed in KI-12's erratum. The review's fix applied
+//!   to honest opens is still measured here: `max(B̂_spot, B̂_ema)` exceeds spot `N_open` by
+//!   the open's own price impact.
 //! - **M7-SEC-5** (fixed): the fee-scaled caps took the live one-way fee, which pump-fees picks
 //!   from the live market cap — a sale in the open's own transaction moved the pool into a
 //!   higher-fee tier and raised `3.0·φ·X₀` / `7.5·φ·X₁`. They now take `min(φ_live, φ at P_ema)`

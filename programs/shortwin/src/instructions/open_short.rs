@@ -60,8 +60,10 @@
 //!    PumpSwap `Open.venue_rent` reports it).
 //! 9. The venue state reloaded: `N_open = B̂_spot(q)` on the post-open reserves; `B̂_ema = B̂(q;
 //!    x, y)` of the newest ring entry (post-roll). `N_open ≥ min_notional`
-//!    (`BelowMinNotional`); `total_notional_open + N_open ≤ market_max_notional`
-//!    (`MarketNotionalCap`).
+//!    (`BelowMinNotional`); the launch / market notional cap uses
+//!    `N_cap = max(N_open, B̂_ema)` (EMA dropped when undefined): `total_notional_open + N_cap ≤
+//!    market_max_notional` (`MarketNotionalCap`). The open fee and the stored `n_open` stay on
+//!    `N_open` (KI-12 erratum / Chaplin).
 //! 10. Margin (D4; `risk::margin_d4`): `M = max(0, ⌈cr_open·max(B̂_spot, B̂_ema)/10⁴⌉ − S)`, the
 //!     EMA leg dropped when undefined; `M ≤ max_margin` (`MarginAboveMax`); System transfer
 //!     borrower → position.
@@ -544,6 +546,13 @@ pub fn handler<'info>(
     };
     let n_open = post.buy(q).ok_or(ShortwinError::VenueResultMismatch)?.cost;
     let b_ema = post.buy_at(q, ema_xy.0, ema_xy.1).map(|b| b.cost);
+    // Launch / market notional cap: max(spot, EMA) so a same-tx sale cannot understate the
+    // notional that fills `market_max_notional` when spot started above the EMA (KI-12 erratum;
+    // Chaplin (ahsanimtoken)). Fee and stored `n_open` stay on the spot figure.
+    let n_cap = match b_ema {
+        Some(b) => n_open.max(b),
+        None => n_open,
+    };
     require_gte!(
         n_open,
         config.params.min_notional,
@@ -555,7 +564,7 @@ pub fn handler<'info>(
     };
     require!(
         shortwin_math::caps::notional_ok(
-            n_open,
+            n_cap,
             open_total,
             config.params.min_notional,
             config.params.market_max_notional

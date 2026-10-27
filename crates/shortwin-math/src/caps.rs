@@ -523,6 +523,30 @@ mod tests {
         assert!(!notional_ok(100, 901, 100, 1_000));
     }
 
+    /// Callers of [`notional_ok`] for the launch / market notional cap must pass
+    /// `max(n_open, b_ema)` (KI-12 erratum, Chaplin (ahsanimtoken)): a sale-wrapped open can
+    /// record a spot `n_open` under the 25 SOL cap while the EMA quote exceeds it.
+    #[test]
+    fn launch_cap_notional_uses_max_of_spot_and_ema() {
+        let n_open = 20_000_000_000u64; // 20 SOL recorded after a sale wrap
+        let b_ema = 30_000_000_000u64; // 30 SOL at the EMA ring
+        let n_cap = n_open.max(b_ema);
+        let min = 100_000_000u64;
+        let max = 25_000_000_000u64; // 25 SOL launch cap
+        assert!(
+            notional_ok(n_open, 0, min, max),
+            "spot figure alone would wrongly pass the launch cap"
+        );
+        assert!(
+            !notional_ok(n_cap, 0, min, max),
+            "max(spot, ema) must refuse when the EMA quote exceeds the cap"
+        );
+        assert!(
+            notional_ok(n_open.max(20_000_000_000), 0, min, max),
+            "an open whose EMA quote fits still passes"
+        );
+    }
+
     /// "Switch only if all fit": the per-position caps on the bound of every open `q`, then the
     /// per-market caps on `ΣQ` at `X₁ = X₀`, each exactly at its boundary.
     #[test]
