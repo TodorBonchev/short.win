@@ -1,5 +1,6 @@
 import { type Address, createNoopSigner } from '@solana/kit';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../../components/Toast.tsx';
 import { parseMint } from '../../../rpc/mint.ts';
@@ -31,20 +32,29 @@ vi.mock('../../../wallet/useWallet.ts', () => ({
 }));
 vi.mock('../../../tx/TxReviewModal.tsx', () => ({
     TxDoneContext: { Provider: ({ children }: { children: unknown }) => children },
-    TxReviewModal: () => null,
+    TxReviewModal: ({ flow }: { flow: { state: { stage: string } } }) => (
+        <div data-testid="repay-review-stage">{flow.state.stage}</div>
+    ),
 }));
 vi.mock('./useRepay.ts', () => ({
-    useRepay: () => ({
-        state: { data: store.state, error: null, refetch: vi.fn() },
-        math: {},
-        mathError: null,
-        preview: store.preview,
-        previewError: null,
-        flow: { state: { stage: 'idle', signature: null } },
-        building: false,
-        buildError: null,
-        submit: store.submit,
-    }),
+    useRepay: () => {
+        // Model the real hook's position-local flow state; rerendering alone must not reset it.
+        const [stage, setStage] = useState('idle');
+        return {
+            state: { data: store.state, error: null, refetch: vi.fn() },
+            math: {},
+            mathError: null,
+            preview: store.preview,
+            previewError: null,
+            flow: { state: { stage, signature: null } },
+            building: false,
+            buildError: null,
+            submit: (...args: unknown[]) => {
+                store.submit(...args);
+                setStage('review');
+            },
+        };
+    },
 }));
 vi.mock('../hooks.ts', async (original) => ({
     ...(await original<typeof import('../hooks.ts')>()),
@@ -163,6 +173,62 @@ describe('borrower token repayment panel', () => {
             store.preview.rentDue + 10n,
             'TOK',
         );
+    });
+    it('requires fresh rent authorization and resets account selection on a direct position switch', () => {
+        if (!store.state || !store.preview) throw new Error('state');
+        const source = store.state.sources[0];
+        if (!source) throw new Error('source');
+        const selectedSource = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA' as Address;
+        store.state = { ...store.state, sources: [source, { ...source, address: selectedSource }] };
+        const view = panel();
+        const rent = plainAmount(store.preview.rentDue + 10n, 9);
+        fireEvent.change(screen.getByTestId('repay-source'), { target: { value: selectedSource } });
+        enterRent(rent);
+        expect(disabled()).toBe(false);
+        // A fresh read of the same position preserves the user's explicit choices.
+        store.state = { ...store.state, readAt: Date.now() };
+        view.rerender(
+            <ToastProvider>
+                <RepayPanel position={store.state.positionAddress} symbol="TOK" />
+            </ToastProvider>,
+        );
+        expect((screen.getByTestId('repay-max-rent') as HTMLInputElement).value).toBe(rent);
+        expect((screen.getByTestId('repay-source') as HTMLSelectElement).value).toBe(selectedSource);
+        // The outer consumer is deliberately unkeyed, as it is on the position page.
+        const nextPosition = 'BPFLoaderUpgradeab1e11111111111111111111111' as Address;
+        store.state = { ...store.state, positionAddress: nextPosition };
+        view.rerender(
+            <ToastProvider>
+                <RepayPanel position={nextPosition} symbol="TOK" />
+            </ToastProvider>,
+        );
+        expect((screen.getByTestId('repay-max-rent') as HTMLInputElement).value).toBe('');
+        expect((screen.getByTestId('repay-source') as HTMLSelectElement).value).toBe(source.address);
+        expect(screen.queryByTestId('repay-exact-limit')).toBeNull();
+        expect(disabled()).toBe(true);
+        expect(screen.getByTestId('repay-reason').textContent).toContain('Enter the maximum accrued rent');
+        expect(store.submit).not.toHaveBeenCalled();
+        enterRent(rent);
+        fireEvent.click(screen.getByTestId('repay-submit'));
+        expect(store.submit).toHaveBeenCalledExactlyOnceWith(source.address, store.preview.rentDue + 10n, 'TOK');
+    });
+    it('discards the previous position local review flow on a direct position switch', () => {
+        if (!store.state) throw new Error('state');
+        const view = panel();
+        enterRent();
+        fireEvent.click(screen.getByTestId('repay-submit'));
+        expect(screen.getByTestId('repay-review-stage').textContent).toBe('review');
+        const nextPosition = 'BPFLoaderUpgradeab1e11111111111111111111111' as Address;
+        store.state = { ...store.state, positionAddress: nextPosition };
+        view.rerender(
+            <ToastProvider>
+                <RepayPanel position={nextPosition} symbol="TOK" />
+            </ToastProvider>,
+        );
+        expect(screen.getByTestId('repay-review-stage').textContent).toBe('idle');
+        expect((screen.getByTestId('repay-max-rent') as HTMLInputElement).value).toBe('');
+        expect(disabled()).toBe(true);
+        expect(store.submit).toHaveBeenCalledTimes(1);
     });
     it('keeps the repayment panel available on the position page when live pricing fails', async () => {
         if (!store.state) throw new Error('state');

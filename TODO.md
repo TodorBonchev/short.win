@@ -40,6 +40,11 @@ permissionless financial authority. New tokens stay disabled until qualified.
   still-open quote-native financial integration and final qualification.
 - [ ] Measure the combined price-worker/keeper/indexer/database workload and API/RPC
       budget on the [initial host](docs/deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host).
+- [ ] Qualify an affordable publication cadence, batching design and funded SOL
+      budget. The [measured two-feed/two-second candidate](docs/audit/probes/price-publication-cost-2026-10-27/README.md)
+      costs 12.96 SOL per continuous 30 days separately, or 6.48 SOL with qualified
+      batching, in base fees alone. The approved hosting/API baseline excludes
+      these fees. Packet-size fit with a synthetic ALT is not landing qualification.
 - [ ] Implement the [selected whole-position atomic liquidation](docs/design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice):
       bounded isolated buyback, actual full-debt token credit, rollback and budgeted
       fresh-route retries. No hosted liquidation orders or partial/mixed repayment.

@@ -1,0 +1,14 @@
+{
+  "verified_at_utc": "2026-10-27T18:35:50.355328+00:00",
+  "verification_method": "Official Solana documentation read through web tool; no RPC or transaction submission.",
+  "sources": [
+    {
+      "url": "https://solana.com/docs/core/fees/fee-structure",
+      "checked_fact": "Current base signature fee is 5000 lamports. Priority fees are additional. Executed unsuccessful transactions also pay fees."
+    },
+    {
+      "url": "https://solana.com/docs/core/transactions",
+      "checked_fact": "Legacy/v0 maximum packet size is 1232 bytes; each Ed25519 transaction signature uses 64 bytes. The separate v1 format is outside this experiment."
+    }
+  ]
+}

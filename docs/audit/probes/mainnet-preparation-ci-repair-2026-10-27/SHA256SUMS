@@ -1,0 +1,8 @@
+cd94174043e9b52b9b2a9215698a35835e063cabe564ac316f852299d09234de  README.md
+1a3016362908ee490845aa147b8dfbf1c67cd285650c774d40b910cfa219ac3c  ci-final-check-2026-10-27-122382684993-indexer.raw.log.gz
+7d48f41fb354df2fff1290e4a62e3f1d6c72c2093ad74a33c76b90e30fa41e5b  ci-final-check-2026-10-27-fuzz-smoke-direct-log.raw.gz
+5ec31b6271ae915451377f970930549e362821156e69aa4d70a513ee972bdaf6  ci-fuzz-catalog-repair-2026-10-27-clippy.log.gz
+4f27d4773975187af49733cde520dd21c938aa55bd39669e15cf3d85fdf64668  ci-fuzz-catalog-repair-2026-10-27-smoke.log.gz
+25ad5c8a7f13926b67dd2c0d664916f7262c2210775e5f8a30ea1c73238d5de5  ci-fuzz-catalog-repair-2026-10-27-test.log.gz
+a1f0f02a44102be5dae12a8e8f8f61d15757bec1bd7cc4f446c046954cfb4ffb  ci-fuzz-catalog-repair-2026-10-27-validation.json.gz
+63c8afa67cc405b55b17309ce65d90c98f92b9255c3da86afe1fb79cb2d76d10  ci-repay-fixture-repair-2026-10-27-repair-receipt.json.gz

@@ -148,3 +148,97 @@ five bench locks; no external package/version/checksum was upgraded. Locked offl
 metadata and the focused M1 check pass. The [CI/repair evidence](probes/mainnet-preparation-ci-2026-10-27/)
 retains the original failure and correction. A rerun is required on the correction;
 this is not a final full gate or fresh fuzz result.
+
+## Concrete release packet sequence
+
+1. Resolve the proposed financial contract before admitting quote-native debt.
+   The overdue-default choice changes lender lock horizons, loss accounting and
+   borrower disclosure. Final reporter public keys, policy hashes, covered lots,
+   risk limits and timing settings still require the concrete owner review.
+2. Finish versioned market/position persistence and actual financial/debt-lifecycle
+   integration, qualified two-sided price production, production atomic execution
+   and compatible keeper/readers. Host math and test-only executor results cannot
+   stand in for those adapters. Keep the provider-stopped review scope disclosed;
+   it has not been retried or counted as completed.
+3. Select the version **before** freezing final build/fuzzer inputs. The proposed
+   version is **1.1.0**, reflecting the larger redesign; it is not a tag or current
+   binary version. Apply the chosen version consistently, then freeze source,
+   IDL, clients, lockfiles, fixtures, commands and exact binary hashes.
+4. Obtain the final full gate including selected mutation tests, reviewed current
+   dependencies and reproducible Anchor/verifier bytes. Repeat the read-only live
+   identity check near release; review changed upstream code before promotion.
+5. Extend the harness/invariants to exercise the actual new report/admission,
+   notional-rent, repayment, liquidation and chosen recovery paths before the
+   campaign. Rerunning the six legacy profiles alone cannot qualify unused new
+   backend paths. Run fresh qualifying all-profile fuzz on the frozen inputs:
+   at least 24h, readable final summary, zero failures/anomalies/invariant failures,
+   exact completion/log/artifact hashes and profile-coverage evidence. Old 1.0.3
+   duration is not transferred. Any relevant input change requires new evidence.
+6. Commission approved infrastructure under the owner's accounts. Record exact
+   artifact/service identities, covered markets, actual funded payer balances and
+   top-up policy, report freshness and combined-load/credit measurements. Verify
+   isolated database restore and independently delivered outage/exit/funding alerts.
+   Code tests, a purchased VM and the proposed monthly budget prove none of these.
+7. Prepare the concrete unsigned deployment/configuration packet: program identity,
+   canonical ELF/IDL hashes, actual authority/payer public keys, current venue pins,
+   reporter policies, exact risk settings, all rent/transaction budgets and simulation
+   results. Derive rent from the final artifact and live RPC; do not spend an estimate
+   tied to this incremental build. Keep governance/emergency signers off the VPS.
+8. After owner review and satisfied gates, use an annotated final version tag tied
+   to the approved source and build receipts, then separately authorize/sign the
+   deployment and configuration transactions. Begin with opens paused, verify actual
+   deployed bytes/authorities/guards and commissioned readers, and enable only
+   qualified covered pilot markets through the reviewed governance packet.
+
+All launch surfaces must disclose that external audit and a funded bounty are
+post-launch funding work, that operators control the in-house price authority,
+and that the 25-SOL compiled opening-notional cap is per market while deposits and
+market count remain uncapped. None of this sequence constitutes a purchase, tag,
+deployment or financial transaction in this checkpoint.
+
+## Publication cost and packet-size finding
+
+SDK serialization and an independent wire parser measured the proposed two-feed
+v0 publication packets. Two Finite updates plus the normal compute-budget
+limit/price instructions are 1,278 bytes, exceeding the 1,232-byte packet limit.
+A synthetic ALT gives 1,188 bytes and establishes structural fit only. For a
+continuous two-second schedule over 30 days with one signer/transaction, separate
+updates cost 12.96 SOL in base fees; qualified batching would cost 6.48 SOL, before
+priority fees, retries, initialization or other operations. The approved hosting/
+API budget excludes these fees. The [retained measurement](probes/price-publication-cost-2026-10-27/README.md)
+records exact bytes, source hashes, official fee/packet documentation and assumptions.
+No real key, RPC call, signature, ALT account, simulation or transaction was used.
+This remains a concrete cost/cadence/funding review prerequisite, not a new default
+or approved expense.
+
+## Follow-up CI catalog/fixture repairs
+
+The next CI run found the fuzzer's old 30-instruction name catalog and a committed
+ingest-session inventory without Repay. The statistics catalog now recognizes all
+33 instructions and the Repay event, without counting any unexecuted path. The
+original source/catalog assertion and new discriminator checks pass (13 library
+tests); all 21 local smoke/corpus tests and strict Clippy pass against verified CI
+SBF artifacts. Refreshed only the actual-SBF mock lifecycle session; the original
+all 15-session PostgreSQL ingest/catalog/chain/ledger test passes, with all other
+14 fixture hashes preserved. The [repair archive](probes/mainnet-preparation-ci-repair-2026-10-27/)
+retains the failures, corrections and exact receipts. A fresh CI rerun remains owed.
+
+The earlier run's independently downloaded Anchor and verifier artifacts match
+byte for byte: release SHA-256
+`392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9`,
+trimmed executable hash
+`95c151e4081835772382dd48d0732c140eadca8f32c568991fd99d85c7dab7a2`.
+Its IDL exactly matches the regenerated client. These identify the incremental
+program only, not the final proposed 1.1.0 runtime or changed fuzzer/fixtures.
+
+## Repayment form context regression
+
+A direct rerender reproduced stale source/rent authorization and local review
+state when the route reused the panel for another position. The public panel now
+owns a position-keyed inner form, resetting all local repayment state together.
+Same-position updates preserve explicit choices. Two regressions fail before the
+fix and pass afterward; panel/useRepay10 tests, TypeScript and focused Biome pass.
+No program, server, wallet/send pipeline or on-chain rent bound changed. The
+[red/green receipt](probes/repay-position-switch-2026-10-27/README.md) retains
+source, router evidence, exact commands and hashes. Final integration qualification
+remains open.

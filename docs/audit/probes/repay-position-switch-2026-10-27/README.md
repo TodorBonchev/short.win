@@ -1,0 +1,9 @@
+# Repayment position-switch regression — 2026-10-27
+
+Confirmed a component-lifetime defect. `PositionDetailPage` passes the position into an unkeyed `RepayPanel`. The app router does not configure `remountDeps` or `defaultRemountDeps`; the installed TanStack Router therefore supplies an undefined component key. When the panel is reused for another position, React can preserve its source selection, explicit rent authorization and the local `useRepay` review state. A loading state may incidentally unmount it, but that is not a reset guarantee for cached data or another consumer.
+
+The narrow production fix makes the public panel render an inner form keyed by position. The source/rent state and `useRepay` flow now share that position lifetime. Same-position reads preserve explicit choices. No program/server/rent-bound behavior or wallet/send pipeline was modified.
+
+Two direct `rerender` regressions exercise the public component without putting a key in the test. The first verifies both preservation on the same position and reset on a different position, then requires a fresh explicit bound before review. The second enters a local review flow, switches positions and checks an idle flow with blank rent. The mocked hook owns ordinary React state; it does not inspect position to reset itself.
+
+Before changing production code, both new regressions failed: the prior rent text remained and the flow still showed review. The existing six panel tests passed. After the fix, all eight panel tests and both adjacent `useRepay` tests pass (10 total). Web typecheck, Biome on the two owned files and `git diff --check` pass. Red/green logs and command metadata, before/after sources, the patch, route-source hashes and final source hashes are retained here. No commit or push was performed by this task.

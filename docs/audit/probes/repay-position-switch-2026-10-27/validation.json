@@ -1,0 +1,100 @@
+{
+  "schema": "shortwin-repay-position-switch/v1",
+  "verified_at_utc": "2026-10-27T18:53:50.311859+00:00",
+  "source_head": "b7fcfc3e7437bc00d0abe34a241e13636de154c0",
+  "finding": "An unkeyed RepayPanel reused with a new position prop retained source/rent authorization and its useRepay local review flow. Router remount dependencies are not configured; ordinary route reuse does not guarantee a remount.",
+  "fix": "RepayPanel owns an inner form keyed by position. All form and useRepay hook state reset together when that position changes. Same-position rerenders preserve user choices.",
+  "scope": [
+    "apps/web/src/features/short/positions/RepayPanel.tsx",
+    "apps/web/src/features/short/positions/RepayPanel.test.tsx"
+  ],
+  "wallet_send_pipeline_changed": false,
+  "program_or_server_semantics_changed": false,
+  "tracked_source_sha256": [
+    {
+      "path": "apps/web/src/features/short/positions/RepayPanel.tsx",
+      "sha256": "a3b67c4754da7db62251701b3c27295d53986086efd2a6fcc07b3a9ccb030474"
+    },
+    {
+      "path": "apps/web/src/features/short/positions/RepayPanel.test.tsx",
+      "sha256": "2c32a273458002eb4cad300ee71c660dd61c155355c2abb9037c80a3542452cd"
+    }
+  ],
+  "route_evidence": [
+    {
+      "path": "apps/web/src/router.tsx",
+      "sha256": "8dd8674437c28ab6cc698c4d9c5fdcd074a531e2057824a1c56313e72e061439",
+      "observation": "No remountDeps or defaultRemountDeps configured."
+    },
+    {
+      "path": "apps/web/src/features/short/PositionDetailPage.tsx",
+      "sha256": "9a61ea67959f86ad0ff90f9ff1f21f4d248c7e9fa1a3fef9f537a09cdff9b60a",
+      "observation": "RepayPanel rendered without position key."
+    },
+    {
+      "path": "/root/short.win-jupiter-redesign/node_modules/.pnpm/@tanstack+react-router@1.170.41_react-dom@19.3.0_react@19.3.0__react@19.3.0/node_modules/@tanstack/react-router/src/Match.tsx",
+      "sha256": "69fc670957ceec3a08a7d9401334c76231419e169636dc637e89d7b8a482821d",
+      "observation": "Pinned TanStack Router uses undefined React component key without remount dependencies."
+    }
+  ],
+  "checks": {
+    "red": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "web",
+        "exec",
+        "vitest",
+        "run",
+        "src/features/short/positions/RepayPanel.test.tsx"
+      ],
+      "started_at_utc": "2026-10-27T18:51:55.816305+00:00",
+      "exit_code": 1,
+      "component_changed": false
+    },
+    "green": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "web",
+        "exec",
+        "vitest",
+        "run",
+        "src/features/short/positions/RepayPanel.test.tsx",
+        "src/features/short/positions/useRepay.test.tsx"
+      ],
+      "started_at_utc": "2026-10-27T18:52:29.610119+00:00",
+      "exit_code": 0
+    },
+    "typecheck": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "web",
+        "typecheck"
+      ],
+      "started_at_utc": "2026-10-27T18:52:29.605640+00:00",
+      "exit_code": 0
+    },
+    "biome": {
+      "command": [
+        "pnpm",
+        "--filter",
+        "web",
+        "exec",
+        "biome",
+        "check",
+        "src/features/short/positions/RepayPanel.tsx",
+        "src/features/short/positions/RepayPanel.test.tsx"
+      ],
+      "started_at_utc": "2026-10-27T18:52:29.622353+00:00",
+      "exit_code": 0
+    }
+  },
+  "regressions": [
+    "Direct unkeyed public-component rerender: source and explicit rent preserved for same position, cleared for new position; no inherited authorization, and fresh input required before review.",
+    "Direct unkeyed public-component rerender while local flow is in review: new position gets idle local flow and blank rent. The mock hook owns ordinary React state and does not reset it from the position prop."
+  ],
+  "diff_check_passed": true,
+  "committed_or_pushed": false
+}

@@ -1,0 +1,23 @@
+{
+  "reason": "Retain exact patch/log bytes while avoiding Git whitespace diagnostics on raw evidence. SOURCE_SHA256SUMS is the original unchanged manifest; decompress the mapped files to verify its original paths.",
+  "files": [
+    {
+      "original_name": "change.patch",
+      "stored_name": "change.patch.gz",
+      "original_sha256": "7eef21a53c96be03d455c83407e3a2a756d51c9981507a5a171fcbed63054270",
+      "stored_sha256": "a9d01bb2543e49d0d98a492b963e13a4b9277f970e657c57ef61cafadc0e6000"
+    },
+    {
+      "original_name": "red.log",
+      "stored_name": "red.log.gz",
+      "original_sha256": "72e86bf3515a9fd5848aaabc470c1e9bafe3eb462a30fe8c620b5b7ddf487233",
+      "stored_sha256": "c32e1984d5fd6e4d17289b8ffcba3ee8627935c0b08ea2636637114897d61c48"
+    },
+    {
+      "original_name": "green.log",
+      "stored_name": "green.log.gz",
+      "original_sha256": "75018cf72b2cb1c78db7df81338526e1dedad7fae02be859016debb71ba0990e",
+      "stored_sha256": "7717ab5962555319d953c2f945dd285170d235a60b091d4cb25569b91a7cf630"
+    }
+  ]
+}

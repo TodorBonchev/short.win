@@ -1,0 +1,271 @@
+{
+  "schema": "shortwin-price-publication-cost/v1",
+  "measured_at_utc": "2026-10-27T18:35:27.899Z",
+  "source_head": "b7fcfc3e7437bc00d0abe34a241e13636de154c0",
+  "node_version": "v24.21.0",
+  "kit_version": "8.3.0",
+  "sources": [
+    {
+      "path": "clients/js/src/generated/instructions/publishPriceReport.ts",
+      "sha256": "8472015b7e246799f0ac38ce1a1b0153c969bced6e807c6bdd8877ea334450a1"
+    },
+    {
+      "path": "clients/js/src/generated/types/priceReportDomainArgs.ts",
+      "sha256": "6befef706e68c0d8bba554a669bc7cefb7b531ad76b82fe766f7113cb83d5347"
+    },
+    {
+      "path": "clients/js/src/generated/types/priceReportModelArgs.ts",
+      "sha256": "36f598aa4e28c3cfa05907b739fca89abb852b57763241ab40ab808af634c03f"
+    },
+    {
+      "path": "clients/js/src/generated/types/priceReportStatusArgs.ts",
+      "sha256": "a5323a11cc54c25abbcdf35f887cb0da625e9ea47edb5127a494c56f11d5762d"
+    },
+    {
+      "path": "clients/js/package.json",
+      "sha256": "1fbbee574fc341f25911aacbb98f4e7e95d4f6999506e1c7f8cd6aa8b82dd4fe"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "9912c1f7235cf0a80322ac3ed4668b47784e34b66314ef06109a675a7ce7510b"
+    }
+  ],
+  "official_sources": [
+    {
+      "url": "https://solana.com/docs/core/fees/fee-structure",
+      "fact": "Current base fee 5000 lamports per transaction signature; failed transactions are charged; optional priority fees separate."
+    },
+    {
+      "url": "https://solana.com/docs/core/transactions",
+      "fact": "Legacy/v0 maximum packet size 1232 bytes; each signature 64 bytes."
+    }
+  ],
+  "assumptions": [
+    "Synthetic addresses and blockhash; no real keys, signing, RPC, sending, simulation, account creation or program execution.",
+    "Two distinct already-initialized exact-q report accounts for one market; publisher is fee payer and sole transaction signer.",
+    "Generated current Finite publish_price_report instruction; no Ed25519 verification precompile instructions, no nonce or account initialization. Four baseline packets have no ALT; a fifth uses an in-memory NON-EXISTENT synthetic ALT containing config/market/both report addresses, while signer and both program IDs remain static.",
+    "All signatures remain null; standard serialized unsigned transactions contain 64-byte zero signature placeholders.",
+    "ComputeBudget limit 200000 and price 1000 micro-lamports/CU illustrate packet overhead only; no CU sufficiency, priority-fee budget, settings approval or landing guarantee.",
+    "30 consecutive 24-hour days and exactly one successful publication per feed every 2 seconds; no extra signatures, failed attempts, resends requiring new fees, account rent, priority fees, initialization, RPC/API credits, indexer/keeper transactions or market creation included.",
+    "A byte-size fit does not prove timely observation, simulation, execution, source-window freshness, matching epochs, simultaneous report availability, confirmation or finality. The synthetic ALT neither exists nor has an approved creation/funding/authority/extension/deactivation lifecycle."
+  ],
+  "synthetic_addresses": {
+    "program": "4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi",
+    "publisherFeePayer": "8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR",
+    "config": "CktRuQ2mttgRGkXJtyksdKHjUdc2C4TgDzyB98oEzy8",
+    "market": "GgBaCs3NCBuZN12kCJgAW63ydqohFkHEdfdEXBPzLHq",
+    "reports": [
+      "LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY",
+      "QWmroo4YnnMqYW3cnxWkFdaTxGD3P7vMSzwMHGbUzwF"
+    ],
+    "syntheticNonexistentLookupTable": "swqrv48gsrwpBFbftEwnP2vB4jckpvfGJfXkwaniLCC",
+    "baseMint": "US517G5965aydkZ46HS38QLi7UQiSojurfbQfKCELFx",
+    "baseTokenProgram": "YMN9Qj5jPNp7j14VPcML1B6xGgcPWVZUGLFU3Mnyfaf",
+    "quoteMint": "cGfHiC6Kgg3FpFZvgwGcswsCRtp4aBP2fzuXRQPizuN",
+    "quoteTokenProgram": "gBxS1f6uyyGPuW5MzGBukidSb71jdsCb5fZaoSzULE5"
+  },
+  "finite_instruction_data_bytes": 457,
+  "packets": [
+    {
+      "finite_reports": 1,
+      "compute_budget_instructions": 0,
+      "illustrative_compute_unit_limit": null,
+      "illustrative_micro_lamports_per_compute_unit": null,
+      "compute_settings_approved_or_measured": false,
+      "required_transaction_signatures": 1,
+      "signature_values_all_null": true,
+      "zero_signature_placeholders": 1,
+      "message_version": 0,
+      "address_lookup_tables": 0,
+      "synthetic_alt_account_exists_or_fetched": false,
+      "loaded_account_count": 0,
+      "synthetic_alt_contents": [],
+      "publisher_and_program_ids_remain_static": true,
+      "static_account_keys": 5,
+      "total_instructions": 1,
+      "finite_instruction_data_bytes": [
+        457
+      ],
+      "instruction_data_bytes": [
+        457
+      ],
+      "serialized_packet_bytes": 729,
+      "packet_limit_bytes": 1232,
+      "fits_legacy_v0_packet_limit": true,
+      "remaining_bytes": 503,
+      "file": "v0-1-finite-without-compute-budget.unsigned.bin",
+      "sha256": "fa14a7bc8b6d825c27c836a2ca15032772c2ee230393ff61ae5bd54c95921e78"
+    },
+    {
+      "finite_reports": 1,
+      "compute_budget_instructions": 2,
+      "illustrative_compute_unit_limit": 200000,
+      "illustrative_micro_lamports_per_compute_unit": "1000",
+      "compute_settings_approved_or_measured": false,
+      "required_transaction_signatures": 1,
+      "signature_values_all_null": true,
+      "zero_signature_placeholders": 1,
+      "message_version": 0,
+      "address_lookup_tables": 0,
+      "synthetic_alt_account_exists_or_fetched": false,
+      "loaded_account_count": 0,
+      "synthetic_alt_contents": [],
+      "publisher_and_program_ids_remain_static": true,
+      "static_account_keys": 6,
+      "total_instructions": 3,
+      "finite_instruction_data_bytes": [
+        457
+      ],
+      "instruction_data_bytes": [
+        5,
+        9,
+        457
+      ],
+      "serialized_packet_bytes": 781,
+      "packet_limit_bytes": 1232,
+      "fits_legacy_v0_packet_limit": true,
+      "remaining_bytes": 451,
+      "file": "v0-1-finite-with-compute-budget.unsigned.bin",
+      "sha256": "34190031afd5fd1df387ab9de7e5028669c3ed8c53016978faf5c294169a233c"
+    },
+    {
+      "finite_reports": 2,
+      "compute_budget_instructions": 0,
+      "illustrative_compute_unit_limit": null,
+      "illustrative_micro_lamports_per_compute_unit": null,
+      "compute_settings_approved_or_measured": false,
+      "required_transaction_signatures": 1,
+      "signature_values_all_null": true,
+      "zero_signature_placeholders": 1,
+      "message_version": 0,
+      "address_lookup_tables": 0,
+      "synthetic_alt_account_exists_or_fetched": false,
+      "loaded_account_count": 0,
+      "synthetic_alt_contents": [],
+      "publisher_and_program_ids_remain_static": true,
+      "static_account_keys": 6,
+      "total_instructions": 2,
+      "finite_instruction_data_bytes": [
+        457,
+        457
+      ],
+      "instruction_data_bytes": [
+        457,
+        457
+      ],
+      "serialized_packet_bytes": 1226,
+      "packet_limit_bytes": 1232,
+      "fits_legacy_v0_packet_limit": true,
+      "remaining_bytes": 6,
+      "file": "v0-2-finite-without-compute-budget.unsigned.bin",
+      "sha256": "a3979bcb7c07755971f84e6ba4e3be4e6ddffaef58fe19d78e7ac011d8a07e42"
+    },
+    {
+      "finite_reports": 2,
+      "compute_budget_instructions": 2,
+      "illustrative_compute_unit_limit": 200000,
+      "illustrative_micro_lamports_per_compute_unit": "1000",
+      "compute_settings_approved_or_measured": false,
+      "required_transaction_signatures": 1,
+      "signature_values_all_null": true,
+      "zero_signature_placeholders": 1,
+      "message_version": 0,
+      "address_lookup_tables": 0,
+      "synthetic_alt_account_exists_or_fetched": false,
+      "loaded_account_count": 0,
+      "synthetic_alt_contents": [],
+      "publisher_and_program_ids_remain_static": true,
+      "static_account_keys": 7,
+      "total_instructions": 4,
+      "finite_instruction_data_bytes": [
+        457,
+        457
+      ],
+      "instruction_data_bytes": [
+        5,
+        9,
+        457,
+        457
+      ],
+      "serialized_packet_bytes": 1278,
+      "packet_limit_bytes": 1232,
+      "fits_legacy_v0_packet_limit": false,
+      "remaining_bytes": -46,
+      "file": "v0-2-finite-with-compute-budget.unsigned.bin",
+      "sha256": "f79232f492203ebb8e8dbda04a24cd60ee9c36b0461f1120a051058989f619a9"
+    },
+    {
+      "finite_reports": 2,
+      "compute_budget_instructions": 2,
+      "illustrative_compute_unit_limit": 200000,
+      "illustrative_micro_lamports_per_compute_unit": "1000",
+      "compute_settings_approved_or_measured": false,
+      "required_transaction_signatures": 1,
+      "signature_values_all_null": true,
+      "zero_signature_placeholders": 1,
+      "message_version": 0,
+      "address_lookup_tables": 1,
+      "synthetic_alt_account_exists_or_fetched": false,
+      "loaded_account_count": 4,
+      "synthetic_alt_contents": [
+        "CktRuQ2mttgRGkXJtyksdKHjUdc2C4TgDzyB98oEzy8",
+        "GgBaCs3NCBuZN12kCJgAW63ydqohFkHEdfdEXBPzLHq",
+        "LbUiWL3xVV8hTFYBVdbTNrpDo41NKS6o3LHHuDzjfcY",
+        "QWmroo4YnnMqYW3cnxWkFdaTxGD3P7vMSzwMHGbUzwF"
+      ],
+      "publisher_and_program_ids_remain_static": true,
+      "static_account_keys": 3,
+      "total_instructions": 4,
+      "finite_instruction_data_bytes": [
+        457,
+        457
+      ],
+      "instruction_data_bytes": [
+        5,
+        9,
+        457,
+        457
+      ],
+      "serialized_packet_bytes": 1188,
+      "packet_limit_bytes": 1232,
+      "fits_legacy_v0_packet_limit": true,
+      "remaining_bytes": 44,
+      "file": "v0-2-finite-with-compute-budget-synthetic-alt.unsigned.bin",
+      "sha256": "9e1633106fa2d7798a03be2e5c030c6f40341cc752018b083b15f791807f64a2"
+    }
+  ],
+  "thirty_day_base_fee_lower_bounds": [
+    {
+      "name": "Separate one-report transactions, two feeds",
+      "feeds": 2,
+      "cadence_seconds_per_feed": 2,
+      "days": 30,
+      "seconds": "2592000",
+      "publication_updates_per_feed": "1296000",
+      "total_reports": "2592000",
+      "reports_per_transaction": 1,
+      "transactions": "2592000",
+      "required_signatures_per_transaction": 1,
+      "base_lamports_per_signature": "5000",
+      "base_fee_lamports": "12960000000",
+      "base_fee_sol": "12.960000000",
+      "feasibility": "Each measured one-report packet fits with or without the illustrative ComputeBudget instructions; runtime/landing unqualified."
+    },
+    {
+      "name": "One two-report transaction each 2 seconds",
+      "feeds": 2,
+      "cadence_seconds_per_feed": 2,
+      "days": 30,
+      "seconds": "2592000",
+      "publication_updates_per_feed": "1296000",
+      "total_reports": "2592000",
+      "reports_per_transaction": 2,
+      "transactions": "1296000",
+      "required_signatures_per_transaction": 1,
+      "base_lamports_per_signature": "5000",
+      "base_fee_lamports": "6480000000",
+      "base_fee_sol": "6.480000000",
+      "feasibility": "Current no-ALT payload fits by 6 bytes only without ComputeBudget; adding normal limit+price exceeds 1232. A non-existent synthetic four-address ALT makes the two-report + both-CU packet 1188 bytes, but no ALT account/lifecycle, runtime or landing is qualified. This is not an approved batching or spending plan."
+    }
+  ]
+}

@@ -16,7 +16,14 @@ import { plainAmount } from '../ui.tsx';
 import { repaymentReason } from './repay.ts';
 import { useRepay } from './useRepay.ts';
 
-export function RepayPanel({ position, symbol }: { position: Address; symbol: string }) {
+type RepayPanelProps = { position: Address; symbol: string };
+
+export function RepayPanel(props: RepayPanelProps) {
+    // Rent authorization, source selection and review state belong to one position.
+    return <PositionRepayForm key={props.position} {...props} />;
+}
+
+function PositionRepayForm({ position, symbol }: RepayPanelProps) {
     const { connected } = useWallet();
     const repay = useRepay(position);
     const [sourceAddress, setSourceAddress] = useState('');

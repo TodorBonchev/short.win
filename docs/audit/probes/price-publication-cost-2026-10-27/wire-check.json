@@ -1,0 +1,97 @@
+{
+  "schema": "shortwin-price-publication-wire-check/v1",
+  "checks": [
+    {
+      "file": "v0-1-finite-without-compute-budget.unsigned.bin",
+      "bytes": 729,
+      "required_signatures": 1,
+      "static_keys": 5,
+      "instructions": 1,
+      "instruction_data_bytes": [
+        457
+      ],
+      "address_lookups": 0,
+      "loaded_accounts": 0,
+      "lookup_records": [],
+      "wire_structure_valid": true
+    },
+    {
+      "file": "v0-1-finite-with-compute-budget.unsigned.bin",
+      "bytes": 781,
+      "required_signatures": 1,
+      "static_keys": 6,
+      "instructions": 3,
+      "instruction_data_bytes": [
+        5,
+        9,
+        457
+      ],
+      "address_lookups": 0,
+      "loaded_accounts": 0,
+      "lookup_records": [],
+      "wire_structure_valid": true
+    },
+    {
+      "file": "v0-2-finite-without-compute-budget.unsigned.bin",
+      "bytes": 1226,
+      "required_signatures": 1,
+      "static_keys": 6,
+      "instructions": 2,
+      "instruction_data_bytes": [
+        457,
+        457
+      ],
+      "address_lookups": 0,
+      "loaded_accounts": 0,
+      "lookup_records": [],
+      "wire_structure_valid": true
+    },
+    {
+      "file": "v0-2-finite-with-compute-budget.unsigned.bin",
+      "bytes": 1278,
+      "required_signatures": 1,
+      "static_keys": 7,
+      "instructions": 4,
+      "instruction_data_bytes": [
+        5,
+        9,
+        457,
+        457
+      ],
+      "address_lookups": 0,
+      "loaded_accounts": 0,
+      "lookup_records": [],
+      "wire_structure_valid": true
+    },
+    {
+      "file": "v0-2-finite-with-compute-budget-synthetic-alt.unsigned.bin",
+      "bytes": 1188,
+      "required_signatures": 1,
+      "static_keys": 3,
+      "instructions": 4,
+      "instruction_data_bytes": [
+        5,
+        9,
+        457,
+        457
+      ],
+      "address_lookups": 1,
+      "loaded_accounts": 4,
+      "lookup_records": [
+        {
+          "table_bytes_hex": "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
+          "writable_indices": [
+            2,
+            3
+          ],
+          "readonly_indices": [
+            0,
+            1
+          ]
+        }
+      ],
+      "wire_structure_valid": true
+    }
+  ],
+  "base_fee_arithmetic_checked": true
+}

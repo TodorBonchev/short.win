@@ -1,0 +1,10 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "web",
+    "typecheck"
+  ],
+  "started_at_utc": "2026-10-27T18:52:29.605640+00:00",
+  "exit_code": 0
+}

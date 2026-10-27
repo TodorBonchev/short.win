@@ -1,0 +1,14 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "web",
+    "exec",
+    "biome",
+    "check",
+    "src/features/short/positions/RepayPanel.tsx",
+    "src/features/short/positions/RepayPanel.test.tsx"
+  ],
+  "started_at_utc": "2026-10-27T18:52:29.622353+00:00",
+  "exit_code": 0
+}

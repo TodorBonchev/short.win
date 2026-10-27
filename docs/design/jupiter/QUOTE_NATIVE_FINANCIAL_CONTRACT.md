@@ -362,3 +362,19 @@ source/search/simulation rules, numerical settings, raw lots/caps, expiry/grace 
 full-collateral-default examples, funded operators, measured request/latency limits,
 byte identities, review/CI/fuzz evidence and actual deployment/configuration packet.
 Do not call the model ready or enable markets while any of these is only a draft.
+
+## Operational cost addendum (same proposed financial policy)
+
+The two-second/two-feed profile above remains a candidate, with no production
+cadence or spending approval. The [measured publication-cost record](../../audit/probes/price-publication-cost-2026-10-27/README.md)
+shows continuous 30-day base signature fees of 12.96 SOL with separate updates,
+or 6.48 SOL with qualified batching. A two-Finite-report v0 packet is 1,226 bytes
+without compute-budget instructions, 1,278 bytes with the normal limit/price pair,
+and 1,188 bytes with a synthetic four-address ALT. No real ALT or timely landing was
+qualified. These exclude priority fees, retries, rent and other transactions.
+
+The owner-approved 245.20 USD hosting/API baseline excludes SOL fees. Actual
+publication duty cycle, cost/funding, payload/batching design and observation/
+landing feasibility require review before final settings selection; reducing
+cadence or changing history/trust semantics is not silently authorized by this
+measurement. This addendum changes no numerical financial rule in the proposal.

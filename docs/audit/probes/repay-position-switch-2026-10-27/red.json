@@ -1,0 +1,14 @@
+{
+  "command": [
+    "pnpm",
+    "--filter",
+    "web",
+    "exec",
+    "vitest",
+    "run",
+    "src/features/short/positions/RepayPanel.test.tsx"
+  ],
+  "started_at_utc": "2026-10-27T18:51:55.816305+00:00",
+  "exit_code": 1,
+  "component_changed": false
+}

@@ -220,7 +220,7 @@ impl Stats {
 }
 
 /// The number of short.win instructions (`programs/shortwin/src/lib.rs`; [`ix_name`]'s table).
-pub const IX_COUNT: usize = 30;
+pub const IX_COUNT: usize = 33;
 
 /// A short.win instruction's name from its Anchor discriminator.
 pub fn ix_name(data: &[u8]) -> &'static str {
@@ -233,6 +233,8 @@ pub fn ix_name(data: &[u8]) -> &'static str {
     }
     table!(
         InitializeConfig => "initialize_config",
+        InitializePriceReport => "initialize_price_report",
+        PublishPriceReport => "publish_price_report",
         ProposeConfig => "propose_config",
         ApplyConfig => "apply_config",
         CancelConfig => "cancel_config",
@@ -252,6 +254,7 @@ pub fn ix_name(data: &[u8]) -> &'static str {
         CrankSolUsd => "crank_sol_usd",
         OpenShort => "open_short",
         CloseShort => "close_short",
+        RepayShort => "repay_short",
         AddMargin => "add_margin",
         Liquidate => "liquidate",
         Expire => "expire",
@@ -278,6 +281,7 @@ pub fn event_name(d: &[u8]) -> &'static str {
         MarketCreated,
         Open,
         Close,
+        Repay,
         Liquidate,
         Expire,
         SolSettle,
@@ -488,6 +492,29 @@ pub fn excerpt(logs: &[String], needle: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Catalog support is not evidence that an action generator exercised a path.
+    #[test]
+    fn report_and_repayment_discriminators_are_named_without_counting_execution() {
+        use shortwin::instruction as i;
+        for (discriminator, name) in [
+            (
+                i::InitializePriceReport::DISCRIMINATOR,
+                "initialize_price_report",
+            ),
+            (i::PublishPriceReport::DISCRIMINATOR, "publish_price_report"),
+            (i::RepayShort::DISCRIMINATOR, "repay_short"),
+        ] {
+            assert_eq!(ix_name(discriminator), name);
+            let mut with_payload = discriminator.to_vec();
+            with_payload.extend_from_slice(&[0; 32]);
+            assert_eq!(ix_name(&with_payload), name);
+        }
+        assert_eq!(event_name(shortwin::events::Repay::DISCRIMINATOR), "Repay");
+        assert_eq!(ix_name(&[0; 7]), "unknown");
+        assert!(Stats::default().ix.is_empty());
+        assert!(Stats::default().events.is_empty());
+    }
 
     /// [`IX_COUNT`] and [`ix_name`]'s table cover every instruction of the program's
     /// `#[program]` module.
