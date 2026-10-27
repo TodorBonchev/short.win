@@ -123,3 +123,36 @@ path = ["docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-*.md", "docs
 precedence = "override"
 SPDX-FileCopyrightText = "RustSec Advisory Database contributors"
 SPDX-License-Identifier = "CC-BY-4.0"
+
+[[annotations]]
+path = "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/*.production.diff.gz"
+precedence = "override"
+SPDX-FileCopyrightText = "The Solana Program Library authors"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = [
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0395.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0395.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0396.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0396.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0397.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0397.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0399.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0399.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0400.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0400.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0401.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0401.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0402.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0402.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0404.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0404.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0405.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0405.md.original.gz",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0406.md",
+    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0406.md.original.gz"
+]
+precedence = "override"
+SPDX-FileCopyrightText = "RustSec Advisory Database contributors"
+SPDX-License-Identifier = "CC0-1.0"

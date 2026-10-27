@@ -878,6 +878,10 @@ jobs:
           --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
           --ignore RUSTSEC-2026-0387 --ignore RUSTSEC-2026-0391 --ignore RUSTSEC-2026-0398
           --ignore RUSTSEC-2026-0403 --ignore RUSTSEC-2026-0410
+          --ignore RUSTSEC-2026-0395 --ignore RUSTSEC-2026-0396 --ignore RUSTSEC-2026-0397
+          --ignore RUSTSEC-2026-0399 --ignore RUSTSEC-2026-0400 --ignore RUSTSEC-2026-0401
+          --ignore RUSTSEC-2026-0402 --ignore RUSTSEC-2026-0404 --ignore RUSTSEC-2026-0405
+          --ignore RUSTSEC-2026-0406
       - name: Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`)
         env:
           SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so

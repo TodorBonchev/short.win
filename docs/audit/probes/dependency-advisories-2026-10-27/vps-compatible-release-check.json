@@ -1,0 +1,117 @@
+{
+  "checked_utc": "2026-10-27T01:32:29.692062+00:00",
+  "records": [
+    {
+      "crate": "zstd-safe",
+      "url": "https://crates.io/api/v1/crates/zstd-safe",
+      "default_version": "8.2.0",
+      "versions_relevant_to_compatibility": [
+        {
+          "num": "8.2.0",
+          "yanked": false,
+          "created_at": "2026-10-16T16:59:12.917175Z",
+          "checksum": "ded520f16b29e1a9b771c722221b2b0a0398c2316d9bb3c42b458a5414d7434b",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.3.0",
+          "yanked": false,
+          "created_at": "2026-09-04T14:31:21.134134Z",
+          "checksum": "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.2.4",
+          "yanked": false,
+          "created_at": "2025-03-20T14:47:49.625660Z",
+          "checksum": "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.2.3",
+          "yanked": false,
+          "created_at": "2025-02-20T23:21:36.690837Z",
+          "checksum": "f3051792fbdc2e1e143244dc28c60f73d8470e93f3f9cbd0ead44da5ed802722",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.2.2",
+          "yanked": false,
+          "created_at": "2025-02-20T21:41:10.121255Z",
+          "checksum": "7b135d7b2f7fdf2e3adc2f7dc4372cbfd6356c1848201125e31c269b903fa1d4",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.2.1",
+          "yanked": false,
+          "created_at": "2024-08-02T15:44:17.892180Z",
+          "checksum": "54a3ab4db68cea366acc5c897c7b4d4d1b8994a9cd6e6f841f8964566a419059",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.2.0",
+          "yanked": false,
+          "created_at": "2024-07-05T22:19:37.379794Z",
+          "checksum": "fa556e971e7b568dc775c136fc9de8c779b1c2fc3a63defaafadffdbd3181afa",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.1.0",
+          "yanked": false,
+          "created_at": "2024-03-27T15:02:00.582311Z",
+          "checksum": "1cd99b45c6bc03a018c8b8a86025678c87e55526064e38f9df301989dce7ec0a",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "7.0.0",
+          "yanked": false,
+          "created_at": "2023-10-11T15:41:35.441601Z",
+          "checksum": "43747c7422e2924c11144d5229878b98180ef8b06cca4ab5af37afc8a8d8ea3e",
+          "rust_version": "1.64"
+        }
+      ]
+    },
+    {
+      "crate": "zstd",
+      "url": "https://crates.io/api/v1/crates/zstd",
+      "default_version": "0.14.3",
+      "versions_relevant_to_compatibility": [
+        {
+          "num": "0.14.3",
+          "yanked": false,
+          "created_at": "2026-10-16T16:59:51.114469Z",
+          "checksum": "db3ae9bf90af6e40197bef767eeefc46ad6397420fe873830bd85e5fbbfb3c70",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "0.13.3",
+          "yanked": false,
+          "created_at": "2025-02-20T21:43:13.047065Z",
+          "checksum": "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "0.13.2",
+          "yanked": false,
+          "created_at": "2024-07-05T22:17:39.205966Z",
+          "checksum": "fcf2b778a664581e31e389454a7072dab1647606d44f7feea22cd5abb9c9f3f9",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "0.13.1",
+          "yanked": false,
+          "created_at": "2024-03-27T15:02:11.566516Z",
+          "checksum": "2d789b1514203a1120ad2429eae43a7bd32b90976a7bb8a05f7ec02fa88cc23a",
+          "rust_version": "1.64"
+        },
+        {
+          "num": "0.13.0",
+          "yanked": false,
+          "created_at": "2023-10-11T15:45:55.027360Z",
+          "checksum": "bffb3309596d527cfcba7dfc6ed6052f1d39dfbd7c867aa2e865e4a449c10110",
+          "rust_version": "1.64"
+        }
+      ]
+    }
+  ]
+}

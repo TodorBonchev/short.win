@@ -12,6 +12,16 @@ records it. The existing reviewed per-market borrowing limits are the selected
 caps; deposits and the number of permissionlessly created markets are uncapped.
 A keeper allowlist or website limit cannot make those two quantities capped.
 
+**Current technical hold (2026-10-27):** the read-only live fixture check found a
+new Token-2022 deployment with different executable bytes, at slot 460,497,271
+rather than the tested slot 427,147,035. The scoped interface/layout/CPI/extension
+compatibility review and applicable qualifying evidence remain pending. Do not
+promote the new fixture or describe the final mainnet-ready tag as qualified by
+the old upstream bytes. See the retained
+[mainnet preparation observations](../audit/probes/mainnet-preparation-2026-10-27/README.md)
+and [current release plan](../release/MAINNET-1.0.3.md). This technical hold is
+separate from the owner's decision to launch before external audit/bounty.
+
 ## Host selection and budget
 
 For a first production host, choose **DigitalOcean Frankfurt (`fra1`), General
@@ -152,10 +162,9 @@ Copy the matching `services/keeper/keeper.example.toml` to the private operator
 config, then explicitly review at least:
 
 ```toml
-# Select the exact markets for which this keeper promises funded coverage.
-# Add every admitted market before allowing positions there. This is an
-# operator responsibility, not an on-chain permissionless-market allowlist.
-markets = { only = ["<MAINNET_MARKET_PUBLIC_KEY>"] }
+# Production discovers all permissionlessly created markets. This setting
+# does not cap their number or guarantee capacity, funding or first-open coverage.
+markets = "all"
 dry_run = false
 tx_format = "auto"
 lookup_tables = ["<VERIFIED_MAINNET_PROTOCOL_ALT>"]
@@ -175,7 +184,27 @@ authority_keypair = "/etc/shortwin/secrets/coverage.json"
 ```
 
 This fragment is a planning profile; merge these keys into the complete matching
-example. The zero VaR floor covers small pilot positions as covered markets.
+example. The zero VaR floor makes small positions eligible for covered-market
+behavior, subject to actual budget and capacity. `markets = "all"` is the
+production selection because market creation is permissionless and uncapped;
+measure RPC, CPU, memory and funded observation/exit headroom as the inventory
+grows. It does not establish unlimited service capacity or funded coverage.
+
+Discovery is asynchronous (the matching example's `discovery_interval_s = 10`).
+A newly created market may admit its first open before the keeper discovers it.
+Once discovered, a degraded market may receive a coverage pause, but that is an
+asynchronous response, not an atomic on-chain allowlist or a guarantee that its
+first position was covered. If new markets exceed capacity or funding, the
+Emergency authority must use the reviewed **global new-opens pause** while the
+operator catches up and restores coverage, retaining funded exit service.
+That pause still allows deposits, permissionless market creation, withdrawals
+and claims; it does not make market count or deposited value capped.
+
+A bounded `markets = { only = ["<MARKET_PUBLIC_KEY>"] }` selection is suitable
+for controlled/read-only commissioning while global new opens remain paused.
+Restore the all-market production selection and reconcile the entire on-chain
+inventory before lifting the global opens pause. Do not use an `only` selection
+as the unattended production profile or promise it prevents opens elsewhere.
 Retain the normal oracle, venue-watch, sweep, graduation, pool-selection and
 coverage defaults applicable to supported mainnet venues. Do not copy devnet
 oracle exceptions, unavailable-venue warnings or disabled discovery into mainnet.
@@ -358,8 +387,9 @@ never private URLs, API keys, keypair contents or database credentials.
   authority public keys, multisig/timelock identities, ALT checks and the cap values.
 - VPS/provider/region, funded keeper payer public key/current balance and selected
   observation/incident budget, top-up owner and reachable emergency contacts.
-- Covered-market set and its relation to all existing/admitted markets; defined
-  response to newly created permissionless markets and an uncovered-market alert.
+- All-market production discovery and a reconciled on-chain market inventory;
+  measured capacity/funding headroom, uncovered/new-market alerts, the first-open
+  discovery gap and an exercised Emergency global-opens-pause escalation.
 - Actual 400-ms active keeper operation with a controlled open position: required
   observation coverage, known zero-reward exit path, pause/recovery and received alerts.
 - Singleton writer, migrations/backfill/finality receipts, source-matched readers,

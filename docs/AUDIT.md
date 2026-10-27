@@ -4,6 +4,25 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
+- **Current mainnet launch policy (owner, 2026-10-27):** launch with existing
+  per-market borrowing limits before an external security audit and a funded bug
+  bounty, accumulating earned protocol fees toward those later engagements. The
+  compiled default is **25 SOL of aggregate opening notional of currently open
+  positions per market**; deposits and market count remain uncapped. It is not a
+  TVL, borrower-margin, current-marked-exposure or protocol-wide cap. The
+  [owner decision](audit/owner-mainnet-decision-1.0.3-2026-10-27.md) and
+  [current release plan](release/MAINNET-1.0.3.md) supersede earlier audit-first
+  and delegated no-go timing. No external audit or funded bounty is a prelaunch
+  requirement for this initial phase, and neither is represented as completed.
+  Stable `v1.0.3` remains pending exact-revision CI and qualification of the newly
+  changed Token-2022 executable; this is a technical dependency hold. Mainnet
+  deployment and funded/monitored operation remain unproven and require the
+  concrete governance, signing and operator checks in the release plan.
+
+**Historical checkpoints below retain their status as of their stated dates.**
+They do not reinstate the superseded audit-first sequence or report current live
+venue identities, mainnet deployment or operating readiness.
+
 - **Program-only devnet deployment (2026-10-22):** the unreleased 1.0.3
   `shortwin` ELF is executable at
   [`5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK`](https://explorer.solana.com/address/5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK?cluster=devnet).

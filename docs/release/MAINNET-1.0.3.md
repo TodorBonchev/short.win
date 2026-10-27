@@ -75,7 +75,12 @@ This is a real code change, not a header-only redeploy. Pump/PumpSwap/pump-fees,
 Raydium, Jupiter, Squads and memo matched the dated check. Retained
 [observations and exact diagnostic bytes](../audit/probes/mainnet-preparation-2026-10-27/README.md)
 do not promote a new fixture or qualify the old fuzz against that new upstream ELF.
-Complete the scoped Token-2022 interface/layout/CPI/extension compatibility review,
+The [new scoped source/provenance review](../audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/REPORT.md)
+now attributes both complete ELF files to the publisher's actual release assets,
+and retains an external public-verifier match for the new source commit. Static
+comparison identifies no required adapter change within the existing mint
+allowlist. That is not a new-ELF execution test or a fresh local reproducible build.
+Complete the remaining Token-2022 initialization/ATA/memo/CPI execution tests,
 applicable fork tests and qualifying evidence before the final mainnet-ready tag.
 Stable `v1.0.3` remains pending that technical gate; audit-first timing is not the
 reason for this hold. The program ID itself had no mainnet account at finalized

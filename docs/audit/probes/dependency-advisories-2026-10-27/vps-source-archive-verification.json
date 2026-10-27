@@ -1,0 +1,30 @@
+[
+  {
+    "name": "zstd",
+    "version": "0.13.3",
+    "archive_sha256": "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a",
+    "lock_checksum": "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a",
+    "match": true
+  },
+  {
+    "name": "zstd-safe",
+    "version": "7.3.0",
+    "archive_sha256": "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882",
+    "lock_checksum": "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882",
+    "match": true
+  },
+  {
+    "name": "solana-account-decoder",
+    "version": "4.2.2",
+    "archive_sha256": "d2f5eca13228e4e175b7390222ac9c13b80543cd42a25a47b4bc6373c63caa6d",
+    "lock_checksum": "d2f5eca13228e4e175b7390222ac9c13b80543cd42a25a47b4bc6373c63caa6d",
+    "match": true
+  },
+  {
+    "name": "solana-account-decoder-client-types",
+    "version": "4.2.2",
+    "archive_sha256": "be3662c80dbbc25f38ee9a9035d48d1f15164bd3d356c546e7204a69d2cbc728",
+    "lock_checksum": "be3662c80dbbc25f38ee9a9035d48d1f15164bd3d356c546e7204a69d2cbc728",
+    "match": true
+  }
+]

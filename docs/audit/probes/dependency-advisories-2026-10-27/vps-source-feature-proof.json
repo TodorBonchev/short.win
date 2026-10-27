@@ -1,0 +1,1395 @@
+{
+  "checked_utc": "2026-10-27T01:33:37.752989+00:00",
+  "lockfile_sha256": "19de05a720184ccb4f2c84f1a68fb30d6ae87f1dc82cfad569e31bb8e4f128d4",
+  "reverse_direct_dependencies": {
+    "zstd": [
+      {
+        "name": "solana-account-decoder",
+        "version": "4.2.2"
+      },
+      {
+        "name": "solana-account-decoder-client-types",
+        "version": "4.2.2"
+      }
+    ],
+    "zstd-safe": [
+      {
+        "name": "zstd",
+        "version": "0.13.3"
+      }
+    ],
+    "zstd-sys": [
+      {
+        "name": "zstd-safe",
+        "version": "7.3.0"
+      }
+    ]
+  },
+  "direct_workspace_api_refs": [],
+  "source_excerpts": [
+    {
+      "file": "solana-account-decoder-4.2.2/src/lib.rs",
+      "sha256": "40b017955dea954a5ed33e266b98189067352087c70e499a53387abb15cbbee9",
+      "start_line": 60,
+      "end_line": 79,
+      "lines": [
+        {
+          "line": 60,
+          "text": "            let data = encode_bs58(account, data_slice_config);"
+        },
+        {
+          "line": 61,
+          "text": "            UiAccountData::Binary(data, encoding)"
+        },
+        {
+          "line": 62,
+          "text": "        }"
+        },
+        {
+          "line": 63,
+          "text": "        UiAccountEncoding::Base64 => UiAccountData::Binary("
+        },
+        {
+          "line": 64,
+          "text": "            BASE64_STANDARD.encode(slice_data(account.data(), data_slice_config)),"
+        },
+        {
+          "line": 65,
+          "text": "            encoding,"
+        },
+        {
+          "line": 66,
+          "text": "        ),"
+        },
+        {
+          "line": 67,
+          "text": "        UiAccountEncoding::Base64Zstd => {"
+        },
+        {
+          "line": 68,
+          "text": "            let mut encoder = zstd::stream::write::Encoder::new(Vec::new(), 0).unwrap();"
+        },
+        {
+          "line": 69,
+          "text": "            match encoder"
+        },
+        {
+          "line": 70,
+          "text": "                .write_all(slice_data(account.data(), data_slice_config))"
+        },
+        {
+          "line": 71,
+          "text": "                .and_then(|()| encoder.finish())"
+        },
+        {
+          "line": 72,
+          "text": "            {"
+        },
+        {
+          "line": 73,
+          "text": "                Ok(zstd_data) => UiAccountData::Binary(BASE64_STANDARD.encode(zstd_data), encoding),"
+        },
+        {
+          "line": 74,
+          "text": "                Err(_) => UiAccountData::Binary("
+        },
+        {
+          "line": 75,
+          "text": "                    BASE64_STANDARD.encode(slice_data(account.data(), data_slice_config)),"
+        },
+        {
+          "line": 76,
+          "text": "                    UiAccountEncoding::Base64,"
+        },
+        {
+          "line": 77,
+          "text": "                ),"
+        },
+        {
+          "line": 78,
+          "text": "            }"
+        },
+        {
+          "line": 79,
+          "text": "        }"
+        }
+      ]
+    },
+    {
+      "file": "solana-account-decoder-client-types-4.2.2/src/lib.rs",
+      "sha256": "4ab3c6cd19d80f6e8afb67dcfbcbba902c5dd3adbc2993c44911210fe909ef31",
+      "start_line": 35,
+      "end_line": 60,
+      "lines": [
+        {
+          "line": 35,
+          "text": "}"
+        },
+        {
+          "line": 36,
+          "text": ""
+        },
+        {
+          "line": 37,
+          "text": "impl UiAccountData {"
+        },
+        {
+          "line": 38,
+          "text": "    /// Returns decoded account data in binary format if possible"
+        },
+        {
+          "line": 39,
+          "text": "    pub fn decode(&self) -> Option<Vec<u8>> {"
+        },
+        {
+          "line": 40,
+          "text": "        match self {"
+        },
+        {
+          "line": 41,
+          "text": "            UiAccountData::Json(_) => None,"
+        },
+        {
+          "line": 42,
+          "text": "            UiAccountData::LegacyBinary(blob) => bs58::decode(blob).into_vec().ok(),"
+        },
+        {
+          "line": 43,
+          "text": "            UiAccountData::Binary(blob, encoding) => match encoding {"
+        },
+        {
+          "line": 44,
+          "text": "                UiAccountEncoding::Base58 => bs58::decode(blob).into_vec().ok(),"
+        },
+        {
+          "line": 45,
+          "text": "                UiAccountEncoding::Base64 => BASE64_STANDARD.decode(blob).ok(),"
+        },
+        {
+          "line": 46,
+          "text": "                #[cfg(feature = \"zstd\")]"
+        },
+        {
+          "line": 47,
+          "text": "                UiAccountEncoding::Base64Zstd => {"
+        },
+        {
+          "line": 48,
+          "text": "                    BASE64_STANDARD.decode(blob).ok().and_then(|zstd_data| {"
+        },
+        {
+          "line": 49,
+          "text": "                        let mut data = vec![];"
+        },
+        {
+          "line": 50,
+          "text": "                        zstd::stream::read::Decoder::new(zstd_data.as_slice())"
+        },
+        {
+          "line": 51,
+          "text": "                            .and_then(|mut reader| reader.read_to_end(&mut data))"
+        },
+        {
+          "line": 52,
+          "text": "                            .map(|_| data)"
+        },
+        {
+          "line": 53,
+          "text": "                            .ok()"
+        },
+        {
+          "line": 54,
+          "text": "                    })"
+        },
+        {
+          "line": 55,
+          "text": "                }"
+        },
+        {
+          "line": 56,
+          "text": "                #[cfg(not(feature = \"zstd\"))]"
+        },
+        {
+          "line": 57,
+          "text": "                UiAccountEncoding::Base64Zstd => None,"
+        },
+        {
+          "line": 58,
+          "text": "                UiAccountEncoding::Binary | UiAccountEncoding::JsonParsed => None,"
+        },
+        {
+          "line": 59,
+          "text": "            },"
+        },
+        {
+          "line": 60,
+          "text": "        }"
+        }
+      ]
+    },
+    {
+      "file": "zstd-0.13.3/src/stream/raw.rs",
+      "sha256": "a9ef3a34949d32e9528d7b43ad986479afb587f87e568fae4dc36be0fa2cfbe1",
+      "start_line": 138,
+      "end_line": 153,
+      "lines": [
+        {
+          "line": 138,
+          "text": "impl Decoder<'static> {"
+        },
+        {
+          "line": 139,
+          "text": "    /// Creates a new decoder."
+        },
+        {
+          "line": 140,
+          "text": "    pub fn new() -> io::Result<Self> {"
+        },
+        {
+          "line": 141,
+          "text": "        Self::with_dictionary(&[])"
+        },
+        {
+          "line": 142,
+          "text": "    }"
+        },
+        {
+          "line": 143,
+          "text": ""
+        },
+        {
+          "line": 144,
+          "text": "    /// Creates a new decoder initialized with the given dictionary."
+        },
+        {
+          "line": 145,
+          "text": "    pub fn with_dictionary(dictionary: &[u8]) -> io::Result<Self> {"
+        },
+        {
+          "line": 146,
+          "text": "        let mut context = zstd_safe::DCtx::create();"
+        },
+        {
+          "line": 147,
+          "text": "        context.init().map_err(map_error_code)?;"
+        },
+        {
+          "line": 148,
+          "text": "        context"
+        },
+        {
+          "line": 149,
+          "text": "            .load_dictionary(dictionary)"
+        },
+        {
+          "line": 150,
+          "text": "            .map_err(map_error_code)?;"
+        },
+        {
+          "line": 151,
+          "text": "        Ok(Decoder {"
+        },
+        {
+          "line": 152,
+          "text": "            context: MaybeOwnedDCtx::Owned(context),"
+        },
+        {
+          "line": 153,
+          "text": "        })"
+        }
+      ]
+    },
+    {
+      "file": "zstd-0.13.3/src/stream/raw.rs",
+      "sha256": "a9ef3a34949d32e9528d7b43ad986479afb587f87e568fae4dc36be0fa2cfbe1",
+      "start_line": 204,
+      "end_line": 243,
+      "lines": [
+        {
+          "line": 204,
+          "text": "impl Operation for Decoder<'_> {"
+        },
+        {
+          "line": 205,
+          "text": "    fn run<C: WriteBuf + ?Sized>("
+        },
+        {
+          "line": 206,
+          "text": "        &mut self,"
+        },
+        {
+          "line": 207,
+          "text": "        input: &mut InBuffer<'_>,"
+        },
+        {
+          "line": 208,
+          "text": "        output: &mut OutBuffer<'_, C>,"
+        },
+        {
+          "line": 209,
+          "text": "    ) -> io::Result<usize> {"
+        },
+        {
+          "line": 210,
+          "text": "        match &mut self.context {"
+        },
+        {
+          "line": 211,
+          "text": "            MaybeOwnedDCtx::Owned(x) => x.decompress_stream(output, input),"
+        },
+        {
+          "line": 212,
+          "text": "            MaybeOwnedDCtx::Borrowed(x) => x.decompress_stream(output, input),"
+        },
+        {
+          "line": 213,
+          "text": "        }"
+        },
+        {
+          "line": 214,
+          "text": "        .map_err(map_error_code)"
+        },
+        {
+          "line": 215,
+          "text": "    }"
+        },
+        {
+          "line": 216,
+          "text": ""
+        },
+        {
+          "line": 217,
+          "text": "    fn flush<C: WriteBuf + ?Sized>("
+        },
+        {
+          "line": 218,
+          "text": "        &mut self,"
+        },
+        {
+          "line": 219,
+          "text": "        output: &mut OutBuffer<'_, C>,"
+        },
+        {
+          "line": 220,
+          "text": "    ) -> io::Result<usize> {"
+        },
+        {
+          "line": 221,
+          "text": "        // To flush, we just offer no additional input."
+        },
+        {
+          "line": 222,
+          "text": "        self.run(&mut InBuffer::around(&[]), output)?;"
+        },
+        {
+          "line": 223,
+          "text": ""
+        },
+        {
+          "line": 224,
+          "text": "        // We don't _know_ how much (decompressed data) there is still in buffer."
+        },
+        {
+          "line": 225,
+          "text": "        if output.pos() < output.capacity() {"
+        },
+        {
+          "line": 226,
+          "text": "            // We only know when there's none (the output buffer is not full)."
+        },
+        {
+          "line": 227,
+          "text": "            Ok(0)"
+        },
+        {
+          "line": 228,
+          "text": "        } else {"
+        },
+        {
+          "line": 229,
+          "text": "            // Otherwise, pretend there's still \"1 byte\" remaining."
+        },
+        {
+          "line": 230,
+          "text": "            Ok(1)"
+        },
+        {
+          "line": 231,
+          "text": "        }"
+        },
+        {
+          "line": 232,
+          "text": "    }"
+        },
+        {
+          "line": 233,
+          "text": ""
+        },
+        {
+          "line": 234,
+          "text": "    fn reinit(&mut self) -> io::Result<()> {"
+        },
+        {
+          "line": 235,
+          "text": "        match &mut self.context {"
+        },
+        {
+          "line": 236,
+          "text": "            MaybeOwnedDCtx::Owned(x) => {"
+        },
+        {
+          "line": 237,
+          "text": "                x.reset(zstd_safe::ResetDirective::SessionOnly)"
+        },
+        {
+          "line": 238,
+          "text": "            }"
+        },
+        {
+          "line": 239,
+          "text": "            MaybeOwnedDCtx::Borrowed(x) => {"
+        },
+        {
+          "line": 240,
+          "text": "                x.reset(zstd_safe::ResetDirective::SessionOnly)"
+        },
+        {
+          "line": 241,
+          "text": "            }"
+        },
+        {
+          "line": 242,
+          "text": "        }"
+        },
+        {
+          "line": 243,
+          "text": "        .map_err(map_error_code)?;"
+        }
+      ]
+    },
+    {
+      "file": "zstd-0.13.3/src/stream/raw.rs",
+      "sha256": "a9ef3a34949d32e9528d7b43ad986479afb587f87e568fae4dc36be0fa2cfbe1",
+      "start_line": 268,
+      "end_line": 289,
+      "lines": [
+        {
+          "line": 268,
+          "text": "impl Encoder<'static> {"
+        },
+        {
+          "line": 269,
+          "text": "    /// Creates a new encoder."
+        },
+        {
+          "line": 270,
+          "text": "    pub fn new(level: i32) -> io::Result<Self> {"
+        },
+        {
+          "line": 271,
+          "text": "        Self::with_dictionary(level, &[])"
+        },
+        {
+          "line": 272,
+          "text": "    }"
+        },
+        {
+          "line": 273,
+          "text": ""
+        },
+        {
+          "line": 274,
+          "text": "    /// Creates a new encoder initialized with the given dictionary."
+        },
+        {
+          "line": 275,
+          "text": "    pub fn with_dictionary(level: i32, dictionary: &[u8]) -> io::Result<Self> {"
+        },
+        {
+          "line": 276,
+          "text": "        let mut context = zstd_safe::CCtx::create();"
+        },
+        {
+          "line": 277,
+          "text": ""
+        },
+        {
+          "line": 278,
+          "text": "        context"
+        },
+        {
+          "line": 279,
+          "text": "            .set_parameter(CParameter::CompressionLevel(level))"
+        },
+        {
+          "line": 280,
+          "text": "            .map_err(map_error_code)?;"
+        },
+        {
+          "line": 281,
+          "text": ""
+        },
+        {
+          "line": 282,
+          "text": "        context"
+        },
+        {
+          "line": 283,
+          "text": "            .load_dictionary(dictionary)"
+        },
+        {
+          "line": 284,
+          "text": "            .map_err(map_error_code)?;"
+        },
+        {
+          "line": 285,
+          "text": ""
+        },
+        {
+          "line": 286,
+          "text": "        Ok(Encoder {"
+        },
+        {
+          "line": 287,
+          "text": "            context: MaybeOwnedCCtx::Owned(context),"
+        },
+        {
+          "line": 288,
+          "text": "        })"
+        },
+        {
+          "line": 289,
+          "text": "    }"
+        }
+      ]
+    },
+    {
+      "file": "zstd-0.13.3/src/stream/raw.rs",
+      "sha256": "a9ef3a34949d32e9528d7b43ad986479afb587f87e568fae4dc36be0fa2cfbe1",
+      "start_line": 365,
+      "end_line": 415,
+      "lines": [
+        {
+          "line": 365,
+          "text": "            }"
+        },
+        {
+          "line": 366,
+          "text": "        }"
+        },
+        {
+          "line": 367,
+          "text": "        .map_err(map_error_code)?;"
+        },
+        {
+          "line": 368,
+          "text": "        Ok(())"
+        },
+        {
+          "line": 369,
+          "text": "    }"
+        },
+        {
+          "line": 370,
+          "text": "}"
+        },
+        {
+          "line": 371,
+          "text": ""
+        },
+        {
+          "line": 372,
+          "text": "impl<'a> Operation for Encoder<'a> {"
+        },
+        {
+          "line": 373,
+          "text": "    fn run<C: WriteBuf + ?Sized>("
+        },
+        {
+          "line": 374,
+          "text": "        &mut self,"
+        },
+        {
+          "line": 375,
+          "text": "        input: &mut InBuffer<'_>,"
+        },
+        {
+          "line": 376,
+          "text": "        output: &mut OutBuffer<'_, C>,"
+        },
+        {
+          "line": 377,
+          "text": "    ) -> io::Result<usize> {"
+        },
+        {
+          "line": 378,
+          "text": "        match &mut self.context {"
+        },
+        {
+          "line": 379,
+          "text": "            MaybeOwnedCCtx::Owned(x) => x.compress_stream(output, input),"
+        },
+        {
+          "line": 380,
+          "text": "            MaybeOwnedCCtx::Borrowed(x) => x.compress_stream(output, input),"
+        },
+        {
+          "line": 381,
+          "text": "        }"
+        },
+        {
+          "line": 382,
+          "text": "        .map_err(map_error_code)"
+        },
+        {
+          "line": 383,
+          "text": "    }"
+        },
+        {
+          "line": 384,
+          "text": ""
+        },
+        {
+          "line": 385,
+          "text": "    fn flush<C: WriteBuf + ?Sized>("
+        },
+        {
+          "line": 386,
+          "text": "        &mut self,"
+        },
+        {
+          "line": 387,
+          "text": "        output: &mut OutBuffer<'_, C>,"
+        },
+        {
+          "line": 388,
+          "text": "    ) -> io::Result<usize> {"
+        },
+        {
+          "line": 389,
+          "text": "        match &mut self.context {"
+        },
+        {
+          "line": 390,
+          "text": "            MaybeOwnedCCtx::Owned(x) => x.flush_stream(output),"
+        },
+        {
+          "line": 391,
+          "text": "            MaybeOwnedCCtx::Borrowed(x) => x.flush_stream(output),"
+        },
+        {
+          "line": 392,
+          "text": "        }"
+        },
+        {
+          "line": 393,
+          "text": "        .map_err(map_error_code)"
+        },
+        {
+          "line": 394,
+          "text": "    }"
+        },
+        {
+          "line": 395,
+          "text": ""
+        },
+        {
+          "line": 396,
+          "text": "    fn finish<C: WriteBuf + ?Sized>("
+        },
+        {
+          "line": 397,
+          "text": "        &mut self,"
+        },
+        {
+          "line": 398,
+          "text": "        output: &mut OutBuffer<'_, C>,"
+        },
+        {
+          "line": 399,
+          "text": "        _finished_frame: bool,"
+        },
+        {
+          "line": 400,
+          "text": "    ) -> io::Result<usize> {"
+        },
+        {
+          "line": 401,
+          "text": "        match &mut self.context {"
+        },
+        {
+          "line": 402,
+          "text": "            MaybeOwnedCCtx::Owned(x) => x.end_stream(output),"
+        },
+        {
+          "line": 403,
+          "text": "            MaybeOwnedCCtx::Borrowed(x) => x.end_stream(output),"
+        },
+        {
+          "line": 404,
+          "text": "        }"
+        },
+        {
+          "line": 405,
+          "text": "        .map_err(map_error_code)"
+        },
+        {
+          "line": 406,
+          "text": "    }"
+        },
+        {
+          "line": 407,
+          "text": ""
+        },
+        {
+          "line": 408,
+          "text": "    fn reinit(&mut self) -> io::Result<()> {"
+        },
+        {
+          "line": 409,
+          "text": "        match &mut self.context {"
+        },
+        {
+          "line": 410,
+          "text": "            MaybeOwnedCCtx::Owned(x) => {"
+        },
+        {
+          "line": 411,
+          "text": "                x.reset(zstd_safe::ResetDirective::SessionOnly)"
+        },
+        {
+          "line": 412,
+          "text": "            }"
+        },
+        {
+          "line": 413,
+          "text": "            MaybeOwnedCCtx::Borrowed(x) => {"
+        },
+        {
+          "line": 414,
+          "text": "                x.reset(zstd_safe::ResetDirective::SessionOnly)"
+        },
+        {
+          "line": 415,
+          "text": "            }"
+        }
+      ]
+    },
+    {
+      "file": "zstd-safe-7.3.0/src/lib.rs",
+      "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+      "start_line": 26,
+      "end_line": 34,
+      "lines": [
+        {
+          "line": 26,
+          "text": ""
+        },
+        {
+          "line": 27,
+          "text": "#[cfg(test)]"
+        },
+        {
+          "line": 28,
+          "text": "mod tests;"
+        },
+        {
+          "line": 29,
+          "text": ""
+        },
+        {
+          "line": 30,
+          "text": "#[cfg(feature = \"seekable\")]"
+        },
+        {
+          "line": 31,
+          "text": "pub mod seekable;"
+        },
+        {
+          "line": 32,
+          "text": ""
+        },
+        {
+          "line": 33,
+          "text": "// Re-export zstd-sys"
+        },
+        {
+          "line": 34,
+          "text": "pub use zstd_sys;"
+        }
+      ]
+    },
+    {
+      "file": "zstd-safe-7.3.0/src/lib.rs",
+      "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+      "start_line": 398,
+      "end_line": 416,
+      "lines": [
+        {
+          "line": 398,
+          "text": "    }"
+        },
+        {
+          "line": 399,
+          "text": ""
+        },
+        {
+          "line": 400,
+          "text": "    /// Wraps the `ZSTD_initCStream_usingCDict()` function."
+        },
+        {
+          "line": 401,
+          "text": "    #[cfg(feature = \"experimental\")]"
+        },
+        {
+          "line": 402,
+          "text": "    #[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"experimental\")))]"
+        },
+        {
+          "line": 403,
+          "text": "    #[deprecated]"
+        },
+        {
+          "line": 404,
+          "text": "    pub fn init_using_cdict<'b>(&mut self, cdict: &CDict<'b>) -> SafeResult"
+        },
+        {
+          "line": 405,
+          "text": "    where"
+        },
+        {
+          "line": 406,
+          "text": "        'b: 'a, // Dictionary outlives the stream."
+        },
+        {
+          "line": 407,
+          "text": "    {"
+        },
+        {
+          "line": 408,
+          "text": "        // Safety: Just FFI"
+        },
+        {
+          "line": 409,
+          "text": "        let code = unsafe {"
+        },
+        {
+          "line": 410,
+          "text": "            zstd_sys::ZSTD_initCStream_usingCDict("
+        },
+        {
+          "line": 411,
+          "text": "                self.0.as_ptr(),"
+        },
+        {
+          "line": 412,
+          "text": "                cdict.0.as_ptr(),"
+        },
+        {
+          "line": 413,
+          "text": "            )"
+        },
+        {
+          "line": 414,
+          "text": "        };"
+        },
+        {
+          "line": 415,
+          "text": "        parse_code(code)"
+        },
+        {
+          "line": 416,
+          "text": "    }"
+        }
+      ]
+    },
+    {
+      "file": "zstd-safe-7.3.0/src/lib.rs",
+      "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+      "start_line": 748,
+      "end_line": 769,
+      "lines": [
+        {
+          "line": 748,
+          "text": "    ///"
+        },
+        {
+          "line": 749,
+          "text": "    /// This only works before any data has been compressed. An error will be"
+        },
+        {
+          "line": 750,
+          "text": "    /// returned otherwise."
+        },
+        {
+          "line": 751,
+          "text": "    #[cfg(feature = \"experimental\")]"
+        },
+        {
+          "line": 752,
+          "text": "    #[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"experimental\")))]"
+        },
+        {
+          "line": 753,
+          "text": "    pub fn try_clone("
+        },
+        {
+          "line": 754,
+          "text": "        &self,"
+        },
+        {
+          "line": 755,
+          "text": "        pledged_src_size: Option<u64>,"
+        },
+        {
+          "line": 756,
+          "text": "    ) -> Result<Self, ErrorCode> {"
+        },
+        {
+          "line": 757,
+          "text": "        // Safety: Just FFI"
+        },
+        {
+          "line": 758,
+          "text": "        let context = NonNull::new(unsafe { zstd_sys::ZSTD_createCCtx() })"
+        },
+        {
+          "line": 759,
+          "text": "            .ok_or(0usize)?;"
+        },
+        {
+          "line": 760,
+          "text": ""
+        },
+        {
+          "line": 761,
+          "text": "        // Safety: Just FFI"
+        },
+        {
+          "line": 762,
+          "text": "        parse_code(unsafe {"
+        },
+        {
+          "line": 763,
+          "text": "            zstd_sys::ZSTD_copyCCtx("
+        },
+        {
+          "line": 764,
+          "text": "                context.as_ptr(),"
+        },
+        {
+          "line": 765,
+          "text": "                self.0.as_ptr(),"
+        },
+        {
+          "line": 766,
+          "text": "                pledged_src_size.unwrap_or(CONTENTSIZE_UNKNOWN),"
+        },
+        {
+          "line": 767,
+          "text": "            )"
+        },
+        {
+          "line": 768,
+          "text": "        })?;"
+        },
+        {
+          "line": 769,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "file": "zstd-safe-7.3.0/src/lib.rs",
+      "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+      "start_line": 1034,
+      "end_line": 1049,
+      "lines": [
+        {
+          "line": 1034,
+          "text": "    /// Wraps the `ZSTD_initDStream_usingDDict()` function."
+        },
+        {
+          "line": 1035,
+          "text": "    #[cfg(feature = \"experimental\")]"
+        },
+        {
+          "line": 1036,
+          "text": "    #[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"experimental\")))]"
+        },
+        {
+          "line": 1037,
+          "text": "    #[deprecated]"
+        },
+        {
+          "line": 1038,
+          "text": "    pub fn init_using_ddict<'b>(&mut self, ddict: &DDict<'b>) -> SafeResult"
+        },
+        {
+          "line": 1039,
+          "text": "    where"
+        },
+        {
+          "line": 1040,
+          "text": "        'b: 'a,"
+        },
+        {
+          "line": 1041,
+          "text": "    {"
+        },
+        {
+          "line": 1042,
+          "text": "        let code = unsafe {"
+        },
+        {
+          "line": 1043,
+          "text": "            zstd_sys::ZSTD_initDStream_usingDDict("
+        },
+        {
+          "line": 1044,
+          "text": "                self.0.as_ptr(),"
+        },
+        {
+          "line": 1045,
+          "text": "                ddict.0.as_ptr(),"
+        },
+        {
+          "line": 1046,
+          "text": "            )"
+        },
+        {
+          "line": 1047,
+          "text": "        };"
+        },
+        {
+          "line": 1048,
+          "text": "        parse_code(code)"
+        },
+        {
+          "line": 1049,
+          "text": "    }"
+        }
+      ]
+    },
+    {
+      "file": "zstd-safe-7.3.0/src/lib.rs",
+      "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+      "start_line": 1264,
+      "end_line": 1275,
+      "lines": [
+        {
+          "line": 1264,
+          "text": "    /// This only works before any data has been decompressed. An error will be"
+        },
+        {
+          "line": 1265,
+          "text": "    /// returned otherwise."
+        },
+        {
+          "line": 1266,
+          "text": "    #[cfg(feature = \"experimental\")]"
+        },
+        {
+          "line": 1267,
+          "text": "    #[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"experimental\")))]"
+        },
+        {
+          "line": 1268,
+          "text": "    pub fn try_clone(&self) -> Result<Self, ErrorCode> {"
+        },
+        {
+          "line": 1269,
+          "text": "        let context = NonNull::new(unsafe { zstd_sys::ZSTD_createDCtx() })"
+        },
+        {
+          "line": 1270,
+          "text": "            .ok_or(0usize)?;"
+        },
+        {
+          "line": 1271,
+          "text": ""
+        },
+        {
+          "line": 1272,
+          "text": "        unsafe { zstd_sys::ZSTD_copyDCtx(context.as_ptr(), self.0.as_ptr()) };"
+        },
+        {
+          "line": 1273,
+          "text": ""
+        },
+        {
+          "line": 1274,
+          "text": "        Ok(DCtx(context, self.1))"
+        },
+        {
+          "line": 1275,
+          "text": "    }"
+        }
+      ]
+    },
+    {
+      "file": "zstd-safe-7.3.0/src/lib.rs",
+      "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+      "start_line": 2150,
+      "end_line": 2157,
+      "lines": [
+        {
+          "line": 2150,
+          "text": "    #[cfg(feature = \"experimental\")]"
+        },
+        {
+          "line": 2151,
+          "text": "    #[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"experimental\")))]"
+        },
+        {
+          "line": 2152,
+          "text": "    EnableDedicatedDictSearch(bool),"
+        },
+        {
+          "line": 2153,
+          "text": ""
+        },
+        {
+          "line": 2154,
+          "text": "    #[cfg(feature = \"experimental\")]"
+        },
+        {
+          "line": 2155,
+          "text": "    #[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"experimental\")))]"
+        },
+        {
+          "line": 2156,
+          "text": "    StableInBuffer(bool),"
+        },
+        {
+          "line": 2157,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "file": "zstd-safe-7.3.0/src/lib.rs",
+      "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+      "start_line": 2300,
+      "end_line": 2325,
+      "lines": [
+        {
+          "line": 2300,
+          "text": ""
+        },
+        {
+          "line": 2301,
+          "text": "/// Wraps the `ZDICT_trainFromBuffer()` function."
+        },
+        {
+          "line": 2302,
+          "text": "#[cfg(feature = \"zdict_builder\")]"
+        },
+        {
+          "line": 2303,
+          "text": "#[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"zdict_builder\")))]"
+        },
+        {
+          "line": 2304,
+          "text": "pub fn train_from_buffer<C: WriteBuf + ?Sized>("
+        },
+        {
+          "line": 2305,
+          "text": "    dict_buffer: &mut C,"
+        },
+        {
+          "line": 2306,
+          "text": "    samples_buffer: &[u8],"
+        },
+        {
+          "line": 2307,
+          "text": "    samples_sizes: &[usize],"
+        },
+        {
+          "line": 2308,
+          "text": ") -> SafeResult {"
+        },
+        {
+          "line": 2309,
+          "text": "    assert_eq!(samples_buffer.len(), samples_sizes.iter().sum());"
+        },
+        {
+          "line": 2310,
+          "text": ""
+        },
+        {
+          "line": 2311,
+          "text": "    unsafe {"
+        },
+        {
+          "line": 2312,
+          "text": "        dict_buffer.write_from(|buffer, capacity| {"
+        },
+        {
+          "line": 2313,
+          "text": "            parse_code(zstd_sys::ZDICT_trainFromBuffer("
+        },
+        {
+          "line": 2314,
+          "text": "                buffer,"
+        },
+        {
+          "line": 2315,
+          "text": "                capacity,"
+        },
+        {
+          "line": 2316,
+          "text": "                ptr_void(samples_buffer),"
+        },
+        {
+          "line": 2317,
+          "text": "                samples_sizes.as_ptr(),"
+        },
+        {
+          "line": 2318,
+          "text": "                samples_sizes.len() as u32,"
+        },
+        {
+          "line": 2319,
+          "text": "            ))"
+        },
+        {
+          "line": 2320,
+          "text": "        })"
+        },
+        {
+          "line": 2321,
+          "text": "    }"
+        },
+        {
+          "line": 2322,
+          "text": "}"
+        },
+        {
+          "line": 2323,
+          "text": ""
+        },
+        {
+          "line": 2324,
+          "text": "/// Wraps the `ZDICT_getDictID()` function."
+        },
+        {
+          "line": 2325,
+          "text": "#[cfg(feature = \"zdict_builder\")]"
+        }
+      ]
+    },
+    {
+      "file": "zstd-0.13.3/src/dict.rs",
+      "sha256": "a2c3c61bc85c7f3f41b0080ab5b226e21cc01fdffd79eff81aab5ebbb6b56807",
+      "start_line": 102,
+      "end_line": 127,
+      "lines": [
+        {
+          "line": 102,
+          "text": "/// * `sample_sizes` is the size of each sample in `sample_data`."
+        },
+        {
+          "line": 103,
+          "text": "///     The sum of all `sample_sizes` should equal the length of `sample_data`."
+        },
+        {
+          "line": 104,
+          "text": "/// * `max_size` is the maximum size of the dictionary to generate."
+        },
+        {
+          "line": 105,
+          "text": "///"
+        },
+        {
+          "line": 106,
+          "text": "/// The result is the dictionary data. You can, for example, feed it to [`CDict::create`]."
+        },
+        {
+          "line": 107,
+          "text": "#[cfg(feature = \"zdict_builder\")]"
+        },
+        {
+          "line": 108,
+          "text": "#[cfg_attr(feature = \"doc-cfg\", doc(cfg(feature = \"zdict_builder\")))]"
+        },
+        {
+          "line": 109,
+          "text": "pub fn from_continuous("
+        },
+        {
+          "line": 110,
+          "text": "    sample_data: &[u8],"
+        },
+        {
+          "line": 111,
+          "text": "    sample_sizes: &[usize],"
+        },
+        {
+          "line": 112,
+          "text": "    max_size: usize,"
+        },
+        {
+          "line": 113,
+          "text": ") -> io::Result<Vec<u8>> {"
+        },
+        {
+          "line": 114,
+          "text": "    use crate::map_error_code;"
+        },
+        {
+          "line": 115,
+          "text": ""
+        },
+        {
+          "line": 116,
+          "text": "    // Complain if the lengths don't add up to the entire data."
+        },
+        {
+          "line": 117,
+          "text": "    if sample_sizes.iter().sum::<usize>() != sample_data.len() {"
+        },
+        {
+          "line": 118,
+          "text": "        return Err(io::Error::new("
+        },
+        {
+          "line": 119,
+          "text": "            io::ErrorKind::Other,"
+        },
+        {
+          "line": 120,
+          "text": "            \"sample sizes don't add up\".to_string(),"
+        },
+        {
+          "line": 121,
+          "text": "        ));"
+        },
+        {
+          "line": 122,
+          "text": "    }"
+        },
+        {
+          "line": 123,
+          "text": ""
+        },
+        {
+          "line": 124,
+          "text": "    let mut result = Vec::with_capacity(max_size);"
+        },
+        {
+          "line": 125,
+          "text": "    zstd_safe::train_from_buffer(&mut result, sample_data, sample_sizes)"
+        },
+        {
+          "line": 126,
+          "text": "        .map_err(map_error_code)?;"
+        },
+        {
+          "line": 127,
+          "text": "    Ok(result)"
+        }
+      ]
+    }
+  ]
+}

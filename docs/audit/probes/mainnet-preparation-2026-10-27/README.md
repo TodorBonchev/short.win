@@ -68,3 +68,13 @@ review archives and frozen evidence were preserved; they are not rewritten to
 match these new observations.
 
 The readable first Biome console log has trailing display whitespace normalized; `console-log-retention.json` maps its hashes to `js-00.log.original.gz`, preserving the exact original output used by the receipt.
+
+## Subsequent scoped source/provenance review
+
+[Token-2022 source review](token-2022-source-review/REPORT.md) identifies the new
+publisher asset byte-for-byte, the exact tagged commit, a separately retained
+public verifier response and relevant layout/transfer/initialization/memo changes.
+No adapter change is identified by that static review within the existing mint
+allowlist. Tests, benches and a fresh qualifying campaign against the new upstream
+baseline remain pending; current CI still uses the old fixture. This advances the
+disposition without claiming the live gate passed or promoting fixture bytes.

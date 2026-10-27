@@ -70,6 +70,53 @@ line constrains crypto-bigint to 0.5, while the advisory fixes start at 0.7.6.
 Agave account-decoder 4.2.2 constrains zstd to 0.13, while its fix starts at 0.14.3
 (and zstd-safe 8.2.0). Do not silently substitute incompatible major versions.
 
+
+## Follow-up: explicit unsound-API warnings in the next CI
+
+In [CI 40432351023](https://github.com/TodorBonchev/short.win/actions/runs/40432351023)
+on `f5aef15cfaf6bbad0a1a25dbbf25a798760aaeca`, the completed services job passed
+formatting, Clippy and `cargo deny`, then `cargo audit --deny warnings` failed on
+ten additional `zstd-safe 7.3.0` **unsound** advisories. Those warnings were exposed
+after the earlier advisory errors were dispositioned; they are not demonstrated
+new flaws in short.win's executed paths. Service unit/scenario tests after that
+step did not run. The retained job log and snapshot preserve this failure without
+calling the whole still-running workflow complete.
+
+Two separate agents reviewed the exact locked crate sources, sole callers and
+features; the implementing agent checked their conclusions against all ten pinned
+RustSec records. There is no compatible patched zstd-safe 7.x release at this
+read: the fixes start at 8.2.0, outside zstd 0.13's 7.x dependency range. These are
+additional **usage-scoped nonapplicability** exceptions with the same November 27
+expiry, not a declaration that zstd-safe is sound or repaired.
+
+| Advisory | Current-path boundary |
+| --- | --- |
+| RUSTSEC-2026-0395 | `StableInBuffer(true)` requires the absent `experimental` feature and explicit enabling. The current encoder requests neither. |
+| RUSTSEC-2026-0396 | All affected Seekable/SeekTable methods require the absent `seekable` feature. |
+| RUSTSEC-2026-0397 | No Rust source in the exact zstd 0.13.3 archive calls `OutBuffer::around_pos`. Its writer clears its private Vec then uses `OutBuffer::around` at position zero; its reader wraps an initialized mutable byte slice with `around` at zero. The vulnerable constructor only checks capacity, not initialized length; it is **not fixed** and must not be introduced. |
+| RUSTSEC-2026-0399 | The deprecated `init_using_cdict`/`init_using_ddict` methods require absent `experimental`; normal fresh constructors load an empty dictionary instead. |
+| RUSTSEC-2026-0400 | The sole Solana callers own fresh streaming encoder/read-decoder contexts; they never mix one-shot calls with unfinished streams on the same context. |
+| RUSTSEC-2026-0401 | `zdict_builder` is compiled by default. Nonapplicability is based on absence of dictionary-training calls/sample-size input in either Solana consumer, **not** absence of the feature or assumed checked addition in the vulnerable API. |
+| RUSTSEC-2026-0402 | `CCtx::try_clone` requires absent `experimental`; current consumers also do not request `zstdmt`/positive `NbWorkers` or abandoned multithreaded frames. |
+| RUSTSEC-2026-0404 | `DCtx::try_clone` requires absent `experimental`; no current caller clones raw contexts. |
+| RUSTSEC-2026-0405 | The affected API is specifically `seekable::SeekableCStream::compress_stream`, absent with the seekable feature. This is not a blanket claim that every raw InBuffer API checks bounds. Current wrappers construct ordinary streaming InBuffer at position zero. |
+| RUSTSEC-2026-0406 | The trigger needs unfinished multithreaded jobs plus context/dictionary mutation. Current contexts are single-threaded, created fresh and configured before their first frame. `set_parameter`/`load_dictionary` **do execute**, but without positive `NbWorkers`, unfinished workers or mutation of their dictionary. API absence is not the argument. |
+
+Any new raw buffer manipulation, experimental/seekable feature, dictionary
+training, context reuse/clone, mixed one-shot/streaming operation or multithreaded
+worker configuration invalidates the corresponding disposition immediately.
+Retained source excerpts and independent archive checks are in
+[`policy-buffer-proof.json`](probes/dependency-advisories-2026-10-27/policy-buffer-proof.json)
+and [`vps-source-feature-proof.json`](probes/dependency-advisories-2026-10-27/vps-source-feature-proof.json).
+The feature proof uses exact manifest forwarding and complete lockfile reverse
+edges; it is not a successful full Cargo feature-resolution command or a dynamic
+Miri/UB test. The [per-ID independent review](probes/dependency-advisories-2026-10-27/vps-unsound-final-review.json)
+retains those limits.
+No runtime source or lockfile changed in this follow-up. `--deny warnings` remains
+in place; only the ten individually named advisory IDs are added to the service
+policy, explicit audit flags and dated expiry guard. Fresh service tests and CI
+must still complete, and the independent Token-2022 live gate remains open.
+
 ## Follow-up and invalidation
 
 - The release maintainer must recheck upstream Solana/Agave and RustCrypto

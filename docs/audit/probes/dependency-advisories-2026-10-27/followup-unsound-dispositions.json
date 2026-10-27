@@ -1,0 +1,34 @@
+{
+  "ids": [
+    "RUSTSEC-2026-0395",
+    "RUSTSEC-2026-0396",
+    "RUSTSEC-2026-0397",
+    "RUSTSEC-2026-0399",
+    "RUSTSEC-2026-0400",
+    "RUSTSEC-2026-0401",
+    "RUSTSEC-2026-0402",
+    "RUSTSEC-2026-0404",
+    "RUSTSEC-2026-0405",
+    "RUSTSEC-2026-0406"
+  ],
+  "expiry_utc": "2026-11-27T00:00:00Z",
+  "review_scope": "Only the existing native-Linux Solana fresh streaming encoder/read-decoder call paths and their exact resolved features. No general zstd-safe soundness claim.",
+  "reasons": {
+    "RUSTSEC-2026-0395": "StableInBuffer requires experimental and explicit enabling; current zstd graph does neither",
+    "RUSTSEC-2026-0396": "Seekable APIs require seekable feature, absent from the complete current graph",
+    "RUSTSEC-2026-0397": "current zstd wrappers never call OutBuffer::around_pos; private buffers use around at position zero",
+    "RUSTSEC-2026-0399": "deprecated init_using_cdict/ddict requires experimental, absent from current graph",
+    "RUSTSEC-2026-0400": "fresh Solana streaming contexts never mix unfinished streams with one-shot APIs",
+    "RUSTSEC-2026-0401": "dictionary training is compiled but never called by the sole Solana consumers; no sample sizes admitted",
+    "RUSTSEC-2026-0402": "CCtx try_clone requires experimental; current graph also never requests multithreaded workers",
+    "RUSTSEC-2026-0404": "DCtx try_clone requires experimental and has no current caller",
+    "RUSTSEC-2026-0405": "affected seekable compress_stream is not compiled; ordinary wrappers start InBuffer at zero",
+    "RUSTSEC-2026-0406": "current contexts are single-threaded and configured before the first frame; no unfinished worker jobs"
+  },
+  "independent_reviewers": [
+    "launch_policy_inventory",
+    "vps_operator_plan"
+  ],
+  "runtime_or_lock_changes": false,
+  "global_warning_suppression": false
+}

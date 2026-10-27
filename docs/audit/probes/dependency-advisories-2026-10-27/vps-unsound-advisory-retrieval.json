@@ -1,0 +1,56 @@
+{
+  "checked_utc": "2026-10-27T01:31:01.503986+00:00",
+  "revision": "3279c99911354c400e1d41e47c7d60e39258b147",
+  "records": [
+    {
+      "id": "0395",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0395.md",
+      "sha256": "c1edb31084861c3616c154fe4f929d6bcaf49dc279fecca337979ef7367f34eb"
+    },
+    {
+      "id": "0396",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0396.md",
+      "sha256": "e39b7c95bba3bcf5117a27405bec8f4e5ff49939d0838a1212ab6c24358d723a"
+    },
+    {
+      "id": "0397",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0397.md",
+      "sha256": "7114de7fc31bf3335b9efdda1d962ba7d842c9556f815ad03514663a70374233"
+    },
+    {
+      "id": "0399",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0399.md",
+      "sha256": "c0bafd7a60715bce6359c92813acef499822dfc27bf1db1954fe84af24f7b353"
+    },
+    {
+      "id": "0400",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0400.md",
+      "sha256": "0e6dde9156e9c750af45fbf1b5d1ebd0b4292e8464143462665aac03ff9adb78"
+    },
+    {
+      "id": "0401",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0401.md",
+      "sha256": "fd995c2bb57142e6e6ff0a5cf9b0644eebd7f1fb0fbaafa177b653d65995ab45"
+    },
+    {
+      "id": "0402",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0402.md",
+      "sha256": "22f3974648278672be3feca0e317795e97df1b48b8f346d5b7cb089fbc08ee35"
+    },
+    {
+      "id": "0404",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0404.md",
+      "sha256": "ec593926653683515e4a6a3738f4e4b1ae2d83187f4fc4fc39d69b2a2a92bac2"
+    },
+    {
+      "id": "0405",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0405.md",
+      "sha256": "1acf33f0b15ffd015d183623739a0b142919eb8b7e3cf21b9a751a914676dc4a"
+    },
+    {
+      "id": "0406",
+      "url": "https://raw.githubusercontent.com/RustSec/advisory-db/3279c99911354c400e1d41e47c7d60e39258b147/crates/zstd-safe/RUSTSEC-2026-0406.md",
+      "sha256": "26a7af678e3732bf8a85a8261ee2dcbcc86afb6ad75a49077ebb466d4d6ef7fb"
+    }
+  ]
+}

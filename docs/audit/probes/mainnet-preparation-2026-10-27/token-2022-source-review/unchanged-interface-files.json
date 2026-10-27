@@ -1,0 +1,50 @@
+[
+  {
+    "path": "interface/src/state.rs",
+    "before_sha256": "4566daf8b06ff2e7b975bed3e631ef4ab9591a95ddabd4117300ca1f639a59d2",
+    "after_sha256": "4566daf8b06ff2e7b975bed3e631ef4ab9591a95ddabd4117300ca1f639a59d2",
+    "identical": true
+  },
+  {
+    "path": "interface/src/pod.rs",
+    "before_sha256": "8d1aa1366c00147dd4af820505325d4efc7d6118908b27fed29751a99963ce88",
+    "after_sha256": "8d1aa1366c00147dd4af820505325d4efc7d6118908b27fed29751a99963ce88",
+    "identical": true
+  },
+  {
+    "path": "interface/src/instruction.rs",
+    "before_sha256": "672b3890cb58e5700a67f202491069ed44dffcbfa0e7d0b83a0cfbbb05b3a287",
+    "after_sha256": "672b3890cb58e5700a67f202491069ed44dffcbfa0e7d0b83a0cfbbb05b3a287",
+    "identical": true
+  },
+  {
+    "path": "interface/src/extension/memo_transfer/mod.rs",
+    "before_sha256": "831da8785a008f72bf5a442b7c18f9ecffa1ef3b5fc1ac41ace871807f5d83a0",
+    "after_sha256": "831da8785a008f72bf5a442b7c18f9ecffa1ef3b5fc1ac41ace871807f5d83a0",
+    "identical": true
+  },
+  {
+    "path": "interface/src/extension/cpi_guard/mod.rs",
+    "before_sha256": "f7773ce63c13b2975ce69f1c6f11e2c80cffa229616daf40df0058d8ccbe7aa4",
+    "after_sha256": "f7773ce63c13b2975ce69f1c6f11e2c80cffa229616daf40df0058d8ccbe7aa4",
+    "identical": true
+  },
+  {
+    "path": "interface/src/extension/transfer_hook/mod.rs",
+    "before_sha256": "23245c8a47f09adaf4803a6ffca8d6dfc9da1e4c87741b33338efedd07d90e3e",
+    "after_sha256": "23245c8a47f09adaf4803a6ffca8d6dfc9da1e4c87741b33338efedd07d90e3e",
+    "identical": true
+  },
+  {
+    "path": "program/src/extension/cpi_guard/processor.rs",
+    "before_sha256": "3c98b01b7f10af45abd33ed237508d5d903b6de6598b0db8a2ed385e62be7362",
+    "after_sha256": "3c98b01b7f10af45abd33ed237508d5d903b6de6598b0db8a2ed385e62be7362",
+    "identical": true
+  },
+  {
+    "path": "interface/src/error.rs",
+    "before_sha256": "15daf972b1332208c31b095d405ad33ab35b5a3900306045f6203cb0d4084aeb",
+    "after_sha256": "15daf972b1332208c31b095d405ad33ab35b5a3900306045f6203cb0d4084aeb",
+    "identical": true
+  }
+]

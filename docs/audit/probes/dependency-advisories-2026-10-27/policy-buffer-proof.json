@@ -1,0 +1,306 @@
+{
+  "reviewed_utc": "2026-10-27T01:33:47.808374+00:00",
+  "scope": "Only current Solana fresh stream::write::Encoder<Vec> and stream::read::Decoder callers; not general zstd-safe soundness",
+  "archives": [
+    {
+      "package": "zstd",
+      "version": "0.13.3",
+      "archive_sha256": "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a",
+      "matches_services_lock": true,
+      "selected_source": [
+        {
+          "file": "zstd-0.13.3/src/stream/raw.rs",
+          "sha256": "a9ef3a34949d32e9528d7b43ad986479afb587f87e568fae4dc36be0fa2cfbe1",
+          "ranges": [
+            {
+              "start": 30,
+              "end": 48,
+              "lines": [
+                "    /// Performs a single step of this operation.",
+                "    ///",
+                "    /// This is a comvenience wrapper around `Operation::run` if you don't",
+                "    /// want to deal with `InBuffer`/`OutBuffer`.",
+                "    fn run_on_buffers(",
+                "        &mut self,",
+                "        input: &[u8],",
+                "        output: &mut [u8],",
+                "    ) -> io::Result<Status> {",
+                "        let mut input = InBuffer::around(input);",
+                "        let mut output = OutBuffer::around(output);",
+                "",
+                "        let remaining = self.run(&mut input, &mut output)?;",
+                "",
+                "        Ok(Status {",
+                "            remaining,",
+                "            bytes_read: input.pos(),",
+                "            bytes_written: output.pos(),",
+                "        })"
+              ]
+            },
+            {
+              "start": 268,
+              "end": 288,
+              "lines": [
+                "impl Encoder<'static> {",
+                "    /// Creates a new encoder.",
+                "    pub fn new(level: i32) -> io::Result<Self> {",
+                "        Self::with_dictionary(level, &[])",
+                "    }",
+                "",
+                "    /// Creates a new encoder initialized with the given dictionary.",
+                "    pub fn with_dictionary(level: i32, dictionary: &[u8]) -> io::Result<Self> {",
+                "        let mut context = zstd_safe::CCtx::create();",
+                "",
+                "        context",
+                "            .set_parameter(CParameter::CompressionLevel(level))",
+                "            .map_err(map_error_code)?;",
+                "",
+                "        context",
+                "            .load_dictionary(dictionary)",
+                "            .map_err(map_error_code)?;",
+                "",
+                "        Ok(Encoder {",
+                "            context: MaybeOwnedCCtx::Owned(context),",
+                "        })"
+              ]
+            }
+          ]
+        },
+        {
+          "file": "zstd-0.13.3/src/stream/zio/reader.rs",
+          "sha256": "7b04aa7e019f295b4856b59d1e45a519b74af09aff02ffa2c73e39559bcebac4",
+          "ranges": [
+            {
+              "start": 110,
+              "end": 138,
+              "lines": [
+                "    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {",
+                "        // Keep trying until _something_ has been written.",
+                "        let mut first = true;",
+                "        loop {",
+                "            match self.state {",
+                "                State::Reading => {",
+                "                    let (bytes_read, bytes_written) = {",
+                "                        // Start with a fresh pool of un-processed data.",
+                "                        // This is the only line that can return an interruption error.",
+                "                        let input = if first {",
+                "                            // eprintln!(\"First run, no input coming.\");",
+                "                            b\"\"",
+                "                        } else {",
+                "                            fill_buf(&mut self.reader)?",
+                "                        };",
+                "",
+                "                        // eprintln!(\"Input = {:?}\", input);",
+                "",
+                "                        // It's possible we don't have any new data to read.",
+                "                        // (In this case we may still have zstd's own buffer to clear.)",
+                "                        if !first && input.is_empty() {",
+                "                            self.state = State::PastEof;",
+                "                            continue;",
+                "                        }",
+                "                        first = false;",
+                "",
+                "                        let mut src = InBuffer::around(input);",
+                "                        let mut dst = OutBuffer::around(buf);",
+                ""
+              ]
+            },
+            {
+              "start": 174,
+              "end": 186,
+              "lines": [
+                "                    // We need more data! Try again!",
+                "                }",
+                "                State::PastEof => {",
+                "                    let mut dst = OutBuffer::around(buf);",
+                "",
+                "                    // We already sent all the input we could get to zstd. Time to flush out the",
+                "                    // buffer and be done with it.",
+                "",
+                "                    // Phase 2: flush out the operation's buffer",
+                "                    // Keep calling `finish()` until the buffer is empty.",
+                "                    let hint = self",
+                "                        .operation",
+                "                        .finish(&mut dst, self.finished_frame)?;"
+              ]
+            }
+          ]
+        },
+        {
+          "file": "zstd-0.13.3/src/stream/zio/writer.rs",
+          "sha256": "d6a08f220e47d79aecb8dee0561255146c8dea19a36b0a925a09004c5efc0be4",
+          "ranges": [
+            {
+              "start": 138,
+              "end": 148,
+              "lines": [
+                "    /// Run the given closure on `self.buffer`.",
+                "    ///",
+                "    /// The buffer will be cleared, and made available wrapped in an `OutBuffer`.",
+                "    fn with_buffer<F, T>(&mut self, f: F) -> T",
+                "    where",
+                "        F: FnOnce(&mut OutBuffer<'_, Vec<u8>>, &mut D) -> T,",
+                "    {",
+                "        self.buffer.clear();",
+                "        let mut output = OutBuffer::around(&mut self.buffer);",
+                "        // eprintln!(\"Output: {:?}\", output);",
+                "        f(&mut output, &mut self.operation)"
+              ]
+            },
+            {
+              "start": 219,
+              "end": 245,
+              "lines": [
+                "    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {",
+                "        if self.finished {",
+                "            return Err(io::Error::new(",
+                "                io::ErrorKind::Other,",
+                "                \"encoder is finished\",",
+                "            ));",
+                "        }",
+                "        // Keep trying until _something_ has been consumed.",
+                "        // As soon as some input has been taken, we cannot afford",
+                "        // to take any chance: if an error occurs, the user couldn't know",
+                "        // that some data _was_ successfully written.",
+                "        loop {",
+                "            // First, write any pending data from `self.buffer`.",
+                "            self.write_from_offset()?;",
+                "            // At this point `self.buffer` can safely be discarded.",
+                "",
+                "            // Support writing concatenated frames by re-initializing the",
+                "            // context.",
+                "            if self.finished_frame {",
+                "                self.operation.reinit()?;",
+                "                self.finished_frame = false;",
+                "            }",
+                "",
+                "            let mut src = InBuffer::around(buf);",
+                "            let hint = self.with_buffer(|dst, op| op.run(&mut src, dst));",
+                "            let bytes_read = src.pos;",
+                ""
+              ]
+            }
+          ]
+        }
+      ],
+      "around_pos_mentions": []
+    },
+    {
+      "package": "zstd-safe",
+      "version": "7.3.0",
+      "archive_sha256": "64d80649ab6db9d9f6f9c80a40becd948eda4714a0a5ac8c4d157a32231c7882",
+      "matches_services_lock": true,
+      "selected_source": [
+        {
+          "file": "zstd-safe-7.3.0/src/lib.rs",
+          "sha256": "b636834d90aeb5b16c90c4e1692f12027af78236a6b9a8f6594b7e9d1717162e",
+          "ranges": [
+            {
+              "start": 1825,
+              "end": 1844,
+              "lines": [
+                "impl<'a, C: WriteBuf + ?Sized> OutBuffer<'a, C> {",
+                "    /// Returns a new `OutBuffer` around the given slice.",
+                "    ///",
+                "    /// Starts with `pos = 0`.",
+                "    pub fn around(dst: &'a mut C) -> Self {",
+                "        OutBuffer { dst, pos: 0 }",
+                "    }",
+                "",
+                "    /// Returns a new `OutBuffer` around the given slice, starting at the given position.",
+                "    ///",
+                "    /// # Panics",
+                "    ///",
+                "    /// If `pos > dst.capacity()`.",
+                "    pub fn around_pos(dst: &'a mut C, pos: usize) -> Self {",
+                "        if pos > dst.capacity() {",
+                "            panic!(\"Given position outside of the buffer bounds.\");",
+                "        }",
+                "",
+                "        OutBuffer { dst, pos }",
+                "    }"
+              ]
+            },
+            {
+              "start": 1859,
+              "end": 1876,
+              "lines": [
+                "    /// Sets the new cursor position.",
+                "    ///",
+                "    /// # Panics",
+                "    ///",
+                "    /// If `pos > self.dst.capacity()`.",
+                "    ///",
+                "    /// # Safety",
+                "    ///",
+                "    /// Data up to `pos` must have actually been written to.",
+                "    pub unsafe fn set_pos(&mut self, pos: usize) {",
+                "        if pos > self.dst.capacity() {",
+                "            panic!(\"Given position outside of the buffer bounds.\");",
+                "        }",
+                "",
+                "        self.dst.filled_until(pos);",
+                "",
+                "        self.pos = pos;",
+                "    }"
+              ]
+            },
+            {
+              "start": 1930,
+              "end": 1956,
+              "lines": [
+                "impl<'a> InBuffer<'a> {",
+                "    /// Returns a new `InBuffer` around the given slice.",
+                "    ///",
+                "    /// Starts with `pos = 0`.",
+                "    pub fn around(src: &'a [u8]) -> Self {",
+                "        InBuffer { src, pos: 0 }",
+                "    }",
+                "",
+                "    /// Returns the current cursor position.",
+                "    pub fn pos(&self) -> usize {",
+                "        self.pos",
+                "    }",
+                "",
+                "    /// Sets the new cursor position.",
+                "    ///",
+                "    /// # Panics",
+                "    ///",
+                "    /// If `pos > self.src.len()`.",
+                "    pub fn set_pos(&mut self, pos: usize) {",
+                "        if pos > self.src.len() {",
+                "            panic!(\"Given position outside of the buffer bounds.\");",
+                "        }",
+                "        self.pos = pos;",
+                "    }",
+                "",
+                "    fn wrap<'b>(&'b mut self) -> InBufferWrapper<'b, 'a> {",
+                "        InBufferWrapper {"
+              ]
+            }
+          ]
+        }
+      ],
+      "around_pos_mentions": [
+        {
+          "file": "zstd-safe-7.3.0/src/lib.rs",
+          "line": 1838,
+          "text": "pub fn around_pos(dst: &'a mut C, pos: usize) -> Self {"
+        }
+      ]
+    }
+  ],
+  "findings": {
+    "RUSTSEC-2026-0397": {
+      "trigger": "OutBuffer::around_pos called with pos beyond Vec initialized length",
+      "current_path": "No around_pos mention in entire zstd0.13.3 Rust source. Writer clears private Vec then OutBuffer::around(pos0); reader uses OutBuffer::around on initialized mutable byte slice.",
+      "invalidation": "Any current caller of around_pos or custom raw OutBuffer/WriteBuf manipulation requires new review.",
+      "caution": "The vulnerable around_pos itself checks capacity only, not initialized length; its API is not fixed."
+    },
+    "RUSTSEC-2026-0405": {
+      "trigger": "seekable::SeekableCStream::compress_stream receives InBuffer.pos beyond source length",
+      "current_path": "seekable feature absent; current non-seekable wrappers construct InBuffer::around with pos0. Advisory states ordinary streaming C functions validate position.",
+      "invalidation": "Enabling seekable or exposing raw caller-controlled InBuffer positions requires new review."
+    }
+  }
+}

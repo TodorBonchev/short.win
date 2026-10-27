@@ -1,0 +1,124 @@
+tests/litesvm/tests/add_margin_it.rs:156:    happy_path(TokenProgram::Token2022);
+tests/litesvm/tests/engine_it/flows.rs:209:    happy_path(TokenProgram::Token2022);
+tests/litesvm/tests/engine_it/fuzz.rs:479:            TokenProgram::Token2022
+tests/litesvm/tests/it/admin.rs:930:    let (b, _) = env.install_market(TokenProgram::Token2022, 9);
+tests/litesvm/tests/it/harness.rs:208:        TokenProgram::Token2022,
+tests/litesvm/tests/it/harness.rs:214:        &TokenProgram::Token2022.id(),
+tests/litesvm/tests/it/layout.rs:97:    let (k, _) = env.install_market(TokenProgram::Token2022, 9);
+tests/litesvm/tests/ki65_it.rs:205:    let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/ki65_it.rs:306:    let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/ki65_it.rs:373:    let mut lab = rebased_pair(TokenProgram::Token2022);
+tests/litesvm/tests/ki65_it.rs:432:    let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/ki65_it.rs:502:    let mut lab = rebased_pair(TokenProgram::Token2022);
+tests/litesvm/tests/ki66_sec_it.rs:321:        let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/ki66_sec_it.rs:725:        let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/ki67_sec_it.rs:559:    let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/latch_raydium_it.rs:79:const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);
+tests/litesvm/tests/lender_it/adversarial.rs:25:    let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/lender_it/adversarial.rs:144:    let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/adversarial.rs:250:    let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/adversarial.rs:319:    let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/adversarial.rs:787:    let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/adversarial.rs:807:    let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/flows.rs:285:    let mut lab = Lab::with_cap(TokenProgram::Token2022, 10_000);
+tests/litesvm/tests/lender_it/flows.rs:374:    let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/flows.rs:624:    let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/pot.rs:185:    let mut lab = Lab::on(env, TokenProgram::Token2022, 9_000);
+tests/litesvm/tests/lender_it/pot.rs:271:        let mut lab = Lab::new(TokenProgram::Token2022);
+tests/litesvm/tests/lender_it/traces.rs:958:            let s = replay(&t, TokenProgram::Token2022, lines);
+tests/litesvm/tests/liquidate_it.rs:793:        program: TokenProgram::Token2022,
+tests/litesvm/tests/market_create.rs:218:        TokenProgram::Token2022,
+tests/litesvm/tests/market_create.rs:277:            TokenProgram::Token2022
+tests/litesvm/tests/market_create.rs:295:    let (mint, _) = mint_for(&mut env, TokenProgram::Token2022);
+tests/litesvm/tests/market_create.rs:304:        TokenProgram::Token2022,
+tests/litesvm/tests/market_create.rs:315:        TokenProgram::Token2022,
+tests/litesvm/tests/market_create.rs:529:    let t22 = TokenProgram::Token2022.id();
+tests/litesvm/tests/mint_filter_extensions.rs:82:        | E::ImmutableOwner
+tests/litesvm/tests/mint_filter_extensions.rs:84:        | E::CpiGuard
+tests/litesvm/tests/mint_filter_extensions.rs:111:    let program = if acc.owner == TokenProgram::Token2022.id() {
+tests/litesvm/tests/mint_filter_extensions.rs:112:        TokenProgram::Token2022
+tests/litesvm/tests/mint_filter_extensions.rs:289:    mints::revoke_freeze_authority(&mut env, &fx.mint, &fx.authority, TokenProgram::Token2022);
+tests/litesvm/tests/mock_cpamm.rs:305:    ix.accounts[8].pubkey = TokenProgram::Token2022.id();
+tests/litesvm/tests/mock_cpamm.rs:309:    let ix = mock::initialize_pool_ix(&admin.pubkey(), &mint, TokenProgram::Token2022, FEE);
+tests/litesvm/tests/mock_cpamm.rs:322:    let f = mock::new_pool(&mut env, TokenProgram::Token2022, 6, FEE);
+tests/litesvm/tests/mock_cpamm.rs:348:                TokenProgram::Token2022.id(),
+tests/litesvm/tests/mock_cpamm.rs:357:                TokenProgram::Token2022.id(),
+tests/litesvm/tests/mock_cpamm.rs:386:        base_token_program: TokenProgram::Token2022.id(),
+tests/litesvm/tests/mock_cpamm.rs:392:        keys(mock::initialize_pool_ix(&admin, &k.base_mint, TokenProgram::Token2022, 1).accounts),
+tests/litesvm/tests/mock_cpamm.rs:404:        base_token_program: TokenProgram::Token2022.id(),
+tests/litesvm/tests/mock_cpamm.rs:422:        base_token_program: TokenProgram::Token2022.id(),
+tests/litesvm/tests/mock_cpamm.rs:479:    let program = prop_oneof![Just(TokenProgram::Spl), Just(TokenProgram::Token2022)];
+tests/litesvm/tests/mock_cpamm.rs:664:            program: TokenProgram::Token2022,
+tests/litesvm/tests/mock_cpamm.rs:828:        TokenProgram::Token2022,
+tests/litesvm/tests/mock_cpamm.rs:982:        TokenProgram::Token2022,
+tests/litesvm/tests/mock_cpamm.rs:1065:    let keys = mock::create_pool(&mut env, &admin, &m.mint, TokenProgram::Token2022, FEE);
+tests/litesvm/tests/mock_cpamm.rs:1159:    ix.accounts[9].pubkey = TokenProgram::Token2022.id();
+tests/litesvm/tests/mock_cpamm.rs:1178:    let f = mock::new_pool(&mut env, TokenProgram::Token2022, 6, FEE);
+tests/litesvm/tests/pumpswap_negvqr_e2e.rs:134:        TokenProgram::Token2022,
+tests/litesvm/tests/ray_it/common.rs:29:pub const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);
+tests/litesvm/tests/ray_it/flows.rs:162:    assert_eq!(rm.program(), TokenProgram::Token2022);
+tests/litesvm/tests/ray_it/listing.rs:464:    assert_eq!(program, TokenProgram::Token2022);
+tests/litesvm/tests/ray_math_it.rs:600:    let t22 = env.load_cpmm(CpmmFixture::Token2022);
+tests/litesvm/tests/raydium_cpmm_e2e.rs:66:const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);
+tests/litesvm/tests/raydium_cpmm_e2e.rs:852:    assert_eq!(p.token_program(), TokenProgram::Token2022);
+tests/litesvm/tests/raydium_cpmm_exits_it.rs:30:const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);
+tests/litesvm/tests/security.rs:297:    let market = create_market_for(&mut env, TokenProgram::Token2022);
+tests/litesvm/tests/security.rs:427:// ---- M1-SEC-7: withdraw serves memo-required destinations (ARCH §3.3) ----------------------
+tests/litesvm/tests/security.rs:430:fn memo_account(env: &mut Env, mint: &Pubkey, owner: &Keypair) -> Pubkey {
+tests/litesvm/tests/security.rs:455:        t22::extension::memo_transfer::instruction::enable_required_transfer_memos(
+tests/litesvm/tests/security.rs:468:/// `solana-program/token-2022@9bc02757`, from its real ProgramData) and spl-memo v3 (BPFLoader2,
+tests/litesvm/tests/security.rs:473:        eprintln!("[t-memo] SHORTWIN_BUNDLED_SPL=1: LiteSVM's bundled Token-2022 / spl-memo v3");
+tests/litesvm/tests/security.rs:505:    let memo = env.svm.get_account(&MEMO_PROGRAM_ID).unwrap();
+tests/litesvm/tests/security.rs:507:        memo.owner.to_string(),
+tests/litesvm/tests/security.rs:510:    assert!(memo.executable);
+tests/litesvm/tests/security.rs:512:        fork::sha256_hex(&memo.data),
+tests/litesvm/tests/security.rs:514:        "spl-memo v3: not the mainnet build"
+tests/litesvm/tests/security.rs:539:/// Without the memo program the withdrawal names the problem (`MemoProgramRequired`); with it
+tests/litesvm/tests/security.rs:540:/// the program CPIs the memo right before `transfer_checked`, and Token-2022 accepts the CPI'd
+tests/litesvm/tests/security.rs:541:/// memo as the transfer's previous sibling (T-MEMO, U17). Since M10 this runs on the programs
+tests/litesvm/tests/security.rs:542:/// mainnet runs ([`assert_mainnet_spl`]): the logs show spl-memo v3's `invoke [2]` before
+tests/litesvm/tests/security.rs:543:/// Token-2022's `invoke [2]`, the memo at 7,928 CU (asserted above 5,000), `transfer_checked` at
+tests/litesvm/tests/security.rs:547:/// needs no memo program, and a zero-token withdrawal moves nothing, so it needs none either.
+tests/litesvm/tests/security.rs:549:fn sec_7_memo_required_destination_is_served() {
+tests/litesvm/tests/security.rs:552:    let (l, h) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000_000);
+tests/litesvm/tests/security.rs:556:    let memo_acct = memo_account(&mut env, &l.k.mint, &owner);
+tests/litesvm/tests/security.rs:557:    let mut to_memo = lk;
+tests/litesvm/tests/security.rs:558:    to_memo.owner_token_account = memo_acct;
+tests/litesvm/tests/security.rs:561:    let res = env.send(&[ix::withdraw(&to_memo, shares / 2, 0)], &[&owner]);
+tests/litesvm/tests/security.rs:564:    // 1 share pays 0 tokens: no transfer, no memo needed.
+tests/litesvm/tests/security.rs:565:    ok(env.send(&[ix::withdraw(&to_memo, 1, 0)], &[&owner]));
+tests/litesvm/tests/security.rs:568:        &[ix::withdraw_with(&to_memo, shares / 2, 1, 0, true)],
+tests/litesvm/tests/security.rs:571:    let got = read::token_amount(&env.svm, &memo_acct).unwrap();
+tests/litesvm/tests/security.rs:577:    // The memo CPI, then the transfer CPI, both at stack height 2 (siblings).
+tests/litesvm/tests/security.rs:583:    let memo_at = at(&MEMO_PROGRAM_ID.to_string()).expect("memo invoke [2]");
+tests/litesvm/tests/security.rs:585:    assert!(memo_at < xfer_at, "{logs}");
+tests/litesvm/tests/security.rs:586:    let memo_cu = consumed_at(&meta.logs, &MEMO_PROGRAM_ID, 2);
+tests/litesvm/tests/security.rs:589:        "[t-memo] memo-required withdraw: {} CU in all; spl-memo v3 {memo_cu:?} CU, Token-2022 \
+tests/litesvm/tests/security.rs:595:        // cache that kept the bundled ELF would pass that check). Mainnet's spl-memo v3 is a
+tests/litesvm/tests/security.rs:596:        // 74,800-byte ELF; LiteSVM bundles spl-memo 4.0.0 (2,304 bytes, a few hundred CU) at the
+tests/litesvm/tests/security.rs:599:        assert_eq!(memo_cu.len(), 1);
+tests/litesvm/tests/security.rs:600:        assert!(memo_cu[0] > 5_000, "{memo_cu:?}");
+tests/litesvm/tests/security.rs:608:    // A plain destination works without the memo program (and with it, the memo is skipped).
+tests/litesvm/tests/security.rs:614:    // A wrong account in the memo slot is refused.
+tests/litesvm/tests/security.rs:615:    let (l2, h2) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000);
+tests/litesvm/tests/security.rs:631:/// environment runs, so sec_7 passing means the CPI'd memo satisfies it (not that the check is
+tests/litesvm/tests/security.rs:632:/// missing). A top-level `transfer_checked` into a memo-required account fails `NoMemo` (36)
+tests/litesvm/tests/security.rs:633:/// alone, passes right after a memo (spl-memo v3 or v1), and fails again when another
+tests/litesvm/tests/security.rs:634:/// instruction sits between the memo and the transfer.
+tests/litesvm/tests/security.rs:636:fn t_memo_control_top_level_sibling_check() {
+tests/litesvm/tests/security.rs:640:    let (l, h) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000_000);
+tests/litesvm/tests/security.rs:642:    let dest = memo_account(&mut env, &l.k.mint, &owner);
+tests/litesvm/tests/security.rs:656:    let memo = |program: Pubkey, text: &[u8]| Instruction {
+tests/litesvm/tests/security.rs:666:    assert_eq!(custom_code(&res), Some(36), "no memo: NoMemo");
+tests/litesvm/tests/security.rs:667:    let meta = ok(env.send(&[memo(MEMO_PROGRAM_ID, b"t-memo v3"), xfer(2)], &[&owner]));
+tests/litesvm/tests/security.rs:668:    let memo_cu = consumed_at(&meta.logs, &MEMO_PROGRAM_ID, 1);
+tests/litesvm/tests/security.rs:669:    eprintln!("[t-memo] top-level spl-memo v3: {memo_cu:?} CU");
+tests/litesvm/tests/security.rs:670:    ok(env.send(&[memo(v1, b"t-memo v1"), xfer(3)], &[&owner]));
+tests/litesvm/tests/security.rs:677:        &[memo(MEMO_PROGRAM_ID, b"t-memo gap"), gap, xfer(4)],
+tests/litesvm/tests/security.rs:683:        "memo not the previous sibling: NoMemo"
+tests/litesvm/tests/security.rs:936:    let (l, h) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000_000);
+tests/litesvm/tests/security.rs:952:    let (other, _) = env.install_market(TokenProgram::Token2022, 6);
+tests/litesvm/tests/security.rs:1067:    let (mint, creator) = new_mint(&mut env, TokenProgram::Token2022);
+tests/litesvm/tests/squads_gov_it.rs:248:        memo: None,
+tests/litesvm/tests/trace_raydium_it.rs:60:const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);
+tests/litesvm/tests/tx_size_raydium.rs:87:const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);

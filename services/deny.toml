@@ -14,6 +14,17 @@ ignore = [
     # Temporary native-Linux/current-caller nonapplicability; packages remain vulnerable.
     # Independently checked 2026-10-27; expires 2026-11-27 (CI checks the date).
     # No services ctutils exception: its potentially keyed paths use patched 0.4.4.
+    # Additional explicit unsound-API dispositions exposed by the next cargo-audit run.
+    { id = "RUSTSEC-2026-0395", reason = "StableInBuffer requires experimental and explicit enabling; current zstd graph does neither; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0396", reason = "Seekable APIs require seekable feature, absent from the complete current graph; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0397", reason = "current zstd wrappers never call OutBuffer::around_pos; private buffers use around at position zero; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0399", reason = "deprecated init_using_cdict/ddict requires experimental, absent from current graph; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0400", reason = "fresh Solana streaming contexts never mix unfinished streams with one-shot APIs; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0401", reason = "dictionary training is compiled but never called by the sole Solana consumers; no sample sizes admitted; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0402", reason = "CCtx try_clone requires experimental; current graph also never requests multithreaded workers; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0404", reason = "DCtx try_clone requires experimental and has no current caller; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0405", reason = "affected seekable compress_stream is not compiled; ordinary wrappers start InBuffer at zero; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0406", reason = "current contexts are single-threaded and configured before the first frame; no unfinished worker jobs; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
     { id = "RUSTSEC-2026-0387", reason = "crypto-bigint only through test-only public secp256k1 recovery; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
     { id = "RUSTSEC-2026-0391", reason = "Solana decoder creates fresh zstd contexts, never reuses with_context; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
     { id = "RUSTSEC-2026-0398", reason = "sole zstd-safe caller does not enable seekable, no Seekable API; dependency-advisories-2026-10-27.md; expires 2026-11-27" },

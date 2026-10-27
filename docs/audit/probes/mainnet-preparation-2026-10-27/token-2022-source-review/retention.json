@@ -1,0 +1,51 @@
+[
+  {
+    "original": "program@v11.0.0-ref.json",
+    "original_sha256": "c1d72718c6637923f9460086a51d2af155dd95b5ada9f0699ed8cd7613313239",
+    "readable_sha256": "25f4b08f27b118d9f7b9893f1bd990c8dde38ca9c24cbccf094de47ffd6c29ee",
+    "exact_original": "program@v11.0.0-ref.json.original.gz"
+  },
+  {
+    "original": "program@v11.1.0-ref.json",
+    "original_sha256": "5ab08f376b1b4a003ae18d679456c5112a8c6b8cce101038f9f71b8fd1b256f0",
+    "readable_sha256": "e438367993a0dd16da74f1a782c184c3eaa38e3145b3bef5a9417763e3346843",
+    "exact_original": "program@v11.1.0-ref.json.original.gz"
+  },
+  {
+    "original": "program@v11.0.0-release.json",
+    "original_sha256": "fcfb08146d54a17ad503d0d681f414807d066365c827fc69655ba019814f6a51",
+    "readable_sha256": "605a05cbde22e940b13bc88a26570672eb8a30bfb70afc887699cc1b0e44e4a0",
+    "exact_original": "program@v11.0.0-release.json.original.gz"
+  },
+  {
+    "original": "program@v11.1.0-release.json",
+    "original_sha256": "63feb0eccca3007c6f94b0816894ed59b836bbf219a70eec1af1ee80bfa25a81",
+    "readable_sha256": "cbdd1c4670542431e7157c57bf793813c9720fed8afea9e5808939b2c9eb9eff",
+    "exact_original": "program@v11.1.0-release.json.original.gz"
+  },
+  {
+    "original": "interface__src__extension__interest_bearing_mint__mod.rs.production.diff",
+    "original_sha256": "04e84236223e779ff1f81c3ad45645edb49ac17a1a6f953c80935dc168593141",
+    "exact_original": "interface__src__extension__interest_bearing_mint__mod.rs.production.diff.gz"
+  },
+  {
+    "original": "interface__src__extension__mod.rs.production.diff",
+    "original_sha256": "efe4ab28fe0e756ddf29456c5f0aeaea45f00fc08c758a0f27d3d8d7461411f9",
+    "exact_original": "interface__src__extension__mod.rs.production.diff.gz"
+  },
+  {
+    "original": "interface__src__extension__scaled_ui_amount__mod.rs.production.diff",
+    "original_sha256": "608e3550788d00c318f5c6017e291b95203915acf475b5925eff756d3717f91a",
+    "exact_original": "interface__src__extension__scaled_ui_amount__mod.rs.production.diff.gz"
+  },
+  {
+    "original": "program__src__extension__memo_transfer__mod.rs.production.diff",
+    "original_sha256": "2228b2c25c18b364211b14b5b3b32baf2bc4a723adaf93bd62e999815495501e",
+    "exact_original": "program__src__extension__memo_transfer__mod.rs.production.diff.gz"
+  },
+  {
+    "original": "program__src__processor.rs.production.diff",
+    "original_sha256": "1028e2720857bd70f78c21203c676a0ce786c1d2145531163e29c89f79e03fde",
+    "exact_original": "program__src__processor.rs.production.diff.gz"
+  }
+]

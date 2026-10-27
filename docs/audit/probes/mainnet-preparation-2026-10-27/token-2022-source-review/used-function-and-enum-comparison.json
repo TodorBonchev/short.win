@@ -1,0 +1,94 @@
+[
+  {
+    "function": "process_initialize_account",
+    "identical_source": true,
+    "old_sha256": "5905fc2eeeafb0c74b1fd74daaa359210a245ce15aa72479de30877dc85635b0",
+    "new_sha256": "5905fc2eeeafb0c74b1fd74daaa359210a245ce15aa72479de30877dc85635b0",
+    "old_start_line": 254,
+    "new_start_line": 261
+  },
+  {
+    "function": "process_initialize_account2",
+    "identical_source": true,
+    "old_sha256": "d94cb32d210b37c7f8cb5e64e27fcbda1346017949a5028f339bd94dfe6d8b52",
+    "new_sha256": "d94cb32d210b37c7f8cb5e64e27fcbda1346017949a5028f339bd94dfe6d8b52",
+    "old_start_line": 260,
+    "new_start_line": 267
+  },
+  {
+    "function": "process_initialize_account3",
+    "identical_source": true,
+    "old_sha256": "63a5f644c5d464fdee244531c061b1eb86ee382e0a5a081645965ce5c8d08af1",
+    "new_sha256": "63a5f644c5d464fdee244531c061b1eb86ee382e0a5a081645965ce5c8d08af1",
+    "old_start_line": 266,
+    "new_start_line": 273
+  },
+  {
+    "function": "_process_initialize_account",
+    "identical_source": false,
+    "old_sha256": "c5f80fee4d0d9e91148290adba22f63953d72b9395e7ab9442d8ea75b644e75a",
+    "new_sha256": "14c35a3bf118983c894d3ad9e7ed70ac529d101b23e295a089bd6083e062f1ad",
+    "old_start_line": 165,
+    "new_start_line": 169
+  },
+  {
+    "function": "process_close_account",
+    "identical_source": true,
+    "old_sha256": "13666f898093de459aede7c07386ddcfe568f32ac65f225c7e05db305cc86583",
+    "new_sha256": "13666f898093de459aede7c07386ddcfe568f32ac65f225c7e05db305cc86583",
+    "old_start_line": 1291,
+    "new_start_line": 1298
+  },
+  {
+    "function": "process_initialize_immutable_owner",
+    "identical_source": true,
+    "old_sha256": "52bbbded83e5ec9622275ef694468af4b2daa85c5e6ef118bb132cd66413cf90",
+    "new_sha256": "52bbbded83e5ec9622275ef694468af4b2daa85c5e6ef118bb132cd66413cf90",
+    "old_start_line": 1534,
+    "new_start_line": 1531
+  },
+  {
+    "function": "process_get_account_data_size",
+    "identical_source": false,
+    "old_sha256": "17d693087656f72a67d7508d5a037be2fa0c91549bd0e0600db3db7ef981c347",
+    "new_sha256": "a265411f217ffe07f4935e18119d091e333bb276922a882b72b18d052fde4dc0",
+    "old_start_line": 1505,
+    "new_start_line": 1512
+  },
+  {
+    "function": "process_withdraw_excess_lamports",
+    "identical_source": false,
+    "old_sha256": "0b67bcc1640fac150da9b5cc124580f2ccc7a0929c06c9ce8f98ec2396cd52c2",
+    "new_sha256": "4de271117c19b13bc33f517d7f423a100a24f336d5fd188827261e70d5e87aa4",
+    "old_start_line": 1683,
+    "new_start_line": 1680
+  },
+  {
+    "function": "process_sync_native",
+    "identical_source": true,
+    "old_sha256": "66f595a53ea61ace58074478c0a8765880f2c5dc4f19f2662e9617acd80318eb",
+    "new_sha256": "66f595a53ea61ace58074478c0a8765880f2c5dc4f19f2662e9617acd80318eb",
+    "old_start_line": 1447,
+    "new_start_line": 1454
+  },
+  {
+    "enum": "ExtensionType",
+    "identical_definition": true,
+    "old_sha256": "d95a6cea6b9b15e06219b398f838f7328a10bc2ff2aa1a32651d68b8cdd8e06e",
+    "new_sha256": "d95a6cea6b9b15e06219b398f838f7328a10bc2ff2aa1a32651d68b8cdd8e06e"
+  },
+  {
+    "enum": "AccountType",
+    "identical_definition": true,
+    "old_sha256": "0630507879ae7448f1f19859d31782a121c9854dbc4116b900aff048fa5cf135",
+    "new_sha256": "0630507879ae7448f1f19859d31782a121c9854dbc4116b900aff048fa5cf135"
+  },
+  {
+    "function": "process_transfer",
+    "identical_source": true,
+    "old_sha256": "90001a704a9011b8150200b08458f3f1ef2ea30aa1814d3356c16aa062293704",
+    "new_sha256": "90001a704a9011b8150200b08458f3f1ef2ea30aa1814d3356c16aa062293704",
+    "old_start_line": 328,
+    "new_start_line": 335
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "utc": "2026-10-27T01:36:47.308005+00:00",
+  "yaml_parse": "passed",
+  "expiry_guard_cases": "current passes; active due/future fail; all removed after due passes; services0385 always refused",
+  "id_sets": {
+    "deny.toml": {
+      "count": 7,
+      "matches_explicit_audit_flags": true
+    },
+    "services/deny.toml": {
+      "count": 20,
+      "matches_explicit_audit_flags": true
+    }
+  },
+  "diff_check_exit": 0,
+  "runtime_fixture_and_all_lockfiles_unchanged_from_parent_f5": true,
+  "local_service_unit_execution": "not performed; fresh CI still required",
+  "blanket_unsound_suppression": false
+}

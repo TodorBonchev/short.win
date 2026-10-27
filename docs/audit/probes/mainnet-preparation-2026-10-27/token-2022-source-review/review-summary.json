@@ -1,0 +1,43 @@
+{
+  "reviewed_utc": "2026-10-27T01:31:29.384808+00:00",
+  "shortwin_head_at_review": "f5aef15cfaf6bbad0a1a25dbbf25a798760aaeca",
+  "old_commit": "9bc02757f600ffe754746708a8a072bcd49d1260",
+  "new_commit": "8867f751c0f69367ba03af4f85510b5611989491",
+  "releases": {
+    "11.0.0": {
+      "tag": "program@v11.0.0",
+      "release_url": "https://github.com/solana-program/token-2022/releases/tag/program%40v11.0.0",
+      "published_at": "2026-05-08T17:18:44Z",
+      "asset_bytes": 632560,
+      "asset_sha256": "9bbf90b30e06778ca0feca100b29f0eeb9be576ae024f6323cc207308f51a5d1",
+      "asset_trimmed_sha256": "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947",
+      "matches_retained_fixture_or_observation": true
+    },
+    "11.1.0": {
+      "tag": "program@v11.1.0",
+      "release_url": "https://github.com/solana-program/token-2022/releases/tag/program%40v11.1.0",
+      "published_at": "2026-09-23T21:16:29Z",
+      "asset_bytes": 611056,
+      "asset_sha256": "3dde54d202caa2d10514fd58a154df5f26f07643f9f5fd0402ff08084f0cb954",
+      "asset_trimmed_sha256": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "matches_retained_fixture_or_observation": true
+    }
+  },
+  "public_verifier": {
+    "is_verified": true,
+    "message": "On chain program verified",
+    "on_chain_hash": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+    "executable_hash": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+    "repo_url": "https://github.com/solana-program/token-2022/tree/8867f751c0f69367ba03af4f85510b5611989491",
+    "commit": "8867f751c0f69367ba03af4f85510b5611989491",
+    "last_verified_at": "2026-10-23T15:43:22.904525",
+    "is_frozen": false,
+    "is_closed": false
+  },
+  "full_tag_diff_changed_paths": 302,
+  "api_compare_files_cap": 300,
+  "new_elf_execution_tests_run": false,
+  "fixture_or_pin_promoted": false,
+  "program_or_root_lock_changed_by_review": false,
+  "source_assessment": "No incompatible change identified in the supported mint/layout/transfer paths; initialization TLV sizing and memo sibling handling require execution qualification on the new ELF."
+}

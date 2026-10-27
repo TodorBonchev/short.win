@@ -1,0 +1,89 @@
+{
+  "checked_utc": "2026-10-27T01:35:14.689414+00:00",
+  "reviewer": "vps_operator_plan AI engineering source review; separate from startup logging authorship",
+  "scope": "Current native Linux service dependency graph/callers only. Read-only source/manifest review, not package remediation or external audit.",
+  "advisory_revision": "3279c99911354c400e1d41e47c7d60e39258b147",
+  "source_revision": "f5aef15cf (CI40432351023); working tracked modifications limited to separately requested operations documentation",
+  "new_advisories": [
+    {
+      "id": "RUSTSEC-2026-0395",
+      "affected_api": "zstd_safe::CCtx::set_parameter(CParameter::StableInBuffer(true))",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "API variant compiled only with experimental, which neither exact Solana caller requests/forwards; zstd defaults are legacy/arrays/zdict_builder and safe std.",
+      "evidence": "sources/zstd-safe-7.3.0/src/lib.rs:2154-2156; caller-features.json"
+    },
+    {
+      "id": "RUSTSEC-2026-0396",
+      "affected_api": "zstd_safe::seekable::Seekable / SeekTable",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "seekable module is cfg(feature=seekable). No direct safe/sys dependency, and zstd has no seekable forwarding feature; no current feature path compiles the API.",
+      "evidence": "sources/zstd-safe-7.3.0/src/lib.rs:30-31; reverse-callers-and-source-proof.json"
+    },
+    {
+      "id": "RUSTSEC-2026-0397",
+      "affected_api": "zstd_safe::OutBuffer::around_pos",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "No around_pos call exists in exact high-level zstd source. Its normal reader/writer/raw wrappers use OutBuffer::around with position zero. Vec output is cleared before wrapping; read output is an initialized mutable byte slice. Independent buffer-boundary review is retained separately by launch_policy_inventory.",
+      "evidence": "sources/zstd-0.13.3/src/stream/zio/writer.rs:145-146; sources/zstd-0.13.3/src/stream/zio/reader.rs:136-137,177"
+    },
+    {
+      "id": "RUSTSEC-2026-0399",
+      "affected_api": "zstd_safe::CCtx::init_using_cdict and DCtx::init_using_ddict",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "Both affected deprecated methods require cfg experimental. Current paths create owned contexts and load only an empty byte-slice dictionary, not these dictionary-reference constructors.",
+      "evidence": "sources/zstd-safe-7.3.0/src/lib.rs:400-406,1034-1040; sources/zstd-0.13.3/src/stream/raw.rs:138-153,268-289"
+    },
+    {
+      "id": "RUSTSEC-2026-0400",
+      "affected_api": "One-shot CCtx/DCtx APIs mixed with unfinished streaming on the same context",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "Solana encoding creates a fresh write Encoder(Vec::new(),0), writes and consumes finish; decoding creates a fresh read Decoder and reads to end. Their owned contexts are not exposed to one-shot calls, dictionary substitution or reuse. The prerequisite mixed-mode context sequence is absent; untrusted frame contents cannot make the Rust application call these APIs.",
+      "evidence": "sources/solana-account-decoder-4.2.2/src/lib.rs:67-78; sources/solana-account-decoder-client-types-4.2.2/src/lib.rs:46-54; sources/zstd-0.13.3/src/stream/raw.rs:138-153,268-289,365-415"
+    },
+    {
+      "id": "RUSTSEC-2026-0401",
+      "affected_api": "zstd_safe::train_from_buffer / zstd::dict::from_continuous",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "zdict_builder IS enabled by default, so no feature-absence argument. The only direct callers are the exact two Solana packages; their complete source contains only the normal encoding/decoding calls and no dictionary training/sample-size entry point. Workspace adds no direct zstd/safe/sys API use. No untrusted sample_sizes values reach training.",
+      "evidence": "sources/zstd-safe-7.3.0/src/lib.rs:2301-2317; sources/zstd-0.13.3/src/dict.rs:107-125; reverse-callers-and-source-proof.json"
+    },
+    {
+      "id": "RUSTSEC-2026-0402",
+      "affected_api": "zstd_safe::CCtx::try_clone with multithreaded context",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "try_clone is cfg experimental, absent. Its additional multithreaded/NbWorkers trigger is also absent: the fresh Solana encoder only sets compression level and empty dictionary before the first frame.",
+      "evidence": "sources/zstd-safe-7.3.0/src/lib.rs:748-769; sources/zstd-0.13.3/src/stream/raw.rs:268-289"
+    },
+    {
+      "id": "RUSTSEC-2026-0404",
+      "affected_api": "zstd_safe::DCtx::try_clone",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "Affected method is cfg experimental, absent; no context clone call in either Solana caller.",
+      "evidence": "sources/zstd-safe-7.3.0/src/lib.rs:1264-1275; caller-features.json"
+    },
+    {
+      "id": "RUSTSEC-2026-0405",
+      "affected_api": "zstd_safe::seekable::SeekableCStream::compress_stream",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "Official affected function is seekable compressor, not ordinary streaming compressor/decompressor. seekable is not compiled; ordinary wrappers also start InBuffer at zero.",
+      "evidence": "RUSTSEC-2026-0405.md; sources/zstd-safe-7.3.0/src/lib.rs:30-31"
+    },
+    {
+      "id": "RUSTSEC-2026-0406",
+      "affected_api": "CCtx dictionary/parameter/reset changes while multithreaded frame remains unfinished",
+      "conclusion": "trigger not reachable through current reviewed callers/features",
+      "basis": "Current feature requests do not enable zstdmt; no caller sets positive NbWorkers or uses multithread. Empty dictionary loading and CompressionLevel setting occur on a fresh owned encoder before the first frame. No mid-frame parameter/dictionary replacement occurs, including failure/drop paths. Merely reaching load_dictionary on a fresh single-thread context is not the advisory trigger.",
+      "evidence": "sources/zstd-0.13.3/src/stream/raw.rs:268-289; sources/solana-account-decoder-4.2.2/src/lib.rs:67-78; caller-features.json"
+    }
+  ],
+  "limitations": [
+    "No dynamic UB reproducer or Miri validation was run.",
+    "Feature exclusions are derived from exact manifest forwarding paths and complete reverse dependencies, not a full cargo metadata resolve (offline cache is incomplete).",
+    "Compiled-but-unused dictionary training is dispositioned by complete caller source, not feature exclusion.",
+    "An arbitrary new direct dependency/reexport, feature, API call, context pooling/mixed-mode/dictionary/MT path or changed target invalidates these claims.",
+    "The existing failure remains failed; fresh CI must actually execute previously skipped service tests/A49.",
+    "RPC account decompression/resource exhaustion and general C decoder correctness are outside this advisory applicability review."
+  ],
+  "prior_exception_review": "No new evidence here invalidates the existing fresh-context0391, disabled-seekable0398, read-not-writeDecoder0403 or native-not-wasm0410 boundaries. None is a statement that the packages are fixed.",
+  "compatible_patch": "Official registry has no patched zstd-safe7.x or zstd0.13.x release; current fixes are safe8.2.0/zstd0.14.3. sys-only update does not fix Rust wrappers. Custom backport unimplemented/unverified, requires separate source/test/compatibility ownership."
+}

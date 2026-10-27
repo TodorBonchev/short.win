@@ -1,0 +1,92 @@
+services/keeper-litesvm/tests/scenarios/m7_sec.rs:494:                tokens::create_mint(&mut env.svm, &payer, &auth.pubkey(), 6, TokenProgram::Spl);
+services/keeper-litesvm/tests/scenarios/m7_sec.rs:499:                TokenProgram::Spl,
+services/keeper-litesvm/tests/scenarios/raydium.rs:33:pub const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);
+services/keeper-litesvm/tests/scenarios/wipe.rs:220:        shortwin_litesvm_tests::tokens::TokenProgram::Token2022
+services/keeper-litesvm/tests/scenarios/wipe.rs:222:        shortwin_litesvm_tests::tokens::TokenProgram::Spl
+tests/bench/m1_cu/README.md:12:(since M10, `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), and a clock
+tests/bench/m1_cu/src/lib.rs:7://! `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), the clock under test
+tests/bench/m1_cu/src/lib.rs:308:    let (k, _) = env.install_market(TokenProgram::Spl, 6);
+tests/bench/m1_cu/src/lib.rs:319:    let (k, _) = env.install_market(TokenProgram::Spl, 6);
+tests/bench/m1_cu/src/lib.rs:401:    create_market_for(TokenProgram::Spl).0
+tests/bench/m1_cu/src/lib.rs:405:    create_market_for(TokenProgram::Token2022).0
+tests/bench/m1_cu/src/lib.rs:417:        TokenProgram::Spl,
+tests/bench/m1_cu/src/lib.rs:425:        TokenProgram::Spl,
+tests/bench/m1_cu/src/lib.rs:480:    let s = LenderEnv::new(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:486:    let s = LenderEnv::new(TokenProgram::Token2022);
+tests/bench/m1_cu/src/lib.rs:492:    let s = LenderEnv::deposited(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:498:    let s = LenderEnv::deposited(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:516:    let (k, authority) = env.install_market(TokenProgram::Spl, 6);
+tests/bench/m1_cu/src/lib.rs:526:        TokenProgram::Spl,
+tests/bench/m1_cu/src/lib.rs:534:        TokenProgram::Spl,
+tests/bench/m1_cu/src/lib.rs:597:    let s = LenderEnv::deposited(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:603:    let mut s = LenderEnv::deposited(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:612:    let s = LenderEnv::deposited(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:631:    let mut s = LenderEnv::deposited(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:844:    let mut s = LenderEnv::deposited(TokenProgram::Spl);
+tests/bench/m1_cu/src/lib.rs:998:    ) = create_market_for(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:7://! `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), the clock under test
+tests/bench/m2_cu/src/lib.rs:388:    let (mut env, mm, b, nonce) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:445:    let (mut env, mm, b, nonce) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:517:    open_first(TokenProgram::Spl)
+tests/bench/m2_cu/src/lib.rs:521:    open_first(TokenProgram::Token2022)
+tests/bench/m2_cu/src/lib.rs:525:    let (env, mm, b, nonce) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:531:    let (mut env, mm) = market_on(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:549:    close_on(TokenProgram::Spl, false)
+tests/bench/m2_cu/src/lib.rs:553:    close_on(TokenProgram::Token2022, false)
+tests/bench/m2_cu/src/lib.rs:557:    close_on(TokenProgram::Spl, true)
+tests/bench/m2_cu/src/lib.rs:561:    let (env, mm, b, nonce) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:581:    let (mut env, mm, b, nonce) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:595:    let (mut env, mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:601:    let (env, mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:606:    let (mut env, mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:613:    let (mut env, mm, _b, _n) = with_position(TokenProgram::Token2022);
+tests/bench/m2_cu/src/lib.rs:620:    let (keys, _auth) = env.install_market(TokenProgram::Spl, 6);
+tests/bench/m2_cu/src/lib.rs:647:    let (env, mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:654:    let (env, _mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:692:    let (env, _mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:699:    let (mut env, _mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:717:    let (mut env, _mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:737:    let (mut env, mm, _b, _n) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:745:        TokenProgram::Spl,
+tests/bench/m2_cu/src/lib.rs:1054:    let (mut env, mm) = market_on(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:1067:    let (mut env, mm) = market_on(TokenProgram::Spl);
+tests/bench/m2_cu/src/lib.rs:1096:    let (env, mm, b, nonce) = with_position(TokenProgram::Spl);
+tests/bench/m2_cu/tests/t_trace.rs:96:    let (mut env, mm, b, nonce) = with_position(TokenProgram::Spl);
+tests/bench/m3_cu/src/lib.rs:9://! (since M10, `fork::load_mainnet_spl`; `SHORTWIN_BUNDLED_SPL=1` keeps LiteSVM's), the clock at
+tests/bench/m3_cu/src/lib.rs:82:pub const T22: RayFixture = RayFixture::Cpmm(CpmmFixture::Token2022);
+tests/bench/m3_cu/src/lib.rs:99:        RayFixture::Cpmm(CpmmFixture::Token2022) => "CPMM, Token-2022 base",
+tests/bench/m5_cu/README.md:107:  `t22_115` (Token-2022, 115 B, a creator), `fresh` (Token-2022, 125 B), `near` (Token-2022,
+tests/bench/m5_cu/depth.md:13:| `open_short` | Token-2022, 115 B curve (t22_115): first open, normalising | 3 | 4 | 5 | refused (`CallDepth`) |
+tests/bench/m5_cu/depth.md:14:| `close_short` | Token-2022, 115 B curve (t22_115) | 3 | 4 | 5 | refused (`CallDepth`) |
+tests/bench/m5_cu/depth.md:15:| `liquidate` | Token-2022, 115 B curve (t22_115) | 3 | 4 | 5 | refused (`CallDepth`) |
+tests/bench/m5_cu/depth.md:16:| `expire` | Token-2022, 115 B curve (t22_115) | 3 | 4 | 5 | refused (`CallDepth`) |
+tests/bench/m5_cu/depth.md:17:| `create_market` | Auto, Token-2022, 115 B curve (t22_115): `PumpCurve`, init set | 3 | 4 | 5 | refused (`CallDepth`) |
+tests/bench/m5_cu/depth.md:18:| `sweep_trader` | Token-2022, 115 B curve (t22_115): token leg | 2 | 3 | 4 | 5 |
+tests/bench/m5_cu/depth.md:29:| `crank_price` | Token-2022, 115 B curve (t22_115): `None → PumpCurve` re-detection | 2 | 3 | 4 | 5 |
+tests/bench/m5_cu/results.md:8:| `create_market` | Auto, Token-2022, 115 B curve (t22_115): `PumpCurve`, the trader's base ATA and pump UVA created | 169955 | 169955 | 15546 | 250000 | §6.1 `create_market` | 15 | — | 3 |
+tests/bench/m5_cu/results.md:15:| `open_short` | Token-2022, 115 B curve (t22_115): first open of a wallet (position + exposure created) | 145429 | 145429 | 48342 | 250000 | §6.1 `open_short` curve | 13 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:20:| `open_short` | Token-2022, 115 B curve (t22_115): second position of a wallet | 144789 | 144789 | 48475 | 250000 | §6.1 `open_short` curve | 12 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:21:| `open_short` | Token-2022, 115 B curve (t22_115): first open, normalising (lamports to the trader, tokens to trader_base_ata) | 154126 | 154126 | 48342 | 250000 | §6.1 `open_short` curve | 16 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:24:| `close_short` | Token-2022, 115 B curve (t22_115) | 113974 | 113974 | 50707 | 250000 | §6.1 `close_short` curve / PumpSwap | 9 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:28:| `close_short` | Token-2022, 115 B curve (t22_115): normalising | 123108 | 123108 | 50707 | 250000 | §6.1 `close_short` curve / PumpSwap | 12 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:29:| `close_short` | Token-2022, 115 B curve (t22_115): costliest — normalising, after a creator change into an empty vault, the last buyback recipient | 123304 | 123304 | 50889 | 250000 | §6.1 `close_short` curve / PumpSwap | 12 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:35:| `liquidate` | Token-2022, 115 B curve (t22_115): after a real pump (40 % of vT bought), both legs | 134975 | 134975 | 50706 | 300000 | §6.1 `liquidate` / `expire` curve | 9 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:37:| `liquidate` | Token-2022, 115 B curve (t22_115): costliest — normalising, creator change into an empty vault, last recipients | 144182 | 144182 | 50888 | 300000 | §6.1 `liquidate` / `expire` curve | 12 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:41:| `expire` | Token-2022, 115 B curve (t22_115): past the deadline, healthy | 131732 | 131732 | 50707 | 300000 | §6.1 `liquidate` / `expire` curve | 9 | 12 (≤ 15) | 3 |
+tests/bench/m5_cu/results.md:49:| `sol_settle` | Token-2022, 115 B curve (t22_115): healthy, the no-change call | 44117 | 44117 | — | 150000 | §6.1 `sol_settle` | 1 | 2 (≤ 5) | 1 |
+tests/bench/m5_cu/results.md:54:| `crank_price` | Token-2022, 115 B curve (t22_115): roll + record (first crank of a second) | 32442 | 32442 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+tests/bench/m5_cu/results.md:57:| `crank_price` | Token-2022, 115 B curve (t22_115): record only (same second again) | 27787 | 27787 | — | 60000 | §6.1 `crank_price` | 2 | 2 (≤ 2) | 2 |
+tests/bench/m5_cu/results.md:63:| `crank_price` | Token-2022, 115 B curve (t22_115): `None → PumpCurve` re-detection (curve cache, price start, Tier D, chains and fp_* cleared) | 50757 | 50757 | — | 60000 | §6.1 `crank_price` | 4 | 2 (≤ 2) | 2 |
+tests/bench/m5_cu/results.md:65:| `sweep_trader` | Token-2022, 115 B curve (t22_115): token leg — lamports on the trader, tokens on trader_base_ata | 24536 | 24536 | — | 60000 | no §6.1 row (§3.9); §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 4 | — | 2 |
+tests/bench/m5_cu/results.md:66:| `sweep_trader` | Token-2022, 115 B curve (t22_115): nothing to sweep | 18574 | 18574 | — | 60000 | no §6.1 row (§3.9); §6.1 `claim_sol` / `cover_deficit` / `sync_lender` class | 2 | — | 2 |
+tests/bench/m5_cu/src/lib.rs:76:/// A live Token-2022 curve of 115 bytes with a creator (`t22_115`).
+tests/bench/m5_cu/src/lib.rs:99:        PumpCoin::T22_115 => "Token-2022, 115 B curve (t22_115)",
+tests/bench/m5_cu/tests/t_trace.rs:162:    let program = TokenProgram::Token2022;
+tests/bench/m5_cu/trace.md:13:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + open_short, first open, normalising | 18 | 18 | 3 | 154426 | 250000 | **1330** / 33 | 901 / 33 | 2 + ≤ 15 (§6.2 curve `open_short` max) |
+tests/bench/m5_cu/trace.md:14:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + close_short, normalising | 14 | 14 | 3 | 123408 | 250000 | 1232 / 31 | 865 / 31 | 2 + ≤ 15 (§6.2 curve exit max) |
+tests/bench/m5_cu/trace.md:20:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + [pump buy_v2, open_short normalising, pump sell_v2] | 30 | 30 | 3 | 321624 | 1400000 | **1981** / 48 | **1366** / 48 | no row (an attacker's atomic sandwich, §8.2; v1: it does not fit v0 through the protocol ALT) |
+tests/bench/m5_cu/trace.md:25:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + liquidate (keeper) | 13 | 13 | 3 | 167713 | 300000 | **1313** / 33 | 915 / 33 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+tests/bench/m5_cu/trace.md:26:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + expire (keeper) | 13 | 13 | 3 | 164473 | 300000 | **1313** / 33 | 915 / 33 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+tests/bench/m5_cu/trace.md:27:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + crank_price + the costliest liquidate (keeper) | 16 | 16 | 3 | 176920 | 300000 | **1313** / 33 | 915 / 33 | 2 + 2 + ≤ 15 on the curve (§6.2) |
+tests/bench/m5_cu/trace.md:40:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + create_market (Auto, `PumpCurve`, init set) | 17 | 17 | 3 | 170255 | 250000 | 897 / 21 | 685 / 21 | no row |
+tests/bench/m5_cu/trace.md:41:| Token-2022, 115 B curve (t22_115): ComputeBudget ×2 + sweep_trader (token leg) | 6 | 6 | 2 | 24836 | 60000 | 692 / 17 | 573 / 17 | no row |
