@@ -2,7 +2,7 @@
 //! R-MINT §9.5).
 //!
 //! - [`t22_mint`]: a Token-2022 mint carrying the requested extensions, built with the real
-//!   Token-2022 v11.0.0 program (mainnet's ELF, [`crate::fork::load_mainnet_spl`]), through
+//!   Token-2022 v11.1.0 program (mainnet's ELF, [`crate::fork::load_mainnet_spl`]), through
 //!   [`Env::send`], with the instruction builders of `spl-token-2022-interface` 3.1 (the pinned
 //!   test dependency, which knows every type up to `PermissionedBurn` = 28). Companion
 //!   extensions the program requires are added automatically (TokenMetadata →

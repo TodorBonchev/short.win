@@ -37,8 +37,11 @@ Writes, under ``tests/fixtures/``:
   ``accounts/raydium_cpmm_2026_10/*.bin``: CPMM as redeployed at slot 452,376,460; the pool and
   config **state** stays ``raydium_state``'s, whose layouts the redeploy kept, and
   ``raydium_programs`` keeps the 445,763,504 deploy for T-LATCH); ``spl_programs``
-  (``programs/token_2022.so`` with ``accounts/spl/*.bin``: the deployed upgradeable Token-2022;
-  ``programs/spl_memo_v3.so``: spl-memo v3 under BPFLoader2, whose account data is the ELF);
+  (``programs/token_2022.so`` with ``accounts/spl/*.bin``: historical v11.0.0 Token-2022;
+  ``programs/spl_memo_v3.so``: unchanged spl-memo v3 under BPFLoader2, whose data is the ELF);
+  ``spl_programs_2026_10_27`` (``programs/token_2022_2026_10_27.so`` with
+  ``accounts/spl_2026_10_27/*.bin``: selected v11.1.0 Token-2022, deploy 460,497,271,
+  preserving the old group for authenticated differential controls);
   ``squads_programs`` (``programs/squads_v4.so``, ``accounts/squads/*.bin``: Squads v4 and its
   ``ProgramConfig``; ``idl/squads_multisig_program.json``: the IDL 2.1.0 vendored from the source
   repository at a pinned commit, recorded in the group's snapshot under ``vendored``);
@@ -1930,6 +1933,7 @@ def cmd_candidates(args):
 CPMM_2026_10_ACCOUNT_DIR = "accounts/raydium_cpmm_2026_10"
 PUMP_2026_10_ACCOUNT_DIR = "accounts/pump_2026_10"
 SPL_ACCOUNT_DIR = "accounts/spl"
+SPL_2026_10_27_ACCOUNT_DIR = "accounts/spl_2026_10_27"
 SQUADS_ACCOUNT_DIR = "accounts/squads"
 IDL_DIR = "idl"
 LOADER_V2 = "BPFLoader2111111111111111111111111111111111"
@@ -2040,6 +2044,11 @@ SPL_PROGRAMS = [
         427_147_035,
     ),
 ]
+SPL_PROGRAMS_2026_10_27 = [
+    ("token_2022_2026_10_27", TOKEN_2022,
+     "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+     "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9", 460_497_271),
+]
 SQUADS_PROGRAMS = [
     (
         "squads_v4",
@@ -2080,6 +2089,12 @@ PROGRAM_SOURCES = {
         "commit": "9bc02757f600ffe754746708a8a072bcd49d1260",
         "status": "verified build per verify.osec.io (on_chain_hash = executable_hash = "
         "elf_trimmed_sha256, last verified 2026-09-16; read 2026-10-02)",
+    },
+    "token_2022_2026_10_27": {
+        "repository": "https://github.com/solana-program/token-2022",
+        "commit": "8867f751c0f69367ba03af4f85510b5611989491",
+        "status": "Publisher release bytes match observed mainnet; verify.osec.io reports the "
+        "same verified hash/commit (last verified 2026-10-23; read 2026-10-27). No local rebuild",
     },
     **{
         name: {
@@ -2184,6 +2199,10 @@ M10_GROUP_USE = {
         "The deployed mainnet program, so T-MEMO and the suites run the mainnet build instead of "
         "LiteSVM's bundled one (WP-3)",
         "the mainnet Token-2022 ELF (verified build, see `source`) and its live upgrade authority",
+    ),
+    "spl_programs_2026_10_27": (
+        "Current Token-2022 v11.1.0; old spl_programs fixtures remain loadable",
+        "the observed v11.1.0 ELF and its actual upgrade authority; source attribution above",
     ),
     "squads_programs": (
         "Squads v4, the governance and emergency multisigs' program (WP-7)",
@@ -2321,7 +2340,9 @@ def check_m10(m, only=None):
         return {e["name"]: e for e in m["accounts"] if e.get("group") == group}
 
     for group, programs in (("raydium_cpmm_2026_10", CPMM_PROGRAMS_2026_10),
-                            ("spl_programs", SPL_PROGRAMS), ("squads_programs", SQUADS_PROGRAMS),
+                            ("spl_programs", SPL_PROGRAMS),
+                            ("spl_programs_2026_10_27", SPL_PROGRAMS_2026_10_27),
+                            ("squads_programs", SQUADS_PROGRAMS),
                             ("pump_programs_2026_10", PUMP_PROGRAMS_2026_10),
                             ("pump_programs_2026_10_13", PUMP_PROGRAMS_2026_10_13),
                             ("pump_programs_2026_10_13b", PUMP_PROGRAMS_2026_10_13B),
@@ -2378,7 +2399,8 @@ RAYDIUM_GROUPS = ("raydium_programs", "raydium_state")
 PUMP_GROUPS = ("pump_programs", "pump_state")
 # `pamm_synthetic` is derived from `pamm_state` and must follow it.
 PAMM_GROUPS = ("pamm_state", "pamm_synthetic")
-M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "squads_programs",
+M10_PROGRAM_GROUPS = ("raydium_cpmm_2026_10", "spl_programs", "spl_programs_2026_10_27",
+                      "squads_programs",
                       "pump_programs_2026_10", "pump_programs_2026_10_13",
                       "pump_programs_2026_10_13b", "pump_programs_2026_10_21")
 # The state the 2026-10-08/12 redeploys introduced (the 2026-10-13 re-pin), after its programs.
@@ -2388,7 +2410,8 @@ GROUPS = (RAYDIUM_GROUPS + PUMP_GROUPS + PAMM_GROUPS + M10_PROGRAM_GROUPS
 # Every directory whose files are all managed (SHA256SUMS lines outside them are kept verbatim).
 MANAGED_DIRS = (ACCOUNT_DIR, PUMP_ACCOUNT_DIR, PAMM_ACCOUNT_DIR, CPMM_2026_10_ACCOUNT_DIR,
                 PUMP_2026_10_ACCOUNT_DIR, PUMP_2026_10_13_ACCOUNT_DIR,
-                PUMP_2026_10_13B_ACCOUNT_DIR, SPL_ACCOUNT_DIR, SQUADS_ACCOUNT_DIR, PROGRAM_DIR,
+                PUMP_2026_10_13B_ACCOUNT_DIR, SPL_ACCOUNT_DIR, SPL_2026_10_27_ACCOUNT_DIR,
+                SQUADS_ACCOUNT_DIR, PROGRAM_DIR,
                 IDL_DIR)
 
 
@@ -2777,6 +2800,9 @@ def cmd_fetch(args):
         elif g == PUMP_STATE_2026_10_13:
             entries, files, snap = fetch_pump_state_2026_10_13(
                 rpc, pump_coins_2026_10_13(args.coin, rpc), m)
+        elif g == "spl_programs_2026_10_27":
+            entries, files, snap = fetch_programs(rpc, SPL_PROGRAMS_2026_10_27, g,
+                                                  SPL_2026_10_27_ACCOUNT_DIR)
         elif g == "spl_programs":
             entries, files, snap = fetch_spl(rpc)
         elif g == "squads_programs":
@@ -3020,7 +3046,7 @@ def cmd_check_live(args):
         v.sort(key=lambda e: e["decoded"]["deploy_slot"], reverse=True)
     targets = [(lb, p, pd_, sl) for lb, p, pd_, sl in venues]
     seen = {p for _, p, _, _ in targets}
-    for name, program, program_data, _, _ in (CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SQUADS_PROGRAMS
+    for name, program, program_data, _, _ in (CPMM_PROGRAMS_2026_10 + SPL_PROGRAMS + SPL_PROGRAMS_2026_10_27 + SQUADS_PROGRAMS
                                               + PUMP_PROGRAMS_2026_10 + PUMP_PROGRAMS_2026_10_13
                                               + PUMP_PROGRAMS_2026_10_13B
                                               + PUMP_PROGRAMS_2026_10_21):

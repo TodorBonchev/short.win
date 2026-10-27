@@ -31,7 +31,8 @@ export async function validatorHealthy(): Promise<boolean> {
         if (!p?.executable) return false;
         // The first `confirmed` banks can predate the genesis accounts' visibility to preflight.
         const slot = await rpc().getSlot({ commitment: 'confirmed' }).send();
-        return slot >= 3n;
+        const firstBank = ENV.bundledSpl ? 0n : splPrograms().minimumBankSlot;
+        return slot >= firstBank + 3n;
     } catch {
         return false;
     }
@@ -77,7 +78,12 @@ export async function startValidator(): Promise<void> {
     ];
     if (ENV.program === 'test-venue') args.push('--bpf-program', PROGRAMS.mock, progs.mock);
     // A program given on the command line replaces the genesis SPL program at its address.
-    if (!ENV.bundledSpl) args.push('--upgradeable-program', ...splPrograms().token2022);
+    if (!ENV.bundledSpl) {
+        const spl = splPrograms();
+        // A local genesis deployment uses its own header. Warp the execution bank
+        // explicitly; this is synthetic qualification, not a live-bank snapshot.
+        args.push('--warp-slot', String(spl.minimumBankSlot), '--upgradeable-program', ...spl.token2022);
+    }
     if (ENV.venues) {
         for (const [id, elf, auth] of venuePrograms()) args.push('--upgradeable-program', id, elf, auth);
     }
@@ -119,6 +125,12 @@ export async function checkSplPrograms(): Promise<void> {
         return;
     }
     const spl = splPrograms();
+    const slot = await rpc().getSlot({ commitment: 'confirmed' }).send();
+    if (slot < spl.minimumBankSlot) {
+        throw new Error(
+            `Token-2022 qualification bank ${slot} predates ${spl.minimumBankSlot}; restart without SHORTWIN_E2E_REUSE`,
+        );
+    }
     const pd = await getAccount(await programDataOf(PROGRAMS.token2022));
     const elf = pd?.data.subarray(45) ?? new Uint8Array();
     let end = elf.length;

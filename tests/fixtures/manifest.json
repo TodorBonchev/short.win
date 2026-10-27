@@ -1,5 +1,5 @@
 {
-  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: the mainnet Token-2022 and spl-memo; squads_programs: Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of 2026-10-08/12; pump_programs_2026_10_13b: pump's of 2026-10-13; pump_programs_2026_10_21: pump/PumpSwap builds observed in the 2026-10-21 local preflight) and the state those introduced (group pump_state_2026_10_13) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
+  "description": "Mainnet accounts, programs and transactions dumped for the program tests (ARCHITECTURE §1.2, §8.2). Each entry records how it was fetched; SHA256SUMS pins the bytes (CI: cd tests/fixtures && sha256sum -c SHA256SUMS). The Raydium entries (groups raydium_programs and raydium_state), the pump entries (groups pump_programs and pump_state) and the PumpSwap entries (group pamm_state, and pamm_synthetic: pools derived offline from pamm_state bytes, marked `synthetic`) and the M10 program groups (raydium_cpmm_2026_10: the CPMM redeploy; spl_programs: historical Token-2022 v11.0.0 and pinned spl-memo; spl_programs_2026_10_27: the observed Token-2022 v11.1.0 qualification baseline; squads_programs: Squads v4, its ProgramConfig and the vendored IDL; pump_programs_2026_10: the pump, pump-fees and PumpSwap redeploys of 2026-10-02; pump_programs_2026_10_13: those of 2026-10-08/12; pump_programs_2026_10_13b: pump's of 2026-10-13; pump_programs_2026_10_21: pump/PumpSwap builds observed in the 2026-10-21 local preflight) and the state those introduced (group pump_state_2026_10_13) are written by scripts/dump-fixtures.py; `snapshots` records the slot and RPC of each group (`vendored`: files taken from a pinned source).",
   "accounts": [
     {
       "name": "pyth_sol_usd_shard0",
@@ -8721,6 +8721,56 @@
         "commit": "639b87fb45c3adeffa6f7c4a1bf0cb85e392bf22",
         "status": "UNVERIFIED: no published program source or verified build. The latest official IDL commit was dated 2026-10-13, before these observed ELFs; it is an interface reference, not proof of their source or compatibility. See the scoped signed SOL/WSOL-path review in tests/fixtures/README.md."
       }
+    },
+    {
+      "name": "token_2022_2026_10_27_program",
+      "group": "spl_programs_2026_10_27",
+      "purpose": "Observed mainnet Token-2022 program account for program@v11.1.0; historical spl_programs entry is preserved.",
+      "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 70228638,
+      "executable": true,
+      "rent_epoch": 18446744073709551615,
+      "space": 36,
+      "slot": 461878038,
+      "sha256": "bae3e5d63e30c0c3e6fe788b9e027bf003ca5e5bb46d3a9627e034bb3002ea5c",
+      "file": "accounts/spl_2026_10_27/token_2022_2026_10_27_program.bin",
+      "decoded": {
+        "program_data": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY"
+      }
+    },
+    {
+      "name": "token_2022_2026_10_27_program_data",
+      "group": "spl_programs_2026_10_27",
+      "purpose": "Observed mainnet Token-2022 v11.1.0 ProgramData; exact header and ELF, with zero padding reconstructed to space. New qualification baseline; historical spl_programs entry is preserved.",
+      "address": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "lamports": 7021520120,
+      "executable": false,
+      "rent_epoch": 18446744073709551615,
+      "space": 1382061,
+      "slot": 461878038,
+      "sha256": "babc437405bea7f9d4083097a7266db84de58330bdc41c2b54f1f4e4c66aaa94",
+      "files": {
+        "header": "accounts/spl_2026_10_27/token_2022_2026_10_27_program_data_header.bin",
+        "elf": "programs/token_2022_2026_10_27.so"
+      },
+      "elf_len": 611056,
+      "elf_sha256": "3dde54d202caa2d10514fd58a154df5f26f07643f9f5fd0402ff08084f0cb954",
+      "elf_trimmed_len": 611041,
+      "elf_trimmed_sha256": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "elf_trimmed_sha256_expected": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "deploy_slot_expected": 460497271,
+      "source": {
+        "repository": "https://github.com/solana-program/token-2022",
+        "commit": "8867f751c0f69367ba03af4f85510b5611989491",
+        "status": "Publisher release asset byte-equal to observed mainnet ELF; verify.osec.io reports verified matching trimmed hash/commit, last verified 2026-10-23T15:43:22.904525; read 2026-10-27. No fresh local upstream build claimed."
+      },
+      "decoded": {
+        "deploy_slot": 460497271,
+        "upgrade_authority": "AeLmXCbPaQHGWRLr2saFsEVfmMNuKnxRAbWCT9P5twgz",
+        "e_flags": 0
+      }
     }
   ],
   "snapshots": [
@@ -8877,6 +8927,13 @@
       "rpc": "https://api.mainnet-beta.solana.com",
       "method": "getAccountInfo (base64) of each program and ProgramData account; `solana program dump -um <program> out.so` gives the same ELF bytes followed by the zero padding",
       "read_date_note": "2026-10-20 UTC; 2026-10-21 local deployment preflight. These are fetch dates, not claimed deployment dates."
+    },
+    {
+      "group": "spl_programs_2026_10_27",
+      "slot": 461878038,
+      "fetched_at": "2026-10-27T01:06:20Z",
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "method": "getMultipleAccounts, finalized, program and complete ProgramData in one context slot; retained evidence from the 2026-10-27 preflight. Selected only on the qualification branch; new runtime CI and frozen-campaign gates remain pending."
     }
   ]
 }

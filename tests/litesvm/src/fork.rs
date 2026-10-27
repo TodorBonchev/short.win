@@ -18,7 +18,8 @@
 //!   their mainnet addresses from their dumped ProgramData (header ‖ ELF ‖ zeros, rebuilt and
 //!   sha256-checked against the mainnet account, so the venue-upgrade latch reads the real
 //!   deploy slot: T-LATCH on the dumped ProgramData), one pool with every account its swaps
-//!   need, and the clock at the snapshot's slot and block time. On any other environment (e.g.
+//!   need, and the snapshot's original block time at an explicitly translated execution slot.
+//!   This is synthetic historical-state evidence. On any other environment (e.g.
 //!   the test-venue build) use [`Env::load_raydium_programs`], [`Env::load_ray_v4`],
 //!   [`Env::load_cpmm`] and [`Env::set_fork_clock`]. Every fixture file is checked against its
 //!   manifest sha256 when it is first read.
@@ -72,12 +73,14 @@
 //! the dump found absent (the event authorities, a closed boost vault, a creator vault that never
 //! existed) are simply not loaded ([`is_absent`]).
 //!
-//! **The mainnet SPL programs (M10, T-MEMO; at the end of the file).** Group `spl_programs`:
+//! **The mainnet SPL programs (M10, T-MEMO; at the end of the file).** Historical group
+//! `spl_programs` and selected v11.1.0 group `spl_programs_2026_10_27`:
 //! [`load_mainnet_spl`] replaces LiteSVM's bundled Token-2022 and spl-memo v3 with the builds
 //! mainnet runs — Token-2022 from its dumped ProgramData (real header, the ELF, the zero
 //! padding; trimmed ELF [`TOKEN_2022_MAINNET_TRIMMED_SHA256`]) under the upgradeable loader,
 //! spl-memo v3 under BPFLoader2 ([`SPL_MEMO_V3_MAINNET_SHA256`]). Every [`Env`] calls it right
-//! after `LiteSVM::new()`, unless `SHORTWIN_BUNDLED_SPL=1` ([`bundled_spl`]).
+//! after setting a bank beyond the selected deploy, unless `SHORTWIN_BUNDLED_SPL=1`
+//! ([`bundled_spl`]).
 //!
 //! **Squads v4 (M10 WP-7; at the end of the file).** Group `squads_programs`: [`load_squads`]
 //! deploys the immutable mainnet Squads v4 from its dumped ProgramData (deploy slot 302,582,236,
@@ -575,11 +578,11 @@ impl Env {
         }
     }
 
-    /// Sets the clock to the snapshot's slot and block time ([`state_snapshot`]); time only
-    /// moves forward from there ([`Env::warp`]).
+    /// Replays the historical snapshot's block time at its explicitly translated bank slot
+    /// ([`state_snapshot`]); immutable snapshot metadata stays unchanged.
     pub fn set_fork_clock(&mut self) {
         let s = state_snapshot();
-        self.set_clock(s.block_time, s.slot);
+        self.set_historical_clock(s.block_time, s.slot);
     }
 
     /// Loads AMM v4 pool `which` and every account its swaps need (pool, vaults, both mints,
@@ -3456,10 +3459,11 @@ impl Env {
         c
     }
 
-    /// Sets the clock to the pump snapshot's slot and block time (group `pump_state`).
+    /// Replays the historical pump snapshot's block time at its translated bank slot
+    /// (group `pump_state`); this is synthetic historical-state evidence.
     pub fn set_pump_clock(&mut self) {
         let s = pump_snapshot();
-        self.set_clock(s.block_time, s.slot);
+        self.set_historical_clock(s.block_time, s.slot);
     }
 
     /// [`Env::initialized`] (release short.win at the harness's default config, whose venue
@@ -3473,7 +3477,7 @@ impl Env {
         let c = env.load_pump_coin(coin);
         env.set_pump_rent();
         let s = coin.snapshot();
-        env.set_clock(s.block_time, s.slot);
+        env.set_historical_clock(s.block_time, s.slot);
         (env, c)
     }
 
@@ -3775,16 +3779,27 @@ pub fn pump_event_names(meta: &TransactionMetadata) -> Vec<&'static str> {
 
 // ---- the mainnet SPL programs (M10, T-MEMO) ---------------------------------------------------
 
-/// The manifest group of the mainnet SPL programs (M10): Token-2022 as deployed (upgradeable;
-/// its ProgramData at deploy slot 427,147,035 with the live upgrade authority, `header ‖ ELF ‖
-/// zeros` up to 1,382,061 bytes) and spl-memo v3 (BPFLoader2: the account data is the ELF).
-pub const SPL_GROUPS: [&str; 1] = ["spl_programs"];
+/// The historical and current mainnet SPL fixture groups. Token-2022 v11.0.0 at
+/// slot 427,147,035 remains authenticated; v11.1.0 at 460,497,271 is selected for new
+/// qualification. Both retain real ProgramData; spl-memo v3 remains the historical
+/// BPFLoader2 fixture (the account data is its ELF).
+pub const SPL_GROUPS: [&str; 2] = ["spl_programs", "spl_programs_2026_10_27"];
 
 /// The deployed Token-2022's executable hash: sha256 of its ProgramData after the 45-byte
 /// header with the trailing zeros trimmed (solana-verify's hash). It equals OtterSec's verified
 /// build of `solana-program/token-2022@9bc02757` (program v11.0.0).
-pub const TOKEN_2022_MAINNET_TRIMMED_SHA256: &str =
+pub const TOKEN_2022_V11_0_TRIMMED_SHA256: &str =
     "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947";
+
+/// The current v11.1.0 artifact, independently pinned from observed mainnet and publisher bytes.
+pub const TOKEN_2022_MAINNET_TRIMMED_SHA256: &str =
+    "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9";
+/// The current mainnet Token-2022 ProgramData deploy slot.
+pub const TOKEN_2022_MAINNET_DEPLOY_SLOT: u64 = 460_497_271;
+/// Active Token-2022 program fixture name; old generic names remain historical v11.0.0.
+pub const TOKEN_2022_ACTIVE_PROGRAM: &str = "token_2022_2026_10_27_program";
+/// Active Token-2022 ProgramData fixture name.
+pub const TOKEN_2022_ACTIVE_PROGRAM_DATA: &str = "token_2022_2026_10_27_program_data";
 
 /// sha256 of the deployed spl-memo v3 program account (74,800 bytes; its data is the ELF).
 pub const SPL_MEMO_V3_MAINNET_SHA256: &str =
@@ -3815,12 +3830,25 @@ fn spl_fixtures() -> &'static HashMap<String, Fixture> {
         let (by_name, _, absent) = load_entries(&manifest(), &SPL_GROUPS);
         assert!(absent.is_empty(), "spl_programs: absent entries {absent:?}");
         let pd = by_name.get("token_2022_program_data").expect(
-            "no token_2022_program_data (scripts/dump-fixtures.py fetch --group spl_programs)",
+            "missing preserved token_2022_program_data; restore the historical fixture from Git",
         );
         assert_eq!(
             trimmed_elf_sha256(&pd.account.data),
+            TOKEN_2022_V11_0_TRIMMED_SHA256,
+            "token_2022_program_data: not the historical v11.0.0 Token-2022"
+        );
+        let current = by_name
+            .get(TOKEN_2022_ACTIVE_PROGRAM_DATA)
+            .expect("missing current v11.1.0 Token-2022 fixture");
+        assert_eq!(
+            trimmed_elf_sha256(&current.account.data),
             TOKEN_2022_MAINNET_TRIMMED_SHA256,
-            "token_2022_program_data: not the pinned mainnet Token-2022"
+            "current Token-2022 ELF pin"
+        );
+        assert_eq!(
+            u64::from_le_bytes(current.account.data[4..12].try_into().unwrap()),
+            TOKEN_2022_MAINNET_DEPLOY_SLOT,
+            "current Token-2022 deploy slot"
         );
         let memo = by_name
             .get("spl_memo_v3_program")
@@ -3834,33 +3862,48 @@ fn spl_fixtures() -> &'static HashMap<String, Fixture> {
     })
 }
 
-/// The mainnet SPL fixture `name` (group `spl_programs`).
+/// The authenticated SPL fixture `name` from either [`SPL_GROUPS`] group.
 pub fn spl_fixture(name: &str) -> &'static Fixture {
     spl_fixtures()
         .get(name)
-        .unwrap_or_else(|| panic!("no fixture `{name}` in group spl_programs"))
+        .unwrap_or_else(|| panic!("no fixture `{name}` in SPL_GROUPS"))
 }
 
 /// Replaces LiteSVM's bundled Token-2022 and spl-memo v3 with the programs mainnet runs
 /// (T-MEMO, U17), exactly as mainnet holds their accounts: Token-2022 under the upgradeable
-/// loader from its dumped ProgramData (real header: deploy slot 427,147,035 and the live
+/// loader from its dumped ProgramData (real header: deploy slot 460,497,271 and the live
 /// upgrade authority; the ELF; the zero padding), and spl-memo v3 under BPFLoader2. Each
 /// account is checked against the manifest's sha256 and the pins
 /// ([`TOKEN_2022_MAINNET_TRIMMED_SHA256`], [`SPL_MEMO_V3_MAINNET_SHA256`]).
 ///
-/// [`Env`]'s constructors call it right after `LiteSVM::new()` unless [`bundled_spl`]. SPL
+/// [`Env`]'s constructors establish the post-deploy execution bank before calling it,
+/// unless [`bundled_spl`]. SPL
 /// Token (p-token under the mainnet feature set), the ATA program and spl-memo v1 stay
 /// LiteSVM's.
 pub fn load_mainnet_spl(svm: &mut LiteSVM) {
+    assert!(
+        svm.get_sysvar::<solana_clock::Clock>().slot > TOKEN_2022_MAINNET_DEPLOY_SLOT,
+        "load current Token-2022 only after its actual deployment"
+    );
     // The ProgramData first: setting the program account compiles the ELF it names.
     for name in [
-        "token_2022_program_data",
-        "token_2022_program",
+        TOKEN_2022_ACTIVE_PROGRAM_DATA,
+        TOKEN_2022_ACTIVE_PROGRAM,
         "spl_memo_v3_program",
     ] {
         let f = spl_fixture(name);
         svm.set_account(f.address, f.account.clone())
             .unwrap_or_else(|e| panic!("set_account({name}): {e:?}"));
+    }
+}
+
+/// Loads the authenticated historical v11.0.0 Token-2022 into an existing VM.
+/// Used only for old/new differential controls; it does not select LiteSVM's bundled binary.
+pub fn load_token_2022_v11_0(svm: &mut LiteSVM) {
+    for name in ["token_2022_program_data", "token_2022_program"] {
+        let f = spl_fixture(name);
+        svm.set_account(f.address, f.account.clone())
+            .expect("load historical Token-2022");
     }
 }
 

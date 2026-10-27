@@ -46,7 +46,7 @@ fn dump() -> PriceUpdate {
 /// An initialized environment at the dump's time and slot.
 fn env() -> Env {
     let mut env = Env::initialized();
-    env.set_clock(DUMP_TS, DUMP_SLOT);
+    env.set_historical_clock(DUMP_TS, DUMP_SLOT);
     env
 }
 
@@ -183,7 +183,7 @@ fn the_mainnet_update_is_cached() {
             conf: 1_399_451,
             expo: -8,
             publish_time: u.publish_time,
-            updated_slot: DUMP_SLOT,
+            updated_slot: Env::historical_bank_slot(DUMP_SLOT),
             bump: empty.bump,
         }
     );
@@ -302,9 +302,9 @@ fn a_stale_update_is_refused() {
 
     // The dump itself: accepted at exactly oracle_max_age_s (120 s), refused 1 s later.
     put_update(&mut env, &u);
-    env.set_clock(u.publish_time + 121, DUMP_SLOT + 300);
+    env.set_historical_clock(u.publish_time + 121, DUMP_SLOT + 300);
     assert_err(&crank(&mut env), ShortwinError::OracleStale);
-    env.set_clock(u.publish_time + 120, DUMP_SLOT + 300);
+    env.set_historical_clock(u.publish_time + 120, DUMP_SLOT + 300);
     ok(crank(&mut env));
     assert_eq!(cache(&env).publish_time, u.publish_time);
 }
@@ -395,12 +395,12 @@ fn the_step_is_not_bounded_by_a_stale_cache() {
     assert_eq!(stale, 600);
     let jump = later(&u, stale, u.price * 2);
     put_update(&mut env, &jump);
-    env.set_clock(u.publish_time + stale, DUMP_SLOT + 9_000);
+    env.set_historical_clock(u.publish_time + stale, DUMP_SLOT + 9_000);
     assert_err(&crank(&mut env), ShortwinError::OracleStep);
     // … one second later it does not.
     let jump = later(&u, stale + 1, u.price * 2);
     put_update(&mut env, &jump);
-    env.set_clock(u.publish_time + stale + 1, DUMP_SLOT + 9_003);
+    env.set_historical_clock(u.publish_time + stale + 1, DUMP_SLOT + 9_003);
     ok(crank(&mut env));
     assert_eq!(cache(&env).price, u.price * 2);
 }

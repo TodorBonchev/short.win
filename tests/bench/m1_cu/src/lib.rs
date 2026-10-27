@@ -1028,7 +1028,7 @@ fn put_price_update(env: &mut Env, data: Vec<u8>) {
 
 fn crank_first() -> Prepared {
     let mut env = Env::initialized();
-    env.set_clock(PYTH_DUMP_TS, PYTH_DUMP_SLOT);
+    env.set_historical_clock(PYTH_DUMP_TS, PYTH_DUMP_SLOT);
     put_price_update(&mut env, PYTH_DUMP.to_vec());
     prepared(env, ix::crank_sol_usd(&PYTH_SOL_USD_ACCOUNT), &[])
 }

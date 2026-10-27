@@ -1295,10 +1295,11 @@ impl Env {
         fork::load(&mut self.svm, "pamm_mature_pool_negative_vqr");
     }
 
-    /// Sets the clock to the `pamm_state` snapshot's slot and block time.
+    /// Replays the `pamm_state` snapshot at its explicit translated bank slot and original
+    /// block time. The old account state at the later bank is synthetic integration evidence.
     pub fn set_pamm_clock(&mut self) {
         let s = fork::pamm_snapshot();
-        self.set_clock(s.block_time, s.slot);
+        self.set_historical_clock(s.block_time, s.slot);
     }
 
     /// [`Env::initialized`], the pump programs and statics, PumpSwap's statics, `coin`'s accounts,

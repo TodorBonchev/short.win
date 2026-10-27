@@ -31,8 +31,13 @@ pub type TxResult = Result<TransactionMetadata, FailedTransactionMetadata>;
 
 /// Unix time the tests start at (2026-09-21T15:06:40Z).
 pub const START_TS: i64 = 1_790_000_000;
-/// Slot the tests start at.
-pub const START_SLOT: u64 = 450_000_000;
+/// Historical fixture-coordinate origin. Snapshot metadata stays in this coordinate system.
+pub const HISTORICAL_SLOT_ORIGIN: u64 = 450_000_000;
+/// Execution bank origin: one slot after the selected Token-2022 deployment.
+/// Historical account state and Unix times at this bank are synthetic integration evidence.
+pub const START_SLOT: u64 = fork::TOKEN_2022_MAINNET_DEPLOY_SLOT + 1;
+/// One explicit translation preserves differences between historical fixture slots.
+pub const HISTORICAL_SLOT_OFFSET: u64 = START_SLOT - HISTORICAL_SLOT_ORIGIN;
 /// Lamports every harness key starts with.
 pub const FUNDING: u64 = 1_000_000_000_000;
 /// `GlobalConfig.venue_enabled`'s offset (discriminator included; `state::config` layout).
@@ -280,6 +285,12 @@ impl Env {
             )
         });
         let mut svm = LiteSVM::new();
+        // set_account compiles programs at the VM's current bank slot. Establish the
+        // qualification bank before loading the new ELF; keep its real deploy header.
+        let mut clock = svm.get_sysvar::<Clock>();
+        clock.unix_timestamp = START_TS;
+        clock.slot = START_SLOT;
+        svm.set_sysvar(&clock);
         if !crate::fork::bundled_spl() {
             crate::fork::load_mainnet_spl(&mut svm);
         }
@@ -730,12 +741,40 @@ impl Env {
         self.clock().unix_timestamp
     }
 
-    /// Sets the clock's unix time and slot.
+    /// Sets an exact execution-bank coordinate, without translating or clamping.
+    ///
+    /// Historical fixture inputs must use [`Self::set_historical_clock`]. Current-clock
+    /// arithmetic and saved-clock restoration remain raw. Unix time may move backward
+    /// for explicit test controls; the bank must still be after the selected SPL deploy.
     pub fn set_clock(&mut self, unix_timestamp: i64, slot: u64) {
+        assert!(
+            slot >= START_SLOT,
+            "execution bank slot predates the selected Token-2022 deployment; use an explicit historical coordinate"
+        );
         let mut c = self.clock();
         c.unix_timestamp = unix_timestamp;
         c.slot = slot;
         self.svm.set_sysvar(&c);
+    }
+
+    /// Maps an immutable historical fixture slot to this qualification's execution bank.
+    ///
+    /// This is a synthetic replay coordinate, not a rewrite of manifest/ProgramData/Pyth
+    /// metadata or a claim that the historical account state existed at the later slot.
+    pub fn historical_bank_slot(historical_slot: u64) -> u64 {
+        assert!(
+            historical_slot >= HISTORICAL_SLOT_ORIGIN,
+            "historical fixture slot predates the supported replay origin"
+        );
+        historical_slot
+            .checked_add(HISTORICAL_SLOT_OFFSET)
+            .expect("historical execution-bank slot overflow")
+    }
+
+    /// Sets a historical fixture's Unix time and explicitly translated execution slot.
+    /// Never pass an already translated current-bank slot to this method.
+    pub fn set_historical_clock(&mut self, unix_timestamp: i64, historical_slot: u64) {
+        self.set_clock(unix_timestamp, Self::historical_bank_slot(historical_slot));
     }
 
     /// Advances time by `seconds` (and the slot by 2.5 per second, 400 ms slots).

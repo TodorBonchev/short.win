@@ -11,7 +11,7 @@
 //!   `match` in [`decision`] stops compiling when the pinned `spl-token-2022-interface` gains a
 //!   variant, and every discriminant it knows must be in the reviewed range.
 //! - [`one_real_mint_per_mint_extension`]: each of the 19 mint extensions put on a mint by the
-//!   real Token-2022 v11.0.0 program.
+//!   real Token-2022 v11.1.0 program.
 //! - [`one_forged_mint_per_discriminant`]: every discriminant 0..=28 (mint and account
 //!   extensions) and unknown ones, as a single TLV entry.
 //! - freeze authority, native mints, legacy SPL Token, the pump.fun shape, groups and
@@ -237,6 +237,169 @@ fn one_real_mint_per_mint_extension() {
         covered.push(t);
     }
     assert_eq!(covered.len(), 19, "every mint extension: {covered:?}");
+}
+
+/// The upstream InitAccount/GetAccountDataSize implementation changed. Qualify real
+/// pool-vault and ATA sizing for every allowed mint extension on both authenticated ELFs.
+/// The old/new arms use identical bank/time; companion mint extensions are real instructions.
+#[test]
+fn allowed_extensions_preserve_pool_vault_and_ata_sizing_on_both_elves() {
+    use shortwin_litesvm_tests::{START_SLOT, START_TS, fork};
+    use spl_token_2022_interface::state::Account as TokenAccount;
+    if fork::bundled_spl() {
+        eprintln!("[token-2022 sizing] bundled opt-out is not pinned old/new evidence");
+        return;
+    }
+    let allowed = [
+        ExtensionType::MetadataPointer,
+        ExtensionType::TokenMetadata,
+        ExtensionType::GroupPointer,
+        ExtensionType::TokenGroup,
+        ExtensionType::GroupMemberPointer,
+        ExtensionType::TokenGroupMember,
+    ];
+    let mut cases = vec![vec![]];
+    cases.extend(allowed.iter().map(|t| vec![*t]));
+    cases.push(allowed.to_vec());
+    for historical in [true, false] {
+        let mut env = Env::initialized();
+        if historical {
+            fork::load_token_2022_v11_0(&mut env.svm);
+        }
+        for requested in &cases {
+            assert_eq!((env.now(), env.clock().slot), (START_TS, START_SLOT));
+            let fixture = mints::t22_mint(&mut env, requested, false);
+            assert!(
+                requested.iter().all(|t| fixture.extensions.contains(t)),
+                "requested {requested:?}, actual {:?}, historical={historical}",
+                fixture.extensions
+            );
+            assert!(
+                fixture
+                    .extensions
+                    .iter()
+                    .all(|&t| decision(t) == Decision::Allow),
+                "only reviewed allowed mint extensions: {:?}",
+                fixture.extensions
+            );
+            assert!(
+                vs::check(
+                    &fixture.mint.to_bytes(),
+                    &TokenProgram::Token2022.id().to_bytes(),
+                    &env.svm.get_account(&fixture.mint).unwrap().data,
+                )
+                .is_ok()
+            );
+            let creator = env.funded_keypair();
+            let create = ix::create_market(
+                &creator.pubkey(),
+                &fixture.mint,
+                &TokenProgram::Token2022.id(),
+                VENUE_HINT_AUTO,
+                &pda::canonical_pool(&fixture.mint),
+            );
+            let meta = ok(env.send(&[create], &[&creator]));
+            assert!(
+                meta.logs
+                    .iter()
+                    .any(|l| l.contains("Instruction: InitializeAccount3")),
+                "pool vault executes Token-2022 initialization: {requested:?}"
+            );
+            let market = pda::market(&fixture.mint).0;
+            assert_eq!(env.svm.get_account(&market).unwrap().owner, shortwin::ID);
+            let vault = env.svm.get_account(&pda::pool_vault(&market).0).unwrap();
+            assert_eq!(vault.owner, TokenProgram::Token2022.id());
+            assert_eq!(vault.data.len(), 165, "pool vault: {requested:?}");
+            let vault_state = StateWithExtensions::<TokenAccount>::unpack(&vault.data).unwrap();
+            assert_eq!(vault_state.base.mint, fixture.mint);
+            assert_eq!(vault_state.base.owner, market);
+            assert!(vault_state.get_extension_types().unwrap().is_empty());
+
+            let owner = env.funded_keypair().pubkey();
+            let ata = pda::ata(&owner, &fixture.mint, &TokenProgram::Token2022.id());
+            let create_ata =
+                anchor_spl::associated_token::spl_associated_token_account::instruction::create_associated_token_account_idempotent(
+                    &env.payer.pubkey(),
+                    &owner,
+                    &fixture.mint,
+                    &TokenProgram::Token2022.id(),
+                );
+            let meta = ok(env.send(&[create_ata], &[]));
+            for instruction in [
+                "GetAccountDataSize",
+                "InitializeImmutableOwner",
+                "InitializeAccount3",
+            ] {
+                assert!(
+                    meta.logs
+                        .iter()
+                        .any(|l| l.contains(&format!("Instruction: {instruction}"))),
+                    "ATA must execute {instruction}: {requested:?}"
+                );
+            }
+            let account = env.svm.get_account(&ata).unwrap();
+            assert_eq!(account.owner, TokenProgram::Token2022.id());
+            assert_eq!(account.data.len(), 170, "ImmutableOwner ATA: {requested:?}");
+            let state = StateWithExtensions::<TokenAccount>::unpack(&account.data).unwrap();
+            assert_eq!(state.base.mint, fixture.mint);
+            assert_eq!(state.base.owner, owner);
+            assert_eq!(
+                state.get_extension_types().unwrap(),
+                [ExtensionType::ImmutableOwner],
+                "display-only mint extensions require no additional account extensions"
+            );
+        }
+    }
+}
+
+/// Synthetic invalid mints reach Token-2022's TLV sizing walker directly rather than
+/// being rejected earlier by short.win's separate fail-closed mint filter.
+#[test]
+fn both_token_2022_tlv_sizers_reject_unknown_and_truncated_headers() {
+    use shortwin_litesvm_tests::{START_SLOT, START_TS, fork};
+    use solana_instruction::error::InstructionError;
+    use solana_transaction_error::TransactionError;
+    if fork::bundled_spl() {
+        eprintln!("[token-2022 invalid TLV] bundled opt-out is not pinned old/new evidence");
+        return;
+    }
+    let unknown = mints::t22_mint_bytes(false, &[(999, vec![0; 4])]);
+    let mut truncated = mints::t22_mint_bytes(false, &[]);
+    truncated.extend_from_slice(&u16::from(ExtensionType::MetadataPointer).to_le_bytes());
+    for historical in [true, false] {
+        let mut env = Env::initialized();
+        if historical {
+            fork::load_token_2022_v11_0(&mut env.svm);
+        }
+        for (name, data) in [
+            ("unknown type", unknown.clone()),
+            ("truncated header", truncated.clone()),
+        ] {
+            assert_eq!((env.now(), env.clock().slot), (START_TS, START_SLOT));
+            let mint = Pubkey::new_unique();
+            mints::set_raw(&mut env, &mint, &TokenProgram::Token2022.id(), data);
+            let instruction = spl_token_2022_interface::instruction::get_account_data_size(
+                &TokenProgram::Token2022.id(),
+                &mint,
+                &[],
+            )
+            .unwrap();
+            let failure = env.send(&[instruction], &[]).unwrap_err();
+            assert!(
+                failure
+                    .meta
+                    .logs
+                    .iter()
+                    .any(|l| l.contains("Instruction: GetAccountDataSize")),
+                "the upstream walker must execute: {name}"
+            );
+            assert_eq!(
+                failure.err,
+                TransactionError::InstructionError(0, InstructionError::InvalidAccountData),
+                "{name}, historical={historical}"
+            );
+        }
+    }
 }
 
 #[test]

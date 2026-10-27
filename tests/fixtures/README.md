@@ -12,6 +12,35 @@ how the harness loads them.
   `vendored`: files taken from a pinned source).
 - `SHA256SUMS`: every fixture file (CI: `cd tests/fixtures && sha256sum -c SHA256SUMS`).
 
+### Token-2022 qualification baseline (2026-10-27)
+
+The new group retains the exact Program and ProgramData header observed at finalized
+context slot 461,878,038. Its raw ELF is 611,056 bytes; the full 1,382,061-byte ProgramData
+is reconstructed with its original header and zero padding. See the retained
+[source and compatibility review](../../docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/REPORT.md).
+Publisher-byte equality and third-party build attribution support provenance; they do
+not substitute for new runtime qualification.
+
+The default LiteSVM environment selects this new ELF. The older generic fixture names
+stay v11.0.0, independently pinned and loadable with `load_token_2022_v11_0`.
+Old/new execution controls use the same bank/time. A synthetic Memo-v3 program copied
+to the Memo-v4 address distinguishes old/new Token-2022 memo-ID acceptance and verifies
+that replacing program accounts changes the executed code; it does not qualify the
+production Memo-v4 artifact.
+
+The execution bank starts at 460,497,272, before loading the new ELF. Immutable fixture
+slot coordinates translate exactly once by 10,497,272 through
+`Env::set_historical_clock`. Raw current-bank setters preserve their input and reject
+pre-deployment slots. Original account data, ProgramData headers, Pyth posted slots,
+snapshot metadata and Unix times remain unchanged. Historical account state at the
+later bank is a synthetic replay, not a fresh live mainnet snapshot. The web E2E
+validator selects the same ELF and explicitly warps its local genesis bank; its
+locally created ProgramData header is not presented as the live header.
+
+New full CI, affected CU/integration checks and a newly frozen 24h all-profile campaign
+are required for this deliberately changed harness/fixture baseline. The earlier
+completed campaign remains evidence only for its original inputs and duration.
+
 ## Groups
 
 | Group | Files | What |
@@ -21,7 +50,8 @@ how the harness loads them.
 | `pump_programs`, `pump_state` | `programs/pump{,_fees,_amm}.so`, `accounts/pump/*` | pump, pump-fees and PumpSwap (M5): the 2026-09 deploys (449,734,335 / 446,465,969 / 446,462,733), T-LATCH's "before" since the 2026-10 redeploy |
 | `pamm_state`, `pamm_synthetic` | `accounts/pamm/*` | PumpSwap pools (M6). The synthetic group is derived offline |
 | `raydium_cpmm_2026_10` (M10) | `programs/raydium_cpmm_2026_10.so`, `accounts/raydium_cpmm_2026_10/*` | CPMM **as redeployed at 452,376,460**. This group holds the ELF only. The pools and configs stay `raydium_state`'s, because the redeploy kept their layouts (AmmConfig 236 B, PoolState 637 B) and the 21 live configs still equal the fixture bytes. Every CPMM test loads this build |
-| `spl_programs` (M10) | `programs/token_2022.so`, `accounts/spl/*`, `programs/spl_memo_v3.so` | the deployed Token-2022 (upgradeable, a verified build) and spl-memo v3 (BPFLoader2, where the account data *is* the ELF) |
+| `spl_programs` (M10) | `programs/token_2022.so`, `accounts/spl/*`, `programs/spl_memo_v3.so` | historical Token-2022 v11.0.0 (upgradeable, exact retained controls) and unchanged spl-memo v3 (BPFLoader2, where the account data *is* the ELF) |
+| `spl_programs_2026_10_27` | `programs/token_2022_2026_10_27.so`, `accounts/spl_2026_10_27/*` | selected Token-2022 v11.1.0, deployed 460,497,271; additive qualification baseline, old fixtures never rewritten |
 | `pump_programs_2026_10` (M10) | `programs/pump{,_fees,_amm}_2026_10.so`, `accounts/pump_2026_10/*` | pump, pump-fees and PumpSwap **as redeployed on 2026-10-02**. ELFs only: the state stays `pump_state`'s and `pamm_state`'s, because the redeploy only appends fee buckets (`BondingCurve` @125/@133, `Pool` @271/@279) and pump `Global`, both `FeeConfig`s, `GlobalConfig` and the volume accumulators still equal the fixture bytes on mainnet (slot 452,964,363). T-LATCH's "before" since the 2026-10-13 re-pin |
 | `pump_programs_2026_10_13` | `programs/pump_2026_10_08.so`, `programs/pump_amm_2026_10_08.so`, `programs/pump_fees_2026_10_12.so`, `accounts/pump_2026_10_13/*_program*.bin` | pump and PumpSwap **as redeployed on 2026-10-08** and pump-fees **as redeployed on 2026-10-12** (the 2026-10-13 re-pin; dumped at slot 456,395,404). Retains the historical PumpSwap build and the still-current pump-fees build; its pump build is kept (never refreshed) as the differential's other side |
 | `pump_programs_2026_10_13b` | `programs/pump_2026_10_13.so`, `accounts/pump_2026_10_13b/*` | Historical pump **as redeployed on 2026-10-13** at 15:40 UTC (slot 456,494,698; dumped at slot 456,535,056), retained for the differential and latch tests |
@@ -38,7 +68,8 @@ The M10 groups are pinned in the script:
 | Program | Deploy slot | Trimmed-ELF sha256 | Source |
 |---|---|---|---|
 | CPMM `CPMMoo8L…` | 452,376,460 | `93cad245…a0d2` | `raydium-cp-swap` `feat/creator-fee-share` @ `bdeee23`, **reproduced byte for byte** (M10 WP-2, below); the manifest's `source.status` still says UNVERIFIED (the script's pin text) |
-| Token-2022 `TokenzQd…` | 427,147,035 (authority `AeLmXCbP…`) | `7ea94a02…1947` (ELF `9bbf90b3…a5d1`) | `solana-program/token-2022` @ `9bc02757`, verified on verify.osec.io |
+| Historical Token-2022 v11.0.0 `TokenzQd…` | 427,147,035 (authority `AeLmXCbP…`) | `7ea94a02…1947` (ELF `9bbf90b3…a5d1`) | `solana-program/token-2022` @ `9bc02757`, verified on verify.osec.io |
+| Selected Token-2022 v11.1.0 `TokenzQd…` | 460,497,271 (same authority) | `5e888b29…13d9` (ELF `3dde54d2…b954`) | official release asset equals observed ELF; public verifier attributes commit `8867f751`; no new local reproducible build claimed |
 | spl-memo v3 `MemoSq4g…` | (BPFLoader2) | account `f520eaf0…7954` | |
 | Squads v4 `SQDS4ep6…` | 302,582,236 (no authority) | `d4866083…2fac` | UNVERIFIED (probably `Squads-Protocol/v4` @ `64af733`) |
 | pump `6EF8rrec…` | 452,654,932 (authority `7gZufwwA…`) | `b0b777c6…0c75` | UNVERIFIED: no public source; the release of `pump-rust-client` 0.2.0's unreleased artifacts (below) |
@@ -392,9 +423,12 @@ whose sha256 differs. `dump-fixtures.py` does not manage `shortwin/`; `SHA256SUM
 ```sh
 python3 scripts/dump-fixtures.py                       # offline check (= `check`)
 (cd tests/fixtures && sha256sum -c SHA256SUMS)
-python3 scripts/dump-fixtures.py fetch --group spl_programs   # fetch a missing group (pins enforced)
+python3 scripts/dump-fixtures.py fetch --group spl_programs_2026_10_27   # selected current group; pins enforced
 python3 scripts/dump-fixtures.py check --live          # mainnet drift, read-only; exit 1 names it
 ```
+
+Historical groups are restored from their committed files, not refreshed from a later live
+deployment. A current-group fetch refuses drift before writing.
 
 `check --live` makes about ten paced read-only calls:
 - one `getMultipleAccounts` call for the program accounts;

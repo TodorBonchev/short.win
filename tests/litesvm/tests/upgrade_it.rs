@@ -97,7 +97,7 @@ fn fork_on_1_0_0(coins: &[PumpCoin]) -> (Env, Vec<PumpCurve>) {
     let curves = coins.iter().map(|c| env.load_pump_coin(*c)).collect();
     env.set_pump_rent();
     let s = PumpCoin::Near166.snapshot();
-    env.set_clock(s.block_time, s.slot);
+    env.set_historical_clock(s.block_time, s.slot);
     (env, curves)
 }
 
@@ -449,7 +449,7 @@ fn current_schema_upgrade_preserves_full_guard_and_latched_exit_recovery() {
 
     let (mut env, curve) = Env::fork_pump_coin(PumpCoin::Fresh166);
     // A post-deploy clock over retained historical SOL-curve state, not a fresh live bank.
-    env.set_clock(1_792_432_041, 458_921_518);
+    env.set_historical_clock(1_792_432_041, 458_921_518);
     let (pm, q) = add_market(&mut env, curve);
     env.warp(1);
     let mut a = env.borrower();

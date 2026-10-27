@@ -464,11 +464,15 @@ fn memo_account(env: &mut Env, mint: &Pubkey, owner: &Keypair) -> Pubkey {
     acct.pubkey()
 }
 
-/// The environment runs mainnet's Token-2022 (trimmed ELF `7ea94a02…`, the verified build of
-/// `solana-program/token-2022@9bc02757`, from its real ProgramData) and spl-memo v3 (BPFLoader2,
+/// The environment runs mainnet's Token-2022 (trimmed ELF `5e888b29…`, the verified build of
+/// `solana-program/token-2022@8867f751`, from its real ProgramData) and spl-memo v3 (BPFLoader2,
 /// `f520eaf0…`), not LiteSVM's bundled builds (M10 T-MEMO). Pinned here independently of the
 /// harness's own check. Skipped (with a note) under `SHORTWIN_BUNDLED_SPL=1`.
 fn assert_mainnet_spl(env: &Env) {
+    assert_mainnet_spl_version(env, false);
+}
+
+fn assert_mainnet_spl_version(env: &Env, historical: bool) {
     if fork::bundled_spl() {
         eprintln!("[t-memo] SHORTWIN_BUNDLED_SPL=1: LiteSVM's bundled Token-2022 / spl-memo v3");
         return;
@@ -486,11 +490,15 @@ fn assert_mainnet_spl(env: &Env) {
     );
     let pd = env.svm.get_account(&pd_key).unwrap();
     assert_eq!(pd.data.len(), 1_382_061, "the mainnet ProgramData's space");
+    assert!(
+        env.clock().slot >= 460_497_272,
+        "new qualification requires a post-deploy bank slot"
+    );
     assert_eq!(&pd.data[..4], &3u32.to_le_bytes(), "ProgramData tag");
     assert_eq!(
         u64::from_le_bytes(pd.data[4..12].try_into().unwrap()),
-        427_147_035,
-        "deploy slot"
+        if historical { 427_147_035 } else { 460_497_271 },
+        "selected deploy slot"
     );
     assert_eq!(pd.data[12], 1, "an upgrade authority");
     assert_eq!(
@@ -499,8 +507,12 @@ fn assert_mainnet_spl(env: &Env) {
     );
     assert_eq!(
         fork::trimmed_elf_sha256(&pd.data),
-        "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947",
-        "Token-2022: not the mainnet build"
+        if historical {
+            "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947"
+        } else {
+            "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9"
+        },
+        "Token-2022: not the selected authenticated build"
     );
     let memo = env.svm.get_account(&MEMO_PROGRAM_ID).unwrap();
     assert_eq!(
@@ -541,14 +553,33 @@ fn consumed_at(logs: &[String], program: &Pubkey, depth: usize) -> Vec<u64> {
 /// memo as the transfer's previous sibling (T-MEMO, U17). Since M10 this runs on the programs
 /// mainnet runs ([`assert_mainnet_spl`]): the logs show spl-memo v3's `invoke [2]` before
 /// Token-2022's `invoke [2]`, the memo at 7,928 CU (asserted above 5,000), `transfer_checked` at
-/// exactly 2,487 and the whole withdrawal at about 42,700 CU (printed; it varies by a few tens of
-/// CU with the random keys). On LiteSVM's bundled builds (`SHORTWIN_BUNDLED_SPL=1`, the CU
+/// historically 2,487 on v11.0.0, whose exact control is retained. The v11.1.0
+/// fingerprint is recorded independently and the whole withdrawal must meet ARCH §6.1's
+/// 100,000 CU budget. On LiteSVM's bundled builds (`SHORTWIN_BUNDLED_SPL=1`, the CU
 /// assertions skipped) the same figures are 287, 2,470 and about 35,000. A plain destination
 /// needs no memo program, and a zero-token withdrawal moves nothing, so it needs none either.
 #[test]
 fn sec_7_memo_required_destination_is_served() {
+    memo_required_destination_contract(false);
+}
+
+/// Preserve the previously qualified exact memo/transfer CU control on the old
+/// authenticated ELF, at the same execution bank/time as the new-build test.
+#[test]
+fn token_2022_v11_0_memo_required_destination_is_served() {
+    if fork::bundled_spl() {
+        eprintln!("[t-memo historical] bundled opt-out is not old-ELF evidence");
+        return;
+    }
+    memo_required_destination_contract(true);
+}
+
+fn memo_required_destination_contract(historical: bool) {
     let mut env = Env::initialized();
-    assert_mainnet_spl(&env);
+    if historical {
+        fork::load_token_2022_v11_0(&mut env.svm);
+    }
+    assert_mainnet_spl_version(&env, historical);
     let (l, h) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000_000);
     let owner = h.owner.insecure_clone();
     let lk = lender_keys(&l.k, &h);
@@ -594,15 +625,27 @@ fn sec_7_memo_required_destination_is_served() {
         // What the VM executes, not just the account bytes `assert_mainnet_spl` hashes (a program
         // cache that kept the bundled ELF would pass that check). Mainnet's spl-memo v3 is a
         // 74,800-byte ELF; LiteSVM bundles spl-memo 4.0.0 (2,304 bytes, a few hundred CU) at the
-        // same address. Mainnet's Token-2022 spends 2,487 CU on this `transfer_checked`, LiteSVM's
-        // bundled v11 build 2,470.
+        // same address. Historical v11.0.0 spends 2487 CU on this transfer; the selected
+        // new ELF must be measured independently, with the existing withdrawal budget.
         assert_eq!(memo_cu.len(), 1);
         assert!(memo_cu[0] > 5_000, "{memo_cu:?}");
-        assert_eq!(
-            xfer_cu,
-            [2_487],
-            "Token-2022 transfer_checked CU: not mainnet's ELF?"
-        );
+        if historical {
+            assert_eq!(
+                xfer_cu,
+                [2_487],
+                "historical Token-2022 transfer_checked fingerprint changed"
+            );
+        } else {
+            // The new compiler/ELF receives its own measured fingerprint in the
+            // retained CI log. Never infer it from the historical 2487 CU value.
+            assert_eq!(xfer_cu.len(), 1, "one executed Token-2022 transfer CPI");
+            assert!(xfer_cu[0] > 0, "the transfer CPI consumed compute");
+            assert!(
+                meta.compute_units_consumed <= 100_000,
+                "ARCH §6.1 deposit/withdraw budget: {} CU",
+                meta.compute_units_consumed
+            );
+        }
     }
 
     // A plain destination works without the memo program (and with it, the memo is skipped).
@@ -686,6 +729,95 @@ fn t_memo_control_top_level_sibling_check() {
     let _ = l.authority;
 }
 
+/// Runtime cache tripwire: v11.1.0 recognizes the Memo-v4 address; v11.0.0 does not.
+/// A COPY of the authenticated Memo-v3 ELF is planted at that address so the sibling
+/// succeeds without qualifying or claiming to run the production Memo-v4 artifact.
+/// Repeated old/new swaps at one bank must change Token-2022's actual acceptance.
+#[test]
+fn token_2022_loader_switch_changes_the_executed_memo_id_rule() {
+    use spl_token_2022_interface as t22;
+    if fork::bundled_spl() {
+        eprintln!("[token-2022 tripwire] bundled opt-out is not pinned old/new evidence");
+        return;
+    }
+    let mut env = Env::initialized();
+    let (l, h) = market_with_holder(&mut env, TokenProgram::Token2022, 1_000_000);
+    let owner = h.owner.insecure_clone();
+    let destination = memo_account(&mut env, &l.k.mint, &owner);
+    // Exact spl-memo-interface2.1.0 v4 ID, pinned by upstream Token-2022 v11.1.0.
+    let memo_v4: Pubkey = "Memo4c2pN8afCj432Lb7RMVKi9PbQnnW7ewFFaV3oAH"
+        .parse()
+        .unwrap();
+    env.svm
+        .add_program(
+            memo_v4,
+            &fork::spl_fixture("spl_memo_v3_program").account.data,
+        )
+        .expect("synthetic Memo-v3 code at the Memo-v4 address");
+    let bank = env.clock();
+    let send = |env: &mut Env, amount| {
+        let memo = Instruction {
+            program_id: memo_v4,
+            accounts: vec![],
+            data: b"synthetic memo-id cache tripwire".to_vec(),
+        };
+        let transfer = t22::instruction::transfer_checked(
+            &TOKEN_2022_PROGRAM_ID,
+            &h.token_account,
+            &l.k.mint,
+            &destination,
+            &owner.pubkey(),
+            &[],
+            amount,
+            6,
+        )
+        .unwrap();
+        env.send(&[memo, transfer], &[&owner])
+    };
+    for amount in [2, 3] {
+        fork::load_token_2022_v11_0(&mut env.svm);
+        assert_mainnet_spl_version(&env, true);
+        assert_eq!(
+            custom_code(&send(&mut env, amount)),
+            Some(36),
+            "historical ELF must execute its narrower NoMemo rule"
+        );
+        fork::load_mainnet_spl(&mut env.svm);
+        assert_mainnet_spl(&env);
+        ok(send(&mut env, amount));
+        assert_eq!(
+            (env.clock().unix_timestamp, env.clock().slot),
+            (bank.unix_timestamp, bank.slot),
+            "the behavior difference is not caused by a clock change"
+        );
+    }
+    assert_eq!(read::token_amount(&env.svm, &destination), Some(5));
+}
+
+/// New qualification must preserve exact old controls rather than silently rewriting their pins.
+#[test]
+fn token_2022_old_and_new_fixture_pins_are_both_authenticated() {
+    let old = fork::spl_fixture("token_2022_program_data");
+    let current = fork::spl_fixture(fork::TOKEN_2022_ACTIVE_PROGRAM_DATA);
+    assert_eq!(
+        fork::trimmed_elf_sha256(&old.account.data),
+        "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947"
+    );
+    assert_eq!(
+        u64::from_le_bytes(old.account.data[4..12].try_into().unwrap()),
+        427_147_035
+    );
+    assert_eq!(
+        fork::trimmed_elf_sha256(&current.account.data),
+        "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9"
+    );
+    assert_eq!(
+        u64::from_le_bytes(current.account.data[4..12].try_into().unwrap()),
+        460_497_271
+    );
+    assert_ne!(old.account.data, current.account.data);
+}
+
 // ---- M1-SEC-8: `crank_sol_usd` refuses future-dated updates and odd exponents --------------
 
 const DUMP: &[u8] = include_bytes!("../../fixtures/accounts/pyth_sol_usd_shard0.bin");
@@ -715,7 +847,7 @@ fn put_update(env: &mut Env, key: Pubkey, u: &PriceUpdate) {
 #[test]
 fn sec_8_future_dated_updates_are_refused() {
     let mut env = Env::initialized();
-    env.set_clock(DUMP_TS, DUMP_SLOT);
+    env.set_historical_clock(DUMP_TS, DUMP_SLOT);
     let max_age = i64::from(env.config().params.oracle_max_age_s);
     let u = pyth::read(&pyth::RECEIVER, DUMP).unwrap();
     let dated = |t: i64| PriceUpdate {
@@ -804,7 +936,7 @@ fn sec_9_pending_changes_lapse_after_the_apply_window() {
 #[test]
 fn sec_10_an_oracle_feed_change_empties_the_cache() {
     let mut env = Env::initialized();
-    env.set_clock(DUMP_TS, DUMP_SLOT);
+    env.set_historical_clock(DUMP_TS, DUMP_SLOT);
     let u = pyth::read(&pyth::RECEIVER, DUMP).unwrap();
     let other = Pubkey::new_unique();
     let feed = [7u8; 32];

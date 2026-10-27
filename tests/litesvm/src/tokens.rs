@@ -2,7 +2,7 @@
 //! feature, whose builders speak both programs through `spl-token-2022-interface`).
 //!
 //! SPL Token is the p-token LiteSVM 0.16 bundles under the mainnet feature set (R-TOOL §2);
-//! Token-2022 is the ELF mainnet runs, v11.0.0 from its dumped ProgramData
+//! Token-2022 is the ELF mainnet runs, v11.1.0 from its dumped ProgramData
 //! ([`crate::fork::load_mainnet_spl`], M10; LiteSVM's bundled v11.0.0 build with
 //! `SHORTWIN_BUNDLED_SPL=1`). Mints with Token-2022 extensions (the filter's one
 //! fixture per extension) are built by the market track with `spl-token-2022-interface`

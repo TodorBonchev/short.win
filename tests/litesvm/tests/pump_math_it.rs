@@ -3447,7 +3447,7 @@ fn observed_build_supports_sol_trades_after_its_deploy_slot() {
         PumpDeploy::Oct2026QuoteFees,
         false,
     );
-    t.both(|env| env.set_clock(1_792_432_041, 458_921_518));
+    t.both(|env| env.set_historical_clock(1_792_432_041, 458_921_518));
     let (user, ata) = t.user(100_000_000_000);
     let buyback = fork::pump_buyback_fee_recipient(&t.new.svm, 1);
     let q = t.c.state(&t.new.svm).real_token_reserves / 50;

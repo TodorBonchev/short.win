@@ -73,7 +73,7 @@ SPDX-FileCopyrightText = "Raydium"
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-path = ["tests/fixtures/programs/token_2022.so", "tests/fixtures/programs/spl_memo_v3.so",
+path = ["tests/fixtures/programs/token_2022.so", "tests/fixtures/programs/token_2022_2026_10_27.so", "tests/fixtures/programs/spl_memo_v3.so",
     "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022/observed-token-2022.so.gz"]
 precedence = "override"
 SPDX-FileCopyrightText = "The Solana Program Library authors"

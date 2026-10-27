@@ -110,6 +110,7 @@ const PROGRAM_GROUPS = new Set([
     'pump_programs',
     'raydium_cpmm_2026_10',
     'spl_programs',
+    'spl_programs_2026_10_27',
     'squads_programs',
     'pump_programs_2026_10',
     'pump_programs_2026_10_13',
@@ -151,7 +152,8 @@ export function venuePrograms(): [string, string, string][] {
 }
 
 /**
- * The mainnet SPL programs (group `spl_programs`, M10 T-MEMO): Token-2022 for `--upgradeable-program`
+ * The selected SPL programs (Token-2022 group `spl_programs_2026_10_27`, M10 T-MEMO):
+ * v11.1.0 Token-2022 for `--upgradeable-program`
  * (`[program id, ELF path, upgrade authority]`) with its pinned trimmed-ELF sha256, and spl-memo v3's
  * pinned account sha256. spl-memo v3 needs no override: solana-test-validator 4.1.2's built-in at
  * `MemoSq4g…` is already mainnet's account (BPFLoader2, the same 74,800 bytes; `checkSplPrograms`
@@ -160,23 +162,31 @@ export function venuePrograms(): [string, string, string][] {
 export function splPrograms(): {
     token2022: [string, string, string];
     token2022TrimmedSha256: string;
+    minimumBankSlot: bigint;
     memoSha256: string;
 } {
     const byName = new Map(manifest().accounts.map((a) => [a.name, a]));
-    const p = byName.get('token_2022_program');
-    const d = byName.get('token_2022_program_data');
+    const p = byName.get('token_2022_2026_10_27_program');
+    const d = byName.get('token_2022_2026_10_27_program_data');
     const memo = byName.get('spl_memo_v3_program');
     const elf = d?.files?.elf;
     const auth = d?.decoded?.upgrade_authority;
     const trimmed = d?.elf_trimmed_sha256_expected;
     if (!p || !elf || typeof auth !== 'string' || !trimmed || !memo?.sha256_expected) {
-        throw new Error(
-            'fixture manifest lacks the spl_programs group (scripts/dump-fixtures.py fetch --group spl_programs)',
-        );
+        throw new Error('fixture manifest lacks the selected spl_programs_2026_10_27 group');
+    }
+    // Independent pins: neither a changed manifest label nor the old fixture may
+    // silently select a different executable for this qualification.
+    if (
+        trimmed !== '5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9' ||
+        d?.decoded?.deploy_slot !== 460_497_271
+    ) {
+        throw new Error('Token-2022 qualification fixture hash/deploy-slot pin differs');
     }
     return {
         token2022: [p.address, join(PATHS.fixtures, elf), auth],
         token2022TrimmedSha256: trimmed,
+        minimumBankSlot: 460_497_272n,
         memoSha256: memo.sha256_expected,
     };
 }

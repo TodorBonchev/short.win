@@ -36,6 +36,150 @@ fn clock_is_under_test_control() {
     assert_eq!(env.now(), START_TS + 86_400);
 }
 
+/// Historical coordinates preserve fences and progression while the loaded ELF executes
+/// after its deployment. Raw current-bank arithmetic must not be translated a second time.
+#[test]
+fn historical_clock_replay_preserves_deltas_and_raw_bank_coordinates() {
+    let mut env = Env::new();
+    let historical = 451_037_803;
+    let mapped = Env::historical_bank_slot(historical);
+    assert_eq!(
+        mapped, 461_535_075,
+        "one explicit, independently checked offset"
+    );
+    let pyth = include_bytes!("../../../fixtures/accounts/pyth_sol_usd_shard0.bin");
+    let old_header = shortwin_litesvm_tests::fork::spl_fixture("token_2022_program_data")
+        .account
+        .data
+        .clone();
+    env.set_historical_clock(START_TS, historical);
+    assert_eq!((env.now(), env.clock().slot), (START_TS, mapped));
+    env.set_historical_clock(START_TS + 1, historical + 1);
+    assert_eq!((env.now(), env.clock().slot), (START_TS + 1, mapped + 1));
+    env.set_historical_clock(START_TS + 120, historical + 300);
+    assert_eq!(
+        (env.now(), env.clock().slot),
+        (START_TS + 120, mapped + 300)
+    );
+
+    let current = env.clock();
+    env.set_clock(current.unix_timestamp - 1, current.slot + 1);
+    assert_eq!(
+        (env.now(), env.clock().slot),
+        (START_TS + 119, mapped + 301)
+    );
+    env.warp(2);
+    assert_eq!(
+        (env.now(), env.clock().slot),
+        (START_TS + 121, mapped + 306)
+    );
+    // Restore an already mapped bank exactly, including the original Unix timestamp.
+    env.set_clock(current.unix_timestamp, current.slot);
+    assert_eq!(
+        (env.now(), env.clock().slot),
+        (START_TS + 120, mapped + 300)
+    );
+    assert_eq!(
+        shortwin_litesvm_tests::fork::spl_fixture("token_2022_program_data")
+            .account
+            .data,
+        old_header,
+        "clock translation must not rewrite the historical ProgramData"
+    );
+    let update =
+        shortwin_venue_state::pyth::read(&shortwin_venue_state::pyth::RECEIVER, pyth).unwrap();
+    assert_eq!(
+        update.posted_slot, 451_037_781,
+        "immutable Pyth posted slot"
+    );
+}
+
+/// An accidental old raw bank would make the newer ProgramData's chronology false.
+#[test]
+#[should_panic(expected = "execution bank slot predates the selected Token-2022 deployment")]
+fn raw_clock_refuses_a_predeployment_bank() {
+    let mut env = Env::new();
+    env.set_clock(START_TS, 451_037_803);
+}
+
+/// Exercise initialization, ATA creation, checked transfer and the decimals refusal on both
+/// authenticated ELFs at the SAME post-deploy bank/time. This is actual execution coverage;
+/// source comparison or account hashes alone do not establish adapter compatibility.
+#[test]
+fn token_2022_v11_0_and_v11_1_preserve_base_account_transfer_contract() {
+    use shortwin_litesvm_tests::errors::custom_code;
+    use shortwin_litesvm_tests::fork;
+    use spl_token_2022_interface::{error::TokenError, instruction::transfer_checked};
+    if fork::bundled_spl() {
+        eprintln!("[token-2022 differential] bundled opt-out is not pinned old/new evidence");
+        return;
+    }
+    fn exercise(historical: bool) -> (u64, u64, usize, usize, u32) {
+        let mut env = Env::new();
+        if historical {
+            fork::load_token_2022_v11_0(&mut env.svm);
+        }
+        assert_eq!((env.now(), env.clock().slot), (START_TS, START_SLOT));
+        let payer = env.payer.insecure_clone();
+        let authority = env.funded_keypair();
+        let mint = tokens::create_mint(
+            &mut env.svm,
+            &payer,
+            &authority.pubkey(),
+            6,
+            TokenProgram::Token2022,
+        );
+        let holder = tokens::holder(
+            &mut env.svm,
+            &payer,
+            &mint,
+            &authority,
+            17_000,
+            TokenProgram::Token2022,
+        );
+        let recipient = env.funded_keypair();
+        let destination = tokens::create_ata(
+            &mut env.svm,
+            &payer,
+            &recipient.pubkey(),
+            &mint,
+            TokenProgram::Token2022,
+        );
+        let transfer = |decimals| {
+            transfer_checked(
+                &TokenProgram::Token2022.id(),
+                &holder.token_account,
+                &mint,
+                &destination,
+                &holder.owner.pubkey(),
+                &[],
+                7_001,
+                decimals,
+            )
+            .unwrap()
+        };
+        let wrong_decimals = env.send(&[transfer(5)], &[&holder.owner]);
+        let refusal = custom_code(&wrong_decimals).expect("checked decimals refusal");
+        assert_eq!(refusal, TokenError::MintDecimalsMismatch as u32);
+        ok(env.send(&[transfer(6)], &[&holder.owner]));
+        let source = env.svm.get_account(&holder.token_account).unwrap();
+        let target = env.svm.get_account(&destination).unwrap();
+        assert_eq!(source.owner, TokenProgram::Token2022.id());
+        assert_eq!(target.owner, TokenProgram::Token2022.id());
+        assert_eq!(source.data.len(), 165, "plain initialized token account");
+        let outcome = (
+            read::token_amount(&env.svm, &holder.token_account).unwrap(),
+            read::token_amount(&env.svm, &destination).unwrap(),
+            source.data.len(),
+            target.data.len(),
+            refusal,
+        );
+        assert_eq!((outcome.0, outcome.1), (9_999, 7_001));
+        outcome
+    }
+    assert_eq!(exercise(true), exercise(false));
+}
+
 #[test]
 fn mints_and_holders_on_both_token_programs() {
     let mut env = Env::new();
