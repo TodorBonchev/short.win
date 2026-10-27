@@ -1,0 +1,150 @@
+{
+  "checked_utc": "2026-10-27T02:54:42.821735+00:00",
+  "run_id": 40434130363,
+  "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+  "event": "workflow_dispatch",
+  "conclusion": "success",
+  "passed_jobs": [
+    "anchor-build",
+    "cu-math",
+    "deny",
+    "clippy",
+    "fmt",
+    "web",
+    "vectors",
+    "wasm",
+    "test",
+    "m6-cu",
+    "m2-cu",
+    "indexer",
+    "t-pot",
+    "mutants",
+    "m5-cu",
+    "verifiable-build",
+    "codama",
+    "t-size",
+    "m7-keeper-bench",
+    "web-e2e",
+    "m3-cu",
+    "fuzz-smoke",
+    "program-tests",
+    "m1-cu",
+    "services"
+  ],
+  "skipped_jobs": [
+    "fuzz-nightly"
+  ],
+  "mutant_log_sha256": "163ca48bbdf44aa5740ee1d7be17b422c26e2ccb4327e8430baa39319c836d96",
+  "mutant_evidence_lines": [
+    "2026-10-27T02:31:02.9716388Z ki65-rebase-without-owner: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:33:14.4824772Z ki66-pot-skip-surplus: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:35:28.3371801Z ki66full-walk-accrues-nothing: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:37:43.7390789Z ki66full-open-full-accrual: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:39:58.5391861Z ki66full-hold-accrues-again: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:42:12.3442156Z ki66full-walk-per-touch-floor: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:44:28.5957236Z ki66full-rehold: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:46:42.7488897Z ki66full-jump-keeps-chain: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:48:54.6728118Z ki66full-park-keeps-chain: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:51:12.8519988Z ki67-close-with-pending: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.3585814Z ki67-close-parked: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6938498Z d4-without-ema: tests killed, fuzz (mock, 3m) killed (10 failures)",
+    "2026-10-27T02:53:26.6939024Z fee-size-cap-doubled: tests killed, fuzz (mock, 3m) killed (5 failures)",
+    "2026-10-27T02:53:26.6939632Z wallet-cap-removed: tests killed, fuzz (mock, 3m) killed (10 failures)",
+    "2026-10-27T02:53:26.6940179Z tier-c-as-b: tests killed, fuzz (mock, 3m) killed (120 failures)",
+    "2026-10-27T02:53:26.6941011Z coverage-clear-immediate: tests killed, fuzz (mock, 3m) killed (32 failures)",
+    "2026-10-27T02:53:26.6941935Z curve-caps-live: tests killed, fuzz (curve, 3m) killed (14 failures)",
+    "2026-10-27T02:53:26.6942777Z pump-caps-live-fee: tests killed, fuzz (pumpswap, 3m) killed (1 failures)",
+    "2026-10-27T02:53:26.6943614Z ki65-skip-store-records: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6944254Z ki65-rebase-without-owner: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6944898Z ki66-pot-skip-surplus: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6945593Z ki66full-walk-accrues-nothing: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6946125Z ki66full-open-full-accrual: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6946642Z ki66full-hold-accrues-again: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6947722Z ki66full-walk-per-touch-floor: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6948476Z ki66full-rehold: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6949047Z ki66full-jump-keeps-chain: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6949516Z ki66full-park-keeps-chain: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6949963Z ki67-close-with-pending: tests killed, fuzz not run (tests only)",
+    "2026-10-27T02:53:26.6950390Z ki67-close-parked: tests killed, fuzz not run (tests only)"
+  ],
+  "local_committed_idl_sha256": "5b94b1e98f5b32cf6d3c501d1998965bbbab80d6e2853fa6eeb8f3ba5470a003",
+  "selected_mutants_killed": [
+    {
+      "name": "d4-without-ema",
+      "fuzz": "(mock, 3m) killed (10 failures)"
+    },
+    {
+      "name": "fee-size-cap-doubled",
+      "fuzz": "(mock, 3m) killed (5 failures)"
+    },
+    {
+      "name": "wallet-cap-removed",
+      "fuzz": "(mock, 3m) killed (10 failures)"
+    },
+    {
+      "name": "tier-c-as-b",
+      "fuzz": "(mock, 3m) killed (120 failures)"
+    },
+    {
+      "name": "coverage-clear-immediate",
+      "fuzz": "(mock, 3m) killed (32 failures)"
+    },
+    {
+      "name": "curve-caps-live",
+      "fuzz": "(curve, 3m) killed (14 failures)"
+    },
+    {
+      "name": "pump-caps-live-fee",
+      "fuzz": "(pumpswap, 3m) killed (1 failures)"
+    },
+    {
+      "name": "ki65-skip-store-records",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki65-rebase-without-owner",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66-pot-skip-surplus",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66full-walk-accrues-nothing",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66full-open-full-accrual",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66full-hold-accrues-again",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66full-walk-per-touch-floor",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66full-rehold",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66full-jump-keeps-chain",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki66full-park-keeps-chain",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki67-close-with-pending",
+      "fuzz": "not run (tests only)"
+    },
+    {
+      "name": "ki67-close-parked",
+      "fuzz": "not run (tests only)"
+    }
+  ],
+  "mutation_summary_repeated_in_raw_log": true
+}

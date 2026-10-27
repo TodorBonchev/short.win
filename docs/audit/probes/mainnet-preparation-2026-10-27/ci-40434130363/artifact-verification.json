@@ -1,0 +1,50 @@
+[
+  {
+    "artifact_id": 12703760600,
+    "name": "verifiable-build",
+    "github_digest": "sha256:e2fcc3b9ae6c6d7889e6097965bfec649ef87d5cb217fec87f97814aae646fd2",
+    "zip_sha256": "e2fcc3b9ae6c6d7889e6097965bfec649ef87d5cb217fec87f97814aae646fd2",
+    "files": {
+      "shortwin.build.log": {
+        "bytes": 6357,
+        "sha256": "5ef76b0aaaafc4ec3dcefd994502fafa8e8edfe552c4e36fb0a887b8e8845605"
+      },
+      "shortwin.so": {
+        "bytes": 1644024,
+        "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc"
+      },
+      "verifiable-hashes.txt": {
+        "bytes": 491,
+        "sha256": "e63543c7ecf14f6a50918375e3b67a25ca4e3616cf0eafe7b9b2371ce87d133a"
+      }
+    }
+  },
+  {
+    "artifact_id": 12702399736,
+    "name": "shortwin-program",
+    "github_digest": "sha256:3c2e4c0b5516806039625700fa865e2c720a71103569b5a2cdd8972f57c3b340",
+    "zip_sha256": "3c2e4c0b5516806039625700fa865e2c720a71103569b5a2cdd8972f57c3b340",
+    "files": {
+      "deploy/shortwin.so": {
+        "bytes": 1644024,
+        "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc"
+      },
+      "deploy/mock_cpamm.so": {
+        "bytes": 281240,
+        "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9"
+      },
+      "test-venue/deploy/shortwin.so": {
+        "bytes": 1675056,
+        "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01"
+      },
+      "idl/shortwin.json": {
+        "bytes": 219091,
+        "sha256": "5b94b1e98f5b32cf6d3c501d1998965bbbab80d6e2853fa6eeb8f3ba5470a003"
+      },
+      "types/shortwin.ts": {
+        "bytes": 218543,
+        "sha256": "dbbaaa8fd290c9bb542fe38a6ed74701027d1b9db1e6f770368371c4aba74360"
+      }
+    }
+  }
+]

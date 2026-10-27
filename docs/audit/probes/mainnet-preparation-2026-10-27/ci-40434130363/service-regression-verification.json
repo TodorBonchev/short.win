@@ -1,0 +1,17 @@
+{
+  "run_id": 40434130363,
+  "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+  "job_id": 121959188981,
+  "conclusion": "success",
+  "finished_at": "2026-10-27T01:58:04Z",
+  "log_sha256": "ad1c68d2e3ddcde7e1f028e5a0b04c006e99468be6a740388b070fa59e8b4355",
+  "regressions": {
+    "startup_logs_keep_endpoint_context_without_provider_credentials": [
+      "2026-10-27T01:47:14.5544793Z test tests::startup_logs_keep_endpoint_context_without_provider_credentials ... ok"
+    ],
+    "endpoint_context_handles_root_ipv6_and_invalid_urls_without_echoing_input": [
+      "2026-10-27T01:47:14.5535424Z test tests::endpoint_context_handles_root_ipv6_and_invalid_urls_without_echoing_input ... ok"
+    ]
+  },
+  "checked_utc": "2026-10-27T01:59:21.522383+00:00"
+}

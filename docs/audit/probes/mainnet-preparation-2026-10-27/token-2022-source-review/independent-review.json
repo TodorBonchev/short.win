@@ -1,0 +1,197 @@
+{
+  "reviewed_utc": "2026-10-27T01:47:09.002447+00:00",
+  "reviewer": {
+    "kind": "AI-assisted independent source/provenance review",
+    "agent": "/root/launch_policy_inventory",
+    "external_audit_firm": false,
+    "professional_certification_claimed": false,
+    "authorship_note": "Reviewer did not implement this upstream Token-2022 change, promote the fixture, or write the engineering compatibility report. Reviewer previously edited launch-policy documentation."
+  },
+  "shortwin_head_at_receipt": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+  "engineering_report_file": "REPORT.md",
+  "engineering_report_sha256": "1af40d8bd3c9d736224ad13595de36ee1115c6589eba33f4c5899a96ddf3c5c6",
+  "upstream_identity": {
+    "repository": "https://github.com/solana-program/token-2022",
+    "assets": [
+      {
+        "version": "11.0.0",
+        "tag": "program@v11.0.0",
+        "peeled_commit": "9bc02757f600ffe754746708a8a072bcd49d1260",
+        "asset_file": "publisher-spl-token-2022-11.0.0.so",
+        "bytes": 632560,
+        "sha256": "9bbf90b30e06778ca0feca100b29f0eeb9be576ae024f6323cc207308f51a5d1",
+        "trimmed_sha256": "7ea94a027005b39196fa08e6d0ddcd55ec32eb43266179921a834a1ba2eb1947",
+        "release_metadata_file": "program@v11.0.0-release.json",
+        "release_metadata_sha256": "fcfb08146d54a17ad503d0d681f414807d066365c827fc69655ba019814f6a51",
+        "tag_metadata_file": "program@v11.0.0-ref.json",
+        "tag_metadata_sha256": "c1d72718c6637923f9460086a51d2af155dd95b5ada9f0699ed8cd7613313239"
+      },
+      {
+        "version": "11.1.0",
+        "tag": "program@v11.1.0",
+        "peeled_commit": "8867f751c0f69367ba03af4f85510b5611989491",
+        "asset_file": "publisher-spl-token-2022-11.1.0.so",
+        "bytes": 611056,
+        "sha256": "3dde54d202caa2d10514fd58a154df5f26f07643f9f5fd0402ff08084f0cb954",
+        "trimmed_sha256": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+        "release_metadata_file": "program@v11.1.0-release.json",
+        "release_metadata_sha256": "63feb0eccca3007c6f94b0816894ed59b836bbf219a70eec1af1ee80bfa25a81",
+        "tag_metadata_file": "program@v11.1.0-ref.json",
+        "tag_metadata_sha256": "5ab08f376b1b4a003ae18d679456c5112a8c6b8cce101038f9f71b8fd1b256f0"
+      }
+    ],
+    "official_release_and_commit_api_independently_queried": true,
+    "api_check_time_note": "Official GitHub release/tag-commit API and OtterSec status were queried in this review turn before receipt creation; no separate per-request timestamp was retained.",
+    "github_endpoints": [
+      "https://api.github.com/repos/solana-program/token-2022/releases/tags/program@v11.1.0",
+      "https://api.github.com/repos/solana-program/token-2022/commits/program@v11.1.0",
+      "https://api.github.com/repos/solana-program/token-2022/commits/program@v11.0.0"
+    ],
+    "old_publisher_asset_equals_retained_test_fixture": true,
+    "new_publisher_asset_equals_retained_mainnet_observation": true,
+    "retained_mainnet_observation_file": "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022/observed-token-2022.so.gz",
+    "retained_mainnet_observation_gzip_sha256": "d6d910c54838c7637f02cc9017037eb51ac9a98df1e354a0845ca79b40f61815",
+    "independent_fresh_direct_mainnet_rpc_read_performed": false,
+    "public_verifier_endpoint": "https://verify.osec.io/status/TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "public_verifier_independently_queried_result": {
+      "is_verified": true,
+      "on_chain_hash": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "executable_hash": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "commit": "8867f751c0f69367ba03af4f85510b5611989491",
+      "last_verified_at": "2026-10-23T15:43:22.904525",
+      "is_frozen": false,
+      "is_closed": false
+    },
+    "fresh_local_reproducible_upstream_build_performed": false
+  },
+  "source_checks": {
+    "full_tag_tree_diff_changed_paths": 302,
+    "diff_source": "Independent git diff of both exact commits in retained bare upstream.git, rather than the capped GitHub compare file list.",
+    "unchanged_files": [
+      {
+        "path": "interface/src/state.rs",
+        "old_sha256": "4566daf8b06ff2e7b975bed3e631ef4ab9591a95ddabd4117300ca1f639a59d2",
+        "new_sha256": "4566daf8b06ff2e7b975bed3e631ef4ab9591a95ddabd4117300ca1f639a59d2",
+        "identical": true
+      },
+      {
+        "path": "interface/src/pod.rs",
+        "old_sha256": "8d1aa1366c00147dd4af820505325d4efc7d6118908b27fed29751a99963ce88",
+        "new_sha256": "8d1aa1366c00147dd4af820505325d4efc7d6118908b27fed29751a99963ce88",
+        "identical": true
+      },
+      {
+        "path": "interface/src/instruction.rs",
+        "old_sha256": "672b3890cb58e5700a67f202491069ed44dffcbfa0e7d0b83a0cfbbb05b3a287",
+        "new_sha256": "672b3890cb58e5700a67f202491069ed44dffcbfa0e7d0b83a0cfbbb05b3a287",
+        "identical": true
+      },
+      {
+        "path": "interface/src/error.rs",
+        "old_sha256": "15daf972b1332208c31b095d405ad33ab35b5a3900306045f6203cb0d4084aeb",
+        "new_sha256": "15daf972b1332208c31b095d405ad33ab35b5a3900306045f6203cb0d4084aeb",
+        "identical": true
+      },
+      {
+        "path": "interface/src/extension/memo_transfer/mod.rs",
+        "old_sha256": "831da8785a008f72bf5a442b7c18f9ecffa1ef3b5fc1ac41ace871807f5d83a0",
+        "new_sha256": "831da8785a008f72bf5a442b7c18f9ecffa1ef3b5fc1ac41ace871807f5d83a0",
+        "identical": true
+      },
+      {
+        "path": "interface/src/extension/cpi_guard/mod.rs",
+        "old_sha256": "f7773ce63c13b2975ce69f1c6f11e2c80cffa229616daf40df0058d8ccbe7aa4",
+        "new_sha256": "f7773ce63c13b2975ce69f1c6f11e2c80cffa229616daf40df0058d8ccbe7aa4",
+        "identical": true
+      },
+      {
+        "path": "program/src/extension/cpi_guard/processor.rs",
+        "old_sha256": "3c98b01b7f10af45abd33ed237508d5d903b6de6598b0db8a2ed385e62be7362",
+        "new_sha256": "3c98b01b7f10af45abd33ed237508d5d903b6de6598b0db8a2ed385e62be7362",
+        "identical": true
+      }
+    ],
+    "unchanged_processor_functions": [
+      {
+        "function": "process_transfer",
+        "bytes": 11295,
+        "sha256": "90001a704a9011b8150200b08458f3f1ef2ea30aa1814d3356c16aa062293704",
+        "identical": true
+      },
+      {
+        "function": "process_initialize_account3",
+        "bytes": 178,
+        "sha256": "63a5f644c5d464fdee244531c061b1eb86ee382e0a5a081645965ce5c8d08af1",
+        "identical": true
+      },
+      {
+        "function": "process_close_account",
+        "bytes": 4098,
+        "sha256": "13666f898093de459aede7c07386ddcfe568f32ac65f225c7e05db305cc86583",
+        "identical": true
+      },
+      {
+        "function": "process_sync_native",
+        "bytes": 1426,
+        "sha256": "66f595a53ea61ace58074478c0a8765880f2c5dc4f19f2662e9617acd80318eb",
+        "identical": true
+      },
+      {
+        "function": "process_initialize_immutable_owner",
+        "bytes": 585,
+        "sha256": "52bbbded83e5ec9622275ef694468af4b2daa85c5e6ef118bb132cd66413cf90",
+        "identical": true
+      }
+    ],
+    "complete_interface_mod_diff_reviewed": true,
+    "new_account_len_helper_reviewed": true,
+    "required_account_extension_mapping_equivalent": true,
+    "local_allowlist_names": [
+      "MetadataPointer",
+      "TokenMetadata",
+      "GroupPointer",
+      "TokenGroup",
+      "GroupMemberPointer",
+      "TokenGroupMember"
+    ],
+    "local_allowlist_type_ids": [
+      18,
+      19,
+      20,
+      21,
+      22,
+      23
+    ],
+    "these_six_types_require_no_account_extension_in_both_versions": true,
+    "expected_plain_pool_vault_bytes": 165,
+    "ata_immutable_owner_is_additional_extension": true,
+    "memo_v3_previous_sibling_acceptance_retained_in_source": true,
+    "new_cpi_guard_withdraw_excess_lamports_path_called_by_shortwin": false,
+    "mint_allowlist_broadened_by_review": false
+  },
+  "approval": {
+    "source_and_provenance_disposition": "APPROVED FOR PREPARING FRESH FIXTURE QUALIFICATION",
+    "program_change_required_identified": false,
+    "scope_limit": "No integration incompatibility identified within the existing short.win allowlist and inspected CPI paths. This is a scoped source review, not proof that the new upstream ELF executes correctly with short.win.",
+    "new_elf_execution_gate": "OPEN",
+    "conditions": [
+      "Retain old fixture and stage new ELF/header/identity in a new dated group; review explicit active loader pins.",
+      "Execute new-ELF InitializeAccount3/GetAccountDataSize/ATA cases for plain and all six allowed metadata/group mint types, plus malformed/unknown/unsafe TLV and token-program-confusion controls.",
+      "Run memo-v3 required-destination and NoMemo/gapped-sibling controls, actual CPI-guard deposit refusal, and account close/sync/immutable-owner paths.",
+      "Run lender and full position lifecycle, supported Token-2022 venue/graduation, keeper and indexer generated-flow checks.",
+      "Measure applicable CU/trace/depth/size benches on actual new ELF.",
+      "Freeze the new input baseline and run fresh qualifying affected/all-profile fuzz and exact-revision CI; do not borrow the prior old-fixture duration.",
+      "Repeat current mainnet identities and verify operator/governance/funding/alerts before commissioning."
+    ],
+    "final_tag_gate_closed": false,
+    "mainnet_deployment_or_unpause_authorized": false
+  },
+  "actions": {
+    "new_elf_execution_tests_run": false,
+    "fixture_promoted": false,
+    "program_or_root_lock_changed_by_reviewer": false,
+    "signed_transactions_submitted": false,
+    "historical_stopped_audit_or_fuzz_tasks_resumed": false
+  },
+  "evidence_retention_note": "The compact production diff selected by the engineering record omits some production helpers after an internal cfg(test) marker. The reviewer read the complete interface/src/extension/mod.rs diff and new account_len.rs from exact upstream commits; retain their full compressed source/diff as suggested to the release maintainer."
+}

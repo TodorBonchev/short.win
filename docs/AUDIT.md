@@ -14,8 +14,9 @@ to build and test the code, what the code relies on, and what we already know ab
   [current release plan](release/MAINNET-1.0.3.md) supersede earlier audit-first
   and delegated no-go timing. No external audit or funded bounty is a prelaunch
   requirement for this initial phase, and neither is represented as completed.
-  Stable `v1.0.3` remains pending exact-revision CI and qualification of the newly
-  changed Token-2022 executable; this is a technical dependency hold. Mainnet
+  [Full preparation CI 40434130363](https://github.com/TodorBonchev/short.win/actions/runs/40434130363) passed on `57bc1c845`: 25 jobs, zero failed, one intentional nightly skip; all 19 selected mutants killed and canonical Anchor/verifier bytes matched.
+  Stable `v1.0.3` remains pending qualification of the newly changed Token-2022
+  baseline and its final evidence; this is a technical dependency hold. Mainnet
   deployment and funded/monitored operation remain unproven and require the
   concrete governance, signing and operator checks in the release plan.
 

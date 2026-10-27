@@ -1,0 +1,65 @@
+{
+  "total_count": 3,
+  "artifacts": [
+    {
+      "id": 12703760600,
+      "node_id": "MDg6QXJ0aWZhY3QxMjcwMzc2MDYwMA==",
+      "name": "verifiable-build",
+      "size_in_bytes": 437815,
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/artifacts/12703760600",
+      "archive_download_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/artifacts/12703760600/zip",
+      "expired": false,
+      "digest": "sha256:e2fcc3b9ae6c6d7889e6097965bfec649ef87d5cb217fec87f97814aae646fd2",
+      "created_at": "2026-10-27T01:48:15Z",
+      "updated_at": "2026-10-27T01:48:15Z",
+      "expires_at": "2027-01-25T01:42:15Z",
+      "workflow_run": {
+        "id": 40434130363,
+        "repository_id": 1388967862,
+        "head_repository_id": 1388967862,
+        "head_branch": "codex/capped-mainnet-1.0.3",
+        "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da"
+      }
+    },
+    {
+      "id": 12702724998,
+      "node_id": "MDg6QXJ0aWZhY3QxMjcwMjcyNDk5OA==",
+      "name": "protocol-alt",
+      "size_in_bytes": 2232,
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/artifacts/12702724998",
+      "archive_download_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/artifacts/12702724998/zip",
+      "expired": false,
+      "digest": "sha256:b4029af870d9467b03288f1b0b809da44ef9ee3a8f7f4f2ee97444c613e17ba8",
+      "created_at": "2026-10-27T01:45:44Z",
+      "updated_at": "2026-10-27T01:45:44Z",
+      "expires_at": "2027-01-25T01:42:15Z",
+      "workflow_run": {
+        "id": 40434130363,
+        "repository_id": 1388967862,
+        "head_repository_id": 1388967862,
+        "head_branch": "codex/capped-mainnet-1.0.3",
+        "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da"
+      }
+    },
+    {
+      "id": 12702399736,
+      "node_id": "MDg6QXJ0aWZhY3QxMjcwMjM5OTczNg==",
+      "name": "shortwin-program",
+      "size_in_bytes": 1006982,
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/artifacts/12702399736",
+      "archive_download_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/artifacts/12702399736/zip",
+      "expired": false,
+      "digest": "sha256:3c2e4c0b5516806039625700fa865e2c720a71103569b5a2cdd8972f57c3b340",
+      "created_at": "2026-10-27T01:44:00Z",
+      "updated_at": "2026-10-27T01:44:00Z",
+      "expires_at": "2027-01-25T01:42:15Z",
+      "workflow_run": {
+        "id": 40434130363,
+        "repository_id": 1388967862,
+        "head_repository_id": 1388967862,
+        "head_branch": "codex/capped-mainnet-1.0.3",
+        "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da"
+      }
+    }
+  ]
+}
