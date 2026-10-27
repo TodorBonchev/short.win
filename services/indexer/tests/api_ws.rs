@@ -519,7 +519,10 @@ async fn inbound_floods_are_refused_then_closed() {
     )
     .await;
     let mut c = Client::new(addr).await;
-    for _ in 0..12 {
+    // The 11th message crosses twice the limit and starts the server close.
+    // Stop there: an extra unread client frame can cause TCP reset on teardown
+    // and discard the close frame whose policy code this test must observe.
+    for _ in 0..11 {
         c.send(json!({ "op": "ping" })).await;
     }
     let mut pongs = 0;

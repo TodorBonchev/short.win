@@ -8,7 +8,7 @@ is postponed. The working branch name 1.1 is provisional; no final tag exists.
 |---|---|---|
 | 0 | Record scope, architecture alternatives, selected trust direction and mathematical contracts. | Drafts and decision recorded; provider/settings not approved. |
 | 1 | Pure Jupiter V2 header/fixed-account parser and typed finite quantity-cost math. | Implemented prototypes; no production dependency or instruction wiring. Local focused checks and independent review retained. |
-| 2 | Verify canonical fixed quote-job identity; compile actual oracle verifier/type bridge; obtain authentic signed updates and resource measurements. | Offline identity spike passed. Isolated published-SDK compatibility probe in progress. No live feed or signature proof yet. |
+| 2 | Verify canonical fixed quote-job identity; compile actual oracle verifier/type bridge; obtain authentic signed updates and resource measurements. | Offline identity spike and pinned native ABI probe passed. Candidate SDK verifier quarantined after independent source-level safety findings; safe format preflight added. No live feed, repaired verifier or signature/SBF proof yet. |
 | 3 | Isolated bounded execution SBF probe on actual pinned Jupiter, with hostile account/route tests and measured limits. | Not implemented; parser tests are not a routed swap. |
 | 4 | On-chain provider/risk state, history/admission/failure rules, keeper and client/indexer integration; enable only qualified markets. | Not implemented. Ordinary API JSON never supplies authoritative prices. |
 | 5 | Full source/ABI/fork/regression/CU verification and independent integration review; freeze final runtime inputs and fresh qualifying fuzz. | Not started. Prior 1.0.3 duration does not qualify new code. |
@@ -28,3 +28,9 @@ New-market oracle configuration must fail closed until the verifier, immutable
 feed identity, units/quantities, freshness/epoch coherence and financial policy
 are established. The initial actor/provider/settings remain reviewable even
 though the owner authorized the architecture and implementation.
+
+The next producer step follows the [fixed-quantity contract](QUOTE_PRODUCER_CONTRACT.md).
+Fixed-input outAmount jobs do not yet supply B_hat(q), and a candidate ask upper
+cannot supply an economic lower reference for forced actions. The candidate SDK's
+[native pass and qualification blockers](../../audit/jupiter-oracle-sdk-review-2026-10-27.md)
+are separate evidence. Keep its verifier disabled pending reviewed repair/runtime proof.

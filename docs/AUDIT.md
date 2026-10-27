@@ -15,10 +15,14 @@ to build and test the code, what the code relies on, and what we already know ab
   and delegated no-go timing. No external audit or funded bounty is a prelaunch
   requirement for this initial phase, and neither is represented as completed.
   [Full preparation CI 40434130363](https://github.com/TodorBonchev/short.win/actions/runs/40434130363) passed on `57bc1c845`: 25 jobs, zero failed, one intentional nightly skip; all 19 selected mutants killed and canonical Anchor/verifier bytes matched.
-  Stable `v1.0.3` remains pending qualification of the newly changed Token-2022
-  baseline and its final evidence; this is a technical dependency hold. Mainnet
-  deployment and funded/monitored operation remain unproven and require the
-  concrete governance, signing and operator checks in the release plan.
+  The later owner decision **postpones first mainnet for the broad Jupiter redesign**,
+  selecting signed Jupiter-derived feeds with concrete provider/trust/settings
+  review before deployment. The Token-2022 engineering baseline is preserved;
+  its superseded standalone long run remains unstarted/on hold. No new final
+  version is selected. See the [decision](audit/owner-jupiter-redesign-decision-2026-10-27.md),
+  [implementation plan](design/jupiter/IMPLEMENTATION_PLAN.md) and
+  [candidate verifier qualification hold](audit/jupiter-oracle-sdk-review-2026-10-27.md).
+  New runtime qualification and funded/monitored mainnet operation remain open.
 
 **Historical checkpoints below retain their status as of their stated dates.**
 They do not reinstate the superseded audit-first sequence or report current live

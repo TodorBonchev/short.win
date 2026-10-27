@@ -29,6 +29,10 @@ trust/settings reviewed before deployment. Unchecked keeper JSON remains forbidd
 new tokens stay disabled until feed/size/liquidation requirements qualify.
 
 - [ ] Specify and validate the selected signed-feed pricing, quantity/depth and failure rules.
+      Native component ABI checks passed, but the candidate SDK verifier is
+      [quarantined for source-level safety issues](docs/audit/jupiter-oracle-sdk-review-2026-10-27.md).
+      Complete the [exact-quantity producer contract](docs/design/jupiter/QUOTE_PRODUCER_CONTRACT.md)
+      and separately authenticated lower-reference policy; upper-only routes cannot force liquidation.
 - [ ] Implement bounded Jupiter execution, risk integration and compatible services.
 - [ ] Independently review and qualify final code/fixtures, then run fresh fuzz.
 - [ ] Select the new release version and complete funded mainnet commissioning.
@@ -45,8 +49,8 @@ opening-notional cap is 25 SOL per market, not a global TVL or loss cap. See the
 [current release plan](docs/release/MAINNET-1.0.3.md) and
 [dated decision](docs/audit/owner-mainnet-decision-1.0.3-2026-10-27.md).
 
-- [ ] After the pending Jupiter architecture decision, qualify the selected release
-      inputs and repeat current live identities before selecting final `v1.0.3`.
+- [ ] After the selected Jupiter redesign is implemented, qualify its final release
+      inputs and repeat current live identities before selecting the new final version.
       The [Token-2022 engineering follow-up](docs/audit/token2022-qualification-1.0.3-2026-10-27.md)
       is complete: repaired PR CI 40443684567 passed 24 jobs with two intentional
       skips; source-equivalent dispatch 40440067371 killed all 19 selected mutants

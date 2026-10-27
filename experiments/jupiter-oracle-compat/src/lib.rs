@@ -11,6 +11,8 @@ use solana_pubkey::Pubkey;
 use std::str::FromStr;
 use switchboard_on_demand as sb;
 
+pub mod wire;
+
 pub const SCALE: i128 = 1_000_000_000_000_000_000;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,7 +42,10 @@ pub enum ProbeError {
     QueueOwner,
     SysvarIdentity,
     InstructionIndex,
-    Verification(String),
+    InstructionSysvar,
+    InstructionProgram,
+    Envelope(wire::WireError),
+    ProviderVerifierQuarantined,
     Feed,
     Version,
     Freshness,
@@ -103,6 +108,7 @@ fn validate_accounts(
     Ok(())
 }
 
+#[cfg(test)]
 struct PostVerificationView<'a> {
     feed_id: [u8; 32],
     version: u8,
@@ -115,6 +121,7 @@ struct PostVerificationView<'a> {
 
 /// Business-policy checks only. Synthetic unit tests of this helper do not verify
 /// signatures and must never be described as successful oracle-attestation tests.
+#[cfg(test)]
 fn check_post_verification_policy(
     binding: &FeedBinding,
     view: PostVerificationView<'_>,
@@ -153,10 +160,12 @@ fn check_post_verification_policy(
     u64::try_from(view.scaled_value / SCALE).map_err(|_| ProbeError::Value)
 }
 
-/// Real SDK reader call path, compiled but with ZERO successful live-attestation
-/// tests in this experiment. The caller must bind the feed ID to the independently
-/// reviewed immutable job and choose the queue/version/quorum/freshness policy.
-/// This uses the actual instruction sysvar path, never parse_unverified.
+/// Quarantined reader entry point. It NEVER returns an authenticated value.
+///
+/// Native ABI compilation on c70aa259 succeeded, but independent source review
+/// found unsafe SDK slot-hash slice construction and original-sysvar alignment
+/// assumptions. Do not call its verify/verify_instruction_at path until repaired
+/// and separately qualified. This explicit failure is not UNKNOWN=no-route.
 #[allow(clippy::too_many_arguments)]
 pub fn read_verified_raw_output<'info>(
     binding: &FeedBinding,
@@ -164,40 +173,70 @@ pub fn read_verified_raw_output<'info>(
     queue: &anchor_lang::prelude::AccountInfo<'info>,
     slothashes: &anchor_lang::prelude::AccountInfo<'info>,
     instructions: &anchor_lang::prelude::AccountInfo<'info>,
-    clock: &Clock,
-    ed25519_instruction_index: i64,
-    previous_slot: u64,
+    _clock: &Clock,
+    _ed25519_instruction_index: i64,
+    _previous_slot: u64,
 ) -> Result<u64, ProbeError> {
     validate_request(binding, request)?;
     validate_accounts(binding, queue, slothashes, instructions)?;
-    if ed25519_instruction_index < 0 {
+    Err(ProbeError::ProviderVerifierQuarantined)
+}
+
+/// Runtime-instruction FORMAT preflight only. This never calls an SDK verifier,
+/// verifies signatures, checks queue membership or produces a financial value.
+/// A future repaired verifier must consume these exact securely loaded bytes,
+/// with its own alignment and slot-hash safety requirements established.
+pub fn preflight_runtime_envelope(
+    binding: &FeedBinding,
+    instructions: &AccountInfo<'_>,
+    ed25519_instruction_index: i64,
+) -> Result<(), ProbeError> {
+    if instructions.key.to_bytes() != sysvar_key("Sysvar1nstructions1111111111111111111111111")
+        || instructions.owner.to_bytes()
+            != sysvar_key("Sysvar1111111111111111111111111111111111111")
+    {
+        return Err(ProbeError::SysvarIdentity);
+    }
+    let selected_index =
+        u16::try_from(ed25519_instruction_index).map_err(|_| ProbeError::InstructionIndex)?;
+    let ix_data = instructions
+        .try_borrow_data()
+        .map_err(|_| ProbeError::InstructionSysvar)?;
+    if ix_data.len() < 2 {
+        return Err(ProbeError::InstructionSysvar);
+    }
+    drop(ix_data);
+    let current_index = sb::solana_program::sysvar::instructions::load_current_index_checked(
+        pinned_account_as_sdk(instructions),
+    )
+    .map_err(|_| ProbeError::InstructionSysvar)?;
+    if selected_index >= current_index {
         return Err(ProbeError::InstructionIndex);
     }
-    let mut verifier = sb::QuoteVerifier::new();
-    verifier
-        .queue(anchor_account_as_sdk(queue))
-        .slothash_sysvar(anchor_account_as_sdk(slothashes))
-        .ix_sysvar(anchor_account_as_sdk(instructions))
-        .clock_slot(clock.slot)
-        .max_age(binding.max_age_slots);
-    let quote = verifier
-        .verify_instruction_at(ed25519_instruction_index)
-        .map_err(|error| ProbeError::Verification(error.to_string()))?;
-    let feed = quote.feed(&binding.feed_id).map_err(|_| ProbeError::Feed)?;
-    check_post_verification_policy(
-        binding,
-        PostVerificationView {
-            feed_id: *feed.feed_id(),
-            version: quote.version(),
-            recent_slot: quote.slot(),
-            oracle_count: quote.oracle_count,
-            oracle_indices: quote.oracle_idxs,
-            signed_min_samples: feed.min_oracle_samples(),
-            scaled_value: feed.feed_value(),
-        },
-        clock.slot,
-        previous_slot,
+    let ed_instruction = sb::solana_program::sysvar::instructions::load_instruction_at_checked(
+        usize::from(selected_index),
+        pinned_account_as_sdk(instructions),
     )
+    .map_err(|_| ProbeError::InstructionSysvar)?;
+    if ed_instruction.program_id.to_bytes()
+        != sysvar_key("Ed25519SigVerify111111111111111111111111111")
+        || !ed_instruction.accounts.is_empty()
+    {
+        return Err(ProbeError::InstructionProgram);
+    }
+    // Experimental ceilings, not approved production quorum/resource settings.
+    wire::prevalidate_ed25519(
+        &ed_instruction.data,
+        selected_index,
+        binding.quote_version,
+        wire::EnvelopeLimits {
+            maximum_data_length: 1232,
+            maximum_signatures: 8,
+            maximum_feeds: 8,
+        },
+    )
+    .map_err(ProbeError::Envelope)?;
+    Ok(())
 }
 
 /// Byte-based bridge preserves instruction data and all account privileges. It
@@ -527,5 +566,161 @@ mod tests {
         assert!(converted.accounts[0].is_signer && converted.accounts[0].is_writable);
         assert!(!converted.accounts[1].is_signer && !converted.accounts[1].is_writable);
         assert_eq!(converted.data, ix.data);
+    }
+
+    #[test]
+    fn safe_envelope_agrees_with_published_owned_parser_without_authenticating() {
+        // Meaningless signature bytes: this tests format agreement, not auth.
+        let mut data = vec![1, 0];
+        for value in [16u16, 0, 80, 0, 112, 81, 0] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        data.extend_from_slice(&[0x11; 64]);
+        data.extend_from_slice(&[0x22; 32]);
+        data.extend_from_slice(&[0x33; 32]);
+        data.extend_from_slice(&[0x44; 32]);
+        data.extend_from_slice(&(123i128 * SCALE).to_le_bytes());
+        data.push(1);
+        data.push(0);
+        data.extend_from_slice(&1000u64.to_le_bytes());
+        data.push(1);
+        data.extend_from_slice(b"SBOD");
+        let envelope = wire::prevalidate_ed25519(
+            &data,
+            0,
+            1,
+            wire::EnvelopeLimits {
+                maximum_data_length: 1232,
+                maximum_signatures: 8,
+                maximum_feeds: 8,
+            },
+        )
+        .unwrap();
+        let parsed = ParsedEd25519Instruction::parse(&data).unwrap();
+        assert_eq!(parsed.num_signatures, envelope.signature_count());
+        assert_eq!(parsed.slot, envelope.recent_slot());
+        assert_eq!(parsed.version, envelope.version());
+        assert_eq!(parsed.oracle_idxs, envelope.oracle_indices());
+        assert_eq!(parsed.feeds.len(), usize::from(envelope.feed_count()));
+        assert_eq!(
+            parsed.quote_header.signed_slothash,
+            *envelope.signed_slot_hash()
+        );
+        assert_eq!(
+            parsed.signatures[0].pubkey,
+            *envelope.signature(0).unwrap().public_key()
+        );
+        assert_eq!(
+            parsed.signatures[0].signature,
+            *envelope.signature(0).unwrap().signature()
+        );
+        let feed = envelope.feed(0).unwrap();
+        assert_eq!(*parsed.feeds[0].feed_id(), *feed.feed_id());
+        assert_eq!(
+            parsed.feeds[0].feed_value(),
+            i128::from_le_bytes(*feed.raw_value_bytes())
+        );
+        assert_eq!(
+            parsed.feeds[0].min_oracle_samples(),
+            feed.signed_minimum_samples()
+        );
+    }
+
+    #[test]
+    fn reader_is_quarantined_even_with_matching_synthetic_account_identities() {
+        let queue_key = Pubkey::new_from_array([7; 32]);
+        let queue_owner = Pubkey::new_from_array([8; 32]);
+        let sysvar_owner =
+            Pubkey::new_from_array(sysvar_key("Sysvar1111111111111111111111111111111111111"));
+        let slots_key =
+            Pubkey::new_from_array(sysvar_key("SysvarS1otHashes111111111111111111111111111"));
+        let instructions_key =
+            Pubkey::new_from_array(sysvar_key("Sysvar1nstructions1111111111111111111111111"));
+        let (mut q_lamports, mut s_lamports, mut i_lamports) = (0, 0, 0);
+        let (mut q_data, mut s_data, mut i_data) = ([], [], []);
+        let queue = AccountInfo::new(
+            &queue_key,
+            false,
+            false,
+            &mut q_lamports,
+            &mut q_data,
+            &queue_owner,
+            false,
+        );
+        let slots = AccountInfo::new(
+            &slots_key,
+            false,
+            false,
+            &mut s_lamports,
+            &mut s_data,
+            &sysvar_owner,
+            false,
+        );
+        let instructions = AccountInfo::new(
+            &instructions_key,
+            false,
+            false,
+            &mut i_lamports,
+            &mut i_data,
+            &sysvar_owner,
+            false,
+        );
+        assert_eq!(
+            read_verified_raw_output(
+                &binding(),
+                request(),
+                &queue,
+                &slots,
+                &instructions,
+                &Clock::default(),
+                0,
+                0
+            ),
+            Err(ProbeError::ProviderVerifierQuarantined),
+        );
+        assert_eq!(
+            preflight_runtime_envelope(&binding(), &instructions, 0),
+            Err(ProbeError::InstructionSysvar),
+        );
+    }
+
+    #[test]
+    fn real_sysvar_serialization_can_place_ed25519_data_at_an_odd_offset() {
+        use solana_instruction::BorrowedInstruction;
+        let setup_program = Pubkey::new_from_array([1; 32]);
+        let ed_program =
+            Pubkey::new_from_array(sysvar_key("Ed25519SigVerify111111111111111111111111111"));
+        let consumer_program = Pubkey::new_from_array([2; 32]);
+        let setup_data = [0u8; 5];
+        let ed_data = [0u8; 16]; // Intentionally not a valid attestation.
+        let instructions = [
+            BorrowedInstruction {
+                program_id: &setup_program,
+                accounts: vec![],
+                data: &setup_data,
+            },
+            BorrowedInstruction {
+                program_id: &ed_program,
+                accounts: vec![],
+                data: &ed_data,
+            },
+            BorrowedInstruction {
+                program_id: &consumer_program,
+                accounts: vec![],
+                data: &[],
+            },
+        ];
+        let data =
+            sb::solana_program::sysvar::instructions::construct_instructions_data(&instructions);
+        let ed_start = usize::from(u16::from_le_bytes([data[4], data[5]]));
+        // zero account metas: count2 + program32 + data length2 before instruction data.
+        let ed_data_start = ed_start + 36;
+        assert_eq!(ed_data_start, 85);
+        assert_eq!(
+            ed_data_start % std::mem::align_of::<sb::sysvar::Ed25519SignatureOffsets>(),
+            1
+        );
+        assert_eq!(&data[ed_data_start..ed_data_start + 16], &ed_data);
+        // Do not invoke the SDK's unsafe parser on this original odd-offset slice.
     }
 }

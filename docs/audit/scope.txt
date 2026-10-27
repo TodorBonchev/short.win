@@ -115,12 +115,14 @@ crates/shortwin-jupiter-route/src/lib.rs
 # [context] jupiter-oracle-compat: standalone native oracle SDK compatibility experiment; not linked into production and not a live-attestation qualification
 .github/workflows/jupiter-oracle-compat.yml
 experiments/jupiter-oracle-compat/.gitignore
+experiments/jupiter-oracle-compat/Cargo.lock
 experiments/jupiter-oracle-compat/Cargo.toml
 experiments/jupiter-oracle-compat/README.md
 experiments/jupiter-oracle-compat/provenance.json
 experiments/jupiter-oracle-compat/run_probe.py
 experiments/jupiter-oracle-compat/rust-toolchain.toml
 experiments/jupiter-oracle-compat/src/lib.rs
+experiments/jupiter-oracle-compat/src/wire.rs
 experiments/jupiter-oracle-compat/test_run_probe.py
 
 # [core] shortwin-venue-state: no_std venue, mint, Pyth and ProgramData readers

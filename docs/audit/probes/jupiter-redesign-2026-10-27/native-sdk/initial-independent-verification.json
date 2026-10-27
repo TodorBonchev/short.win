@@ -1,0 +1,1767 @@
+{
+  "verified_utc": "2026-10-27T09:00:13.016832+00:00",
+  "reviewer": "independent /root/vps_operator_plan",
+  "run_id": 40476628349,
+  "source_commit": "21db9fadb888e0a29f999e3346f18dc603b9b999",
+  "run_conclusion": "failure",
+  "github_zip_sha256": "789a4fe3267405f734a1f0a27ea1a23f60232640b08fee12d6d037d23255c6fc",
+  "all_internal_hashes_checked": 304,
+  "full_source_git_blobs_and_modes_checked": 2648,
+  "probe_source_files_match_commit": [
+    "experiments/jupiter-oracle-compat/test_run_probe.py",
+    "experiments/jupiter-oracle-compat/rust-toolchain.toml",
+    "experiments/jupiter-oracle-compat/provenance.json",
+    "experiments/jupiter-oracle-compat/README.md",
+    "experiments/jupiter-oracle-compat/run_probe.py",
+    "experiments/jupiter-oracle-compat/.gitignore",
+    "experiments/jupiter-oracle-compat/Cargo.toml",
+    "experiments/jupiter-oracle-compat/src/lib.rs"
+  ],
+  "lock_sha256": "bedbb8980c823eef135d4ecd1dc7e06bba937884b435e9c61618f1ec594afc8a",
+  "lock_packages": 281,
+  "active_registry_packages": 280,
+  "registry_archives_checked": 280,
+  "registry_archive_details": [
+    {
+      "name": "itertools",
+      "version": "0.14.0",
+      "sha256": "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285",
+      "file": "itertools-0.14.0.crate"
+    },
+    {
+      "name": "solana-define-syscall",
+      "version": "4.0.1",
+      "sha256": "57e5b1c0bc1d4a4d10c88a4100499d954c09d3fecfae4912c1a074dff68b1738",
+      "file": "solana-define-syscall-4.0.1.crate"
+    },
+    {
+      "name": "anchor-lang",
+      "version": "1.2.0",
+      "sha256": "90b556a7a0a734b1ee325c54fb5dd8d5708a2b7c85df70501672d1ace202c803",
+      "file": "anchor-lang-1.2.0.crate"
+    },
+    {
+      "name": "wit-bindgen",
+      "version": "0.57.1",
+      "sha256": "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e",
+      "file": "wit-bindgen-0.57.1.crate"
+    },
+    {
+      "name": "bs58",
+      "version": "0.5.1",
+      "sha256": "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4",
+      "file": "bs58-0.5.1.crate"
+    },
+    {
+      "name": "solana-stake-interface",
+      "version": "2.0.2",
+      "sha256": "b9bc26191b533f9a6e5a14cca05174119819ced680a80febff2f5051a713f0db",
+      "file": "solana-stake-interface-2.0.2.crate"
+    },
+    {
+      "name": "pkcs8",
+      "version": "0.11.0",
+      "sha256": "451913da69c775a56034ea8d9003d27ee8948e12443eae7c038ba100a4f21cb7",
+      "file": "pkcs8-0.11.0.crate"
+    },
+    {
+      "name": "anyhow",
+      "version": "1.0.104",
+      "sha256": "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470",
+      "file": "anyhow-1.0.104.crate"
+    },
+    {
+      "name": "rust_decimal",
+      "version": "1.43.0",
+      "sha256": "7653272e75dcac41dc199fbea6f5797633994fafd339943c06c9af16bf29cd3a",
+      "file": "rust_decimal-1.43.0.crate"
+    },
+    {
+      "name": "wasi",
+      "version": "0.11.1+wasi-snapshot-preview1",
+      "sha256": "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b",
+      "file": "wasi-0.11.1+wasi-snapshot-preview1.crate"
+    },
+    {
+      "name": "generic-array",
+      "version": "0.14.7",
+      "sha256": "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a",
+      "file": "generic-array-0.14.7.crate"
+    },
+    {
+      "name": "solana-blake3-hasher",
+      "version": "3.1.0",
+      "sha256": "7116e1d942a2432ca3f514625104757ab8a56233787e95144c93950029e31176",
+      "file": "solana-blake3-hasher-3.1.0.crate"
+    },
+    {
+      "name": "prost-derive",
+      "version": "0.13.5",
+      "sha256": "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d",
+      "file": "prost-derive-0.13.5.crate"
+    },
+    {
+      "name": "cmov",
+      "version": "0.5.4",
+      "sha256": "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a",
+      "file": "cmov-0.5.4.crate"
+    },
+    {
+      "name": "wincode",
+      "version": "0.5.5",
+      "sha256": "66d967db7705dc29120bb6e8ce5b5a2e27734ed5976d1c904e95bd238d1c3c5a",
+      "file": "wincode-0.5.5.crate"
+    },
+    {
+      "name": "lock_api",
+      "version": "0.4.14",
+      "sha256": "224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965",
+      "file": "lock_api-0.4.14.crate"
+    },
+    {
+      "name": "toml_edit",
+      "version": "0.25.17+spec-1.1.0",
+      "sha256": "e3641d5bbb5349a79e1020a242d251efbc546ad8048d133958323ce9c40a9c9c",
+      "file": "toml_edit-0.25.17+spec-1.1.0.crate"
+    },
+    {
+      "name": "bytemuck",
+      "version": "1.25.2",
+      "sha256": "95832e849adfb21180ccb6826a99da14e5d266ae5c2e668e1602cf234f153797",
+      "file": "bytemuck-1.25.2.crate"
+    },
+    {
+      "name": "defmt",
+      "version": "0.3.101",
+      "sha256": "4deef977660e373c458df605a913d4ab121db0ccd18d1ad6976dff7d37cddb53",
+      "file": "defmt-0.3.101.crate"
+    },
+    {
+      "name": "keccak",
+      "version": "0.1.6",
+      "sha256": "cb26cec98cce3a3d96cbb7bced3c4b16e3d13f27ec56dbd62cbc8f39cfb9d653",
+      "file": "keccak-0.1.6.crate"
+    },
+    {
+      "name": "anchor-lang-idl-spec",
+      "version": "0.1.0",
+      "sha256": "2bdf143115440fe621bdac3a29a1f7472e09f6cd82b2aa569429a0c13f103838",
+      "file": "anchor-lang-idl-spec-0.1.0.crate"
+    },
+    {
+      "name": "solana-program-memory",
+      "version": "3.1.0",
+      "sha256": "4068648649653c2c50546e9a7fb761791b5ab0cda054c771bb5808d3a4b9eb52",
+      "file": "solana-program-memory-3.1.0.crate"
+    },
+    {
+      "name": "cfg-if",
+      "version": "1.0.5",
+      "sha256": "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600",
+      "file": "cfg-if-1.0.5.crate"
+    },
+    {
+      "name": "libsecp256k1",
+      "version": "0.7.2",
+      "sha256": "e79019718125edc905a079a70cfa5f3820bc76139fc91d6f9abc27ea2a887139",
+      "file": "libsecp256k1-0.7.2.crate"
+    },
+    {
+      "name": "rand_chacha",
+      "version": "0.9.0",
+      "sha256": "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb",
+      "file": "rand_chacha-0.9.0.crate"
+    },
+    {
+      "name": "blake3",
+      "version": "1.8.7",
+      "sha256": "6d9e454fc11f76977dc803893aff6304ed33d6a26efae8696573bea74baa27ae",
+      "file": "blake3-1.8.7.crate"
+    },
+    {
+      "name": "solana-rent",
+      "version": "3.1.0",
+      "sha256": "e860d5499a705369778647e97d760f7670adfb6fc8419dd3d568deccd46d5487",
+      "file": "solana-rent-3.1.0.crate"
+    },
+    {
+      "name": "solana-program",
+      "version": "4.0.0",
+      "sha256": "778f08fb0eaf52c9a3bef2978247f7fab0ccfddc44cfddb936d5ad9f98ede886",
+      "file": "solana-program-4.0.0.crate"
+    },
+    {
+      "name": "winnow",
+      "version": "1.0.4",
+      "sha256": "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81",
+      "file": "winnow-1.0.4.crate"
+    },
+    {
+      "name": "rfc6979",
+      "version": "0.6.0",
+      "sha256": "b4a459cddafb3fe76b31fd8f1108007566c40301feb64dc7b54656eb7388172b",
+      "file": "rfc6979-0.6.0.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-linux-x86_64",
+      "version": "3.3.0",
+      "sha256": "873cdcc097593432086661aa432b8078f1cd87bfb02847c332e98ae2c119e966",
+      "file": "protoc-bin-vendored-linux-x86_64-3.3.0.crate"
+    },
+    {
+      "name": "rand_core",
+      "version": "0.10.1",
+      "sha256": "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69",
+      "file": "rand_core-0.10.1.crate"
+    },
+    {
+      "name": "heck",
+      "version": "0.5.0",
+      "sha256": "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea",
+      "file": "heck-0.5.0.crate"
+    },
+    {
+      "name": "hashbrown",
+      "version": "0.17.1",
+      "sha256": "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a",
+      "file": "hashbrown-0.17.1.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-linux-aarch_64",
+      "version": "3.3.0",
+      "sha256": "73fa2624782ca04cd44f51554566717377acd240e4c0016d757dd74fccc9324f",
+      "file": "protoc-bin-vendored-linux-aarch_64-3.3.0.crate"
+    },
+    {
+      "name": "sha2",
+      "version": "0.9.9",
+      "sha256": "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800",
+      "file": "sha2-0.9.9.crate"
+    },
+    {
+      "name": "solana-keccak-hasher",
+      "version": "3.1.0",
+      "sha256": "ed1c0d16d6fdeba12291a1f068cdf0d479d9bff1141bf44afd7aa9d485f65ef8",
+      "file": "solana-keccak-hasher-3.1.0.crate"
+    },
+    {
+      "name": "curve25519-dalek",
+      "version": "4.1.3",
+      "sha256": "97fb8b7c4503de7d6ae7b42ab72a5a59857b4c937ec27a3d4539dba95b5ab2be",
+      "file": "curve25519-dalek-4.1.3.crate"
+    },
+    {
+      "name": "protoc-bin-vendored",
+      "version": "3.3.0",
+      "sha256": "8760a25b6ff9c620324822737e468478fa092234190d2e449760344354896ed9",
+      "file": "protoc-bin-vendored-3.3.0.crate"
+    },
+    {
+      "name": "solana-instructions-sysvar",
+      "version": "3.0.1",
+      "sha256": "9e0732294560e88ecdb2bbc656e67383e9f88c78ec09469cef172f0d28cd1bcd",
+      "file": "solana-instructions-sysvar-3.0.1.crate"
+    },
+    {
+      "name": "ident_case",
+      "version": "1.0.1",
+      "sha256": "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39",
+      "file": "ident_case-1.0.1.crate"
+    },
+    {
+      "name": "sha2-const-stable",
+      "version": "0.1.0",
+      "sha256": "5f179d4e11094a893b82fff208f74d448a7512f99f5a0acbd5c679b705f83ed9",
+      "file": "sha2-const-stable-0.1.0.crate"
+    },
+    {
+      "name": "solana-slot-history",
+      "version": "3.2.0",
+      "sha256": "4560fde841a6f2001aedc33b74fe99840ee3d56a71fe9b98ee332303b8597900",
+      "file": "solana-slot-history-3.2.0.crate"
+    },
+    {
+      "name": "anchor-attribute-error",
+      "version": "1.2.0",
+      "sha256": "1e5f6290f0f54e0e34b8efbb4dcd69dc2c46c655ada8198f35f403d2a88cf9c7",
+      "file": "anchor-attribute-error-1.2.0.crate"
+    },
+    {
+      "name": "anchor-lang-error",
+      "version": "1.2.0",
+      "sha256": "521690425c1f243d6cd2cb4d1fc46f44a017ad5d58a56fd1cd57313accae7355",
+      "file": "anchor-lang-error-1.2.0.crate"
+    },
+    {
+      "name": "solana-serialize-utils",
+      "version": "3.1.2",
+      "sha256": "761357b0853c9623bf12c1d2314b3d6160a85b087b84c45224fb85766d22616b",
+      "file": "solana-serialize-utils-3.1.2.crate"
+    },
+    {
+      "name": "regex",
+      "version": "1.13.1",
+      "sha256": "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d",
+      "file": "regex-1.13.1.crate"
+    },
+    {
+      "name": "bytes",
+      "version": "1.12.1",
+      "sha256": "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04",
+      "file": "bytes-1.12.1.crate"
+    },
+    {
+      "name": "solana-sdk-ids",
+      "version": "3.1.0",
+      "sha256": "def234c1956ff616d46c9dd953f251fa7096ddbaa6d52b165218de97882b7280",
+      "file": "solana-sdk-ids-3.1.0.crate"
+    },
+    {
+      "name": "hybrid-array",
+      "version": "0.4.15",
+      "sha256": "27f864f10dfb56725ce5ce5472bc52252c8f93a4ab86327122cebf62c5f59a17",
+      "file": "hybrid-array-0.4.15.crate"
+    },
+    {
+      "name": "base16ct",
+      "version": "1.0.0",
+      "sha256": "fd307490d624467aa6f74b0eabb77633d1f758a7b25f12bceb0b22e08d9726f6",
+      "file": "base16ct-1.0.0.crate"
+    },
+    {
+      "name": "pbjson",
+      "version": "0.7.0",
+      "sha256": "c7e6349fa080353f4a597daffd05cb81572a9c031a6d4fff7e504947496fcc68",
+      "file": "pbjson-0.7.0.crate"
+    },
+    {
+      "name": "const-oid",
+      "version": "0.10.2",
+      "sha256": "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c",
+      "file": "const-oid-0.10.2.crate"
+    },
+    {
+      "name": "solana-serde-varint",
+      "version": "3.0.1",
+      "sha256": "950e5b83e839dc0f92c66afc124bb8f40e89bc90f0579e8ec5499296d27f54e3",
+      "file": "solana-serde-varint-3.0.1.crate"
+    },
+    {
+      "name": "num-traits",
+      "version": "0.2.19",
+      "sha256": "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841",
+      "file": "num-traits-0.2.19.crate"
+    },
+    {
+      "name": "anchor-derive-space",
+      "version": "1.2.0",
+      "sha256": "69520cea030ee13d2978087a467bf32078012a5ce06b2746318c359887d481ed",
+      "file": "anchor-derive-space-1.2.0.crate"
+    },
+    {
+      "name": "solana-pubkey",
+      "version": "3.0.0",
+      "sha256": "8909d399deb0851aa524420beeb5646b115fd253ef446e35fe4504c904da3941",
+      "file": "solana-pubkey-3.0.0.crate"
+    },
+    {
+      "name": "anchor-derive-serde",
+      "version": "1.2.0",
+      "sha256": "fa658e7d911c4290fe9ee953e75cf95f3c4db19c053f64071512867fa9f40394",
+      "file": "anchor-derive-serde-1.2.0.crate"
+    },
+    {
+      "name": "hmac",
+      "version": "0.13.0",
+      "sha256": "6303bc9732ae41b04cb554b844a762b4115a61bfaa81e3e83050991eeb56863f",
+      "file": "hmac-0.13.0.crate"
+    },
+    {
+      "name": "zmij",
+      "version": "1.0.23",
+      "sha256": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b",
+      "file": "zmij-1.0.23.crate"
+    },
+    {
+      "name": "five8",
+      "version": "1.0.0",
+      "sha256": "23f76610e969fa1784327ded240f1e28a3fd9520c9cec93b636fcf62dd37f772",
+      "file": "five8-1.0.0.crate"
+    },
+    {
+      "name": "serde_bytes",
+      "version": "0.11.19",
+      "sha256": "a5d440709e79d88e51ac01c4b72fc6cb7314017bb7da9eeff678aa94c10e3ea8",
+      "file": "serde_bytes-0.11.19.crate"
+    },
+    {
+      "name": "base64",
+      "version": "0.21.7",
+      "sha256": "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567",
+      "file": "base64-0.21.7.crate"
+    },
+    {
+      "name": "solana-invoke",
+      "version": "0.5.1",
+      "sha256": "84737807e1a4d6d9bbad8358c442ba8a7eb5a260b0f20a20edb98d6b9845b07e",
+      "file": "solana-invoke-0.5.1.crate"
+    },
+    {
+      "name": "defmt-parser",
+      "version": "1.1.0",
+      "sha256": "71958f69fb2de856c5dd51ac9377e986ca1aa5919f931bf5395a807277f889a0",
+      "file": "defmt-parser-1.1.0.crate"
+    },
+    {
+      "name": "num-bigint",
+      "version": "0.4.8",
+      "sha256": "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367",
+      "file": "num-bigint-0.4.8.crate"
+    },
+    {
+      "name": "equivalent",
+      "version": "1.0.3",
+      "sha256": "00d174d5400e5e8fd687ad1049e2f578285fa914201b1af7e8b112a4546bd826",
+      "file": "equivalent-1.0.3.crate"
+    },
+    {
+      "name": "unicode-ident",
+      "version": "1.0.27",
+      "sha256": "a2c754d6c33795a1c324727428e5a7dedb5b06195f9890bdbcba760d3e246563",
+      "file": "unicode-ident-1.0.27.crate"
+    },
+    {
+      "name": "wasm-bindgen-macro",
+      "version": "0.2.129",
+      "sha256": "2e29d0c35b16e224a7eeb5cd2d25e3e1968fbd65604117b44d3b789d00ee8535",
+      "file": "wasm-bindgen-macro-0.2.129.crate"
+    },
+    {
+      "name": "scopeguard",
+      "version": "1.2.0",
+      "sha256": "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49",
+      "file": "scopeguard-1.2.0.crate"
+    },
+    {
+      "name": "smallvec",
+      "version": "1.16.4",
+      "sha256": "d0d5d4b1981b8bbbb7aed204cae5726d683d5d6ac7e74ec54122ea28f315e7c8",
+      "file": "smallvec-1.16.4.crate"
+    },
+    {
+      "name": "base64",
+      "version": "0.22.1",
+      "sha256": "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6",
+      "file": "base64-0.22.1.crate"
+    },
+    {
+      "name": "anchor-lang-idl",
+      "version": "0.1.4",
+      "sha256": "47914b4290ae2bdf4ec203aa821e6eba86d7c78ef497918938038dcc6919f953",
+      "file": "anchor-lang-idl-0.1.4.crate"
+    },
+    {
+      "name": "rand_core",
+      "version": "0.6.4",
+      "sha256": "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c",
+      "file": "rand_core-0.6.4.crate"
+    },
+    {
+      "name": "r-efi",
+      "version": "5.3.0",
+      "sha256": "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f",
+      "file": "r-efi-5.3.0.crate"
+    },
+    {
+      "name": "solana-sysvar",
+      "version": "3.1.1",
+      "sha256": "6690d3dd88f15c21edff68eb391ef8800df7a1f5cec84ee3e8d1abf05affdf74",
+      "file": "solana-sysvar-3.1.1.crate"
+    },
+    {
+      "name": "arrayvec",
+      "version": "0.7.8",
+      "sha256": "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56",
+      "file": "arrayvec-0.7.8.crate"
+    },
+    {
+      "name": "anchor-derive-accounts",
+      "version": "1.2.0",
+      "sha256": "b802cd6561645117219ae6ed62cd322501bf1b5b7fa1a6fd8d911428c4c37192",
+      "file": "anchor-derive-accounts-1.2.0.crate"
+    },
+    {
+      "name": "proc-macro-crate",
+      "version": "3.5.0",
+      "sha256": "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f",
+      "file": "proc-macro-crate-3.5.0.crate"
+    },
+    {
+      "name": "fixedbitset",
+      "version": "0.5.7",
+      "sha256": "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99",
+      "file": "fixedbitset-0.5.7.crate"
+    },
+    {
+      "name": "num-integer",
+      "version": "0.1.47",
+      "sha256": "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b",
+      "file": "num-integer-0.1.47.crate"
+    },
+    {
+      "name": "indexmap",
+      "version": "2.14.2",
+      "sha256": "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855",
+      "file": "indexmap-2.14.2.crate"
+    },
+    {
+      "name": "libsecp256k1-gen-genmult",
+      "version": "0.3.0",
+      "sha256": "3db8d6ba2cec9eacc40e6e8ccc98931840301f1006e95647ceb2dd5c3aa06f7c",
+      "file": "libsecp256k1-gen-genmult-0.3.0.crate"
+    },
+    {
+      "name": "solana-clock",
+      "version": "3.1.1",
+      "sha256": "f0acdace90d96e2c9e70d681465b4fe888b6bcf27c354ae9774e9f8a3b72923d",
+      "file": "solana-clock-3.1.1.crate"
+    },
+    {
+      "name": "arrayref",
+      "version": "0.3.9",
+      "sha256": "76a2e8124351fda1ef8aaaa3bbd7ebbcb486bbcd4225aca0aa0d84bb2db8fecb",
+      "file": "arrayref-0.3.9.crate"
+    },
+    {
+      "name": "hmac",
+      "version": "0.8.1",
+      "sha256": "126888268dcc288495a26bf004b38c5fdbb31682f992c84ceb046a1f0fe38840",
+      "file": "hmac-0.8.1.crate"
+    },
+    {
+      "name": "solana-instruction",
+      "version": "3.4.1",
+      "sha256": "a3957ca1d31107efd9a6bb88b25c348ca5e3b4b6683e3d08adb86d3d17aa01f1",
+      "file": "solana-instruction-3.4.1.crate"
+    },
+    {
+      "name": "thiserror",
+      "version": "1.0.69",
+      "sha256": "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52",
+      "file": "thiserror-1.0.69.crate"
+    },
+    {
+      "name": "regex-syntax",
+      "version": "0.8.11",
+      "sha256": "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4",
+      "file": "regex-syntax-0.8.11.crate"
+    },
+    {
+      "name": "bitflags",
+      "version": "1.3.2",
+      "sha256": "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a",
+      "file": "bitflags-1.3.2.crate"
+    },
+    {
+      "name": "parking_lot_core",
+      "version": "0.9.12",
+      "sha256": "2621685985a2ebf1c516881c026032ac7deafcda1a2c9b7850dc81e3dfcb64c1",
+      "file": "parking_lot_core-0.9.12.crate"
+    },
+    {
+      "name": "sec1",
+      "version": "0.8.1",
+      "sha256": "d56d437c2f19203ce5f7122e507831de96f3d2d4d3be5af44a0b0a09d8a80e4d",
+      "file": "sec1-0.8.1.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-linux-x86_32",
+      "version": "3.3.0",
+      "sha256": "171e39f1e846e5f322ced1ac3b8d4cd3a3833ca24b6e5d58b3632574fe6204fa",
+      "file": "protoc-bin-vendored-linux-x86_32-3.3.0.crate"
+    },
+    {
+      "name": "bytemuck_derive",
+      "version": "1.12.1",
+      "sha256": "6a1f896587b6f2c069c73d2f0913e2d590c3990285cd2f0b6aa02b786b4c679c",
+      "file": "bytemuck_derive-1.12.1.crate"
+    },
+    {
+      "name": "solana-program-entrypoint",
+      "version": "3.1.1",
+      "sha256": "84c9b0a1ff494e05f503a08b3d51150b73aa639544631e510279d6375f290997",
+      "file": "solana-program-entrypoint-3.1.1.crate"
+    },
+    {
+      "name": "der",
+      "version": "0.8.3",
+      "sha256": "6a996a108feb8b427a6e12fcf6af4aa83409b79d72c15337d7741368131ee004",
+      "file": "der-0.8.3.crate"
+    },
+    {
+      "name": "solana-pubkey",
+      "version": "4.2.1",
+      "sha256": "6ab5a422939ca3b81180f79c87f43600728e4c5513d6034902675f96df25d033",
+      "file": "solana-pubkey-4.2.1.crate"
+    },
+    {
+      "name": "rand_core",
+      "version": "0.9.5",
+      "sha256": "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c",
+      "file": "rand_core-0.9.5.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-linux-ppcle_64",
+      "version": "3.3.0",
+      "sha256": "e2417e9817fa237dab803ad4dda7357a111656e242959cc6b8f9a1a583367d42",
+      "file": "protoc-bin-vendored-linux-ppcle_64-3.3.0.crate"
+    },
+    {
+      "name": "syn",
+      "version": "2.0.119",
+      "sha256": "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297",
+      "file": "syn-2.0.119.crate"
+    },
+    {
+      "name": "anchor-attribute-program",
+      "version": "1.2.0",
+      "sha256": "51180111bea3660c0db345bfee34cf23f8d89cf2ac8dd5d8c7a044b3fb24d961",
+      "file": "anchor-attribute-program-1.2.0.crate"
+    },
+    {
+      "name": "zerocopy",
+      "version": "0.8.63",
+      "sha256": "e5fe1f8f1b06191a00962174c61aa5005e0bb391a6d80d07e24d115c01a92ed8",
+      "file": "zerocopy-0.8.63.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-win32",
+      "version": "3.3.0",
+      "sha256": "263a3f48f01e7309e857138bd47f785585b4a005e8e56c6d2824ce91195999c3",
+      "file": "protoc-bin-vendored-win32-3.3.0.crate"
+    },
+    {
+      "name": "anchor-attribute-access-control",
+      "version": "1.2.0",
+      "sha256": "9a0ba6f4d5cff33a16a8cb30fd7419b71cf8b8b408998a341235cefe7e76cc1c",
+      "file": "anchor-attribute-access-control-1.2.0.crate"
+    },
+    {
+      "name": "anchor-attribute-constant",
+      "version": "1.2.0",
+      "sha256": "345a11192cd11fdc8663e3194bbcd0c983c019cd9f21804d7853eeee5ee22653",
+      "file": "anchor-attribute-constant-1.2.0.crate"
+    },
+    {
+      "name": "rustversion",
+      "version": "1.0.23",
+      "sha256": "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f",
+      "file": "rustversion-1.0.23.crate"
+    },
+    {
+      "name": "solana-borsh",
+      "version": "3.0.2",
+      "sha256": "c04abbae16f57178a163125805637b8a076175bb5c0002fb04f4792bea901cf7",
+      "file": "solana-borsh-3.0.2.crate"
+    },
+    {
+      "name": "solana-nonce",
+      "version": "3.2.1",
+      "sha256": "c4172d5b33a0a38fcdb2af8f84406570dd51567267da96c28ad0f31fc11621c0",
+      "file": "solana-nonce-3.2.1.crate"
+    },
+    {
+      "name": "pbjson-build",
+      "version": "0.7.0",
+      "sha256": "6eea3058763d6e656105d1403cb04e0a41b7bbac6362d413e7c33be0c32279c9",
+      "file": "pbjson-build-0.7.0.crate"
+    },
+    {
+      "name": "prost-types",
+      "version": "0.13.5",
+      "sha256": "52c2c1bf36ddb1a1c396b3601a3cec27c2462e45f07c386894ec3ccf5332bd16",
+      "file": "prost-types-0.13.5.crate"
+    },
+    {
+      "name": "anchor-attribute-event",
+      "version": "1.2.0",
+      "sha256": "d0159e0fae5b1b508110b8753fda23ebce778f3bd8c146b8baabd12d2cebe4a7",
+      "file": "anchor-attribute-event-1.2.0.crate"
+    },
+    {
+      "name": "hash32",
+      "version": "0.3.1",
+      "sha256": "47d60b12902ba28e2730cd37e95b8c9223af2808df9e902d4df49588d1470606",
+      "file": "hash32-0.3.1.crate"
+    },
+    {
+      "name": "thiserror-impl",
+      "version": "1.0.69",
+      "sha256": "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1",
+      "file": "thiserror-impl-1.0.69.crate"
+    },
+    {
+      "name": "crunchy",
+      "version": "0.2.4",
+      "sha256": "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5",
+      "file": "crunchy-0.2.4.crate"
+    },
+    {
+      "name": "errno",
+      "version": "0.3.14",
+      "sha256": "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb",
+      "file": "errno-0.3.14.crate"
+    },
+    {
+      "name": "solana-hash",
+      "version": "4.7.0",
+      "sha256": "c7507df0d2c6350053d125e3df200976fdc68d2a942637d11ac657fe7220949a",
+      "file": "solana-hash-4.7.0.crate"
+    },
+    {
+      "name": "toml_parser",
+      "version": "1.1.5+spec-1.1.0",
+      "sha256": "baa693a8032d7e1cada7d0041e96126df243179ff061456783ac7f12bda4744c",
+      "file": "toml_parser-1.1.5+spec-1.1.0.crate"
+    },
+    {
+      "name": "stable_deref_trait",
+      "version": "1.2.1",
+      "sha256": "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596",
+      "file": "stable_deref_trait-1.2.1.crate"
+    },
+    {
+      "name": "constant_time_eq",
+      "version": "0.4.2",
+      "sha256": "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b",
+      "file": "constant_time_eq-0.4.2.crate"
+    },
+    {
+      "name": "wincode-derive",
+      "version": "0.4.6",
+      "sha256": "15ab90b719560d0fda79c74550ad1c948d17b118765942838055ebaf34d67071",
+      "file": "wincode-derive-0.4.6.crate"
+    },
+    {
+      "name": "find-msvc-tools",
+      "version": "0.1.15",
+      "sha256": "1c66915cc5391097de7a2b0b972e8505aa33c0df401fd3a6811dbdb32881ba48",
+      "file": "find-msvc-tools-0.1.15.crate"
+    },
+    {
+      "name": "getrandom",
+      "version": "0.3.4",
+      "sha256": "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd",
+      "file": "getrandom-0.3.4.crate"
+    },
+    {
+      "name": "solana-secp256k1-recover",
+      "version": "3.3.1",
+      "sha256": "99f00f973301968be9f05f4af951974a28848b6513fb16edf77c8af20e681914",
+      "file": "solana-secp256k1-recover-3.3.1.crate"
+    },
+    {
+      "name": "crypto-common",
+      "version": "0.1.7",
+      "sha256": "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a",
+      "file": "crypto-common-0.1.7.crate"
+    },
+    {
+      "name": "solana-system-interface",
+      "version": "2.0.0",
+      "sha256": "4e1790547bfc3061f1ee68ea9d8dc6c973c02a163697b24263a8e9f2e6d4afa2",
+      "file": "solana-system-interface-2.0.0.crate"
+    },
+    {
+      "name": "solana-define-syscall",
+      "version": "5.3.0",
+      "sha256": "e4d02bb1453b6f9e1e705383a44b98a8722669b44adcdfe3643183987fdad72e",
+      "file": "solana-define-syscall-5.3.0.crate"
+    },
+    {
+      "name": "cfg_aliases",
+      "version": "0.2.2",
+      "sha256": "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527",
+      "file": "cfg_aliases-0.2.2.crate"
+    },
+    {
+      "name": "solana-last-restart-slot",
+      "version": "3.2.0",
+      "sha256": "5099e736c3c06c451b307a60637d69eb65b3144143ebeed899e2fd1134f4fc35",
+      "file": "solana-last-restart-slot-3.2.0.crate"
+    },
+    {
+      "name": "strsim",
+      "version": "0.11.1",
+      "sha256": "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f",
+      "file": "strsim-0.11.1.crate"
+    },
+    {
+      "name": "bitflags",
+      "version": "2.13.2",
+      "sha256": "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06",
+      "file": "bitflags-2.13.2.crate"
+    },
+    {
+      "name": "shlex",
+      "version": "2.0.1",
+      "sha256": "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba",
+      "file": "shlex-2.0.1.crate"
+    },
+    {
+      "name": "redox_syscall",
+      "version": "0.5.18",
+      "sha256": "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d",
+      "file": "redox_syscall-0.5.18.crate"
+    },
+    {
+      "name": "solana-epoch-stake",
+      "version": "3.0.1",
+      "sha256": "027e6d0b9e7daac5b2ac7c3f9ca1b727861121d9ef05084cf435ff736051e7c2",
+      "file": "solana-epoch-stake-3.0.1.crate"
+    },
+    {
+      "name": "solana-stake-history",
+      "version": "1.0.0",
+      "sha256": "c736a6aa0e53b9d264d90b06589fc0996f49f882f3e71842ed754fc57ffc1a43",
+      "file": "solana-stake-history-1.0.0.crate"
+    },
+    {
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "sha256": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "file": "proc-macro2-1.0.107.crate"
+    },
+    {
+      "name": "digest",
+      "version": "0.9.0",
+      "sha256": "d3dd60d1080a57a05ab032377049e0591415d2b31afd7028356dbf3cc6dcb066",
+      "file": "digest-0.9.0.crate"
+    },
+    {
+      "name": "switchboard-protos",
+      "version": "0.2.6",
+      "sha256": "dfe8595504af7819a8b0cf16825a0ea992ac60fc0bab6ff22d96c05081161769",
+      "file": "switchboard-protos-0.2.6.crate"
+    },
+    {
+      "name": "rand",
+      "version": "0.8.8",
+      "sha256": "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c",
+      "file": "rand-0.8.8.crate"
+    },
+    {
+      "name": "wasip2",
+      "version": "1.0.4+wasi-0.2.12",
+      "sha256": "b67efb37e106e55ce722a510d6b5f9c17f083e5fc79afc2badeb12cc313d9487",
+      "file": "wasip2-1.0.4+wasi-0.2.12.crate"
+    },
+    {
+      "name": "feature-probe",
+      "version": "0.1.1",
+      "sha256": "835a3dc7d1ec9e75e2b5fb4ba75396837112d2060b03f7d43bc1897c7f7211da",
+      "file": "feature-probe-0.1.1.crate"
+    },
+    {
+      "name": "borsh-derive",
+      "version": "1.8.1",
+      "sha256": "12cdfe656708a01f89b451a7d36466e6fe6c414de0aa18fc54f864f6f9ca9f56",
+      "file": "borsh-derive-1.8.1.crate"
+    },
+    {
+      "name": "serde_json",
+      "version": "1.0.154",
+      "sha256": "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6",
+      "file": "serde_json-1.0.154.crate"
+    },
+    {
+      "name": "block-buffer",
+      "version": "0.10.4",
+      "sha256": "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71",
+      "file": "block-buffer-0.10.4.crate"
+    },
+    {
+      "name": "tinyvec",
+      "version": "1.13.3",
+      "sha256": "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee",
+      "file": "tinyvec-1.13.3.crate"
+    },
+    {
+      "name": "rand",
+      "version": "0.9.5",
+      "sha256": "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41",
+      "file": "rand-0.9.5.crate"
+    },
+    {
+      "name": "memoffset",
+      "version": "0.9.1",
+      "sha256": "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a",
+      "file": "memoffset-0.9.1.crate"
+    },
+    {
+      "name": "solana-account-info",
+      "version": "3.1.1",
+      "sha256": "a9cf16495d9eb53e3d04e72366a33bb1c20c24e78c171d8b8f5978357b63ae95",
+      "file": "solana-account-info-3.1.1.crate"
+    },
+    {
+      "name": "quote",
+      "version": "1.0.47",
+      "sha256": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "file": "quote-1.0.47.crate"
+    },
+    {
+      "name": "solana-program-pack",
+      "version": "3.1.0",
+      "sha256": "3d7701cb15b90667ae1c89ef4ac35a59c61e66ce58ddee13d729472af7f41d59",
+      "file": "solana-program-pack-3.1.0.crate"
+    },
+    {
+      "name": "solana-define-syscall",
+      "version": "3.0.0",
+      "sha256": "f9697086a4e102d28a156b8d6b521730335d6951bd39a5e766512bbe09007cee",
+      "file": "solana-define-syscall-3.0.0.crate"
+    },
+    {
+      "name": "rand_chacha",
+      "version": "0.3.1",
+      "sha256": "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88",
+      "file": "rand_chacha-0.3.1.crate"
+    },
+    {
+      "name": "regex-automata",
+      "version": "0.4.18",
+      "sha256": "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2",
+      "file": "regex-automata-0.4.18.crate"
+    },
+    {
+      "name": "windows-link",
+      "version": "0.2.1",
+      "sha256": "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5",
+      "file": "windows-link-0.2.1.crate"
+    },
+    {
+      "name": "thiserror",
+      "version": "2.0.21",
+      "sha256": "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e",
+      "file": "thiserror-2.0.21.crate"
+    },
+    {
+      "name": "heck",
+      "version": "0.3.3",
+      "sha256": "6d621efb26863f0e9924c6ac577e8275e5e6b77455db64ffa6c65c904e9e132c",
+      "file": "heck-0.3.3.crate"
+    },
+    {
+      "name": "faster-hex",
+      "version": "0.10.1",
+      "sha256": "04839bdf9d8c10f66806fad16b852fc72aab80873aebc3cb69d85b4fa41543ed",
+      "file": "faster-hex-0.10.1.crate"
+    },
+    {
+      "name": "anchor-attribute-account",
+      "version": "1.2.0",
+      "sha256": "af875fe99d9dab01317a3bac577b05f3e52d5bd7d1b424de488ba51f3310feab",
+      "file": "anchor-attribute-account-1.2.0.crate"
+    },
+    {
+      "name": "solana-program-option",
+      "version": "3.1.0",
+      "sha256": "7a88006a9b8594088cec9027ab77caaaa258a2aaa2083d3f086c44b42e50aeab",
+      "file": "solana-program-option-3.1.0.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-linux-s390_64",
+      "version": "3.3.0",
+      "sha256": "4d189c34636356a46a7ed3188233dc8a88c431278cc54d4a19b096a2d270e985",
+      "file": "protoc-bin-vendored-linux-s390_64-3.3.0.crate"
+    },
+    {
+      "name": "curve25519-dalek-derive",
+      "version": "0.1.1",
+      "sha256": "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3",
+      "file": "curve25519-dalek-derive-0.1.1.crate"
+    },
+    {
+      "name": "unicode-segmentation",
+      "version": "1.13.3",
+      "sha256": "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8",
+      "file": "unicode-segmentation-1.13.3.crate"
+    },
+    {
+      "name": "solana-feature-gate-interface",
+      "version": "3.1.0",
+      "sha256": "75ca9b5cbb6f500f7fd73db5bd95640f71a83f04d6121a0e59a43b202dca2731",
+      "file": "solana-feature-gate-interface-3.1.0.crate"
+    },
+    {
+      "name": "bv",
+      "version": "0.11.1",
+      "sha256": "8834bb1d8ee5dc048ee3124f2c7c1afcc6bc9aed03f11e9dfd8c69470a5db340",
+      "file": "bv-0.11.1.crate"
+    },
+    {
+      "name": "wasm-bindgen-macro-support",
+      "version": "0.2.129",
+      "sha256": "6f501a8bc3719dba86ef8ae4728879c08001bea749eb1333ac5b91e040e2a6b7",
+      "file": "wasm-bindgen-macro-support-0.2.129.crate"
+    },
+    {
+      "name": "serdect",
+      "version": "0.4.3",
+      "sha256": "66cf8fedced2fcf12406bcb34223dffb92eaf34908ede12fed414c82b7f00b3e",
+      "file": "serdect-0.4.3.crate"
+    },
+    {
+      "name": "solana-sha256-hasher",
+      "version": "3.1.0",
+      "sha256": "db7dc3011ea4c0334aaaa7e7128cb390ecf546b28d412e9bf2064680f57f588f",
+      "file": "solana-sha256-hasher-3.1.0.crate"
+    },
+    {
+      "name": "anchor-syn",
+      "version": "1.2.0",
+      "sha256": "1ef87b1d3ae59fbf265a9157a9082308af220b4ef5a64a360d8820dcf25b5a86",
+      "file": "anchor-syn-1.2.0.crate"
+    },
+    {
+      "name": "opaque-debug",
+      "version": "0.3.1",
+      "sha256": "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381",
+      "file": "opaque-debug-0.3.1.crate"
+    },
+    {
+      "name": "memchr",
+      "version": "2.8.3",
+      "sha256": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
+      "file": "memchr-2.8.3.crate"
+    },
+    {
+      "name": "zeroize",
+      "version": "1.9.1",
+      "sha256": "e13084392c5e4bc371903e2935a5eaeed24905a7511356b883835e18a78f6879",
+      "file": "zeroize-1.9.1.crate"
+    },
+    {
+      "name": "solana-native-token",
+      "version": "3.0.0",
+      "sha256": "ae8dd4c280dca9d046139eb5b7a5ac9ad10403fbd64964c7d7571214950d758f",
+      "file": "solana-native-token-3.0.0.crate"
+    },
+    {
+      "name": "solana-sysvar",
+      "version": "4.1.0",
+      "sha256": "ada7045bbfdd802af08fbc9c7e2b56ddabb20599d22e4c3840fcef5e7afb8324",
+      "file": "solana-sysvar-4.1.0.crate"
+    },
+    {
+      "name": "getrandom",
+      "version": "0.2.17",
+      "sha256": "ff2abc00be7fca6ebc474524697ae276ad847ad0a6b3faa4bcb027e9a4614ad0",
+      "file": "getrandom-0.2.17.crate"
+    },
+    {
+      "name": "solana-atomic-u64",
+      "version": "3.0.1",
+      "sha256": "085db4906d89324cef2a30840d59eaecf3d4231c560ec7c9f6614a93c652f501",
+      "file": "solana-atomic-u64-3.0.1.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-macos-aarch_64",
+      "version": "3.3.0",
+      "sha256": "eeb72df001783b8297847fe8f5f874ee400fd742c843d60583e8c23d96977c7f",
+      "file": "protoc-bin-vendored-macos-aarch_64-3.3.0.crate"
+    },
+    {
+      "name": "signature",
+      "version": "3.0.0",
+      "sha256": "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5",
+      "file": "signature-3.0.0.crate"
+    },
+    {
+      "name": "solana-sysvar-id",
+      "version": "3.1.0",
+      "sha256": "17358d1e9a13e5b9c2264d301102126cf11a47fd394cdf3dec174fe7bc96e1de",
+      "file": "solana-sysvar-id-3.1.0.crate"
+    },
+    {
+      "name": "linux-raw-sys",
+      "version": "0.12.1",
+      "sha256": "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53",
+      "file": "linux-raw-sys-0.12.1.crate"
+    },
+    {
+      "name": "solana-slot-hashes",
+      "version": "3.2.0",
+      "sha256": "007d6bc909599eea325c9d09f7ff16ef6166c134876ff47a6a122d693d058dad",
+      "file": "solana-slot-hashes-3.2.0.crate"
+    },
+    {
+      "name": "windows-sys",
+      "version": "0.61.2",
+      "sha256": "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc",
+      "file": "windows-sys-0.61.2.crate"
+    },
+    {
+      "name": "five8_core",
+      "version": "1.0.0",
+      "sha256": "059c31d7d36c43fe39d89e55711858b4da8be7eb6dabac23c7289b1a19489406",
+      "file": "five8_core-1.0.0.crate"
+    },
+    {
+      "name": "solana-address",
+      "version": "1.1.0",
+      "sha256": "a2ecac8e1b7f74c2baa9e774c42817e3e75b20787134b76cc4d45e8a604488f5",
+      "file": "solana-address-1.1.0.crate"
+    },
+    {
+      "name": "solana-loader-v3-interface",
+      "version": "6.1.1",
+      "sha256": "2e0538d4dbc9022e01616f1c58f2db98ece739c5d5ed4a2ef8737a953e76a2d4",
+      "file": "solana-loader-v3-interface-6.1.1.crate"
+    },
+    {
+      "name": "switchboard-on-demand",
+      "version": "0.13.0",
+      "sha256": "bc7a36809592252cc73f9ec01623b89628654a2fba00dbf5c339c286eb040d40",
+      "file": "switchboard-on-demand-0.13.0.crate"
+    },
+    {
+      "name": "wasm-bindgen",
+      "version": "0.2.129",
+      "sha256": "9bb54f33acc68fd454578d9820b0bde1a1a3d17aa17bb7b6595806d02886d409",
+      "file": "wasm-bindgen-0.2.129.crate"
+    },
+    {
+      "name": "solana-short-vec",
+      "version": "3.3.0",
+      "sha256": "c75782529cc4521114c1ecd71c7e2cdebd41a6fe9844b5d088fd36ef08c57c36",
+      "file": "solana-short-vec-3.3.0.crate"
+    },
+    {
+      "name": "libsecp256k1-gen-ecmult",
+      "version": "0.3.0",
+      "sha256": "3038c808c55c87e8a172643a7d87187fc6c4174468159cb3090659d55bcb4809",
+      "file": "libsecp256k1-gen-ecmult-0.3.0.crate"
+    },
+    {
+      "name": "version_check",
+      "version": "0.9.5",
+      "sha256": "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a",
+      "file": "version_check-0.9.5.crate"
+    },
+    {
+      "name": "spki",
+      "version": "0.8.1",
+      "sha256": "7ef958a98b9d5da290cfc78946e9f3e61e1e62a18db0d92cac0b83cc161491a9",
+      "file": "spki-0.8.1.crate"
+    },
+    {
+      "name": "cpufeatures",
+      "version": "0.2.17",
+      "sha256": "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280",
+      "file": "cpufeatures-0.2.17.crate"
+    },
+    {
+      "name": "fastrand",
+      "version": "2.5.0",
+      "sha256": "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223",
+      "file": "fastrand-2.5.0.crate"
+    },
+    {
+      "name": "solana-get-sysvar",
+      "version": "1.0.0",
+      "sha256": "ef3bc859fc036ed490146793557386cbfae614ebba4adc704c37d94350824ed4",
+      "file": "solana-get-sysvar-1.0.0.crate"
+    },
+    {
+      "name": "solana-big-mod-exp",
+      "version": "3.0.0",
+      "sha256": "30c80fb6d791b3925d5ec4bf23a7c169ef5090c013059ec3ed7d0b2c04efa085",
+      "file": "solana-big-mod-exp-3.0.0.crate"
+    },
+    {
+      "name": "serde_derive",
+      "version": "1.0.229",
+      "sha256": "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348",
+      "file": "serde_derive-1.0.229.crate"
+    },
+    {
+      "name": "syn",
+      "version": "3.0.9",
+      "sha256": "d78c8dee4c7bf0e14673097256fed6142ce9d3b85a408189d07482442145823b",
+      "file": "syn-3.0.9.crate"
+    },
+    {
+      "name": "toml_datetime",
+      "version": "1.1.2+spec-1.1.0",
+      "sha256": "2b86d767906c6c42421dcba507eb9d203e779497710a47782a224bb871653053",
+      "file": "toml_datetime-1.1.2+spec-1.1.0.crate"
+    },
+    {
+      "name": "wnaf",
+      "version": "0.14.1",
+      "sha256": "795ca18b3fdb5e62bf982199278341ddcf7ebf7d32e25e212ad05d496e95f6fa",
+      "file": "wnaf-0.14.1.crate"
+    },
+    {
+      "name": "serde_core",
+      "version": "1.0.229",
+      "sha256": "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48",
+      "file": "serde_core-1.0.229.crate"
+    },
+    {
+      "name": "solana-sanitize",
+      "version": "3.0.1",
+      "sha256": "dcf09694a0fc14e5ffb18f9b7b7c0f15ecb6eac5b5610bf76a1853459d19daf9",
+      "file": "solana-sanitize-3.0.1.crate"
+    },
+    {
+      "name": "r-efi",
+      "version": "6.0.0",
+      "sha256": "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf",
+      "file": "r-efi-6.0.0.crate"
+    },
+    {
+      "name": "elliptic-curve",
+      "version": "0.14.3",
+      "sha256": "900f37e7e18d74a2347389af6cd69e3a30d5cc9e697f40004865679aa75e9c7c",
+      "file": "elliptic-curve-0.14.3.crate"
+    },
+    {
+      "name": "wasm-bindgen-shared",
+      "version": "0.2.129",
+      "sha256": "23f0c9c52aa7cd7d77769a4cfe2a9adb1b331f489a41d912ce14513d5ab995c6",
+      "file": "wasm-bindgen-shared-0.2.129.crate"
+    },
+    {
+      "name": "solana-system-interface",
+      "version": "3.2.0",
+      "sha256": "55b54965bf0b76fa8e2b35376583efddd4d916618cfe595bf48c7d7b55a9e628",
+      "file": "solana-system-interface-3.2.0.crate"
+    },
+    {
+      "name": "solana-address",
+      "version": "2.6.1",
+      "sha256": "39c93e262f671bf402e1040e4a7e40b05d81da5956c7681948c975a0997517bb",
+      "file": "solana-address-2.6.1.crate"
+    },
+    {
+      "name": "parking_lot",
+      "version": "0.12.5",
+      "sha256": "93857453250e3077bd71ff98b6a65ea6621a19bb0f559a85248955ac12c45a1a",
+      "file": "parking_lot-0.12.5.crate"
+    },
+    {
+      "name": "either",
+      "version": "1.19.0",
+      "sha256": "0e9c71c2167ca323c882b99918929403426e2373ea17242ff5653e0d5e1058be",
+      "file": "either-1.19.0.crate"
+    },
+    {
+      "name": "lazy_static",
+      "version": "1.5.1",
+      "sha256": "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb",
+      "file": "lazy_static-1.5.1.crate"
+    },
+    {
+      "name": "prost",
+      "version": "0.13.5",
+      "sha256": "2796faa41db3ec313a31f7624d9286acf277b52de526150b7e69f3debf891ee5",
+      "file": "prost-0.13.5.crate"
+    },
+    {
+      "name": "tempfile",
+      "version": "3.27.0",
+      "sha256": "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd",
+      "file": "tempfile-3.27.0.crate"
+    },
+    {
+      "name": "darling_core",
+      "version": "0.23.0",
+      "sha256": "9865a50f7c335f53564bb694ef660825eb8610e0a53d3e11bf1b0d3df31e03b0",
+      "file": "darling_core-0.23.0.crate"
+    },
+    {
+      "name": "log",
+      "version": "0.4.34",
+      "sha256": "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6",
+      "file": "log-0.4.34.crate"
+    },
+    {
+      "name": "const-crypto",
+      "version": "0.3.0",
+      "sha256": "1c06f1eb05f06cf2e380fdded278fbf056a38974299d77960555a311dcf91a52",
+      "file": "const-crypto-0.3.0.crate"
+    },
+    {
+      "name": "subtle",
+      "version": "2.6.1",
+      "sha256": "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292",
+      "file": "subtle-2.6.1.crate"
+    },
+    {
+      "name": "ff",
+      "version": "0.14.0",
+      "sha256": "a1f686ab92a9fb0eaf188f6c6c87b89490baa6fdb0db4544ba4dc47f7942489f",
+      "file": "ff-0.14.0.crate"
+    },
+    {
+      "name": "heapless",
+      "version": "0.8.0",
+      "sha256": "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad",
+      "file": "heapless-0.8.0.crate"
+    },
+    {
+      "name": "defmt",
+      "version": "1.2.0",
+      "sha256": "e4a0795ac740cb54d7b3775c9c17345f6aaecf884c01733b39d6017738e0e3e1",
+      "file": "defmt-1.2.0.crate"
+    },
+    {
+      "name": "hmac-drbg",
+      "version": "0.3.0",
+      "sha256": "17ea0a1394df5b6574da6e0c1ade9e78868c9fb0a4e5ef4428e32da4676b85b1",
+      "file": "hmac-drbg-0.3.0.crate"
+    },
+    {
+      "name": "itoa",
+      "version": "1.0.18",
+      "sha256": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682",
+      "file": "itoa-1.0.18.crate"
+    },
+    {
+      "name": "fiat-crypto",
+      "version": "0.2.9",
+      "sha256": "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d",
+      "file": "fiat-crypto-0.2.9.crate"
+    },
+    {
+      "name": "k256",
+      "version": "0.14.0",
+      "sha256": "93f50113171a713f4a4231ef82eb26703607139b35dcb56241f0ceab2ae1f7d8",
+      "file": "k256-0.14.0.crate"
+    },
+    {
+      "name": "autocfg",
+      "version": "1.5.1",
+      "sha256": "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53",
+      "file": "autocfg-1.5.1.crate"
+    },
+    {
+      "name": "cpufeatures",
+      "version": "0.3.1",
+      "sha256": "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566",
+      "file": "cpufeatures-0.3.1.crate"
+    },
+    {
+      "name": "thiserror-impl",
+      "version": "2.0.21",
+      "sha256": "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524",
+      "file": "thiserror-impl-2.0.21.crate"
+    },
+    {
+      "name": "semver",
+      "version": "1.0.28",
+      "sha256": "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd",
+      "file": "semver-1.0.28.crate"
+    },
+    {
+      "name": "libsecp256k1-core",
+      "version": "0.3.0",
+      "sha256": "5be9b9bb642d8522a44d533eab56c16c738301965504753b03ad1de3425d5451",
+      "file": "libsecp256k1-core-0.3.0.crate"
+    },
+    {
+      "name": "base64ct",
+      "version": "1.7.3",
+      "sha256": "89e25b6adfb930f02d1981565a6e5d9c547ac15a96606256d3b59040e5cd4ca3",
+      "file": "base64ct-1.7.3.crate"
+    },
+    {
+      "name": "ctutils",
+      "version": "0.4.6",
+      "sha256": "fe3e9d21d39e6f39ff46e03d5b621424f88ee23d8a1672c6bfc9ccc7f2da4f6a",
+      "file": "ctutils-0.4.6.crate"
+    },
+    {
+      "name": "bincode",
+      "version": "1.3.3",
+      "sha256": "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad",
+      "file": "bincode-1.3.3.crate"
+    },
+    {
+      "name": "protoc-bin-vendored-macos-x86_64",
+      "version": "3.3.0",
+      "sha256": "b04652167eca899dda05f32f5481adeaf25c623a98ce2fc146a001cc59a2add7",
+      "file": "protoc-bin-vendored-macos-x86_64-3.3.0.crate"
+    },
+    {
+      "name": "defmt-macros",
+      "version": "1.2.0",
+      "sha256": "840bb056bd99c495c9188198a258ab787c79f306d864db3e6e8451442d6d8366",
+      "file": "defmt-macros-1.2.0.crate"
+    },
+    {
+      "name": "libc",
+      "version": "0.2.191",
+      "sha256": "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a",
+      "file": "libc-0.2.191.crate"
+    },
+    {
+      "name": "five8_const",
+      "version": "1.0.0",
+      "sha256": "1a0f1728185f277989ca573a402716ae0beaaea3f76a8ff87ef9dd8fb19436c5",
+      "file": "five8_const-1.0.0.crate"
+    },
+    {
+      "name": "prettyplease",
+      "version": "0.2.37",
+      "sha256": "479ca8adacdd7ce8f1fb39ce9ecccbfe93a3f1344b3d0d97f20bc0196208f62b",
+      "file": "prettyplease-0.2.37.crate"
+    },
+    {
+      "name": "petgraph",
+      "version": "0.7.1",
+      "sha256": "3672b37090dbd86368a4145bc067582552b29c27377cad4e0a306c97f9bd7772",
+      "file": "petgraph-0.7.1.crate"
+    },
+    {
+      "name": "solana-epoch-rewards",
+      "version": "3.2.0",
+      "sha256": "0788d74ee15778deecaa15ed1a1e37727ba954f86cbc35225450a1f2b5012969",
+      "file": "solana-epoch-rewards-3.2.0.crate"
+    },
+    {
+      "name": "sha3",
+      "version": "0.10.9",
+      "sha256": "77fd7028345d415a4034cf8777cd4f8ab1851274233b45f84e3d955502d93874",
+      "file": "sha3-0.10.9.crate"
+    },
+    {
+      "name": "byteorder",
+      "version": "1.5.0",
+      "sha256": "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b",
+      "file": "byteorder-1.5.0.crate"
+    },
+    {
+      "name": "typenum",
+      "version": "1.20.1",
+      "sha256": "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20",
+      "file": "typenum-1.20.1.crate"
+    },
+    {
+      "name": "solana-epoch-schedule",
+      "version": "3.4.0",
+      "sha256": "43ae73018043cff5d3990b3998d846fab2e823c07e3b2f49be602ea584be3d4f",
+      "file": "solana-epoch-schedule-3.4.0.crate"
+    },
+    {
+      "name": "crypto-bigint",
+      "version": "0.7.10",
+      "sha256": "9c035cb64cba03dad2fb921f3e218785e8cf9a41790da5eb3a1400f62fa2be11",
+      "file": "crypto-bigint-0.7.10.crate"
+    },
+    {
+      "name": "itertools",
+      "version": "0.13.0",
+      "sha256": "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186",
+      "file": "itertools-0.13.0.crate"
+    },
+    {
+      "name": "solana-stable-layout",
+      "version": "3.0.1",
+      "sha256": "c9f6a291ba063a37780af29e7db14bdd3dc447584d8ba5b3fc4b88e2bbc982fa",
+      "file": "solana-stable-layout-3.0.1.crate"
+    },
+    {
+      "name": "bumpalo",
+      "version": "3.20.3",
+      "sha256": "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649",
+      "file": "bumpalo-3.20.3.crate"
+    },
+    {
+      "name": "sha2",
+      "version": "0.11.1",
+      "sha256": "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19",
+      "file": "sha2-0.11.1.crate"
+    },
+    {
+      "name": "zerocopy-derive",
+      "version": "0.8.63",
+      "sha256": "863ad3ac83293fb4d740aedbfdc9240dd8d1a50c1099acd76ce80ce7c7230c7f",
+      "file": "zerocopy-derive-0.8.63.crate"
+    },
+    {
+      "name": "block-buffer",
+      "version": "0.12.1",
+      "sha256": "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa",
+      "file": "block-buffer-0.12.1.crate"
+    },
+    {
+      "name": "primeorder",
+      "version": "0.14.0",
+      "sha256": "5c9f42978c78a00e3d68f69fc03e57a234debae69da4020a4fb588fcdcd07b06",
+      "file": "primeorder-0.14.0.crate"
+    },
+    {
+      "name": "getrandom",
+      "version": "0.4.3",
+      "sha256": "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099",
+      "file": "getrandom-0.4.3.crate"
+    },
+    {
+      "name": "digest",
+      "version": "0.11.3",
+      "sha256": "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2",
+      "file": "digest-0.11.3.crate"
+    },
+    {
+      "name": "ecdsa",
+      "version": "0.17.0",
+      "sha256": "c0681a4fc24c767085329728d8dfba959af91228aa4610cca4f8ce317ba46ae0",
+      "file": "ecdsa-0.17.0.crate"
+    },
+    {
+      "name": "sha2",
+      "version": "0.10.9",
+      "sha256": "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283",
+      "file": "sha2-0.10.9.crate"
+    },
+    {
+      "name": "cc",
+      "version": "1.10.0",
+      "sha256": "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0",
+      "file": "cc-1.10.0.crate"
+    },
+    {
+      "name": "solana-instruction-error",
+      "version": "2.4.0",
+      "sha256": "3b7d34343838343a3755b7dfb1e438d94c6db2263b519cfe3c2257af932b6e93",
+      "file": "solana-instruction-error-2.4.0.crate"
+    },
+    {
+      "name": "borsh",
+      "version": "1.8.1",
+      "sha256": "553c5d846a6ba5150c65e3b1b8ec073bcf1abc20f9b7220de384a4443ea4e20a",
+      "file": "borsh-1.8.1.crate"
+    },
+    {
+      "name": "serde",
+      "version": "1.0.229",
+      "sha256": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba",
+      "file": "serde-1.0.229.crate"
+    },
+    {
+      "name": "group",
+      "version": "0.14.0",
+      "sha256": "7fd1a1c7a5206c5b7a3f5a0d7ccd3ff85d0c8f5133d62a02680255b0004af5f4",
+      "file": "group-0.14.0.crate"
+    },
+    {
+      "name": "aho-corasick",
+      "version": "1.1.5",
+      "sha256": "c982642fa9e8606056828ee9a8505737230110bb1099153c79efe865c59d12ba",
+      "file": "aho-corasick-1.1.5.crate"
+    },
+    {
+      "name": "solana-rent",
+      "version": "4.5.0",
+      "sha256": "6e7c7590d4e53446a00c363783d98199d8c8f5099ca60eaf2a0f1f50d0e7a31e",
+      "file": "solana-rent-4.5.0.crate"
+    },
+    {
+      "name": "solana-sdk-macro",
+      "version": "3.0.1",
+      "sha256": "8765316242300c48242d84a41614cb3388229ec353ba464f6fe62a733e41806f",
+      "file": "solana-sdk-macro-3.0.1.crate"
+    },
+    {
+      "name": "solana-fee-calculator",
+      "version": "3.4.0",
+      "sha256": "55add16a1c8f8953379a2b91ff3e94ee7096feac787ca33fad0292c6ca86dbe5",
+      "file": "solana-fee-calculator-3.4.0.crate"
+    },
+    {
+      "name": "primefield",
+      "version": "0.14.0",
+      "sha256": "c555a6e4eb7d4e158fcb028c835c3b8642206ddc279b5c6b202ef9a8bdb592f4",
+      "file": "primefield-0.14.0.crate"
+    },
+    {
+      "name": "rustc_version",
+      "version": "0.4.1",
+      "sha256": "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92",
+      "file": "rustc_version-0.4.1.crate"
+    },
+    {
+      "name": "solana-cpi",
+      "version": "3.1.0",
+      "sha256": "4dea26709d867aada85d0d3617db0944215c8bb28d3745b912de7db13a23280c",
+      "file": "solana-cpi-3.1.0.crate"
+    },
+    {
+      "name": "solana-program-error",
+      "version": "3.0.1",
+      "sha256": "4f04fa578707b3612b095f0c8e19b66a1233f7c42ca8082fcb3b745afcc0add6",
+      "file": "solana-program-error-3.0.1.crate"
+    },
+    {
+      "name": "digest",
+      "version": "0.10.7",
+      "sha256": "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292",
+      "file": "digest-0.10.7.crate"
+    },
+    {
+      "name": "crypto-mac",
+      "version": "0.8.0",
+      "sha256": "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab",
+      "file": "crypto-mac-0.8.0.crate"
+    },
+    {
+      "name": "darling",
+      "version": "0.23.0",
+      "sha256": "25ae13da2f202d56bd7f91c25fba009e7717a1e4a1cc98a76d844b65ae912e9d",
+      "file": "darling-0.23.0.crate"
+    },
+    {
+      "name": "once_cell",
+      "version": "1.21.4",
+      "sha256": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50",
+      "file": "once_cell-1.21.4.crate"
+    },
+    {
+      "name": "crypto-common",
+      "version": "0.2.2",
+      "sha256": "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453",
+      "file": "crypto-common-0.2.2.crate"
+    },
+    {
+      "name": "keccak-const",
+      "version": "0.2.0",
+      "sha256": "57d8d8ce877200136358e0bbff3a77965875db3af755a11e1fa6b1b3e2df13ea",
+      "file": "keccak-const-0.2.0.crate"
+    },
+    {
+      "name": "cpubits",
+      "version": "0.1.1",
+      "sha256": "15b85f9c39137c3a891689859392b1bd49812121d0d61c9caf00d46ed5ce06ae",
+      "file": "cpubits-0.1.1.crate"
+    },
+    {
+      "name": "block-buffer",
+      "version": "0.9.0",
+      "sha256": "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4",
+      "file": "block-buffer-0.9.0.crate"
+    },
+    {
+      "name": "darling_macro",
+      "version": "0.23.0",
+      "sha256": "ac3984ec7bd6cfa798e62b4a642426a5be0e68f9401cfc2a01e3fa9ea2fcdb8d",
+      "file": "darling_macro-0.23.0.crate"
+    },
+    {
+      "name": "rustix",
+      "version": "1.1.6",
+      "sha256": "e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa",
+      "file": "rustix-1.1.6.crate"
+    },
+    {
+      "name": "ppv-lite86",
+      "version": "0.2.21",
+      "sha256": "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9",
+      "file": "ppv-lite86-0.2.21.crate"
+    },
+    {
+      "name": "solana-example-mocks",
+      "version": "4.0.0",
+      "sha256": "0eb265ff95e28eceda117e2e3d2d2a611ecbbfe911dfeeeecd1521814540ffab",
+      "file": "solana-example-mocks-4.0.0.crate"
+    },
+    {
+      "name": "multimap",
+      "version": "0.10.1",
+      "sha256": "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084",
+      "file": "multimap-0.10.1.crate"
+    },
+    {
+      "name": "pastey",
+      "version": "0.2.3",
+      "sha256": "2ee67f1008b1ba2321834326597b8e186293b049a023cdef258527550b9935b4",
+      "file": "pastey-0.2.3.crate"
+    },
+    {
+      "name": "solana-msg",
+      "version": "3.1.0",
+      "sha256": "726b7cbbc6be6f1c6f29146ac824343b9415133eee8cce156452ad1db93f8008",
+      "file": "solana-msg-3.1.0.crate"
+    },
+    {
+      "name": "prost-build",
+      "version": "0.13.5",
+      "sha256": "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf",
+      "file": "prost-build-0.13.5.crate"
+    }
+  ],
+  "sdk_features": [
+    "no-entrypoint",
+    "solana-v3"
+  ],
+  "sdk_bridge": {
+    "name": "solana-program",
+    "version": "4.0.0"
+  },
+  "sdk_archive_sha256": "bc7a36809592252cc73f9ec01623b89628654a2fba00dbf5c339c286eb040d40",
+  "protected_root_service_pnpm_files_match_source_and_unchanged": true,
+  "source_registry_feature_gate_passed": true,
+  "native_stage_exit_codes": [
+    [
+      "--version",
+      0
+    ],
+    [
+      "-vV",
+      0
+    ],
+    [
+      "generate-lockfile",
+      0
+    ],
+    [
+      "metadata",
+      0
+    ],
+    [
+      "tree",
+      0
+    ],
+    [
+      "fmt",
+      0
+    ],
+    [
+      "test",
+      101
+    ],
+    [
+      "clippy",
+      101
+    ]
+  ],
+  "diagnosis": [
+    {
+      "file": "cargo-test.log",
+      "error": "E0106 ambiguous outer AccountInfo borrow lifetime",
+      "sha256": "078b1bfc9d3527b07fa337db9d01f86aed15d1eca5a8e3dc5a25d237674a82df"
+    },
+    {
+      "file": "cargo-clippy.log",
+      "error": "E0106 ambiguous outer AccountInfo borrow lifetime",
+      "sha256": "e13d4b17b97ba66a54381e791327ffcc935e2b2238f8c85673699684984199d6"
+    }
+  ],
+  "valid_attestation_successes": 0,
+  "SBF_builds": 0,
+  "limits": "Source/graph evidence verified; no successful native probe compile or oracle attestation is claimed. Failure is in two probe adapter lifetime declarations; narrow fix can reuse this independently verified resolved lock.",
+  "regular_executable_bits_and_symlink_modes_match_git": true
+}

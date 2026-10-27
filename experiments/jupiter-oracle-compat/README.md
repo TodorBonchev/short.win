@@ -9,8 +9,9 @@ The owner selected signed Jupiter-derived feeds; concrete settings still require
 
 - Actual published `switchboard-on-demand=0.13.0`, default features disabled,
   `no-entrypoint,solana-v3`; exact Anchor1.2.0 and current root component versions.
-- Direct AccountInfo type compatibility; actual QuoteVerifier instruction-sysvar
-  reader type-checking; SDK packed-feed accessor ABI and malformed parser refusal.
+- Direct AccountInfo type compatibility; historical QuoteVerifier reader API
+  type-checking; SDK packed-feed accessor ABI and malformed parser refusal.
+  The current reader is explicitly quarantined after source review.
 - Pinned queue/owner/sysvar identities, fixed feed/mint/raw-amount mapping and
   synthetic post-verification freshness/quorum/slot-regression/integer-unit checks.
 - Real Anchor instruction-data construction plus explicit byte/privilege preserving
@@ -26,8 +27,11 @@ The exact feature graph and resolved versions must be inspected from CI evidence
 
 There are ZERO successful valid-attestation tests: no private keys or real signatures
 are available or requested. Synthetic helper tests never replace SDK verification.
-The manual run will compile the complete reader function; no successful native
-compile is claimed before its receipt. No happy-path onchain Ed25519 result, queue
+The complete reader function compiled in manual run40478037582 on c70aa259;
+all11 Rust tests, two runner fault tests, fmt and strict Clippy passed with the
+pinned graph. Its independently checked artifact ZIP SHA256 is
+`d167529b7046b2811a8fe15a161d2591df3bc80123077c2167a127153c5b77ee`.
+That success precedes the safe-envelope additions below; those need their own receipt. No happy-path onchain Ed25519 result, queue
 deployment identity, oracle quorum, managed-update account or source freshness is
 established here. Raw fixed-input output units are not Bhat(q) or executable cost bands.
 Equal quote slots may be reused while fresh; the helper checks slot regression,
@@ -87,3 +91,41 @@ GitHub requires a workflow_dispatch definition on the default branch before manu
 feature-ref dispatch; registration/merge is a separate reviewed step. See the
 [GitHub manual-run documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
 Do not add push/PR triggers to bypass that restriction.
+
+## Safe envelope boundary follow-up
+
+The separate format preflight safely loads the runtime-owned instruction sysvar, requires a
+preceding Ed25519 instruction with no account metas, and bounds its complete local
+wire envelope. It does not call an SDK verifier or produce a price. The dependency-free `wire`
+module forbids unsafe code. It bounds offset tables and1–8 complete signer/feed
+records, requires all explicit source indices to match the actual selected
+instruction, pairwise nonoverlap outside table/suffix, distinct public keys and
+queue indices, unique feed IDs, positive signed minimums satisfied by the count,
+and the expected version/SBOD marker. SDK-compatible explicit indices are required;
+the Ed25519 current-instruction sentinel is deliberately rejected.
+
+This is a stricter experimental format policy, not an assertion of an upstream
+exploit. Published0.13.0's instruction helper checks the first source indices and
+its parser checks remaining indices against the first message index. The added
+preflight establishes bounded local regions before that unsafe parser executes.
+Real managed-update bytes must still prove compatibility with this stricter policy.
+The raw suffix slot is unauthenticated until matched through the signed slot hash,
+actual queue keys and runtime signature path; it is never source-price freshness.
+
+Ten dependency-free format tests include all64 signer/feed count combinations,
+their truncated prefixes, offset/overlap/index/identity/quorum cases and structured
+mutations. A separate native test compares a synthetic envelope with the actual
+published owned parser. Meaningless signature bytes are never described as an
+attestation. None of these tests enables a market or authenticates an API price.
+
+## Verifier quarantine
+
+Independent review found a wrong byte-slice-to-SlotHash slice extent and original
+instruction-buffer alignment assumptions in published0.13.0. See the
+[source-level review](../../docs/audit/jupiter-oracle-sdk-review-2026-10-27.md).
+The current read_verified_raw_output always returns ProviderVerifierQuarantined
+after identity checks; it never returns a verified value or calls SDK verification.
+The financial-policy helpers are synthetic test-only code. Native ABI success is
+retained accurately, but production verifier qualification requires a reviewed
+repair or separately reviewed safe consumer plus actual runtime evidence. No SBF
+exploit is asserted. Valid-attestation and SBF success counts remain0.

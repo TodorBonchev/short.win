@@ -1,0 +1,189 @@
+{
+  "verified_utc": "2026-10-27T09:12:59.980804+00:00",
+  "reviewer": "independent /root/vps_operator_plan",
+  "run_id": 40478037582,
+  "run_url": "https://github.com/TodorBonchev/short.win/actions/runs/40478037582",
+  "source_commit": "c70aa259c7c68ac6eeebe37b8c9f9f61b2499ff8",
+  "run_conclusion": "success",
+  "artifact_id": 12721083541,
+  "artifact_expires_at": "2027-01-25T09:04:32Z",
+  "github_zip_bytes": 91589563,
+  "github_zip_sha256": "d167529b7046b2811a8fe15a161d2591df3bc80123077c2167a127153c5b77ee",
+  "github_digest_size_crc_and_extracted_bytes_match": true,
+  "all_internal_hashes_checked": 303,
+  "full_source_git_blobs_and_modes_checked": 2649,
+  "full_source_bytes": 107604431,
+  "source_archive_sha256": "47aa89ac7fa01c9fca6126ffafe8e0820b8ddb29b1d6f73696b2210dd4b8d414",
+  "probe_source_files_match_commit": [
+    "experiments/jupiter-oracle-compat/.gitignore",
+    "experiments/jupiter-oracle-compat/Cargo.toml",
+    "experiments/jupiter-oracle-compat/README.md",
+    "experiments/jupiter-oracle-compat/provenance.json",
+    "experiments/jupiter-oracle-compat/run_probe.py",
+    "experiments/jupiter-oracle-compat/rust-toolchain.toml",
+    "experiments/jupiter-oracle-compat/src/lib.rs",
+    "experiments/jupiter-oracle-compat/test_run_probe.py"
+  ],
+  "protected_before_after_match_exact_commit_and_worktree": {
+    "Cargo.lock": "b275109d4ad7c5d2adfc2aeb4851db56360c27312c155faf4bfb7d565e111171",
+    "Cargo.toml": "3a2cd6d00ccf80e10f3a8a877a9cbf71e9dad39719894dc8f89dcaa33d69fa93",
+    "services/Cargo.lock": "19de05a720184ccb4f2c84f1a68fb30d6ae87f1dc82cfad569e31bb8e4f128d4",
+    "pnpm-lock.yaml": "9912c1f7235cf0a80322ac3ed4668b47784e34b66314ef06109a675a7ce7510b",
+    "programs/shortwin/Cargo.toml": "02ae56bcfc61f0b1d6a83313afb65c4f7b4950ed3f5dc0fe87001b0b0d5feccb",
+    "experiments/jupiter-oracle-compat/Cargo.lock": "bedbb8980c823eef135d4ecd1dc7e06bba937884b435e9c61618f1ec594afc8a"
+  },
+  "tracked_source_changes_after": "",
+  "lock_sha256": "bedbb8980c823eef135d4ecd1dc7e06bba937884b435e9c61618f1ec594afc8a",
+  "lock_reused_matches_verified_initial_graph": true,
+  "lock_packages": 281,
+  "active_registry_packages": 280,
+  "registry_archives_checked": 280,
+  "registry_checks_file": "registry-checks.json",
+  "registry_checks_sha256": "64ed2efc0054fb5d414b01ab2d14cd4e3308ad59737114f77ef4a1f8b969bdb8",
+  "sdk": {
+    "name": "switchboard-on-demand",
+    "version": "0.13.0",
+    "source": "registry+https://github.com/rust-lang/crates.io-index",
+    "features": [
+      "no-entrypoint",
+      "solana-v3"
+    ],
+    "archive_sha256": "bc7a36809592252cc73f9ec01623b89628654a2fba00dbf5c339c286eb040d40",
+    "file_sha256": {
+      "Cargo.toml": "3440c506bc524324380b4c5cfe07a97e6a38fc193db900909cd38bc94e584612",
+      "src/on_demand/oracle_quote/quote_verifier.rs": "4e17641c4e11d833ae369fef178869fdb80aa75e4a8e264a7a4a7c2fadf3a567",
+      "src/on_demand/oracle_quote/instruction_parser.rs": "0633b34ebf6b9f1b170f9f5914ff34d337963a8e7dbcb2bf4f20393c161f1e72",
+      "src/on_demand/oracle_quote/feed_info.rs": "360f7df964e1c44697f94521709bda1a7f793c6d147e4deebfe3fe30b48d4f1e",
+      "src/account_info_compat.rs": "29206f40d395a52dcaf9769ac1390180d31642c0de68bef6251e5119f5c9c969"
+    },
+    "actual_bridge": {
+      "name": "solana-program",
+      "version": "4.0.0"
+    },
+    "pinned_components": {
+      "anchor-lang": "1.2.0",
+      "solana-account-info": "3.1.1",
+      "solana-clock": "3.1.1",
+      "solana-instruction": "3.4.1",
+      "solana-pubkey": "4.2.1"
+    }
+  },
+  "stages": [
+    {
+      "argv": [
+        "cargo",
+        "--version"
+      ],
+      "exit_code": 0,
+      "output": "cargo-version.log",
+      "sha256": "9950bbb2d5c3417b1a068f0e81f6d3cac991a363193bdf2a22d447f5acf8b503"
+    },
+    {
+      "argv": [
+        "rustc",
+        "-vV"
+      ],
+      "exit_code": 0,
+      "output": "rustc-version.log",
+      "sha256": "778fbc643a806f0dd123c056e66201d7e8a56a61928ec0a33171be8d6c2d5a37"
+    },
+    {
+      "argv": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--format-version",
+        "1",
+        "--manifest-path",
+        "/home/runner/work/short.win/short.win/experiments/jupiter-oracle-compat/Cargo.toml"
+      ],
+      "exit_code": 0,
+      "output": "cargo-metadata.json",
+      "sha256": "11e97eaa14df046a2b7f4092ecf6c141cbad67a35a13275c6d6f590e9d35cf5f"
+    },
+    {
+      "argv": [
+        "cargo",
+        "tree",
+        "--locked",
+        "--manifest-path",
+        "/home/runner/work/short.win/short.win/experiments/jupiter-oracle-compat/Cargo.toml",
+        "-e",
+        "features"
+      ],
+      "exit_code": 0,
+      "output": "cargo-feature-tree.log",
+      "sha256": "582918a7d820b21429494c88c84a402c6f0eb7c06a6147932fd8d33d92a47053"
+    },
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "/home/runner/work/short.win/short.win/experiments/jupiter-oracle-compat/Cargo.toml",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": "cargo-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "/home/runner/work/short.win/short.win/experiments/jupiter-oracle-compat/Cargo.toml",
+        "--all-targets"
+      ],
+      "exit_code": 0,
+      "output": "cargo-test.log",
+      "sha256": "92d6af57e0871d31a3da012ab1bc008b8e30b15a840657528a83bf920713a8d6"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--manifest-path",
+        "/home/runner/work/short.win/short.win/experiments/jupiter-oracle-compat/Cargo.toml",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "output": "cargo-clippy.log",
+      "sha256": "1fb6861d513bd27406e6a67876712e6724a96d7bc32e068f8751e14032356cdc"
+    }
+  ],
+  "runner_fault_tests_passed": 2,
+  "rust_native_tests_passed": 11,
+  "rust_test_names": [
+    "tests::actual_anchor_account_info_alias_matches_published_sdk",
+    "tests::actual_anchor_instruction_builder_and_sdk_bridge_preserve_roles",
+    "tests::actual_sdk_parser_rejects_empty_unverified_payload",
+    "tests::compiled_reader_rejects_mint_and_quantity_mapping",
+    "tests::compiled_reader_rejects_wrong_queue_owner_before_sdk_parsing",
+    "tests::published_sdk_feed_accessor_has_expected_packed_abi",
+    "tests::synthetic_post_verification_gates_preserve_large_integer_units",
+    "tests::synthetic_post_verification_rejects_feed_freshness_and_slot_regression",
+    "tests::synthetic_post_verification_rejects_quorum_and_numeric_errors",
+    "tests::published_sdk_reverse_serializer_is_explicitly_unimplemented",
+    "tests::raw_u64_max_bypasses_sdk_decimal_mantissa_limit_without_truncation"
+  ],
+  "rustc_version_log_sha256": "778fbc643a806f0dd123c056e66201d7e8a56a61928ec0a33171be8d6c2d5a37",
+  "job_log_sha256": "47d1ec7020c8f2fde584b3574bf085eb823d19713dc56b899633bc6e0de360a7",
+  "report_sha256": "03b4d9e8ed9930b04f62279087ac007abb507d42c4f82b3876ce04f6f4e6f62e",
+  "limits": {
+    "valid_attestation_success_tests": 0,
+    "SBF_builds": 0,
+    "signature_generation": 0,
+    "oracle_or_transaction_network_calls": 0,
+    "live_queue_fee_budget_and_API_access": "not tested",
+    "deployment_or_production_integration": "not qualified",
+    "note": "Native ABI bridge, packed accessors, synthetic policy boundaries and instruction builders passed. Expected panic documents upstream reverse serializer missing implementation. Raw i128 feed access avoids SDK Decimal overflow. Source/graph reproducibility is distinct from successful live attestation or SBF qualification."
+  },
+  "result": "PASS within native-only experiment scope"
+}

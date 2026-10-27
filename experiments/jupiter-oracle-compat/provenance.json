@@ -11,7 +11,9 @@
       "src/on_demand/oracle_quote/quote_verifier.rs": "4e17641c4e11d833ae369fef178869fdb80aa75e4a8e264a7a4a7c2fadf3a567",
       "src/on_demand/oracle_quote/instruction_parser.rs": "0633b34ebf6b9f1b170f9f5914ff34d337963a8e7dbcb2bf4f20393c161f1e72",
       "src/on_demand/oracle_quote/feed_info.rs": "360f7df964e1c44697f94521709bda1a7f793c6d147e4deebfe3fe30b48d4f1e",
-      "src/account_info_compat.rs": "29206f40d395a52dcaf9769ac1390180d31642c0de68bef6251e5119f5c9c969"
+      "src/account_info_compat.rs": "29206f40d395a52dcaf9769ac1390180d31642c0de68bef6251e5119f5c9c969",
+      "src/sysvar/ix_sysvar.rs": "b6bf9de4033ecf722cc76c920ec4dffb15c122278c7acd2d42ad8008feb2bc69",
+      "src/sysvar/ed25519_sysvar.rs": "a94a7f7ac7c713b3e67bfba046be76e6bd4a2b001057cb162e448f73f621d620"
     }
   },
   "feature_contract": {
@@ -60,5 +62,15 @@
     "packages": 281,
     "active_registry_archives_verified": 280,
     "status": "Source/registry/feature graph independently verified; initial native run failed only in probe lifetime declarations (E0106). This is not a successful ABI test or attestation."
+  },
+  "verified_native_baseline": {
+    "run_id": 40478037582,
+    "source_commit": "c70aa259c7c68ac6eeebe37b8c9f9f61b2499ff8",
+    "rust_tests": 11,
+    "runner_fault_tests": 2,
+    "status": "passed native fmt/test/clippy; does not cover later safe-envelope additions or SBF/authentic attestations",
+    "artifact_id": 12721083541,
+    "github_zip_sha256": "d167529b7046b2811a8fe15a161d2591df3bc80123077c2167a127153c5b77ee",
+    "independent_verification_sha256": "45fe6f863575b83fcef0129538c18a3e86b3c3eb8cd2cfec35e6ea14d7e4add6"
   }
 }

@@ -1,0 +1,374 @@
+{
+  "reviewed_utc": "2026-10-27T09:18:56.312006+00:00",
+  "reviewer": "independent /root/vps_operator_plan",
+  "scope": "Read-only local changes, no compile, dependency resolution, signatures or transactions",
+  "local_snapshot_sha256": {
+    "experiments/jupiter-oracle-compat/src/lib.rs": "c72a6400b3b9c2fc690c92ec07c484c9deb4db96785a0d70042f7aeb84bc60f4",
+    "experiments/jupiter-oracle-compat/src/wire.rs": "5b2a0fbfabdbb2602cabcc100353e332cf2cf3f6aae2179138a485e514cde295",
+    "services/indexer/tests/api_ws.rs": "44e2e411ff1b5e832382b9778a1ecf3e06e2624409e6bc70c0956d61860cba9d",
+    "services/indexer/src/api/ws.rs": "939613b5db08f32580825cc03bc2075735ab921dd3c6f8e5dfa65a6faf0346c1"
+  },
+  "sdk_version": "0.13.0",
+  "sdk_archive_sha256": "bc7a36809592252cc73f9ec01623b89628654a2fba00dbf5c339c286eb040d40",
+  "findings": [
+    {
+      "severity": "blocks production verifier promotion",
+      "issue": "SDK SlotHash fat-slice length preserved from u8 slice",
+      "proof": "repr(C) SlotHash is u64 plus [u8;32], size40 align8. Transmute &[u8] to &[SlotHash] preserves element length. A 20480byte tail for512entries becomes20480 SlotHash elements nominally819200bytes. Preflight cannot justify backing this slice. Same pattern at quote_verifier.rs636 and1214.",
+      "actual_SBF_exploit_or_crash": "not demonstrated; source-level safety defect only"
+    },
+    {
+      "severity": "needs correction before trusted SDK reader experiment",
+      "issue": "Original sysvar instruction slice may be misaligned",
+      "proof": "verify_instruction_at re-extracts original sysvar slice; EdOffsets reprC align2 is directly dereferenced at Ed25519Sysvar lines204/269. With3instructions header8 and a prior0account/data5 instructionlen41, selectedEd start49/data85 is odd. Safe loaded clone preflight does not align originalslice.",
+      "bounded_remedy": "A repr(C,align8) owned bytebuffer plus exact checked-sysvarcopy and SDK.verify would align table, but DOES NOT repair SlotHash defect."
+    }
+  ],
+  "positive_checks": [
+    "Actual pinned solana-instructions-sysvar3.0.1 exposes both checked loaders and sourcevalidates bounds for selectedinstruction. Minimum2bytes guard prevents load_current_index underflow.",
+    "All explicit record indices must equal selected transaction index; u16MAX sentinel rejection deliberatelymatches stricterSDK ixhelper.",
+    "wire.rs has forbidunsafe, bounded49bytefeedrecords/14byteoffsettable/suffix, checkedregions, commonmessage, distinctkeys+indices+feedIDs, positive signedminimum <=signaturecount.",
+    "PackedQuoteHeader/PackedFeedInfo align1 and bytearrays align1; utils checkp64/checkpubkey use read_unaligned, so no mod8key/messageoffset restriction needed.",
+    "SDKownedparsercomparison uses meaningless signatures and explicitly certifiesFORMATONLY.",
+    "Indexer test11frames equals first strict >2*5 close threshold; same5pongs2errors1008 assertions retained; production WSsource unchanged."
+  ],
+  "recommendation": "Permit fullCI of WebSocket threshold change. Manual native probe remains useful only with verifier blocker explicit; no production SDK qualification, no successful attestation or SBF claim. Prefer failclosed executable reader until reviewed repair or independent safeconsumer.",
+  "SDK_source_excerpts": {
+    "src/sysvar/slothash_sysvar.rs": [
+      {
+        "line": 8,
+        "text": "/// Solana slot hash data structure containing slot number and corresponding hash"
+      },
+      {
+        "line": 9,
+        "text": "#[repr(C)]"
+      },
+      {
+        "line": 10,
+        "text": "#[derive(bytemuck::Pod, bytemuck::Zeroable, Debug, Clone, Copy)]"
+      },
+      {
+        "line": 11,
+        "text": "pub struct SlotHash {"
+      },
+      {
+        "line": 12,
+        "text": "    /// Slot number"
+      },
+      {
+        "line": 13,
+        "text": "    pub slot: u64,"
+      },
+      {
+        "line": 14,
+        "text": "    /// 32-byte hash for this slot"
+      },
+      {
+        "line": 15,
+        "text": "    pub hash: [u8; 32],"
+      },
+      {
+        "line": 16,
+        "text": "}"
+      }
+    ],
+    "src/on_demand/oracle_quote/quote_verifier.rs": [
+      {
+        "line": 1205,
+        "text": "        let slothash_data = borrow_account_data!(slothash_sysvar);"
+      },
+      {
+        "line": 1206,
+        "text": ""
+      },
+      {
+        "line": 1207,
+        "text": "        // # Safety"
+      },
+      {
+        "line": 1208,
+        "text": "        //"
+      },
+      {
+        "line": 1209,
+        "text": "        // This transmute is safe because:"
+      },
+      {
+        "line": 1210,
+        "text": "        // - SlotHash is a POD type with known layout (u64 + [u8; 32])"
+      },
+      {
+        "line": 1211,
+        "text": "        // - We skip the 8-byte sysvar header before transmuting"
+      },
+      {
+        "line": 1212,
+        "text": "        // - The Solana runtime guarantees proper alignment and initialization of sysvar data"
+      },
+      {
+        "line": 1213,
+        "text": "        // - The slice length is determined by the actual data size"
+      },
+      {
+        "line": 1214,
+        "text": "        let slot_data: &[SlotHash] = unsafe { std::mem::transmute(&slothash_data[8..]) };"
+      },
+      {
+        "line": 1215,
+        "text": ""
+      },
+      {
+        "line": 1216,
+        "text": "        let mut estimated_idx = ((slot_data[0].slot - target_slot) % SYSVAR_SLOT_LEN) as usize;"
+      },
+      {
+        "line": 1217,
+        "text": ""
+      },
+      {
+        "line": 1218,
+        "text": "        // Optimized search with early termination"
+      },
+      {
+        "line": 1219,
+        "text": "        loop {"
+      },
+      {
+        "line": 1220,
+        "text": "            let slot_entry = &slot_data[estimated_idx];"
+      },
+      {
+        "line": 1221,
+        "text": "            if slot_entry.slot == target_slot {"
+      },
+      {
+        "line": 1222,
+        "text": "                return Ok(slot_entry.hash);"
+      },
+      {
+        "line": 1223,
+        "text": "            }"
+      },
+      {
+        "line": 1224,
+        "text": "            if estimated_idx == 0 {"
+      },
+      {
+        "line": 1225,
+        "text": "                break;"
+      },
+      {
+        "line": 1226,
+        "text": "            }"
+      },
+      {
+        "line": 1227,
+        "text": "            estimated_idx -= 1;"
+      },
+      {
+        "line": 1228,
+        "text": "        }"
+      }
+    ],
+    "src/sysvar/ed25519_sysvar.rs": [
+      {
+        "line": 199,
+        "text": "        unsafe {"
+      },
+      {
+        "line": 200,
+        "text": "            let mut offset = 2usize; // Skip padding byte after count byte"
+      },
+      {
+        "line": 201,
+        "text": ""
+      },
+      {
+        "line": 202,
+        "text": "            // Parse the first signature to get shared message structure"
+      },
+      {
+        "line": 203,
+        "text": "            let offset_ptr = message_data_ptr.add(offset);"
+      },
+      {
+        "line": 204,
+        "text": "            let first_offsets = *(offset_ptr as *const Ed25519SignatureOffsets);"
+      },
+      {
+        "line": 205,
+        "text": "            let first_message_offset = first_offsets.message_data_offset as usize;"
+      },
+      {
+        "line": 206,
+        "text": "            let first_message_size = first_offsets.message_data_size as usize;"
+      },
+      {
+        "line": 207,
+        "text": ""
+      },
+      {
+        "line": 208,
+        "text": "            // Parse message structure once for all signatures"
+      },
+      {
+        "line": 209,
+        "text": "            let message = core::slice::from_raw_parts("
+      },
+      {
+        "line": 210,
+        "text": "                message_data_ptr.add(first_message_offset),"
+      },
+      {
+        "line": 211,
+        "text": "                first_message_size,"
+      },
+      {
+        "line": 212,
+        "text": "            );"
+      },
+      {
+        "line": 213,
+        "text": ""
+      },
+      {
+        "line": 214,
+        "text": "            if first_message_size < core::mem::size_of::<PackedQuoteHeader>() {"
+      },
+      {
+        "line": 215,
+        "text": "                bail!(\"Message too short for bundle header\");"
+      },
+      {
+        "line": 216,
+        "text": "            }"
+      },
+      {
+        "line": 217,
+        "text": "            let shared_header: &PackedQuoteHeader = std::mem::transmute(&message[0]);"
+      }
+    ],
+    "src/utils.rs": [
+      {
+        "line": 95,
+        "text": "pub fn check_pubkey_eq<L: AsRef<[u8]>, R: AsRef<[u8]>>(lhs: L, rhs: R) -> bool {"
+      },
+      {
+        "line": 96,
+        "text": "    let lhs_bytes = lhs.as_ref();"
+      },
+      {
+        "line": 97,
+        "text": "    let rhs_bytes = rhs.as_ref();"
+      },
+      {
+        "line": 98,
+        "text": ""
+      },
+      {
+        "line": 99,
+        "text": "    unsafe {"
+      },
+      {
+        "line": 100,
+        "text": "        let lhs_ptr = lhs_bytes.as_ptr() as *const u64;"
+      },
+      {
+        "line": 101,
+        "text": "        let rhs_ptr = rhs_bytes.as_ptr() as *const u64;"
+      },
+      {
+        "line": 102,
+        "text": "        core::ptr::read_unaligned(lhs_ptr) == core::ptr::read_unaligned(rhs_ptr)"
+      },
+      {
+        "line": 103,
+        "text": "            && core::ptr::read_unaligned(lhs_ptr.add(1))"
+      },
+      {
+        "line": 104,
+        "text": "                == core::ptr::read_unaligned(rhs_ptr.add(1))"
+      },
+      {
+        "line": 105,
+        "text": "            && core::ptr::read_unaligned(lhs_ptr.add(2))"
+      },
+      {
+        "line": 106,
+        "text": "                == core::ptr::read_unaligned(rhs_ptr.add(2))"
+      },
+      {
+        "line": 107,
+        "text": "            && core::ptr::read_unaligned(lhs_ptr.add(3))"
+      },
+      {
+        "line": 108,
+        "text": "                == core::ptr::read_unaligned(rhs_ptr.add(3))"
+      },
+      {
+        "line": 109,
+        "text": "    }"
+      },
+      {
+        "line": 110,
+        "text": "}"
+      },
+      {
+        "line": 111,
+        "text": ""
+      },
+      {
+        "line": 112,
+        "text": "/// Efficiently compares two 32-byte arrays via u64 pointers (unsafe)"
+      },
+      {
+        "line": 113,
+        "text": "///"
+      },
+      {
+        "line": 114,
+        "text": "/// # Safety"
+      },
+      {
+        "line": 115,
+        "text": "/// The caller must ensure that:"
+      },
+      {
+        "line": 116,
+        "text": "/// - Both `lhs_ptr` and `rhs_ptr` are valid pointers"
+      },
+      {
+        "line": 117,
+        "text": "/// - Both pointers point to memory regions of at least 32 bytes (4 u64 values)"
+      },
+      {
+        "line": 118,
+        "text": "/// - The memory regions are accessible for the duration of the function call"
+      },
+      {
+        "line": 119,
+        "text": "#[inline(always)]"
+      },
+      {
+        "line": 120,
+        "text": "pub unsafe fn check_p64_eq(lhs_ptr: *const u64, rhs_ptr: *const u64) -> bool {"
+      },
+      {
+        "line": 121,
+        "text": "    core::ptr::read_unaligned(lhs_ptr) == core::ptr::read_unaligned(rhs_ptr)"
+      },
+      {
+        "line": 122,
+        "text": "        && core::ptr::read_unaligned(lhs_ptr.add(1)) == core::ptr::read_unaligned(rhs_ptr.add(1))"
+      },
+      {
+        "line": 123,
+        "text": "        && core::ptr::read_unaligned(lhs_ptr.add(2)) == core::ptr::read_unaligned(rhs_ptr.add(2))"
+      },
+      {
+        "line": 124,
+        "text": "        && core::ptr::read_unaligned(lhs_ptr.add(3)) == core::ptr::read_unaligned(rhs_ptr.add(3))"
+      }
+    ]
+  }
+}

@@ -1,19 +1,20 @@
-# Smallest isolated execution prototype while pricing authority remains open
+# Isolated execution prototype for the selected signed-feed architecture
 
 No production instruction should accept a caller-supplied amount as a trusted risk
 bound. The common execution layer can nevertheless be built and tested separately.
 
 ## Proposed modules
 
-1. A small no_std pure route parser/validator, e.g. crates/shortwin-jupiter-exec:
+1. The implemented no_std header/fixed-meta prototype, crates/shortwin-jupiter-route:
    - pinned current Jupiter discriminator/header and fixed-account interpretation;
    - bounded lengths/account counts; canonical authority, account, mint and token
      program binding; explicit allowed fee/route features;
-   - returns a CheckedRoute, never a price or a collateral/liquidation decision.
+   - returns ValidatedHeader, certifying only its partial checks; never CPI authorization, a price or a collateral/liquidation decision.
    No HTTP SDK, price-provider dependency, state mutation or signing occurs here.
 
 2. An internal SBF execution helper, initially reachable only from a test probe:
-   execute_bounded(CheckedRoute, SwapAccounts, AuthorizedExecutionBounds).
+   execute_bounded(AuthorizedRoute, SwapAccounts, AuthorizedExecutionBounds).
+   AuthorizedRoute is not implemented by the current header parser.
    Ultimately bounds are constructed by a selected risk backend in an existing
    protocol handler; the constructor is not the public route payload.
 
@@ -39,15 +40,16 @@ authorization. Include malicious CPI targets/routes that spend less/more, change
 recipient/authority/delegate, duplicate protocol keys, steal rent, replay accounts,
 or attempt re-entry. No fake oracle amount enters open_short/liquidate/sol_settle.
 
-The first production integration can construct these bounds from the existing
-independent reference backend. An externally verified quote backend can later be
-wired only after its financial semantics and provider identity are selected.
+The owner selected externally verified Jupiter-derived feeds for new-market risk.
+The bounded executor can be tested before that feed supplies financial authority.
+An existing reference backend remains a possible regression/test bound source;
+this does not replace the selected new-market architecture.
 
 ## Review of parent's JUPITER_REDESIGN.md
 
 No material incorrect assertion found at the reviewed uncommitted version.
 Its provider candidate and variable-override trust boundaries are properly described
-as unselected/unimplemented. The useful additional precise contracts are:
+as selected at the architecture level, with provider/settings unapproved and integration unimplemented. The useful additional precise contracts are:
 
 - POST-open live B(q) currently defines N_open and the D4 spot leg. A pre-open signed
   quote is a different economic mark even if the same scalar formula is reused.
@@ -62,3 +64,38 @@ as unselected/unimplemented. The useful additional precise contracts are:
 
 Independent AI policy-agent review agreed with these boundaries and the cost-edge/
 pprime arithmetic reasoning. This is not a firm audit or completed qualification.
+
+## First SBF probe scope from independent implementation review
+
+Use `tests/jupiter_exec_probe`, an explicit build script and a separate target
+artifact directory. Do not add it to normal production handlers or the default
+Anchor program list. Start with ordinary V2 ExactIn, two executor-created plain
+PDA token accounts and a unique execution authority. Precreate all venue accounts;
+allow zero venue-side native rent. Shared accounts, ExactOut, external setup/cleanup
+and arbitrary intermediate accounts need separate evidence.
+
+Construct CPI roles deliberately, then inspect them by key across duplicate metas.
+A writable alias of the execution signer must be rejected, including in the opaque
+tail. The current header parser intentionally does not enforce this. Never forward
+market/pool/position/config/oracle/payer/borrower accounts or vault authorities to
+Jupiter. Fund only bounded scratch inventory, then require actual final vault credit,
+refund all remaining WSOL and apply the documented surplus policy locally.
+
+Safe endpoint mints do not prove safe token-account TLVs. The existing base account
+reader ignores Token-2022 TLVs. Initial scratch accounts must be created and checked
+by the executor, with an explicit allowed account-extension policy; attacker-created
+ATAs with MemoTransfer/CpiGuard or unexpected extensions are rejection cases.
+
+Reuse normalization ideas from engine/trader.rs, but independently test program-owned
+escrow-to-WSOL funding under SBF. The existing helper includes the debited position
+in a local System CPI for runtime balance visibility; that precedent does not permit
+forwarding the escrow to Jupiter. Check both donation-normalized token and native
+lamport baselines.
+
+Hostile SBF tests must cover incomplete input consumption, underdelivery, overspend,
+substitution/duplicate privilege escalation, delegate/owner changes, early closes,
+rent theft, prefunded scratch accounts, reentry attempts and atomic rollback after
+postcondition failure. Label these separately from actual pinned Jupiter execution.
+The latter needs retained instruction/account snapshot, ELF/IDL identity, execution
+bank features, deltas and measured CU/account/data limits. No SBF probe is implemented
+or passed by this document or by the header unit tests.

@@ -4,8 +4,9 @@
 The owner [postponed first mainnet](../audit/owner-jupiter-redesign-decision-2026-10-27.md)
 for this redesign. The owner selected signed Jupiter-derived feeds for new markets; concrete
 provider/trust/settings remain subject to review before deployment. The deployed
-program remains the 1.0.3 baseline. Prototype build identities require new CI; no
-final version is selected.
+program remains the 1.0.3 baseline. The initial prototype CI reproduced its exact
+Anchor/verifier bytes; this does not qualify future integration changes. No final
+version is selected.
 
 ## Product boundary
 
@@ -186,3 +187,15 @@ The older [Jupiter research](../research/jupiter-cpi.md) remains historical.
 6. Select the final version/tag and commission real mainnet operators and a
    concrete reviewed transaction packet. Do not tag, deploy or unpause from this
    proposal. The existing audit/bounty funding decision otherwise remains.
+
+## Current engineering qualification boundary
+
+The pure route and cost prototypes remain unwired. The native provider component
+ABI probe passed on its recorded source, but independent review found source-level
+memory-safety blockers in the candidate SDK verifier. Its experimental reader is
+explicitly quarantined; see the [review and receipts](../audit/jupiter-oracle-sdk-review-2026-10-27.md).
+A safe format parser authenticates nothing by itself. The next pricing step follows
+an [exact-quantity producer contract](jupiter/QUOTE_PRODUCER_CONTRACT.md), preserving
+separate candidate upper costs and explicitly attested economic lower references.
+No new market activation, live feed, final fuzz qualification or deployment follows
+from these prototypes or the unchanged legacy ELF.
