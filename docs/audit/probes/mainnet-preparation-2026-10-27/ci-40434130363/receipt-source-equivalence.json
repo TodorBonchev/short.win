@@ -1,0 +1,23 @@
+{
+  "checked_utc": "2026-10-27T03:04:19.384154+00:00",
+  "tested_commit": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+  "protected_pathspecs": [
+    ".github",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    "Anchor.toml",
+    ".cargo",
+    "programs",
+    "crates",
+    "clients",
+    "apps",
+    "services",
+    "scripts",
+    "tests"
+  ],
+  "protected_tracked_delta": [],
+  "untracked_protected_inputs": [],
+  "changes_are_documentation_and_license_evidence_only": true,
+  "note": "The receipt commit records completed CI without changing tested executable, harness, fixture, lock, build, client or service inputs."
+}

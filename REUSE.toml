@@ -156,3 +156,12 @@ path = [
 precedence = "override"
 SPDX-FileCopyrightText = "RustSec Advisory Database contributors"
 SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = [
+    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__mod.rs.diff.gz",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__account_len.rs.new.rs.gz"
+]
+precedence = "override"
+SPDX-FileCopyrightText = "The Solana Program Library authors"
+SPDX-License-Identifier = "Apache-2.0"

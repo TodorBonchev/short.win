@@ -1,0 +1,164 @@
+{
+  "id": 121959188981,
+  "run_id": 40434130363,
+  "workflow_name": "ci",
+  "head_branch": "codex/capped-mainnet-1.0.3",
+  "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+  "run_attempt": 1,
+  "node_id": "CR_kwDOUsn3ts8AAAAcZVWJ9Q",
+  "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+  "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188981",
+  "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188981",
+  "status": "completed",
+  "conclusion": "success",
+  "created_at": "2026-10-27T01:44:03Z",
+  "started_at": "2026-10-27T01:44:05Z",
+  "completed_at": "2026-10-27T01:58:04Z",
+  "name": "services",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1,
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:44:08Z"
+    },
+    {
+      "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2,
+      "started_at": "2026-10-27T01:44:08Z",
+      "completed_at": "2026-10-27T01:44:10Z"
+    },
+    {
+      "name": "Rust toolchain from rust-toolchain.toml",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3,
+      "started_at": "2026-10-27T01:44:10Z",
+      "completed_at": "2026-10-27T01:44:17Z"
+    },
+    {
+      "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4,
+      "started_at": "2026-10-27T01:44:17Z",
+      "completed_at": "2026-10-27T01:44:18Z"
+    },
+    {
+      "name": "Run taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5,
+      "started_at": "2026-10-27T01:44:18Z",
+      "completed_at": "2026-10-27T01:44:19Z"
+    },
+    {
+      "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 6,
+      "started_at": "2026-10-27T01:44:19Z",
+      "completed_at": "2026-10-27T01:44:20Z"
+    },
+    {
+      "name": "Run cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm -p shortwin-ops --check",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 7,
+      "started_at": "2026-10-27T01:44:20Z",
+      "completed_at": "2026-10-27T01:44:20Z"
+    },
+    {
+      "name": "Run cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8,
+      "started_at": "2026-10-27T01:44:20Z",
+      "completed_at": "2026-10-27T01:45:41Z"
+    },
+    {
+      "name": "The keeper on its release feature set (no test-venue)",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9,
+      "started_at": "2026-10-27T01:45:41Z",
+      "completed_at": "2026-10-27T01:45:58Z"
+    },
+    {
+      "name": "Temporary advisory review remains current",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10,
+      "started_at": "2026-10-27T01:45:58Z",
+      "completed_at": "2026-10-27T01:45:58Z"
+    },
+    {
+      "name": "cargo deny (services/deny.toml)",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 11,
+      "started_at": "2026-10-27T01:45:58Z",
+      "completed_at": "2026-10-27T01:46:00Z"
+    },
+    {
+      "name": "cargo audit (services lockfile; dated usage-scoped exceptions)",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 12,
+      "started_at": "2026-10-27T01:46:00Z",
+      "completed_at": "2026-10-27T01:46:03Z"
+    },
+    {
+      "name": "Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`)",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 13,
+      "started_at": "2026-10-27T01:46:03Z",
+      "completed_at": "2026-10-27T01:55:48Z"
+    },
+    {
+      "name": "The keeper binary has no mock venue (A49)",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 14,
+      "started_at": "2026-10-27T01:55:48Z",
+      "completed_at": "2026-10-27T01:57:41Z"
+    },
+    {
+      "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 27,
+      "started_at": "2026-10-27T01:57:41Z",
+      "completed_at": "2026-10-27T01:58:02Z"
+    },
+    {
+      "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 28,
+      "started_at": "2026-10-27T01:58:02Z",
+      "completed_at": "2026-10-27T01:58:02Z"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 29,
+      "started_at": "2026-10-27T01:58:02Z",
+      "completed_at": "2026-10-27T01:58:02Z"
+    }
+  ],
+  "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188981",
+  "labels": [
+    "ubuntu-24.04"
+  ],
+  "runner_id": 1000001169,
+  "runner_name": "GitHub Actions 1000001169",
+  "runner_group_id": 0,
+  "runner_group_name": "GitHub Actions"
+}

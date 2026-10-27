@@ -87,6 +87,13 @@ reason for this hold. The program ID itself had no mainnet account at finalized
 slot 461,879,034, as recorded in the same evidence.
 
 Base for this preparation: main `7f2af5b5787d62978c79e7630f5b0e1a3310d94e`.
+
+[Full CI 40434130363](https://github.com/TodorBonchev/short.win/actions/runs/40434130363)
+passed on `57bc1c845`: 25 jobs passed, zero failed, one intentional nightly skip,
+19 selected mutants killed, both keeper startup regressions executed, and Anchor/
+verifier release bytes matched. [Retained complete result and hashes](../audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/README.md).
+That run uses the old Token-2022 fixture; draft qualification work adds the new
+baseline separately and cannot borrow the earlier fuzz duration.
 The canonical release ELF SHA-256 remains
 `d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc`
 (1,644,024 bytes), trimmed executable hash

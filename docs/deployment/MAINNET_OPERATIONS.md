@@ -315,6 +315,52 @@ Healthy HTTP responses do not prove current chain data or a covered position.
 Compare indexed slot/finality and known on-chain market/position state, and retain
 actual keeper covered-seconds, required-observation misses and exit receipts.
 
+## Initialize fail-closed and complete governance handoff
+
+The current `initialize_config` writes global flags `0`: opens are initially
+**unpaused**. Its signer must be the current loader ProgramData upgrade authority.
+The existing `shortwin-gov init-config` sends that initialization instruction alone;
+the separate execution command sends the Squads instruction alone. Do not submit
+full-venue initialization and rely on a later transaction to pause it.
+
+The faster proposed commissioning packet is one atomic outer transaction:
+
+1. Preapprove Emergency's stored global `set-pause on` transaction to its 2-of-4
+   threshold without executing it (Emergency time lock is zero).
+2. Order `initialize_config` first and that Emergency `VaultTransactionExecute`
+   second in the same transaction. Include the temporary upgrade-authority
+   initializer signer, an authorized Emergency executor/member signer, and the fee
+   payer if distinct. Squads supplies Emergency vault 0's inner CPI signature;
+   the PDA is not an outer keypair signer.
+3. Retain exact stored transaction/index/message identity, final authority/config
+   values, remaining account metas, wire size, ALT/format, CU, costs and successful
+   combined simulation before asking for the actual financial/signing approval.
+   If the second instruction fails, initialization must roll back atomically.
+
+This route is **source-feasible, not an existing CLI flag or a completed packet**.
+No combined-packet simulation or size result is claimed. The legacy sender's
+1,232-byte limit may require a reviewed v0/ALT builder; do not assume v1 availability
+or split the transaction to make it fit. If it is not yet validated, the existing
+CLI-supported fail-closed alternative is `config.venues = []`, whose zero mask
+refuses all opens. Later enabling then needs the normal Governance plus program
+configuration timelocks (approximately 96 hours after threshold approval).
+
+Stage the checked upgrade-authority handoff promptly. `SetAuthorityChecked`
+requires both the current temporary authority and new Governance vault 0 to sign;
+only Squads execution can provide the latter PDA signature. Governance requires
+3-of-5 approval and its existing **48-hour** time lock, with the temporary
+key supplied as co-signer at execution. This is not the program parameter-change
+clock, so the handoff itself has no additional program 48-hour delay. Funding,
+qualification and commissioning can proceed in parallel with that wait, with new
+opens held paused. The temporary key retains unilateral loader upgrade power
+until the actual handoff succeeds. Do not remove the pause before handoff and
+operating checks, or imply that choosing final config authorities completed it.
+
+Source references: `programs/shortwin/src/instructions/initialize_config.rs`,
+`engine/guard.rs`, `instructions/set_pause.rs`, `services/ops/src/{cli,config,ixs,squads,send}.rs`
+and `crates/squads-v4-ix/src/{state,message}.rs`. Existing individual T-SQ/ops tests
+are not a receipt for the proposed combined bootstrap transaction.
+
 ## Funding and fee separation
 
 Fund the keeper **before** admitting real positions; projected protocol fees do

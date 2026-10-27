@@ -120,3 +120,13 @@ change short.win's on-chain adapter in this scoped review. **New-ELF execution,
 bench/fuzz qualification and fixture promotion remain pending**, so this review
 does not close the current live-preflight gate or authorize the final mainnet tag,
 deployment or unpause.
+
+## Independent source/provenance review
+
+`independent-review.json` records a separate AI review of publisher assets/tags,
+source/function/layout comparisons and compatibility conditions. It approves
+preparing fresh fixture qualification; actual new-ELF execution remains open.
+The full extension-module diff and new account-length helper are retained as
+`interface__src__extension__mod.rs.diff.gz` and
+`interface__src__extension__account_len.rs.new.rs.gz`, covering production helpers
+after the first cfg(test) marker as well as the shorter selected production diffs.

@@ -1,0 +1,3404 @@
+{
+  "total_count": 26,
+  "jobs": [
+    {
+      "id": 121958706538,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4tag",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958706538",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958706538",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:44:02Z",
+      "name": "anchor-build",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:34Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:34Z",
+          "completed_at": "2026-10-27T01:42:38Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:38Z",
+          "completed_at": "2026-10-27T01:42:47Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:47Z",
+          "completed_at": "2026-10-27T01:42:52Z"
+        },
+        {
+          "name": "Cache Agave, platform-tools and the Anchor CLI",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:52Z",
+          "completed_at": "2026-10-27T01:43:01Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-27T01:43:01Z",
+          "completed_at": "2026-10-27T01:43:01Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:43:01Z",
+          "completed_at": "2026-10-27T01:43:01Z"
+        },
+        {
+          "name": "Install Anchor CLI 1.2.0",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-10-27T01:43:01Z",
+          "completed_at": "2026-10-27T01:43:01Z"
+        },
+        {
+          "name": "Versions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:43:01Z",
+          "completed_at": "2026-10-27T01:43:02Z"
+        },
+        {
+          "name": "Build release artifacts and IDL from the lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:43:02Z",
+          "completed_at": "2026-10-27T01:43:37Z"
+        },
+        {
+          "name": "Artifacts are SBPF v3",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:43:37Z",
+          "completed_at": "2026-10-27T01:43:37Z"
+        },
+        {
+          "name": "Release artifact has no mock venue (A49)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:43:37Z",
+          "completed_at": "2026-10-27T01:43:37Z"
+        },
+        {
+          "name": "Test-venue build (scripts/build-test-venue.sh)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:43:37Z",
+          "completed_at": "2026-10-27T01:43:59Z"
+        },
+        {
+          "name": "Release artifact has no test-venue code path (A49)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T01:43:59Z",
+          "completed_at": "2026-10-27T01:43:59Z"
+        },
+        {
+          "name": "Release artifacts carry security.txt (SECTXT-1)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-27T01:43:59Z",
+          "completed_at": "2026-10-27T01:43:59Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-27T01:43:59Z",
+          "completed_at": "2026-10-27T01:44:01Z"
+        },
+        {
+          "name": "Post Cache Agave, platform-tools and the Anchor CLI",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-10-27T01:44:01Z",
+          "completed_at": "2026-10-27T01:44:01Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-10-27T01:44:01Z",
+          "completed_at": "2026-10-27T01:44:01Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-10-27T01:44:01Z",
+          "completed_at": "2026-10-27T01:44:01Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-10-27T01:44:01Z",
+          "completed_at": "2026-10-27T01:44:01Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958706538",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001148,
+      "runner_name": "GitHub Actions 1000001148",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958706806,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4udg",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958706806",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958706806",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:43:51Z",
+      "name": "cu-math",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:32Z",
+          "completed_at": "2026-10-27T01:42:33Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:38Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:38Z",
+          "completed_at": "2026-10-27T01:42:47Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:47Z",
+          "completed_at": "2026-10-27T01:42:50Z"
+        },
+        {
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:50Z",
+          "completed_at": "2026-10-27T01:42:59Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-27T01:42:59Z",
+          "completed_at": "2026-10-27T01:42:59Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:42:59Z",
+          "completed_at": "2026-10-27T01:43:00Z"
+        },
+        {
+          "name": "Build the bench program (platform-tools v1.57, SBPF v3)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:43:00Z",
+          "completed_at": "2026-10-27T01:43:05Z"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path tests/bench/cu_math/Cargo.toml --release --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:43:05Z",
+          "completed_at": "2026-10-27T01:43:06Z"
+        },
+        {
+          "name": "Budgets (fails above the \u00a76.1 value + 20 %)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:43:06Z",
+          "completed_at": "2026-10-27T01:43:49Z"
+        },
+        {
+          "name": "results.md is current (informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:43:49Z",
+          "completed_at": "2026-10-27T01:43:49Z"
+        },
+        {
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-27T01:43:49Z",
+          "completed_at": "2026-10-27T01:43:49Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-27T01:43:49Z",
+          "completed_at": "2026-10-27T01:43:49Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-27T01:43:49Z",
+          "completed_at": "2026-10-27T01:43:49Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-27T01:43:49Z",
+          "completed_at": "2026-10-27T01:43:49Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958706806",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001147,
+      "runner_name": "GitHub Actions 1000001147",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958706831,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4ujw",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958706831",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958706831",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:43:13Z",
+      "name": "deny",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:34Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:34Z",
+          "completed_at": "2026-10-27T01:42:38Z"
+        },
+        {
+          "name": "Run taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:38Z",
+          "completed_at": "2026-10-27T01:42:39Z"
+        },
+        {
+          "name": "Temporary advisory review remains current",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:39Z",
+          "completed_at": "2026-10-27T01:42:39Z"
+        },
+        {
+          "name": "cargo deny (workspace and standalone bench lockfiles)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:39Z",
+          "completed_at": "2026-10-27T01:43:01Z"
+        },
+        {
+          "name": "cargo audit (workspace and the standalone bench lockfiles)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:43:01Z",
+          "completed_at": "2026-10-27T01:43:10Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:43:10Z",
+          "completed_at": "2026-10-27T01:43:11Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:43:11Z",
+          "completed_at": "2026-10-27T01:43:11Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958706831",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001149,
+      "runner_name": "GitHub Actions 1000001149",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958706942,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4u_g",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958706942",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958706942",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:43:12Z",
+      "name": "clippy",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:34Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:34Z",
+          "completed_at": "2026-10-27T01:42:38Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:38Z",
+          "completed_at": "2026-10-27T01:42:46Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:46Z",
+          "completed_at": "2026-10-27T01:42:50Z"
+        },
+        {
+          "name": "shortwin-math keeps the ARCHITECTURE \u00a72.2 deny lints",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:50Z",
+          "completed_at": "2026-10-27T01:42:50Z"
+        },
+        {
+          "name": "shortwin-math has zero runtime dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:42:50Z",
+          "completed_at": "2026-10-27T01:42:51Z"
+        },
+        {
+          "name": "Run cargo clippy -p shortwin-math --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:42:51Z",
+          "completed_at": "2026-10-27T01:42:54Z"
+        },
+        {
+          "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:42:54Z",
+          "completed_at": "2026-10-27T01:43:06Z"
+        },
+        {
+          "name": "shortwin without test-venue (the release feature set)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:43:06Z",
+          "completed_at": "2026-10-27T01:43:09Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-27T01:43:09Z",
+          "completed_at": "2026-10-27T01:43:10Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-27T01:43:10Z",
+          "completed_at": "2026-10-27T01:43:10Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T01:43:10Z",
+          "completed_at": "2026-10-27T01:43:10Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958706942",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001154,
+      "runner_name": "GitHub Actions 1000001154",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958707003,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4vOw",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958707003",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958707003",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:42:56Z",
+      "name": "fmt",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:34Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:34Z",
+          "completed_at": "2026-10-27T01:42:39Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:39Z",
+          "completed_at": "2026-10-27T01:42:49Z"
+        },
+        {
+          "name": "Run cargo fmt --all --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:49Z",
+          "completed_at": "2026-10-27T01:42:51Z"
+        },
+        {
+          "name": "T-CU-MATH bench workspace (standalone, tests/bench/cu_math)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:51Z",
+          "completed_at": "2026-10-27T01:42:54Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:42:54Z",
+          "completed_at": "2026-10-27T01:42:54Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:42:54Z",
+          "completed_at": "2026-10-27T01:42:54Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958707003",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001155,
+      "runner_name": "GitHub Actions 1000001155",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958707010,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4vQg",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958707010",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958707010",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:44:21Z",
+      "name": "web",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:35Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:35Z",
+          "completed_at": "2026-10-27T01:42:41Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:41Z",
+          "completed_at": "2026-10-27T01:42:49Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:49Z",
+          "completed_at": "2026-10-27T01:42:51Z"
+        },
+        {
+          "name": "wasm-bindgen CLI (the crate's exact pin)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:51Z",
+          "completed_at": "2026-10-27T01:42:51Z"
+        },
+        {
+          "name": "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:42:51Z",
+          "completed_at": "2026-10-27T01:42:55Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:42:55Z",
+          "completed_at": "2026-10-27T01:43:02Z"
+        },
+        {
+          "name": "Run pnpm --filter @shortwin/math-wasm build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:43:02Z",
+          "completed_at": "2026-10-27T01:43:07Z"
+        },
+        {
+          "name": "The WASM facade from Node (crates/shortwin-math-wasm/js/smoke.cjs)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:43:07Z",
+          "completed_at": "2026-10-27T01:43:07Z"
+        },
+        {
+          "name": "Run pnpm --filter web lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:43:07Z",
+          "completed_at": "2026-10-27T01:43:08Z"
+        },
+        {
+          "name": "Run pnpm --filter web typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:43:08Z",
+          "completed_at": "2026-10-27T01:43:19Z"
+        },
+        {
+          "name": "Run pnpm --filter web test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:43:19Z",
+          "completed_at": "2026-10-27T01:44:06Z"
+        },
+        {
+          "name": "Run pnpm --filter web build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:44:06Z",
+          "completed_at": "2026-10-27T01:44:18Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-27T01:44:18Z",
+          "completed_at": "2026-10-27T01:44:18Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-27T01:44:18Z",
+          "completed_at": "2026-10-27T01:44:18Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-10-27T01:44:18Z",
+          "completed_at": "2026-10-27T01:44:18Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958707010",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001151,
+      "runner_name": "GitHub Actions 1000001151",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958707011,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4vQw",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958707011",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958707011",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:48:18Z",
+      "name": "vectors",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:32Z",
+          "completed_at": "2026-10-27T01:42:33Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:37Z"
+        },
+        {
+          "name": "Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:37Z",
+          "completed_at": "2026-10-27T01:42:38Z"
+        },
+        {
+          "name": "Regenerate every tests/vectors/<track>/gen_*.py",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:38Z",
+          "completed_at": "2026-10-27T01:45:52Z"
+        },
+        {
+          "name": "Run git diff --exit-code -- crates/shortwin-math/tests/vectors",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:45:52Z",
+          "completed_at": "2026-10-27T01:45:52Z"
+        },
+        {
+          "name": "T-CONFIG default configuration passes config_check.py",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:45:52Z",
+          "completed_at": "2026-10-27T01:46:01Z"
+        },
+        {
+          "name": "T-CONFIG config gate (scripts/config-gate.sh)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:46:01Z",
+          "completed_at": "2026-10-27T01:48:16Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:48:16Z",
+          "completed_at": "2026-10-27T01:48:16Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T01:48:16Z",
+          "completed_at": "2026-10-27T01:48:16Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-27T01:48:16Z",
+          "completed_at": "2026-10-27T01:48:16Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958707011",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001153,
+      "runner_name": "GitHub Actions 1000001153",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958707015,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4vRw",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958707015",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958707015",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:42:57Z",
+      "name": "wasm",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:32Z",
+          "completed_at": "2026-10-27T01:42:33Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:37Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:37Z",
+          "completed_at": "2026-10-27T01:42:47Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:47Z",
+          "completed_at": "2026-10-27T01:42:49Z"
+        },
+        {
+          "name": "Run cargo build -p shortwin-math -p shortwin-math-wasm --target wasm32-unknown-unknown --release --locked",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:49Z",
+          "completed_at": "2026-10-27T01:42:55Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:42:55Z",
+          "completed_at": "2026-10-27T01:42:55Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:42:55Z",
+          "completed_at": "2026-10-27T01:42:55Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:42:55Z",
+          "completed_at": "2026-10-27T01:42:55Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958707015",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001150,
+      "runner_name": "GitHub Actions 1000001150",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121958707034,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZU4vWg",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121958707034",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121958707034",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:42:29Z",
+      "started_at": "2026-10-27T01:42:32Z",
+      "completed_at": "2026-10-27T01:43:23Z",
+      "name": "test",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:42:33Z",
+          "completed_at": "2026-10-27T01:42:34Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:42:34Z",
+          "completed_at": "2026-10-27T01:42:38Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:42:38Z",
+          "completed_at": "2026-10-27T01:42:46Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:42:46Z",
+          "completed_at": "2026-10-27T01:42:48Z"
+        },
+        {
+          "name": "Run cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix --locked",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:42:48Z",
+          "completed_at": "2026-10-27T01:43:21Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:43:21Z",
+          "completed_at": "2026-10-27T01:43:21Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:43:21Z",
+          "completed_at": "2026-10-27T01:43:21Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:43:21Z",
+          "completed_at": "2026-10-27T01:43:21Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121958707034",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001152,
+      "runner_name": "GitHub Actions 1000001152",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188796,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJPA",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188796",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188796",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:49:25Z",
+      "name": "m6-cu",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:12Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:12Z",
+          "completed_at": "2026-10-27T01:44:22Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:22Z",
+          "completed_at": "2026-10-27T01:44:32Z"
+        },
+        {
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:32Z",
+          "completed_at": "2026-10-27T01:44:44Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:44Z",
+          "completed_at": "2026-10-27T01:44:44Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:44Z",
+          "completed_at": "2026-10-27T01:44:45Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:45Z",
+          "completed_at": "2026-10-27T01:44:47Z"
+        },
+        {
+          "name": "Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:44:47Z",
+          "completed_at": "2026-10-27T01:44:50Z"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path tests/bench/m6_cu/Cargo.toml --all --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:44:50Z",
+          "completed_at": "2026-10-27T01:44:52Z"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path tests/bench/m6_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:44:52Z",
+          "completed_at": "2026-10-27T01:44:59Z"
+        },
+        {
+          "name": "Budgets, T-TRACE, sizes and depth (fails above a budget or CU limit, off the expected trace, peak or depth, above 64 entries or 1,232 B v0, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:44:59Z",
+          "completed_at": "2026-10-27T01:49:20Z"
+        },
+        {
+          "name": "results.md, trace.md and depth.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:49:20Z",
+          "completed_at": "2026-10-27T01:49:20Z"
+        },
+        {
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-27T01:49:20Z",
+          "completed_at": "2026-10-27T01:49:20Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-27T01:49:20Z",
+          "completed_at": "2026-10-27T01:49:20Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-27T01:49:20Z",
+          "completed_at": "2026-10-27T01:49:21Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-10-27T01:49:21Z",
+          "completed_at": "2026-10-27T01:49:21Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188796",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001157,
+      "runner_name": "GitHub Actions 1000001157",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188800,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJQA",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188800",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188800",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:05Z",
+      "completed_at": "2026-10-27T01:45:22Z",
+      "name": "m2-cu",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:06Z",
+          "completed_at": "2026-10-27T01:44:07Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:09Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:09Z",
+          "completed_at": "2026-10-27T01:44:19Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:19Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path tests/bench/m2_cu/Cargo.toml -p m2-cu-bench --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path tests/bench/m2_cu/Cargo.toml --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:44:32Z"
+        },
+        {
+          "name": "Budgets and T-TRACE (fails above a budget, above 64 trace entries, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:32Z",
+          "completed_at": "2026-10-27T01:45:20Z"
+        },
+        {
+          "name": "results.md and trace.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:45:20Z",
+          "completed_at": "2026-10-27T01:45:20Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-27T01:45:20Z",
+          "completed_at": "2026-10-27T01:45:20Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-27T01:45:20Z",
+          "completed_at": "2026-10-27T01:45:20Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T01:45:20Z",
+          "completed_at": "2026-10-27T01:45:20Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188800",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001159,
+      "runner_name": "GitHub Actions 1000001159",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188809,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJSQ",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188809",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188809",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:55:25Z",
+      "name": "indexer",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:06Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:10Z"
+        },
+        {
+          "name": "Free runner disk space",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:10Z",
+          "completed_at": "2026-10-27T01:45:03Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:45:03Z",
+          "completed_at": "2026-10-27T01:45:13Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:45:13Z",
+          "completed_at": "2026-10-27T01:45:36Z"
+        },
+        {
+          "name": "Cache the embedded PostgreSQL binaries (INDEXER.md \u00a711.1)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:45:36Z",
+          "completed_at": "2026-10-27T01:45:37Z"
+        },
+        {
+          "name": "Cache Agave (solana-test-validator)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:45:37Z",
+          "completed_at": "2026-10-27T01:45:40Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-10-27T01:45:40Z",
+          "completed_at": "2026-10-27T01:45:40Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:45:40Z",
+          "completed_at": "2026-10-27T01:45:40Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:45:40Z",
+          "completed_at": "2026-10-27T01:45:41Z"
+        },
+        {
+          "name": "The embedded-Postgres fixture (downloads the binaries on a cold cache)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:45:41Z",
+          "completed_at": "2026-10-27T01:46:01Z"
+        },
+        {
+          "name": "Indexer \u2014 unit and decoder tests, ingest, analytics, the API contract (seed and replayed sessions), the security review's regressions and its 30-day load test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:46:01Z",
+          "completed_at": "2026-10-27T01:51:30Z"
+        },
+        {
+          "name": "The replay harness \u2014 LiteSVM sessions through the real ingest into the chain state (M8 exit)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:51:30Z",
+          "completed_at": "2026-10-27T01:54:21Z"
+        },
+        {
+          "name": "RPC backfill, logsSubscribe live source and finality against solana-test-validator (history past the status cache, a rolled-back cursor)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T01:54:21Z",
+          "completed_at": "2026-10-27T01:55:19Z"
+        },
+        {
+          "name": "The production indexer links no embedded Postgres (TEST-ONLY `embedded-pg`)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-27T01:55:19Z",
+          "completed_at": "2026-10-27T01:55:19Z"
+        },
+        {
+          "name": "The reference deployment parses (services/indexer/deploy; not run)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-27T01:55:19Z",
+          "completed_at": "2026-10-27T01:55:22Z"
+        },
+        {
+          "name": "Post Cache Agave (solana-test-validator)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-10-27T01:55:22Z",
+          "completed_at": "2026-10-27T01:55:22Z"
+        },
+        {
+          "name": "Post Cache the embedded PostgreSQL binaries (INDEXER.md \u00a711.1)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-10-27T01:55:22Z",
+          "completed_at": "2026-10-27T01:55:23Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-10-27T01:55:23Z",
+          "completed_at": "2026-10-27T01:55:23Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-10-27T01:55:23Z",
+          "completed_at": "2026-10-27T01:55:23Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-10-27T01:55:23Z",
+          "completed_at": "2026-10-27T01:55:23Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188809",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001162,
+      "runner_name": "GitHub Actions 1000001162",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188810,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJSg",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188810",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188810",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:05Z",
+      "completed_at": "2026-10-27T01:47:18Z",
+      "name": "t-pot",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:06Z",
+          "completed_at": "2026-10-27T01:44:07Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:12Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:12Z",
+          "completed_at": "2026-10-27T01:44:20Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:20Z",
+          "completed_at": "2026-10-27T01:44:24Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:24Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "T-POT, every trace (SHORTWIN_TRACES=full)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:47:16Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:47:16Z",
+          "completed_at": "2026-10-27T01:47:16Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:47:16Z",
+          "completed_at": "2026-10-27T01:47:16Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:47:16Z",
+          "completed_at": "2026-10-27T01:47:16Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188810",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001156,
+      "runner_name": "GitHub Actions 1000001156",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188845,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJbQ",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188845",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188845",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T02:53:34Z",
+      "name": "mutants",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:12Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:12Z",
+          "completed_at": "2026-10-27T01:44:22Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:22Z",
+          "completed_at": "2026-10-27T01:44:23Z"
+        },
+        {
+          "name": "Cache Agave, platform-tools and the Anchor CLI",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:23Z",
+          "completed_at": "2026-10-27T01:44:39Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:39Z",
+          "completed_at": "2026-10-27T01:44:39Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:39Z",
+          "completed_at": "2026-10-27T01:44:39Z"
+        },
+        {
+          "name": "Install Anchor CLI 1.2.0",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:39Z",
+          "completed_at": "2026-10-27T01:44:39Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:44:39Z",
+          "completed_at": "2026-10-27T01:44:41Z"
+        },
+        {
+          "name": "The review's mutants must be killed",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:44:41Z",
+          "completed_at": "2026-10-27T02:53:26Z"
+        },
+        {
+          "name": "Post Cache Agave, platform-tools and the Anchor CLI",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-27T02:53:26Z",
+          "completed_at": "2026-10-27T02:53:26Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T02:53:26Z",
+          "completed_at": "2026-10-27T02:53:31Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-27T02:53:31Z",
+          "completed_at": "2026-10-27T02:53:32Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-27T02:53:32Z",
+          "completed_at": "2026-10-27T02:53:32Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188845",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001158,
+      "runner_name": "GitHub Actions 1000001158",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188850,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJcg",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188850",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188850",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:50:02Z",
+      "name": "m5-cu",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:09Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:09Z",
+          "completed_at": "2026-10-27T01:44:13Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:13Z",
+          "completed_at": "2026-10-27T01:44:24Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:24Z",
+          "completed_at": "2026-10-27T01:44:32Z"
+        },
+        {
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:32Z",
+          "completed_at": "2026-10-27T01:44:42Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:42Z",
+          "completed_at": "2026-10-27T01:44:42Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:42Z",
+          "completed_at": "2026-10-27T01:44:43Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:43Z",
+          "completed_at": "2026-10-27T01:44:45Z"
+        },
+        {
+          "name": "Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:44:45Z",
+          "completed_at": "2026-10-27T01:44:46Z"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path tests/bench/m5_cu/Cargo.toml --all --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:44:46Z",
+          "completed_at": "2026-10-27T01:44:48Z"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path tests/bench/m5_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:44:48Z",
+          "completed_at": "2026-10-27T01:44:54Z"
+        },
+        {
+          "name": "Budgets, T-TRACE, sizes and depth (fails above a budget or CU limit, off the expected trace, peak or depth, above 64 entries or 1,232 B v0, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:44:54Z",
+          "completed_at": "2026-10-27T01:49:58Z"
+        },
+        {
+          "name": "results.md, trace.md and depth.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:49:58Z",
+          "completed_at": "2026-10-27T01:49:59Z"
+        },
+        {
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-27T01:49:59Z",
+          "completed_at": "2026-10-27T01:49:59Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-27T01:49:59Z",
+          "completed_at": "2026-10-27T01:49:59Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-27T01:49:59Z",
+          "completed_at": "2026-10-27T01:49:59Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-10-27T01:49:59Z",
+          "completed_at": "2026-10-27T01:49:59Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188850",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001166,
+      "runner_name": "GitHub Actions 1000001166",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188851,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJcw",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188851",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188851",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:48:18Z",
+      "name": "verifiable-build",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:13Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml (to install solana-verify)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:13Z",
+          "completed_at": "2026-10-27T01:44:23Z"
+        },
+        {
+          "name": "Cache solana-verify 0.5.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:23Z",
+          "completed_at": "2026-10-27T01:44:24Z"
+        },
+        {
+          "name": "Install solana-verify 0.5.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:24Z",
+          "completed_at": "2026-10-27T01:44:24Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:24Z",
+          "completed_at": "2026-10-27T01:44:26Z"
+        },
+        {
+          "name": "Verifiable build of shortwin; byte-equal to the anchor-build artifact",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:26Z",
+          "completed_at": "2026-10-27T01:48:13Z"
+        },
+        {
+          "name": "Only the pinned image was used",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:48:13Z",
+          "completed_at": "2026-10-27T01:48:13Z"
+        },
+        {
+          "name": "Verifiable artifacts have no mock venue and no test-venue code path (A49)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:48:13Z",
+          "completed_at": "2026-10-27T01:48:13Z"
+        },
+        {
+          "name": "Job summary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:48:13Z",
+          "completed_at": "2026-10-27T01:48:13Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:48:13Z",
+          "completed_at": "2026-10-27T01:48:15Z"
+        },
+        {
+          "name": "Post Cache solana-verify 0.5.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-27T01:48:15Z",
+          "completed_at": "2026-10-27T01:48:15Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-10-27T01:48:15Z",
+          "completed_at": "2026-10-27T01:48:16Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-10-27T01:48:16Z",
+          "completed_at": "2026-10-27T01:48:16Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188851",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001160,
+      "runner_name": "GitHub Actions 1000001160",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188854,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJdg",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188854",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188854",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:44:27Z",
+      "name": "codama",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:06Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:10Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:10Z",
+          "completed_at": "2026-10-27T01:44:11Z"
+        },
+        {
+          "name": "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:11Z",
+          "completed_at": "2026-10-27T01:44:14Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:14Z",
+          "completed_at": "2026-10-27T01:44:20Z"
+        },
+        {
+          "name": "IDL copy is current",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:20Z",
+          "completed_at": "2026-10-27T01:44:20Z"
+        },
+        {
+          "name": "Generated client is current",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:20Z",
+          "completed_at": "2026-10-27T01:44:22Z"
+        },
+        {
+          "name": "Run pnpm --filter @shortwin/client typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:22Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "Run pnpm --filter @shortwin/client test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:44:26Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T01:44:26Z",
+          "completed_at": "2026-10-27T01:44:26Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188854",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001165,
+      "runner_name": "GitHub Actions 1000001165",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188866,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJgg",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188866",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188866",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:05Z",
+      "completed_at": "2026-10-27T01:45:47Z",
+      "name": "t-size",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:06Z",
+          "completed_at": "2026-10-27T01:44:09Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:09Z",
+          "completed_at": "2026-10-27T01:44:13Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:13Z",
+          "completed_at": "2026-10-27T01:44:23Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:23Z",
+          "completed_at": "2026-10-27T01:44:40Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:40Z",
+          "completed_at": "2026-10-27T01:44:41Z"
+        },
+        {
+          "name": "T-SIZE, Raydium (v0 through the protocol ALT, executed on the fork)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:41Z",
+          "completed_at": "2026-10-27T01:44:59Z"
+        },
+        {
+          "name": "T-SIZE, the pump curve (v0 through the protocol ALT, executed on the fork)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:59Z",
+          "completed_at": "2026-10-27T01:45:17Z"
+        },
+        {
+          "name": "T-SIZE, PumpSwap (v0 through the protocol ALT, executed on the fork)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:45:17Z",
+          "completed_at": "2026-10-27T01:45:33Z"
+        },
+        {
+          "name": "The protocol ALT's static part (scripts/build-alt.sh print)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:45:33Z",
+          "completed_at": "2026-10-27T01:45:43Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:45:43Z",
+          "completed_at": "2026-10-27T01:45:44Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T01:45:44Z",
+          "completed_at": "2026-10-27T01:45:44Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-27T01:45:44Z",
+          "completed_at": "2026-10-27T01:45:45Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-27T01:45:45Z",
+          "completed_at": "2026-10-27T01:45:45Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188866",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001161,
+      "runner_name": "GitHub Actions 1000001161",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188898,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJog",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188898",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188898",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:48:04Z",
+      "name": "m7-keeper-bench",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:12Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:12Z",
+          "completed_at": "2026-10-27T01:44:22Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:22Z",
+          "completed_at": "2026-10-27T01:44:30Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:30Z",
+          "completed_at": "2026-10-27T01:44:32Z"
+        },
+        {
+          "name": "Keeper cost inputs, PumpSwap 4-extras T-SIZE, T-CASCADE (release)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:32Z",
+          "completed_at": "2026-10-27T01:48:00Z"
+        },
+        {
+          "name": "The committed figures are current (informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:48:00Z",
+          "completed_at": "2026-10-27T01:48:00Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:48:00Z",
+          "completed_at": "2026-10-27T01:48:00Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T01:48:00Z",
+          "completed_at": "2026-10-27T01:48:01Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-27T01:48:01Z",
+          "completed_at": "2026-10-27T01:48:01Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188898",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001163,
+      "runner_name": "GitHub Actions 1000001163",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188911,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJrw",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188911",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188911",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T02:07:22Z",
+      "name": "web-e2e",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:09Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:09Z",
+          "completed_at": "2026-10-27T01:44:12Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:12Z",
+          "completed_at": "2026-10-27T01:44:22Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:22Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "wasm-bindgen CLI (the crate's exact pin)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:44:25Z"
+        },
+        {
+          "name": "Cache Agave",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:25Z",
+          "completed_at": "2026-10-27T01:44:29Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:29Z",
+          "completed_at": "2026-10-27T01:44:29Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:29Z",
+          "completed_at": "2026-10-27T01:44:29Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:44:29Z",
+          "completed_at": "2026-10-27T01:44:31Z"
+        },
+        {
+          "name": "The test-venue build (A49) and the mock venue are present",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:44:31Z",
+          "completed_at": "2026-10-27T01:44:31Z"
+        },
+        {
+          "name": "Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:44:31Z",
+          "completed_at": "2026-10-27T01:44:35Z"
+        },
+        {
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:44:35Z",
+          "completed_at": "2026-10-27T01:44:44Z"
+        },
+        {
+          "name": "Run pnpm --filter @shortwin/math-wasm build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:44:44Z",
+          "completed_at": "2026-10-27T01:44:50Z"
+        },
+        {
+          "name": "Playwright's Chromium (user cache, no --with-deps)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T01:44:50Z",
+          "completed_at": "2026-10-27T01:44:59Z"
+        },
+        {
+          "name": "E2E (profile chain)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-27T01:44:59Z",
+          "completed_at": "2026-10-27T02:05:05Z"
+        },
+        {
+          "name": "E2E, the Mobile Wallet Adapter built off (O-6; the Android project, a rebuilt app)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-27T02:05:05Z",
+          "completed_at": "2026-10-27T02:07:16Z"
+        },
+        {
+          "name": "Screenshots of every page (e2e/specs/screens.spec.ts)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-27T02:07:16Z",
+          "completed_at": "2026-10-27T02:07:19Z"
+        },
+        {
+          "name": "Report, traces and logs",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 18,
+          "started_at": "2026-10-27T02:07:19Z",
+          "completed_at": "2026-10-27T02:07:19Z"
+        },
+        {
+          "name": "Post Cache Agave",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34,
+          "started_at": "2026-10-27T02:07:19Z",
+          "completed_at": "2026-10-27T02:07:19Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-10-27T02:07:19Z",
+          "completed_at": "2026-10-27T02:07:19Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36,
+          "started_at": "2026-10-27T02:07:19Z",
+          "completed_at": "2026-10-27T02:07:19Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-10-27T02:07:19Z",
+          "completed_at": "2026-10-27T02:07:19Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188911",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001164,
+      "runner_name": "GitHub Actions 1000001164",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188924,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJvA",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188924",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188924",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:48:27Z",
+      "name": "m3-cu",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:09Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:09Z",
+          "completed_at": "2026-10-27T01:44:13Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:13Z",
+          "completed_at": "2026-10-27T01:44:23Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:23Z",
+          "completed_at": "2026-10-27T01:44:32Z"
+        },
+        {
+          "name": "Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:32Z",
+          "completed_at": "2026-10-27T01:44:44Z"
+        },
+        {
+          "name": "Install Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:44Z",
+          "completed_at": "2026-10-27T01:44:44Z"
+        },
+        {
+          "name": "Select Agave 4.1.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:44Z",
+          "completed_at": "2026-10-27T01:44:45Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:45Z",
+          "completed_at": "2026-10-27T01:44:47Z"
+        },
+        {
+          "name": "Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:44:47Z",
+          "completed_at": "2026-10-27T01:44:49Z"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path tests/bench/m3_cu/Cargo.toml --all --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:44:49Z",
+          "completed_at": "2026-10-27T01:44:51Z"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path tests/bench/m3_cu/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:44:51Z",
+          "completed_at": "2026-10-27T01:44:57Z"
+        },
+        {
+          "name": "Budgets, T-TRACE and depth (fails above a budget, off the expected trace or depth, above 64 entries, or on a failed case)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:44:57Z",
+          "completed_at": "2026-10-27T01:48:23Z"
+        },
+        {
+          "name": "results.md, trace.md and depth.md are current (informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:48:23Z",
+          "completed_at": "2026-10-27T01:48:23Z"
+        },
+        {
+          "name": "Post Cache Agave and platform-tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-27T01:48:23Z",
+          "completed_at": "2026-10-27T01:48:23Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-27T01:48:23Z",
+          "completed_at": "2026-10-27T01:48:23Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-10-27T01:48:23Z",
+          "completed_at": "2026-10-27T01:48:23Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-10-27T01:48:23Z",
+          "completed_at": "2026-10-27T01:48:23Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188924",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001167,
+      "runner_name": "GitHub Actions 1000001167",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188956,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJ3A",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188956",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188956",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:46:01Z",
+      "name": "fuzz-smoke",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:09Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:09Z",
+          "completed_at": "2026-10-27T01:44:12Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:12Z",
+          "completed_at": "2026-10-27T01:44:22Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:22Z",
+          "completed_at": "2026-10-27T01:44:27Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:27Z",
+          "completed_at": "2026-10-27T01:44:29Z"
+        },
+        {
+          "name": "Fuzz smoke, corpus replays, harness self-tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:29Z",
+          "completed_at": "2026-10-27T01:45:58Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 7,
+          "started_at": "2026-10-27T01:45:58Z",
+          "completed_at": "2026-10-27T01:45:58Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:45:58Z",
+          "completed_at": "2026-10-27T01:45:58Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T01:45:58Z",
+          "completed_at": "2026-10-27T01:45:59Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-27T01:45:59Z",
+          "completed_at": "2026-10-27T01:45:59Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188956",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001168,
+      "runner_name": "GitHub Actions 1000001168",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188964,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJ5A",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188964",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188964",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T02:50:57Z",
+      "name": "program-tests",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:13Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:13Z",
+          "completed_at": "2026-10-27T01:44:23Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:23Z",
+          "completed_at": "2026-10-27T01:44:37Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:37Z",
+          "completed_at": "2026-10-27T01:44:38Z"
+        },
+        {
+          "name": "Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:38Z",
+          "completed_at": "2026-10-27T01:44:39Z"
+        },
+        {
+          "name": "Mainnet fixtures match their recorded checksums (tests/fixtures/manifest.json)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:39Z",
+          "completed_at": "2026-10-27T01:44:40Z"
+        },
+        {
+          "name": "T-LAYOUT wasm32 leg",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:40Z",
+          "completed_at": "2026-10-27T01:44:45Z"
+        },
+        {
+          "name": "shortwin unit tests without test-venue",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:44:45Z",
+          "completed_at": "2026-10-27T01:44:54Z"
+        },
+        {
+          "name": "Run cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:44:54Z",
+          "completed_at": "2026-10-27T02:50:54Z"
+        },
+        {
+          "name": "Post Run actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-27T02:50:54Z",
+          "completed_at": "2026-10-27T02:50:54Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T02:50:54Z",
+          "completed_at": "2026-10-27T02:50:54Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-27T02:50:54Z",
+          "completed_at": "2026-10-27T02:50:55Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-27T02:50:55Z",
+          "completed_at": "2026-10-27T02:50:55Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188964",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001171,
+      "runner_name": "GitHub Actions 1000001171",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188972,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJ7A",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188972",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188972",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:06Z",
+      "completed_at": "2026-10-27T01:45:36Z",
+      "name": "m1-cu",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:07Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:09Z",
+          "completed_at": "2026-10-27T01:44:13Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:13Z",
+          "completed_at": "2026-10-27T01:44:22Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:22Z",
+          "completed_at": "2026-10-27T01:44:32Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:32Z",
+          "completed_at": "2026-10-27T01:44:34Z"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path tests/bench/m1_cu/Cargo.toml -p m1-cu-bench --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:34Z",
+          "completed_at": "2026-10-27T01:44:34Z"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path tests/bench/m1_cu/Cargo.toml --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:34Z",
+          "completed_at": "2026-10-27T01:44:40Z"
+        },
+        {
+          "name": "Budgets (fails above a budget or on a failed case)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:40Z",
+          "completed_at": "2026-10-27T01:45:32Z"
+        },
+        {
+          "name": "results.md is current (informational)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:45:32Z",
+          "completed_at": "2026-10-27T01:45:32Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-27T01:45:32Z",
+          "completed_at": "2026-10-27T01:45:32Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-27T01:45:32Z",
+          "completed_at": "2026-10-27T01:45:32Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T01:45:32Z",
+          "completed_at": "2026-10-27T01:45:32Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188972",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001170,
+      "runner_name": "GitHub Actions 1000001170",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959188981,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWJ9Q",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959188981",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959188981",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:05Z",
+      "completed_at": "2026-10-27T01:58:04Z",
+      "name": "services",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T01:44:06Z",
+          "completed_at": "2026-10-27T01:44:08Z"
+        },
+        {
+          "name": "Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T01:44:08Z",
+          "completed_at": "2026-10-27T01:44:10Z"
+        },
+        {
+          "name": "Rust toolchain from rust-toolchain.toml",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T01:44:10Z",
+          "completed_at": "2026-10-27T01:44:17Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T01:44:17Z",
+          "completed_at": "2026-10-27T01:44:18Z"
+        },
+        {
+          "name": "Run taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T01:44:18Z",
+          "completed_at": "2026-10-27T01:44:19Z"
+        },
+        {
+          "name": "Run actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T01:44:19Z",
+          "completed_at": "2026-10-27T01:44:20Z"
+        },
+        {
+          "name": "Run cargo fmt --manifest-path services/Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm -p shortwin-ops --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T01:44:20Z",
+          "completed_at": "2026-10-27T01:44:20Z"
+        },
+        {
+          "name": "Run cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T01:44:20Z",
+          "completed_at": "2026-10-27T01:45:41Z"
+        },
+        {
+          "name": "The keeper on its release feature set (no test-venue)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T01:45:41Z",
+          "completed_at": "2026-10-27T01:45:58Z"
+        },
+        {
+          "name": "Temporary advisory review remains current",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-27T01:45:58Z",
+          "completed_at": "2026-10-27T01:45:58Z"
+        },
+        {
+          "name": "cargo deny (services/deny.toml)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T01:45:58Z",
+          "completed_at": "2026-10-27T01:46:00Z"
+        },
+        {
+          "name": "cargo audit (services lockfile; dated usage-scoped exceptions)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T01:46:00Z",
+          "completed_at": "2026-10-27T01:46:03Z"
+        },
+        {
+          "name": "Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T01:46:03Z",
+          "completed_at": "2026-10-27T01:55:48Z"
+        },
+        {
+          "name": "The keeper binary has no mock venue (A49)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T01:55:48Z",
+          "completed_at": "2026-10-27T01:57:41Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-10-27T01:57:41Z",
+          "completed_at": "2026-10-27T01:58:02Z"
+        },
+        {
+          "name": "Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-10-27T01:58:02Z",
+          "completed_at": "2026-10-27T01:58:02Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-10-27T01:58:02Z",
+          "completed_at": "2026-10-27T01:58:02Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959188981",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001169,
+      "runner_name": "GitHub Actions 1000001169",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 121959191249,
+      "run_id": 40434130363,
+      "workflow_name": "ci",
+      "head_branch": "codex/capped-mainnet-1.0.3",
+      "run_url": "https://api.github.com/repos/TodorBonchev/short.win/actions/runs/40434130363",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOUsn3ts8AAAAcZVWS0Q",
+      "head_sha": "57bc1c8454a89a303694e2ea8d9d8df11c0887da",
+      "url": "https://api.github.com/repos/TodorBonchev/short.win/actions/jobs/121959191249",
+      "html_url": "https://github.com/TodorBonchev/short.win/actions/runs/40434130363/job/121959191249",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-10-27T01:44:03Z",
+      "started_at": "2026-10-27T01:44:03Z",
+      "completed_at": "2026-10-27T01:44:03Z",
+      "name": "fuzz-nightly",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/TodorBonchev/short.win/check-runs/121959191249",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}
