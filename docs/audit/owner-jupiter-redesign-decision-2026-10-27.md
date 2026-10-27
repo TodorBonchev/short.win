@@ -12,10 +12,19 @@ per-market borrowing cap and mint/lender protections remain the baseline; no
 new global cap or universal token/exit guarantee is asserted.
 
 The owner then asked whether Jupiter quotes can supply margin/liquidation
-pricing. That is a question, not acceptance of a new oracle trust model. The
-[design proposal](../design/JUPITER_REDESIGN.md) separates execution quotes from
-authenticated risk observations and records the outstanding choice. No keeper-
-provided JSON is authorized to become an unchecked on-chain risk price.
+pricing. After the distinction between raw API responses and verified oracle
+feeds was explained, the owner explicitly selected:
+
+> Proceed with signed Jupiter-derived feeds and review the concrete trust/settings before deployment (Recommended for broad coverage)
+
+This selects a signed quote-oracle architecture for new markets and authorizes
+implementation/prototyping. Evaluate Switchboard first; a provider, live feed,
+authority/queue/quorum, pricing/cap/tier/settlement settings or financial
+transaction is not thereby approved. Keep mint/borrowing protections and leave
+new markets disabled until their feed, trade-size pricing and liquidation rules
+qualify. Review concrete trust and settings before deployment. The
+[design proposal](../design/JUPITER_REDESIGN.md) separates execution proposals
+from authenticated risk observations. Unchecked keeper/API JSON remains forbidden.
 
 The source branch is provisionally named `codex/jupiter-redesign-1.1`; this is a
 development name, not an approved final version or tag. The current 1.0.3 work

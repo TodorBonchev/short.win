@@ -1,0 +1,376 @@
+{
+  "verified_at_utc": "2026-10-27T08:21:48.975047+00:00",
+  "source_head": "e965ba62ccf69bd9597c669a40578d9db0f7cf3d",
+  "idl_sha256": "1c70d6c96e01648411ff1579a35853d966407a4dff5020a5d33e92e6923c9e67",
+  "constant_addresses_roundtrip": {
+    "JUPITER_PROGRAM": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "EVENT_AUTHORITY": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+    "SPL_TOKEN_PROGRAM": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "TOKEN_2022_PROGRAM": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+  },
+  "instructions_checked": {
+    "route_v2": {
+      "discriminator": [
+        187,
+        100,
+        250,
+        204,
+        49,
+        196,
+        175,
+        20
+      ],
+      "fixed_accounts": [
+        {
+          "name": "user_transfer_authority",
+          "signer": true
+        },
+        {
+          "name": "user_source_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_destination_token_account",
+          "writable": true
+        },
+        {
+          "name": "source_mint"
+        },
+        {
+          "name": "destination_mint"
+        },
+        {
+          "name": "source_token_program"
+        },
+        {
+          "name": "destination_token_program"
+        },
+        {
+          "name": "destination_token_account",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "event_authority",
+          "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "in_amount",
+          "type": "u64"
+        },
+        {
+          "name": "quoted_out_amount",
+          "type": "u64"
+        },
+        {
+          "name": "slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "positive_slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "route_plan",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "RoutePlanStepV2"
+              }
+            }
+          }
+        }
+      ],
+      "opaque_route_offset": 34
+    },
+    "shared_accounts_route_v2": {
+      "discriminator": [
+        209,
+        152,
+        83,
+        147,
+        124,
+        254,
+        216,
+        233
+      ],
+      "fixed_accounts": [
+        {
+          "name": "program_authority"
+        },
+        {
+          "name": "user_transfer_authority",
+          "signer": true
+        },
+        {
+          "name": "source_token_account",
+          "writable": true
+        },
+        {
+          "name": "program_source_token_account",
+          "writable": true
+        },
+        {
+          "name": "program_destination_token_account",
+          "writable": true
+        },
+        {
+          "name": "destination_token_account",
+          "writable": true
+        },
+        {
+          "name": "source_mint"
+        },
+        {
+          "name": "destination_mint"
+        },
+        {
+          "name": "source_token_program"
+        },
+        {
+          "name": "destination_token_program"
+        },
+        {
+          "name": "event_authority",
+          "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u8"
+        },
+        {
+          "name": "in_amount",
+          "type": "u64"
+        },
+        {
+          "name": "quoted_out_amount",
+          "type": "u64"
+        },
+        {
+          "name": "slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "positive_slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "route_plan",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "RoutePlanStepV2"
+              }
+            }
+          }
+        }
+      ],
+      "opaque_route_offset": 35
+    },
+    "exact_out_route_v2": {
+      "discriminator": [
+        157,
+        138,
+        184,
+        82,
+        21,
+        244,
+        243,
+        36
+      ],
+      "fixed_accounts": [
+        {
+          "name": "user_transfer_authority",
+          "signer": true
+        },
+        {
+          "name": "user_source_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_destination_token_account",
+          "writable": true
+        },
+        {
+          "name": "source_mint"
+        },
+        {
+          "name": "destination_mint"
+        },
+        {
+          "name": "source_token_program"
+        },
+        {
+          "name": "destination_token_program"
+        },
+        {
+          "name": "destination_token_account",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "event_authority",
+          "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "out_amount",
+          "type": "u64"
+        },
+        {
+          "name": "quoted_in_amount",
+          "type": "u64"
+        },
+        {
+          "name": "slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "positive_slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "route_plan",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "RoutePlanStepV2"
+              }
+            }
+          }
+        }
+      ],
+      "opaque_route_offset": 34
+    },
+    "shared_accounts_exact_out_route_v2": {
+      "discriminator": [
+        53,
+        96,
+        229,
+        202,
+        216,
+        187,
+        250,
+        24
+      ],
+      "fixed_accounts": [
+        {
+          "name": "program_authority"
+        },
+        {
+          "name": "user_transfer_authority",
+          "signer": true
+        },
+        {
+          "name": "source_token_account",
+          "writable": true
+        },
+        {
+          "name": "program_source_token_account",
+          "writable": true
+        },
+        {
+          "name": "program_destination_token_account",
+          "writable": true
+        },
+        {
+          "name": "destination_token_account",
+          "writable": true
+        },
+        {
+          "name": "source_mint"
+        },
+        {
+          "name": "destination_mint"
+        },
+        {
+          "name": "source_token_program"
+        },
+        {
+          "name": "destination_token_program"
+        },
+        {
+          "name": "event_authority",
+          "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u8"
+        },
+        {
+          "name": "out_amount",
+          "type": "u64"
+        },
+        {
+          "name": "quoted_in_amount",
+          "type": "u64"
+        },
+        {
+          "name": "slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "platform_fee_bps",
+          "type": "u16"
+        },
+        {
+          "name": "positive_slippage_bps",
+          "type": "u16"
+        },
+        {
+          "name": "route_plan",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "RoutePlanStepV2"
+              }
+            }
+          }
+        }
+      ],
+      "opaque_route_offset": 35
+    }
+  },
+  "route_minimum_byte_derivation": "One u8 Borsh Swap tag (Saber has no payload) + u16 bps + two u8 indices =5. Necessary lower bound only; no full route decoder.",
+  "source_sha256": "e7e7e648af44228a3b229c522eff873d6930ec66fd284c3472c3c97f05b191de",
+  "root_lock_semantic_change": [
+    {
+      "name": "shortwin-jupiter-route",
+      "version": "0.1.0"
+    }
+  ],
+  "all_existing_root_lock_entries_unchanged": true,
+  "production_dependency_added": false,
+  "qualification": "Static schema/header checks; no Jupiter CPI execution or pricing qualification."
+}

@@ -9,7 +9,7 @@
 The scope is a list of units, each a set of git pathspecs. `write` lists the files git tracks at
 HEAD under each unit, so the file is regenerated (and `check`ed) at the audit tag; it carries no
 commit id, AUDIT.md §0 does. Every file git tracks under a watched root (`programs/`, `crates/`,
-`services/`, and each member of the two Cargo workspaces) must be in exactly one unit or match
+`services/`, `experiments/`, and each member of the two Cargo workspaces) must be in exactly one unit or match
 an EXCLUDED pathspec; `write` and `check` fail otherwise, so a new crate, program or service
 (e.g. a governance tool under `services/`) is classified by a reviewed edit here, never by
 default.
@@ -40,6 +40,12 @@ UNITS = [
     # pump-final §11, owner decision D2; AUDIT.md §0).
     ("shortwin-math", "core", "no_std protocol math, linked into the program and the keeper",
      ["crates/shortwin-math/Cargo.toml", "crates/shortwin-math/src"]),
+    ("shortwin-jupiter-route", "core", "Jupiter redesign header and fixed-account prototype; "
+     "not yet linked into production",
+     ["crates/shortwin-jupiter-route/Cargo.toml", "crates/shortwin-jupiter-route/src"]),
+    ("jupiter-oracle-compat", "context", "standalone native oracle SDK compatibility experiment; "
+     "not linked into production and not a live-attestation qualification",
+     ["experiments/jupiter-oracle-compat", ".github/workflows/jupiter-oracle-compat.yml"]),
     ("shortwin-venue-state", "core", "no_std venue, mint, Pyth and ProgramData readers",
      ["crates/shortwin-venue-state/Cargo.toml", "crates/shortwin-venue-state/src",
       ":(exclude)crates/shortwin-venue-state/src/mock_cpamm.rs"]),
@@ -87,6 +93,7 @@ EXCLUDED = [
     ("crates/shortwin-math/README.md", "documentation (the math derivations; read for context)"),
     ("crates/shortwin-math/LICENSE-APACHE", "published crate license text; not built"),
     ("crates/shortwin-math/NOTICE", "published crate attribution; not built"),
+    ("crates/shortwin-jupiter-route/README.md", "prototype documentation; read for context"),
     ("crates/shortwin-venue-state/README.md", "published crate documentation; read for context"),
     ("programs/shortwin/README.md", "published program crate documentation; read for context"),
     ("crates/shortwin-math/tests", "tests"),
@@ -105,7 +112,7 @@ EXCLUDED = [
     ("tests/fuzz", "the invariant fuzz harness (root workspace member)"),
 ]
 
-WATCHED_ROOTS = ["programs", "crates", "services"]
+WATCHED_ROOTS = ["programs", "crates", "services", "experiments"]
 
 
 def workspace_members():

@@ -1,0 +1,184 @@
+{
+  "checked_utc": "2026-10-27T08:34:24.014485+00:00",
+  "authorship": "Independent AI source/schema/unit review by launch_policy_inventory",
+  "checks": [
+    {
+      "name": "format",
+      "argv": [
+        "/root/.cargo/bin/rustfmt",
+        "--edition",
+        "2024",
+        "--style-edition",
+        "2024",
+        "--check",
+        "crates/shortwin-jupiter-route/src/lib.rs"
+      ],
+      "started_utc": "2026-10-27T08:34:22.672813+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "original-test-compile",
+      "argv": [
+        "/root/.cargo/bin/rustc",
+        "--test",
+        "--edition",
+        "2024",
+        "crates/shortwin-jupiter-route/src/lib.rs",
+        "-o",
+        "/root/short.win-jupiter-redesign/target/jupiter-route-independent-review-2026-10-27/original-tests",
+        "-Dwarnings"
+      ],
+      "started_utc": "2026-10-27T08:34:22.738077+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "original-tests",
+      "argv": [
+        "/root/short.win-jupiter-redesign/target/jupiter-route-independent-review-2026-10-27/original-tests"
+      ],
+      "started_utc": "2026-10-27T08:34:23.470956+00:00",
+      "exit_code": 0,
+      "output_sha256": "4be6d95a70eece414a8f1d4bc15b995b96b1a44d056226d7a8bf279c5b95ffa0"
+    },
+    {
+      "name": "no-std-release",
+      "argv": [
+        "/root/.cargo/bin/rustc",
+        "--crate-type",
+        "rlib",
+        "--crate-name",
+        "shortwin_jupiter_route",
+        "--edition",
+        "2024",
+        "-O",
+        "crates/shortwin-jupiter-route/src/lib.rs",
+        "-o",
+        "/root/short.win-jupiter-redesign/target/jupiter-route-independent-review-2026-10-27/libshortwin_jupiter_route.rlib",
+        "-Dwarnings"
+      ],
+      "started_utc": "2026-10-27T08:34:23.473474+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "independent-test-compile",
+      "argv": [
+        "/root/.cargo/bin/rustc",
+        "--test",
+        "--edition",
+        "2024",
+        "/root/short.win-jupiter-redesign/target/jupiter-route-independent-review-2026-10-27/idl-generated-independent-tests.rs",
+        "--extern",
+        "shortwin_jupiter_route=/root/short.win-jupiter-redesign/target/jupiter-route-independent-review-2026-10-27/libshortwin_jupiter_route.rlib",
+        "-o",
+        "/root/short.win-jupiter-redesign/target/jupiter-route-independent-review-2026-10-27/independent-tests",
+        "-Dwarnings"
+      ],
+      "started_utc": "2026-10-27T08:34:23.617831+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "independent-tests",
+      "argv": [
+        "/root/short.win-jupiter-redesign/target/jupiter-route-independent-review-2026-10-27/independent-tests"
+      ],
+      "started_utc": "2026-10-27T08:34:23.771854+00:00",
+      "exit_code": 0,
+      "output_sha256": "37463bdae10d37436f342dc16db5c7ffd9699fef98f39fd4be2972be9690b3b3"
+    },
+    {
+      "name": "diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_utc": "2026-10-27T08:34:23.781465+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "temp-index-head",
+      "argv": [
+        "git",
+        "read-tree",
+        "HEAD"
+      ],
+      "started_utc": "2026-10-27T08:34:23.803392+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "temp-index-prototype-paths",
+      "argv": [
+        "git",
+        "add",
+        "--",
+        "crates/shortwin-jupiter-route",
+        "crates/shortwin-math/src/quote_oracle.rs"
+      ],
+      "started_utc": "2026-10-27T08:34:23.843063+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "prospective-scope-check",
+      "argv": [
+        "python3",
+        "scripts/audit_scope.py",
+        "check"
+      ],
+      "started_utc": "2026-10-27T08:34:23.851410+00:00",
+      "exit_code": 0,
+      "output_sha256": "eddeb5c812f6d5c07a6aaf83648868a2f8d2aee6b52b6fc16fafd13d4d24f1dd"
+    },
+    {
+      "name": "prospective-scope-render",
+      "argv": [
+        "python3",
+        "-c",
+        "import runpy;from pathlib import Path;d=runpy.run_path('scripts/audit_scope.py');Path('target/jupiter-route-independent-review-2026-10-27/rendered-scope.txt').write_text(d['render']())"
+      ],
+      "started_utc": "2026-10-27T08:34:23.965621+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "source_sha256": "e7e7e648af44228a3b229c522eff873d6930ec66fd284c3472c3c97f05b191de",
+  "idl_vectors_sha256": "c3ebffe74aec22d1465e8dfa9304b7c1c01de131ba1324c71a86c8ddecbc9dc3",
+  "core_scope_paths": [
+    "crates/shortwin-math/src/quote_oracle.rs",
+    "crates/shortwin-jupiter-route/Cargo.toml",
+    "crates/shortwin-jupiter-route/src/lib.rs"
+  ],
+  "real_index_sha256_before": "4d4794e82c33fab26356bc2ecf5ef6f11c75bf51f90d4df8a7f107730e37f09d",
+  "real_index_sha256_after": "4d4794e82c33fab26356bc2ecf5ef6f11c75bf51f90d4df8a7f107730e37f09d",
+  "real_index_unchanged": true,
+  "source_findings": [
+    "Four discriminators match pinned onchain IDL and Anchor global:name SHA256; regular10/shared12 fixed roles/order checked against independently IDL-encoded synthetic vectors.",
+    "Every required writable and every unexpected fixed signer role exercised for all4headers. Exhaustive u16 slippage boundary scan checks explicit77bps limit.",
+    "Truncation/byte mutation/length sweeps are panic-free; no Swap enum/route-plan semantic authorization inferred.",
+    "Repeated expected transfer signer and extra writability deliberately remain accepted in opaque remaining accounts; full authorization and runtime global privilege union are outside the API.",
+    "ExactOut quoted maximum is not maximum actual input after private Jupiter slippage rounding.",
+    "No current Jupiter ELF CPI execution, private implementation audit, oracle authentication, payer funding or deployed support was performed or claimed."
+  ],
+  "approval": "PASS header-only prototype contract and prospective core-scope classification; future full route, executable/owner/PDA, balance-delta and oracle checks remain mandatory.",
+  "raw_identity_independently_reconstructed": {
+    "context_slot": 461997164,
+    "observed_rpc_not_source_provenance": true,
+    "programdata_deploy_slot": 459479624,
+    "program_data_pointer_matches": true,
+    "idl_owner_is_jupiter": true,
+    "idl_zlib_size": 5336,
+    "idl_decoded_exact_bytes": true,
+    "program_sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e",
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+    "idl_account_sha256": "c468169462ca9330e499b597ce8d540308dcb66616002aaefa168551e3870558",
+    "decoded_idl_sha256": "1c70d6c96e01648411ff1579a35853d966407a4dff5020a5d33e92e6923c9e67",
+    "all_four_base58_constants_match": true
+  }
+}

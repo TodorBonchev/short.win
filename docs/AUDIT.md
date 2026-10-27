@@ -1706,8 +1706,9 @@ These are where we would look first. They are not limits on the scope.
 
 **Later owner scope decision, 2026-10-27:** first mainnet is postponed for the
 [broad Jupiter redesign](design/JUPITER_REDESIGN.md), as recorded in the
-[new decision](audit/owner-jupiter-redesign-decision-2026-10-27.md). The pricing
-trust model remains open; asking about Jupiter quotes is not risk-feed approval.
+[new decision](audit/owner-jupiter-redesign-decision-2026-10-27.md). The owner
+selected signed Jupiter-derived feeds, with concrete trust/settings reviewed
+before deployment; raw API/keeper responses are not authoritative risk prices.
 Preserve 1.0.3 evidence as its exact baseline; qualify the new program separately.
 The pre-redesign Token-2022-only long campaign is not started and stays on hold.
 Audit/bounty funding timing below otherwise remains the owner's chosen policy.

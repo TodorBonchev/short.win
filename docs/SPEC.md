@@ -1,5 +1,11 @@
 # short.win — Product & Implementation Specification
 
+**Current development scope (owner, 2026-10-27): first mainnet is postponed
+for the [broad Jupiter redesign](design/JUPITER_REDESIGN.md).** Its signed quote-oracle architecture is
+selected; concrete provider/risk settings and implementation need qualification. The existing 1.0.3 specification, measurements
+and operator commands below remain baseline evidence, not deployment approval
+for the new design. Audit/bounty funding timing otherwise remains unchanged.
+
 *v0.3 • Solana • Permissionless P2P token lending for shorting memecoins*
 *Supersedes "ShortMeme" v0.1 and short.win draft v0.2. Domain: **short.win** • Brand: **ShortWin***
 

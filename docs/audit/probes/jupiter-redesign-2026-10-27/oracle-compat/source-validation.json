@@ -1,0 +1,45 @@
+{
+  "validated_utc": "2026-10-27T08:45:16.625957+00:00",
+  "checks": "Rustfmt checked independently; Python AST/TOML/manual-only YAML/pinnedactions/hiddenfiles/no-secrets/whitespace/config validation passed;2 offline fake-executable fault retention tests passed. No real Cargo resolution/build or CI dispatch.",
+  "files": {
+    ".github/workflows/jupiter-oracle-compat.yml": "c9a0f4b21ed4a13f3b038e4cbc06ec3f4319d4f651334fa91d50fe04912ccabb",
+    "experiments/jupiter-oracle-compat/.gitignore": "bc1e2c29816c6fd827aa7880447b455eaa97e8ab4e5154ce20e6e8e723a97812",
+    "experiments/jupiter-oracle-compat/Cargo.toml": "02d6b47a01be9bbc6183147af3a299818301616658412272f10bbaa48549dc25",
+    "experiments/jupiter-oracle-compat/README.md": "0584dd4f6e6b5bb0d2e6558d8be9f5a7efec65599bb2d0d0294efdc6c3f69054",
+    "experiments/jupiter-oracle-compat/provenance.json": "418c7db154676ef131338ddacc370e46a4f2c3c60f59c2fde9ae6aa553eda4dd",
+    "experiments/jupiter-oracle-compat/run_probe.py": "f327a0722dab35c5a31f98a8e0751fc75fe37896fcc9e177201f522926af315f",
+    "experiments/jupiter-oracle-compat/rust-toolchain.toml": "ab904c0789f8961e02b45fd3eddba1b859dee80fc39746239fb6b997b060dd26",
+    "experiments/jupiter-oracle-compat/src/lib.rs": "6baf4b983954a6d401e1a8deed8a83655c987ab3ab7a9b3a249c8fea4abdd3b1",
+    "experiments/jupiter-oracle-compat/test_run_probe.py": "1cad59db7bbb8e84e0221b5eccb4765c710162f1aff714b6a225ce33eba2a42c"
+  },
+  "commands": [
+    {
+      "argv": [
+        "python3",
+        "/root/short.win-jupiter-redesign/experiments/jupiter-oracle-compat/run_probe.py",
+        "--validate-only"
+      ],
+      "exit_code": 0,
+      "log": "check-0.log"
+    },
+    {
+      "argv": [
+        "python3",
+        "/root/short.win-jupiter-redesign/experiments/jupiter-oracle-compat/test_run_probe.py"
+      ],
+      "exit_code": 0,
+      "log": "check-1.log"
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "check-2.log"
+    }
+  ],
+  "native_oracle_attestation_successes": 0,
+  "actual_native_compile_status": "pending reviewed manual CI"
+}

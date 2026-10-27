@@ -1,0 +1,86 @@
+{
+  "status": "offline hash/syntax fixtures only; no operational feed or chosen authority",
+  "taker_fixture": {
+    "pubkey": "552EtYJSUC4G2YE15PVAZmtbEXAiL5Ys8ZtUSZ39ZXe3",
+    "program": "5yvyAddWb8RRGh3pPiFS5eV33eZYeHVmAAfwAFmqVpKK",
+    "seed_utf8": "OFFLINE_JUP_ORACLE_SPIKE",
+    "bump": 255,
+    "warning": "hypothetical offcurve PDA, NOT an implemented/authorized swap authority or existing account"
+  },
+  "quote_metadata": {
+    "input_mint": "So11111111111111111111111111111111111111112",
+    "input_decimals": 9,
+    "output_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "output_decimals": 6,
+    "output_semantics": "raw USDC outAmount for fixed exact SOL input; NOT Bhat(q)",
+    "routing": "/build Metis only; no RFQ/order",
+    "minOracleSamples": "3 is an illustrative unapproved test parameter",
+    "maxAccounts": "48 is an illustrative request constraint; no fit/price/liquidity claim"
+  },
+  "feeds": [
+    {
+      "feed_id_v2": "9c092182dc1d90930266971172b710b37e3d82217ab545937a74e5c21097a91a",
+      "canonical_length_delimited_hex": "8f030a2d4f46464c494e455f4f4e4c595f534f4c5f555344435f4d455449535f4558414354494e5f31303030303030303012d9020ac5020ac2020a9c0268747470733a2f2f6170692e6a75702e61672f737761702f76322f6275696c643f696e7075744d696e743d536f3131313131313131313131313131313131313131313131313131313131313131313131313131313132266f75747075744d696e743d45506a465764643541756671535371654d32714e31787a7962617043384734774547476b5a7779544474317626616d6f756e743d3130303030303030302674616b65723d3535324574594a535543344732594531355056415a6d7462455841694c355973385a7455535a33395a5865332677726170416e64556e77726170536f6c3d66616c736526736c6970706167654270733d3530266d61784163636f756e74733d3438267472616e73616374696f6e56657273696f6e3d3010011a1f0a09782d6170692d6b65791212247b4a5550495445525f4150495f4b45597d0a0f120d0a0b242e6f7574416d6f756e7418032001",
+      "definition": {
+        "name": "OFFLINE_ONLY_SOL_USDC_METIS_EXACTIN_100000000",
+        "jobs": [
+          {
+            "tasks": [
+              {
+                "httpTask": {
+                  "url": "https://api.jup.ag/swap/v2/build?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=100000000&taker=552EtYJSUC4G2YE15PVAZmtbEXAiL5Ys8ZtUSZ39ZXe3&wrapAndUnwrapSol=false&slippageBps=50&maxAccounts=48&transactionVersion=0",
+                  "method": "METHOD_GET",
+                  "headers": [
+                    {
+                      "key": "x-api-key",
+                      "value": "${JUPITER_API_KEY}"
+                    }
+                  ]
+                }
+              },
+              {
+                "jsonParseTask": {
+                  "path": "$.outAmount"
+                }
+              }
+            ]
+          }
+        ],
+        "minOracleSamples": 3,
+        "minJobResponses": 1
+      }
+    },
+    {
+      "feed_id_v2": "c16b9b928a79d02aef59748c2d71b49739f0db56391aa92f92b67e9067782027",
+      "canonical_length_delimited_hex": "8f030a2d4f46464c494e455f4f4e4c595f534f4c5f555344435f4d455449535f4558414354494e5f32303030303030303012d9020ac5020ac2020a9c0268747470733a2f2f6170692e6a75702e61672f737761702f76322f6275696c643f696e7075744d696e743d536f3131313131313131313131313131313131313131313131313131313131313131313131313131313132266f75747075744d696e743d45506a465764643541756671535371654d32714e31787a7962617043384734774547476b5a7779544474317626616d6f756e743d3230303030303030302674616b65723d3535324574594a535543344732594531355056415a6d7462455841694c355973385a7455535a33395a5865332677726170416e64556e77726170536f6c3d66616c736526736c6970706167654270733d3530266d61784163636f756e74733d3438267472616e73616374696f6e56657273696f6e3d3010011a1f0a09782d6170692d6b65791212247b4a5550495445525f4150495f4b45597d0a0f120d0a0b242e6f7574416d6f756e7418032001",
+      "definition": {
+        "name": "OFFLINE_ONLY_SOL_USDC_METIS_EXACTIN_200000000",
+        "jobs": [
+          {
+            "tasks": [
+              {
+                "httpTask": {
+                  "url": "https://api.jup.ag/swap/v2/build?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=200000000&taker=552EtYJSUC4G2YE15PVAZmtbEXAiL5Ys8ZtUSZ39ZXe3&wrapAndUnwrapSol=false&slippageBps=50&maxAccounts=48&transactionVersion=0",
+                  "method": "METHOD_GET",
+                  "headers": [
+                    {
+                      "key": "x-api-key",
+                      "value": "${JUPITER_API_KEY}"
+                    }
+                  ]
+                }
+              },
+              {
+                "jsonParseTask": {
+                  "path": "$.outAmount"
+                }
+              }
+            ]
+          }
+        ],
+        "minOracleSamples": 3,
+        "minJobResponses": 1
+      }
+    }
+  ]
+}

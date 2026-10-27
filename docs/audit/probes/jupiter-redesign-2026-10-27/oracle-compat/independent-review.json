@@ -1,0 +1,97 @@
+{
+  "reviewed_utc": "2026-10-27T08:46:05.686995+00:00",
+  "authorship": "Independent AI static and source-only/fault-test review by launch_policy_inventory",
+  "readiness": "READY for actual manual native CI compatibility experiment on these source bytes, not implementation/provider/deployment approval",
+  "source_sha256": {
+    ".github/workflows/jupiter-oracle-compat.yml": "c9a0f4b21ed4a13f3b038e4cbc06ec3f4319d4f651334fa91d50fe04912ccabb",
+    "experiments/jupiter-oracle-compat/.gitignore": "bc1e2c29816c6fd827aa7880447b455eaa97e8ab4e5154ce20e6e8e723a97812",
+    "experiments/jupiter-oracle-compat/Cargo.toml": "02d6b47a01be9bbc6183147af3a299818301616658412272f10bbaa48549dc25",
+    "experiments/jupiter-oracle-compat/README.md": "0584dd4f6e6b5bb0d2e6558d8be9f5a7efec65599bb2d0d0294efdc6c3f69054",
+    "experiments/jupiter-oracle-compat/provenance.json": "418c7db154676ef131338ddacc370e46a4f2c3c60f59c2fde9ae6aa553eda4dd",
+    "experiments/jupiter-oracle-compat/run_probe.py": "f327a0722dab35c5a31f98a8e0751fc75fe37896fcc9e177201f522926af315f",
+    "experiments/jupiter-oracle-compat/rust-toolchain.toml": "ab904c0789f8961e02b45fd3eddba1b859dee80fc39746239fb6b997b060dd26",
+    "experiments/jupiter-oracle-compat/src/lib.rs": "6baf4b983954a6d401e1a8deed8a83655c987ab3ab7a9b3a249c8fea4abdd3b1",
+    "experiments/jupiter-oracle-compat/test_run_probe.py": "1cad59db7bbb8e84e0221b5eccb4765c710162f1aff714b6a225ce33eba2a42c"
+  },
+  "checks": [
+    {
+      "name": "validate-only",
+      "argv": [
+        "python3",
+        "/root/short.win-jupiter-redesign/experiments/jupiter-oracle-compat/run_probe.py",
+        "--validate-only"
+      ],
+      "started_utc": "2026-10-27T08:46:05.071219+00:00",
+      "exit_code": 0,
+      "output_sha256": "8c87cdff1cf59c0a92f6385b2846abb5b6b1b9fdde3798cb7f5693097f6509f4"
+    },
+    {
+      "name": "runner-fault-tests",
+      "argv": [
+        "python3",
+        "/root/short.win-jupiter-redesign/experiments/jupiter-oracle-compat/test_run_probe.py"
+      ],
+      "started_utc": "2026-10-27T08:46:05.107688+00:00",
+      "exit_code": 0,
+      "output_sha256": "538df9b984efcdfe7ef1b5bd7efbd2326581fad099d265506862db3ee37398c5"
+    },
+    {
+      "name": "rustfmt",
+      "argv": [
+        "/root/.cargo/bin/rustfmt",
+        "--check",
+        "--edition",
+        "2021",
+        "/root/short.win-jupiter-redesign/experiments/jupiter-oracle-compat/src/lib.rs"
+      ],
+      "started_utc": "2026-10-27T08:46:05.616698+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_utc": "2026-10-27T08:46:05.664302+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "root_service_pnpm_and_manifest_hashes_before": {
+    "Cargo.lock": "b275109d4ad7c5d2adfc2aeb4851db56360c27312c155faf4bfb7d565e111171",
+    "services/Cargo.lock": "19de05a720184ccb4f2c84f1a68fb30d6ae87f1dc82cfad569e31bb8e4f128d4",
+    "pnpm-lock.yaml": "9912c1f7235cf0a80322ac3ed4668b47784e34b66314ef06109a675a7ce7510b",
+    "Cargo.toml": "3a2cd6d00ccf80e10f3a8a877a9cbf71e9dad39719894dc8f89dcaa33d69fa93",
+    "programs/shortwin/Cargo.toml": "02ae56bcfc61f0b1d6a83313afb65c4f7b4950ed3f5dc0fe87001b0b0d5feccb"
+  },
+  "protected_hashes_after": {
+    "Cargo.lock": "b275109d4ad7c5d2adfc2aeb4851db56360c27312c155faf4bfb7d565e111171",
+    "services/Cargo.lock": "19de05a720184ccb4f2c84f1a68fb30d6ae87f1dc82cfad569e31bb8e4f128d4",
+    "pnpm-lock.yaml": "9912c1f7235cf0a80322ac3ed4668b47784e34b66314ef06109a675a7ce7510b",
+    "Cargo.toml": "3a2cd6d00ccf80e10f3a8a877a9cbf71e9dad39719894dc8f89dcaa33d69fa93",
+    "programs/shortwin/Cargo.toml": "02ae56bcfc61f0b1d6a83313afb65c4f7b4950ed3f5dc0fe87001b0b0d5feccb"
+  },
+  "protected_files_unchanged": true,
+  "manual_only": true,
+  "workflow_minimum_permissions": {
+    "contents": "read"
+  },
+  "checkout_credentials_not_persisted": true,
+  "artifact_hidden_files_scope": "Only the dedicated evidence directory; prepared source .gitignore is retained. No CARGO_HOME, credentials/config, signing keys or secret environment values are copied by the source.",
+  "failure_retention": "Two direct Python tests (explicit count==2) inject failed metadata and forbidden SDK features with fake local executables; both retain downloaded archive bytes, standalone lock, source .gitignore and diagnostics. Finally snapshot covers native resolution/validation failure.",
+  "signed_minimum_constraint": "Actual distinct oracle_count must meet configured minimum AND signed minimum; duplicate/out-of-range indices refused. Synthetic checks are not signature verification success.",
+  "dependency_graph_limit": "Exact Anchor/components and SDK0.13.0 requested no-entrypoint/solana-v3 plus explicit monolithic4.0.0 are experimental resolver inputs. Actual SDK node/package/features and source checksums must pass retained metadata plus native typechecks; no assumed compatibility, no3.x monolithic or SBF claim.",
+  "no_actual_dependency_resolution_or_native_sdk_build_run_locally": true,
+  "valid_live_attestation_success_tests": 0,
+  "signatures_or_transactions_generated": 0,
+  "oracle_rpc_calls_by_test_review": 0,
+  "remaining_boundaries": [
+    "Actual native compatibility is not yet known; the manual workflow must run and its resolved lock/features/source archives/logs be inspected.",
+    "No real valid oracle signatures, verifier happy path, managed feed creation/update, queue deployment identity, onchain Ed25519/SBF execution or financial trust settings are established.",
+    "Fixed raw-token outAmount is not a buyback cost band/Bhat(q); amount-specific signed job mapping and economic oracle policy remain separate qualification.",
+    "No provider-stopped historical review/fuzz scope was retried; no root/service/pnpm lock was changed by these checks."
+  ]
+}

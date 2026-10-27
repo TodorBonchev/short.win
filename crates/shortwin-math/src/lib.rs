@@ -31,6 +31,7 @@ pub mod persist;
 pub mod pool;
 pub mod pool_select;
 pub mod quote;
+pub mod quote_oracle;
 pub mod rent;
 pub mod risk;
 pub mod settle;

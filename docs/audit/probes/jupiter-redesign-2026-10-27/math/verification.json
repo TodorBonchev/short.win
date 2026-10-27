@@ -1,0 +1,133 @@
+{
+  "checked_utc": "2026-10-27T08:23:02.003692+00:00",
+  "scope": "Pure mathematical prototype only, new module+export; no provider/verifier/state/CPI/admission policy/default changes. Direct rustc compiles actual complete no_std math library with tests off, then actual quote_oracle.rs tests against that library; no mirrored scalar implementations or dependencies/lock mutation.",
+  "checks": [
+    {
+      "name": "rustc-version",
+      "argv": [
+        "/root/.cargo/bin/rustc",
+        "--version"
+      ],
+      "started_utc": "2026-10-27T08:22:59.824887+00:00",
+      "exit_code": 0,
+      "output_sha256": "2073de5abf149185c2f4d7473dc833bc921b99135560d24ae7b2293f33a9c376"
+    },
+    {
+      "name": "format",
+      "argv": [
+        "/root/.cargo/bin/rustfmt",
+        "--edition",
+        "2024",
+        "--style-edition",
+        "2024",
+        "--check",
+        "crates/shortwin-math/src/quote_oracle.rs"
+      ],
+      "started_utc": "2026-10-27T08:22:59.873783+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "library",
+      "argv": [
+        "/root/.cargo/bin/rustc",
+        "--crate-type",
+        "rlib",
+        "--crate-name",
+        "shortwin_math",
+        "--edition",
+        "2024",
+        "crates/shortwin-math/src/lib.rs",
+        "--out-dir",
+        "/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27",
+        "-Dwarnings"
+      ],
+      "started_utc": "2026-10-27T08:22:59.921916+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "focused-compile",
+      "argv": [
+        "/root/.cargo/bin/rustc",
+        "--test",
+        "--edition",
+        "2024",
+        "/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/focused-tests.rs",
+        "--extern",
+        "shortwin_math=/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/libshortwin_math.rlib",
+        "-o",
+        "/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/focused-tests",
+        "-Dwarnings"
+      ],
+      "started_utc": "2026-10-27T08:23:00.637748+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "focused-tests",
+      "argv": [
+        "/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/focused-tests",
+        "--nocapture"
+      ],
+      "started_utc": "2026-10-27T08:23:00.860550+00:00",
+      "exit_code": 0,
+      "output_sha256": "8efe93dd21b9ef698bbfe4aa77daab2d676e70040e513f05cb0be9128dd8b0cb"
+    },
+    {
+      "name": "clippy-library",
+      "argv": [
+        "/root/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--crate-type",
+        "rlib",
+        "--crate-name",
+        "shortwin_math",
+        "--edition",
+        "2024",
+        "crates/shortwin-math/src/lib.rs",
+        "--out-dir",
+        "/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/clippy",
+        "-Dwarnings",
+        "-Wclippy::all"
+      ],
+      "started_utc": "2026-10-27T08:23:01.013487+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-focused",
+      "argv": [
+        "/root/.rustup/toolchains/1.98.1-x86_64-unknown-linux-gnu/bin/clippy-driver",
+        "--test",
+        "--edition",
+        "2024",
+        "/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/focused-tests.rs",
+        "--extern",
+        "shortwin_math=/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/libshortwin_math.rlib",
+        "-o",
+        "/root/short.win-jupiter-redesign/target/quote-oracle-math-prototype-2026-10-27/clippy/focused-tests",
+        "-Dwarnings",
+        "-Wclippy::all"
+      ],
+      "started_utc": "2026-10-27T08:23:01.777876+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_utc": "2026-10-27T08:23:01.982159+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "files": {
+    "crates/shortwin-math/src/quote_oracle.rs": "7c59e267623ba3ef2a44339bd0fe05257a4106fee3d78423a7226926f1cacada",
+    "crates/shortwin-math/src/lib.rs": "bccbdd46037bb12154e96b8bf3823a0d5767697244889baccd2f97f5b69d1f1b"
+  },
+  "exhaustive_small_integer_interval_cases": 322560
+}

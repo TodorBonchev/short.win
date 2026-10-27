@@ -1,5 +1,11 @@
 # Jupiter swaps via CPI from an Anchor program: research for short.win
 
+**Current development scope (owner, 2026-10-27): first mainnet is postponed
+for the [broad Jupiter redesign](../design/JUPITER_REDESIGN.md).** Its signed quote-oracle architecture is
+selected; concrete provider/risk settings and implementation need qualification. The existing 1.0.3 specification, measurements
+and operator commands below remain baseline evidence, not deployment approval
+for the new design. Audit/bounty funding timing otherwise remains unchanged.
+
 *Research note, 2026-09-27. Baseline: `docs/SPEC.md` v0.3 (§2.1, §2.2, §4, §5, §9). This note does not change the spec. Where it recommends something that departs from the spec, it says so and lists it as an owner decision (§9).*
 
 Sibling notes: `docs/research/pumpfun-bonding-curve.md` (bonding-curve venue, canonical PumpSwap pool derivation), `docs/research/toolchain-and-layout.md` (Anchor 1.2.0, `declare_program!`), `docs/research/mint-safety-filter.md`.

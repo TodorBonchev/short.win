@@ -1,5 +1,11 @@
 # Capped mainnet operations — short.win 1.0.3
 
+**Current development scope (owner, 2026-10-27): first mainnet is postponed
+for the [broad Jupiter redesign](../design/JUPITER_REDESIGN.md).** Its signed quote-oracle architecture is
+selected; concrete provider/risk settings and implementation need qualification. The existing 1.0.3 specification, measurements
+and operator commands below remain baseline evidence, not deployment approval
+for the new design. Audit/bounty funding timing otherwise remains unchanged.
+
 Owner decision and research date: **2026-10-27 (Europe/Kyiv)**.
 
 The selected sequence is **capped mainnet before an external audit and a funded bug

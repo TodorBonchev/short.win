@@ -1,8 +1,9 @@
 # Draft: Jupiter execution and two explicit pricing models
 
-Source under review: 3fa558a1bba4cc5884ef8d1d5a44aa1a9b642714. Draft for owner choice,
-not implemented code, chosen production settings or independent-firm audit acceptance.
-The owner has postponed mainnet for this redesign.
+Source under review: 3fa558a1bba4cc5884ef8d1d5a44aa1a9b642714. The owner selected
+architecture B (signed Jupiter-derived feeds) and postponed mainnet. These
+mathematical/ABI details remain a draft, not chosen production settings or an
+independent firm's audit. Implementation prototypes do not qualify new markets.
 
 ## Direct answer
 
@@ -109,7 +110,7 @@ mint/token program/decimals, WSOL quote units, risk/search/grid versions, sequen
 observation epoch and context slots, validity limits, all quantity/cost/status data
 and source commitments. No cross-market, cross-network, stale-config or replay reuse.
 
-One concrete quorum example for evaluation is7 producers, at least 5 fresh individual
+One concrete quorum example for evaluation is 7 producers, at least 5 fresh individual
 reports, median plus dispersion rejection, with at most 2 faulty reporters; this is
 not an accepted production choice. A quorum of keys does not establish independent
 data if all operators share the same API or operator. Require bounded observation
@@ -137,6 +138,29 @@ Let current authenticated size-cost evidence be [C_live_lo(Q),C_live_hi(Q)], wit
 completed-history EMA/robust bands [C_lo(Q),C_hi(Q)]. Stale/unknown is a separate typed
 status, not None=+infinity.
 
+For an initial exact-grid prototype, each position Q must equal an authenticated
+q_i; arbitrary-Q interpolation is disabled. This is a proposed admission tradeoff,
+not a current protocol restriction. For aggregate opening capacity, evaluate the next
+covered quantity at or above sumBorrowedQ+Q; reject if coverage ends. A future envelope
+scheme needs its own proof before arbitrary quantities are admitted.
+
+One explicit temporal contract to evaluate is:
+- C_ema(Q): completed-epoch EMA of authenticated central buy marks, using a fixed,
+  versioned update interval and smoothing rule;
+- C_lo(Q)=min(C_ema(Q), median of prior completed bucket lower-cost extrema);
+- C_hi(Q)=max(C_ema(Q), median of prior completed bucket upper-cost extrema).
+Current-epoch observations never enter these historical values. Require positive,
+ordered bands and sufficient distinct timely epochs. These are accepted oracle
+reference bands, not guaranteed global-minimum market costs. Flash-manipulated
+liquidity can affect even honestly produced quotes, so these formulas still need
+adversarial economic validation; no old locked-depth proof is inherited.
+
+A provider may expose only one signed scalar per fixed feed/job. In that case the
+consumer needs a bound, versioned set of amount/direction-specific verified feed IDs,
+not an imagined one-feed signed curve API. The provider spike must prove how to
+assemble a coherent same-epoch vector and reject mixed/stale quantities. Fixed
+immutable jobs/feeds and their source policy are part of the oracle contract.
+
 - Opening margin can retain the D4 algebra:
   M_req=max(0,ceil(CR_open*max(C_live_hi(Q),C_ema_hi(Q))/10000)-S_actual).
   But these are oracle snapshot costs, NOT the current post-sale on-chain buyback cost.
@@ -160,6 +184,11 @@ status, not None=+infinity.
 - Tiering must use a defined quote-capacity/age policy or a deliberately conservative
   initial tier, not pretend quote depth is locked SOL. Existing SOL/USD conversion
   may still serve USD tier thresholds; it is not a token-price oracle.
+- Current dual fee views also cap risk fees at locked terms while execution pays
+  live fees. Gross router costs do not automatically preserve that rule. Either
+  authenticate enough fee/net decomposition to retain separate execution/risk views,
+  or explicitly version the replacement all-in mark and fee-rise/no-route treatment.
+  Do not claim the old fee-cap protection without the necessary data.
 - Current sigma(Q;P,L) is fee-free net impact. Either attest enough net/fee data to
   retain it or create a new all-in premium term with a versioned threshold. This
   choice changes S2 semantics and must be locked on positions.
@@ -193,6 +222,10 @@ S3/no-route is a separate owner choice. Use per-Q status chains because a token 
 route for small Q but not a large debt:
 AVAILABLE / ATTESTED_NO_ROUTE / UNKNOWN(API error, timeout, staleness, disagreement).
 UNKNOWN must never be interpreted as infinity, CR0 or successful no-route evidence.
+ATTESTED_NO_ROUTE advances only its defined per-size S3 chain; it does not invent
+a finite price or immediately create an S1/CR liquidation. S1/S2 require their defined
+fresh finite financial evidence. Unavailable fair value needs an explicit separate
+policy, not an accidental Option::None fallback.
 If no-route cash settlement is allowed, it relies on a sustained quorum claim plus a
 defined challenge/recovery window; it still does NOT prove absence of every route.
 A successful actual bounded buyback for the debt can refute/reset that claim.
@@ -214,16 +247,16 @@ explicit ABI addition. Do not let anyone submit a bad route or API failure to fo
 cash settlement. Continuing exits during an oracle outage requires this deliberate
 repayment/fallback design; signatures do not solve liveness automatically.
 
-## Owner choice needed before program implementation
+## Selected direction and remaining configuration choices
 
 A: independent on-chain reference risk, slower asset expansion as reference families
 are qualified; Jupiter is the execution layer.
 
-B: external quote oracle reference risk, broader execution-family coverage without
+B (SELECTED architecture): external quote oracle reference risk, broader execution-family coverage without
 per-family on-chain quoting, but producer/search/censorship/lag risk becomes part of
 the financial trust model and the current cap/tier/S2/settlement evidence is redesigned.
 
-The immediate engineering recommendation is a versioned risk-source abstraction and
-one chosen backend, not pretending a URL quote is an on-chain price. Pump can retain
-its known reference backend. The25SOL cap and mint filters stay in both options.
+The implementation direction is a versioned risk-source abstraction and
+the selected signed-feed backend, not pretending a URL quote is an on-chain price. Pump can retain
+its known reference backend. The 25 SOL cap and mint filters stay in both options.
 No old fuzz duration, release tag or audit acceptance is credited to either redesign.

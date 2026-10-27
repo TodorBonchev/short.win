@@ -1,0 +1,358 @@
+[
+  {
+    "name": "exact_out_route_v2",
+    "discriminator": [
+      157,
+      138,
+      184,
+      82,
+      21,
+      244,
+      243,
+      36
+    ],
+    "accounts": [
+      {
+        "name": "user_transfer_authority",
+        "signer": true
+      },
+      {
+        "name": "user_source_token_account",
+        "writable": true
+      },
+      {
+        "name": "user_destination_token_account",
+        "writable": true
+      },
+      {
+        "name": "source_mint"
+      },
+      {
+        "name": "destination_mint"
+      },
+      {
+        "name": "source_token_program"
+      },
+      {
+        "name": "destination_token_program"
+      },
+      {
+        "name": "destination_token_account",
+        "writable": true,
+        "optional": true
+      },
+      {
+        "name": "event_authority",
+        "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+      },
+      {
+        "name": "program"
+      }
+    ],
+    "args": [
+      {
+        "name": "out_amount",
+        "type": "u64"
+      },
+      {
+        "name": "quoted_in_amount",
+        "type": "u64"
+      },
+      {
+        "name": "slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "platform_fee_bps",
+        "type": "u16"
+      },
+      {
+        "name": "positive_slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "route_plan",
+        "type": {
+          "vec": {
+            "defined": {
+              "name": "RoutePlanStepV2"
+            }
+          }
+        }
+      }
+    ],
+    "returns": "u64"
+  },
+  {
+    "name": "route_v2",
+    "discriminator": [
+      187,
+      100,
+      250,
+      204,
+      49,
+      196,
+      175,
+      20
+    ],
+    "accounts": [
+      {
+        "name": "user_transfer_authority",
+        "signer": true
+      },
+      {
+        "name": "user_source_token_account",
+        "writable": true
+      },
+      {
+        "name": "user_destination_token_account",
+        "writable": true
+      },
+      {
+        "name": "source_mint"
+      },
+      {
+        "name": "destination_mint"
+      },
+      {
+        "name": "source_token_program"
+      },
+      {
+        "name": "destination_token_program"
+      },
+      {
+        "name": "destination_token_account",
+        "writable": true,
+        "optional": true
+      },
+      {
+        "name": "event_authority",
+        "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+      },
+      {
+        "name": "program"
+      }
+    ],
+    "args": [
+      {
+        "name": "in_amount",
+        "type": "u64"
+      },
+      {
+        "name": "quoted_out_amount",
+        "type": "u64"
+      },
+      {
+        "name": "slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "platform_fee_bps",
+        "type": "u16"
+      },
+      {
+        "name": "positive_slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "route_plan",
+        "type": {
+          "vec": {
+            "defined": {
+              "name": "RoutePlanStepV2"
+            }
+          }
+        }
+      }
+    ],
+    "returns": "u64"
+  },
+  {
+    "name": "shared_accounts_exact_out_route_v2",
+    "discriminator": [
+      53,
+      96,
+      229,
+      202,
+      216,
+      187,
+      250,
+      24
+    ],
+    "accounts": [
+      {
+        "name": "program_authority"
+      },
+      {
+        "name": "user_transfer_authority",
+        "signer": true
+      },
+      {
+        "name": "source_token_account",
+        "writable": true
+      },
+      {
+        "name": "program_source_token_account",
+        "writable": true
+      },
+      {
+        "name": "program_destination_token_account",
+        "writable": true
+      },
+      {
+        "name": "destination_token_account",
+        "writable": true
+      },
+      {
+        "name": "source_mint"
+      },
+      {
+        "name": "destination_mint"
+      },
+      {
+        "name": "source_token_program"
+      },
+      {
+        "name": "destination_token_program"
+      },
+      {
+        "name": "event_authority",
+        "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+      },
+      {
+        "name": "program"
+      }
+    ],
+    "args": [
+      {
+        "name": "id",
+        "type": "u8"
+      },
+      {
+        "name": "out_amount",
+        "type": "u64"
+      },
+      {
+        "name": "quoted_in_amount",
+        "type": "u64"
+      },
+      {
+        "name": "slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "platform_fee_bps",
+        "type": "u16"
+      },
+      {
+        "name": "positive_slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "route_plan",
+        "type": {
+          "vec": {
+            "defined": {
+              "name": "RoutePlanStepV2"
+            }
+          }
+        }
+      }
+    ],
+    "returns": "u64"
+  },
+  {
+    "name": "shared_accounts_route_v2",
+    "discriminator": [
+      209,
+      152,
+      83,
+      147,
+      124,
+      254,
+      216,
+      233
+    ],
+    "accounts": [
+      {
+        "name": "program_authority"
+      },
+      {
+        "name": "user_transfer_authority",
+        "signer": true
+      },
+      {
+        "name": "source_token_account",
+        "writable": true
+      },
+      {
+        "name": "program_source_token_account",
+        "writable": true
+      },
+      {
+        "name": "program_destination_token_account",
+        "writable": true
+      },
+      {
+        "name": "destination_token_account",
+        "writable": true
+      },
+      {
+        "name": "source_mint"
+      },
+      {
+        "name": "destination_mint"
+      },
+      {
+        "name": "source_token_program"
+      },
+      {
+        "name": "destination_token_program"
+      },
+      {
+        "name": "event_authority",
+        "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf"
+      },
+      {
+        "name": "program"
+      }
+    ],
+    "args": [
+      {
+        "name": "id",
+        "type": "u8"
+      },
+      {
+        "name": "in_amount",
+        "type": "u64"
+      },
+      {
+        "name": "quoted_out_amount",
+        "type": "u64"
+      },
+      {
+        "name": "slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "platform_fee_bps",
+        "type": "u16"
+      },
+      {
+        "name": "positive_slippage_bps",
+        "type": "u16"
+      },
+      {
+        "name": "route_plan",
+        "type": {
+          "vec": {
+            "defined": {
+              "name": "RoutePlanStepV2"
+            }
+          }
+        }
+      }
+    ],
+    "returns": "u64"
+  }
+]

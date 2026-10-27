@@ -1,0 +1,5 @@
+# Native-only probe; do not inherit the parent workspace's wasm target setup.
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

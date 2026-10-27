@@ -1,5 +1,11 @@
 # short.win — Architecture and Implementation Blueprint
 
+**Current development scope (owner, 2026-10-27): first mainnet is postponed
+for the [broad Jupiter redesign](JUPITER_REDESIGN.md).** Its signed quote-oracle architecture is
+selected; concrete provider/risk settings and implementation need qualification. The existing 1.0.3 specification, measurements
+and operator commands below remain baseline evidence, not deployment approval
+for the new design. Audit/bounty funding timing otherwise remains unchanged.
+
 **Current launch policy (owner, 2026-10-27): capped mainnet before an external audit
 and a funded bug bounty**, with protocol fees intended to accumulate funding for
 both. The owner chose the existing `market_max_notional` default: **25 SOL of

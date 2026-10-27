@@ -101,7 +101,7 @@ jobs:
       - name: Rust toolchain from rust-toolchain.toml
         run: rustup toolchain install || rustup show
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: cargo test -p shortwin-math -p shortwin-math-wasm -p squads-v4-ix --locked
+      - run: cargo test -p shortwin-math -p shortwin-math-wasm -p shortwin-jupiter-route -p squads-v4-ix --locked
 
   vectors:
     # Committed test vectors must be exactly what the normative sims generate today.

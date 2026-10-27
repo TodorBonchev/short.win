@@ -2,8 +2,10 @@
 
 **Status: design work; not implemented, qualified or approved for deployment.**
 The owner [postponed first mainnet](../audit/owner-jupiter-redesign-decision-2026-10-27.md)
-for this redesign. The token-pricing trust model is an open decision. The current
-program bytes remain the 1.0.3 baseline. No final version is selected.
+for this redesign. The owner selected signed Jupiter-derived feeds for new markets; concrete
+provider/trust/settings remain subject to review before deployment. The deployed
+program remains the 1.0.3 baseline. Prototype build identities require new CI; no
+final version is selected.
 
 ## Product boundary
 
@@ -36,14 +38,18 @@ proof of fair price. An executed swap proves exchanged amounts, not best price o
 manipulation resistance. A size-independent last-swap USD price is not the cost
 of buying back the whole debt.
 
-Two designs are under consideration:
+The following alternatives were considered; the owner selected the externally
+attested architecture for new markets. Pump retains its established reference
+backend, and any direct/reference fallback remains explicit:
 
 | Risk source | Implementation consequence | Admission consequence |
 |---|---|---|
 | Independently verified on-chain pool/oracle data | Keep existing readers, add correct concentrated/bin-liquidity readers or existing authenticated feeds; Jupiter handles execution separately. | Assets need a supported reference source; add families progressively. |
 | Externally attested Jupiter-derived risk observations | Introduce an explicitly trusted oracle/verifier, immutable feed/job identity, signer/queue rules, amount-aware quote data and separate failure semantics. | Broader routing coverage is possible, but feed availability, manipulation controls and the new trust model still constrain admission. |
 
-No option has been selected merely by the question “can we use Jupiter quotes?”.
+The later explicit owner answer selects signed Jupiter-derived feeds. The earlier
+quote question alone was not treated as acceptance. Provider/queue/quorum/feed
+identities and final financial settings still need a concrete reviewed packet.
 Signing a quote authenticates who supplied it; it does not prove that underlying
 liquidity was not manipulated. Several signers querying one API are not several
 independent price sources. A third-party oracle integration needs its own current
@@ -55,7 +61,7 @@ Switchboard's current published task schema documents `JupiterSwapTask`, and its
 current Solana guide documents verifying Ed25519 updates, storing verified quotes
 and then reading them in the consumer program. This is a concrete candidate for
 an offline compatibility/prototype spike, not an approved provider or deployed
-feed. Native task naming/version alone does not establish that its backend uses
+feed. The signed-feed architecture is selected; this provider choice is not. Native task naming/version alone does not establish that its backend uses
 the current `/swap/v2/build` API. A fixed `HttpTask`/parser can explicitly describe
 that request, but it still needs a successful authenticated integration proof.
 
@@ -137,6 +143,10 @@ and call-depth limits. Keep direct/reference behavior as an explicit bounded
 fallback where it remains supported. Removing direct execution does not remove
 Pump graduation's need for correct post-graduation risk state.
 
+The [execution boundary draft](jupiter/EXECUTION_BOUNDARY_DRAFT.md) separates a
+pure checked-header prototype from complete CPI authorization and financial bounds.
+It is not a claim that a routed swap has executed.
+
 ## Current Jupiter interface facts (checked 2026-10-27)
 
 - `/swap/v2/build` supplies raw Metis instructions for CPI/custom transactions.
@@ -159,7 +169,7 @@ The older [Jupiter research](../research/jupiter-cpi.md) remains historical.
 
 ## Development and release sequence
 
-1. Resolve pricing/admission and failure semantics; write the mathematical/ABI
+1. Complete the selected quote-oracle pricing/admission and failure semantics; write the mathematical/ABI
    contract and independent review before enabling new risk-state updates.
 2. Prototype bounded Jupiter execution and authenticated risk observations
    separately. Verify actual current Jupiter bytes/IDL and any oracle dependency.

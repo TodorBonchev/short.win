@@ -1,0 +1,69 @@
+{
+  "created_utc": "2026-10-27T08:13:20.302743+00:00",
+  "status": "offline feasibility candidate; NOT approved provider, deployable integration or selected risk policy",
+  "head": "e965ba62ccf69bd9597c669a40578d9db0f7cf3d",
+  "tracked_status_before_report": [
+    " M docs/SPEC.md",
+    " M docs/deployment/MAINNET_OPERATIONS.md",
+    " M docs/design/ARCHITECTURE.md",
+    " M docs/design/JUPITER_REDESIGN.md",
+    " M docs/design/jupiter/QUOTE_RISK_DRAFT.md",
+    " M docs/research/jupiter-cpi.md",
+    "?? docs/design/jupiter/EXECUTION_BOUNDARY_DRAFT.md"
+  ],
+  "checks": {
+    "python_pass": 64,
+    "published_sdk_encoder_comparisons_pass": 21,
+    "existing_kit_pda_check": true,
+    "cryptographic_signature_tests": 0,
+    "SBF_or_Rust_integration_builds": 0,
+    "network_execution_requests_in_this_spike": 0
+  },
+  "candidate_feed_ids": [
+    "9c092182dc1d90930266971172b710b37e3d82217ab545937a74e5c21097a91a",
+    "c16b9b928a79d02aef59748c2d71b49739f0db56391aa92f92b67e9067782027"
+  ],
+  "hash_binding": "V2 SHA256(OracleFeed.encodeDelimited(OracleFeed.fromObject(...))); separately verified legacy control SHA256(queue||OracleJob.encodeDelimited). Canonical field presence/order matter; unknown fields are rejected by local strict validator.",
+  "semantic_inputs_fixed": [
+    "origin/path=/swap/v2/build (Metis)",
+    "inputMint",
+    "outputMint",
+    "raw input amount",
+    "fixture taker PDA",
+    "slippageBps",
+    "maxAccounts",
+    "wrapAndUnwrapSol=false",
+    "transactionVersion",
+    "HTTP method",
+    "JSONPath",
+    "task sequence",
+    "encoded minOracleSamples/minJobResponses"
+  ],
+  "only_allowed_execution_override": "x-api-key header:${JUPITER_API_KEY}; map itself not in feedID/checksum. No semantic overrides allowed.",
+  "trusted_sdk_versions": {
+    "common": "5.8.5",
+    "common_npm_integrity": "sha512-FAbrTCdhQrOSMzxbpFIoJejeP95MJgXtgezzl+Hwms7wqSw9WTx52aHPLp/EUeGEj21rn9MuNlV0uvKNFxk5DA==",
+    "common_npm_shasum": "7a1fce9d6889d60c96743746151a4b5f9db90255",
+    "protobufjs_source_bundle": "7.4.0",
+    "protobufjs_npm_integrity": "sha512-mRUWCc3KUU4w1jU8sGxICXH/gNS94DvI1gxqDvBzhj1JpcsimQkYiOJfwsPUykUI5ZaspFbSgmBLER8IrQ3tqw==",
+    "on_demand_js": "3.10.6 (metadata only; not loaded or installed)",
+    "rust_published": "0.13.0",
+    "rust_archive_sha256": "bc7a36809592252cc73f9ec01623b89628654a2fba00dbf5c339c286eb040d40",
+    "rust_git": "0.13.1 source only, unpublished",
+    "rust_published_verifier_sha256": "4e17641c4e11d833ae369fef178869fdb80aa75e4a8e264a7a4a7c2fadf3a567"
+  },
+  "blockers": [
+    "No provider/queue/quorum/authority risk policy selected; current package/program identity and live authorized signer path not qualified.",
+    "Exact-input outAmount at a fixed size is not Bhat(q). Amount buckets, conservative buyback pricing, fees/impact, supported tokens/routes and failure policy remain design work.",
+    "Real execution taker/payer/temporary-account arrangement unknown. Per-position taker and quantity create distinct feed IDs; generic semantic overrides would be unbound and are rejected.",
+    "Published Rust SDK defaults to Solana-v2; short.win Anchor1.2/Solana3 types need controlled no-default/solana-v3 compatibility compile. Git0.13.1 Anchor range differs from published0.13.0.",
+    "JS builder uses web3/Anchor0.31 while web app uses Kit8; explicit instruction/account-role bridge needs qualification.",
+    "No API/task-runner response, real signed receipt, Rust/SBF integration, forged signature/stale/replay fixture verification, transaction size/CU/account simulation, costs or funded operation proved.",
+    "Oracle signing authenticates network results, not independent market fairness or underlying source freshness; one Jupiter endpoint remains correlated source."
+  ],
+  "preserved_no_mutations": [
+    "No repo dependency/lock/program/service/test edits by this agent",
+    "No package install; only integrity-verified source archives/bundles under ignored target",
+    "No feed creation/storage, key/account creation, signature request/signing, payment/order/deploy"
+  ]
+}

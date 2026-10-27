@@ -2645,6 +2645,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "shortwin-jupiter-route"
+version = "0.1.0"
+
+[[package]]
 name = "shortwin-math"
 version = "0.1.0"
 dependencies = [

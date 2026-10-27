@@ -23,11 +23,12 @@ complete SHA-256 VenueGuard correction for first deployment.
 
 The owner postponed first mainnet on 2026-10-27 for broad Jupiter support. Follow
 the [recorded decision](docs/audit/owner-jupiter-redesign-decision-2026-10-27.md) and
-[design proposal](docs/design/JUPITER_REDESIGN.md). The pricing trust model remains
-open: the owner asked whether Jupiter quotes can be used; this is not acceptance
-of unchecked keeper JSON or of a new oracle authority.
+[design proposal](docs/design/JUPITER_REDESIGN.md). The owner selected
+signed Jupiter-derived risk feeds, evaluating Switchboard first, with concrete
+trust/settings reviewed before deployment. Unchecked keeper JSON remains forbidden;
+new tokens stay disabled until feed/size/liquidation requirements qualify.
 
-- [ ] Select and specify authenticated pricing, quantity/depth and failure rules.
+- [ ] Specify and validate the selected signed-feed pricing, quantity/depth and failure rules.
 - [ ] Implement bounded Jupiter execution, risk integration and compatible services.
 - [ ] Independently review and qualify final code/fixtures, then run fresh fuzz.
 - [ ] Select the new release version and complete funded mainnet commissioning.

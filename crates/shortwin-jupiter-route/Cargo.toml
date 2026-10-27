@@ -1,0 +1,17 @@
+[package]
+name = "shortwin-jupiter-route"
+version = "0.1.0"
+publish = false
+description = "short.win Jupiter V2 header and fixed-account validation prototype (no_std)"
+edition = "2024"
+rust-version = "1.89"
+license-file = "../../LICENSE"
+repository = "https://github.com/TodorBonchev/short.win"
+homepage = "https://short.win"
+readme = "README.md"
+keywords = ["solana", "jupiter", "parsing", "no-std"]
+categories = ["cryptography::cryptocurrencies", "parsing", "no-std"]
+include = ["/src/**", "/Cargo.toml", "/README.md"]
+
+# Deliberately no SDK, allocator, runtime, oracle or production-program dependency.
+[dependencies]

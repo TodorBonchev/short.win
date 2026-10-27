@@ -1,0 +1,26 @@
+{
+  "started_utc": "2026-10-27T08:08:21.602265+00:00",
+  "finished_utc": "2026-10-27T08:08:22.076133+00:00",
+  "rpc": "https://api.mainnet-beta.solana.com",
+  "method": "getMultipleAccounts",
+  "commitment": "finalized",
+  "context_slot": 461997164,
+  "program": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "program_data": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+  "deploy_slot": 459479624,
+  "programdata_bytes": 2892269,
+  "program_bytes_sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e",
+  "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+  "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+  "idl_account": "C88XWfp26heEmDkmfSzeXP7Fd7GQJ2j9dDTUsyiZbUTa",
+  "idl_account_sha256": "c468169462ca9330e499b597ce8d540308dcb66616002aaefa168551e3870558",
+  "decoded_idl_sha256": "1c70d6c96e01648411ff1579a35853d966407a4dff5020a5d33e92e6923c9e67",
+  "metadata": {
+    "name": "jupiter",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Jupiter aggregator program"
+  },
+  "raw_rpc_sha256": "c611ab92f91fd6bf4ce415054a1e72cad3a3abe1bef5c2bb22f1e574d7a3c3ff",
+  "scope": "Read-only identity/schema authentication for a header-only prototype. No private source audit, execution compatibility or pricing authorization inferred."
+}

@@ -101,11 +101,27 @@ crates/shortwin-math/src/quote/ray_v4.rs
 crates/shortwin-math/src/quote/reprice.rs
 crates/shortwin-math/src/quote/sol_leg.rs
 crates/shortwin-math/src/quote/straddle.rs
+crates/shortwin-math/src/quote_oracle.rs
 crates/shortwin-math/src/rent.rs
 crates/shortwin-math/src/risk.rs
 crates/shortwin-math/src/settle.rs
 crates/shortwin-math/src/tier.rs
 crates/shortwin-math/src/waterfall.rs
+
+# [core] shortwin-jupiter-route: Jupiter redesign header and fixed-account prototype; not yet linked into production
+crates/shortwin-jupiter-route/Cargo.toml
+crates/shortwin-jupiter-route/src/lib.rs
+
+# [context] jupiter-oracle-compat: standalone native oracle SDK compatibility experiment; not linked into production and not a live-attestation qualification
+.github/workflows/jupiter-oracle-compat.yml
+experiments/jupiter-oracle-compat/.gitignore
+experiments/jupiter-oracle-compat/Cargo.toml
+experiments/jupiter-oracle-compat/README.md
+experiments/jupiter-oracle-compat/provenance.json
+experiments/jupiter-oracle-compat/run_probe.py
+experiments/jupiter-oracle-compat/rust-toolchain.toml
+experiments/jupiter-oracle-compat/src/lib.rs
+experiments/jupiter-oracle-compat/test_run_probe.py
 
 # [core] shortwin-venue-state: no_std venue, mint, Pyth and ProgramData readers
 crates/shortwin-venue-state/Cargo.toml
@@ -197,6 +213,7 @@ tests/mock_cpamm/src/state.rs
 # crates/shortwin-math/README.md: documentation (the math derivations; read for context)
 # crates/shortwin-math/LICENSE-APACHE: published crate license text; not built
 # crates/shortwin-math/NOTICE: published crate attribution; not built
+# crates/shortwin-jupiter-route/README.md: prototype documentation; read for context
 # crates/shortwin-venue-state/README.md: published crate documentation; read for context
 # programs/shortwin/README.md: published program crate documentation; read for context
 # crates/shortwin-math/tests: tests
