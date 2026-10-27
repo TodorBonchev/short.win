@@ -2713,6 +2713,7 @@ dependencies = [
  "anchor-spl",
  "bytemuck",
  "shortwin-math",
+ "shortwin-price-report",
  "shortwin-venue-state",
  "solana-security-txt",
  "solana-sha256-hasher",
@@ -2766,6 +2767,10 @@ dependencies = [
 
 [[package]]
 name = "shortwin-math"
+version = "0.1.0"
+
+[[package]]
+name = "shortwin-price-report"
 version = "0.1.0"
 
 [[package]]

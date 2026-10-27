@@ -135,3 +135,16 @@ remaining collateral to lenders less the capped keeper payment, zero borrower re
 requires the owner's pending explicit choice because a healthy overdue borrower can
 forfeit collateral. Its implementation/activation is not inferred from infrastructure
 budget approval. Quote failures remain Unknown; no quote-only S2/S3 is introduced.
+
+## Published checkpoint CI and lockfile correction
+
+The engineering checkpoint was published as
+`07a34d2ad8f9726184a5a534ee7cf3de948e6115` in draft PR10. Both dedicated
+Jupiter-probe workflow runs passed; their test-only scope and stopped review limit
+remain unchanged. The push-run artifact digest and all eight contained files were
+independently hashed. Ordinary PR CI40556153080 found stale benchmark lockfiles
+for the new local report-crate dependency. Only the local package/edge was added to
+five bench locks; no external package/version/checksum was upgraded. Locked offline
+metadata and the focused M1 check pass. The [CI/repair evidence](probes/mainnet-preparation-ci-2026-10-27/)
+retains the original failure and correction. A rerun is required on the correction;
+this is not a final full gate or fresh fuzz result.
