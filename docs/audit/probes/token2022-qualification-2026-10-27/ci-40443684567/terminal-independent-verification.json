@@ -1,0 +1,1088 @@
+{
+  "reviewed_utc": "2026-10-27T07:43:31.274674+00:00",
+  "authorship": "Independent AI review by launch_policy_inventory",
+  "terminal_runs": [
+    {
+      "id": 40440067371,
+      "head_sha": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+      "event": "workflow_dispatch",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-10-27T02:43:18Z",
+      "updated_at": "2026-10-27T03:51:40Z",
+      "completed_job_conclusions": {
+        "success": 24,
+        "failure": 1,
+        "skipped": 1
+      },
+      "jobs": [
+        {
+          "id": 121978034141,
+          "name": "anchor-build",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:45:13Z"
+        },
+        {
+          "id": 121978034361,
+          "name": "vectors",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:52:15Z"
+        },
+        {
+          "id": 121978034422,
+          "name": "test",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:44:39Z"
+        },
+        {
+          "id": 121978034438,
+          "name": "deny",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:44:03Z"
+        },
+        {
+          "id": 121978034456,
+          "name": "wasm",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:43:52Z"
+        },
+        {
+          "id": 121978034482,
+          "name": "fmt",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:43:46Z"
+        },
+        {
+          "id": 121978034517,
+          "name": "cu-math",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:44:50Z"
+        },
+        {
+          "id": 121978034586,
+          "name": "web",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:45:19Z"
+        },
+        {
+          "id": 121978034611,
+          "name": "clippy",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:44:21Z"
+        },
+        {
+          "id": 121978628801,
+          "name": "t-pot",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:49:09Z"
+        },
+        {
+          "id": 121978628827,
+          "name": "program-tests",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:44:43Z"
+        },
+        {
+          "id": 121978628834,
+          "name": "m1-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:46:41Z"
+        },
+        {
+          "id": 121978628839,
+          "name": "verifiable-build",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:49:33Z"
+        },
+        {
+          "id": 121978628844,
+          "name": "m2-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:48:13Z"
+        },
+        {
+          "id": 121978628846,
+          "name": "codama",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:45:39Z"
+        },
+        {
+          "id": 121978628851,
+          "name": "web-e2e",
+          "conclusion": "failure",
+          "completed_at": "2026-10-27T03:10:02Z"
+        },
+        {
+          "id": 121978628931,
+          "name": "indexer",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:00:35Z"
+        },
+        {
+          "id": 121978628949,
+          "name": "fuzz-smoke",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:47:40Z"
+        },
+        {
+          "id": 121978629004,
+          "name": "t-size",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:49:13Z"
+        },
+        {
+          "id": 121978629014,
+          "name": "m6-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:49:59Z"
+        },
+        {
+          "id": 121978629049,
+          "name": "m5-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:49:58Z"
+        },
+        {
+          "id": 121978629053,
+          "name": "m7-keeper-bench",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:52:16Z"
+        },
+        {
+          "id": 121978629074,
+          "name": "mutants",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:51:39Z"
+        },
+        {
+          "id": 121978629100,
+          "name": "services",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:08:28Z"
+        },
+        {
+          "id": 121978629166,
+          "name": "m3-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T02:49:37Z"
+        },
+        {
+          "id": 121978630008,
+          "name": "fuzz-nightly",
+          "conclusion": "skipped",
+          "completed_at": "2026-10-27T02:45:13Z"
+        }
+      ],
+      "run_raw_sha256": "ec4745f64a870786af1835f5329171e1bfc276b16da0487c6eed5e428d33740b",
+      "jobs_raw_sha256": "b549031c3ba5e8065cf4d9874634e6cab96037fd7a558885fa4d17bc654bd6e6"
+    },
+    {
+      "id": 40443684567,
+      "head_sha": "658d8baafca01d751452d1c67b508747fe0671e2",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T03:21:08Z",
+      "updated_at": "2026-10-27T04:35:13Z",
+      "completed_job_conclusions": {
+        "success": 24,
+        "skipped": 2
+      },
+      "jobs": [
+        {
+          "id": 121989742073,
+          "name": "deny",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:21:49Z"
+        },
+        {
+          "id": 121989742359,
+          "name": "wasm",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:22:11Z"
+        },
+        {
+          "id": 121989742405,
+          "name": "test",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:22:14Z"
+        },
+        {
+          "id": 121989742423,
+          "name": "vectors",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:28:10Z"
+        },
+        {
+          "id": 121989742443,
+          "name": "anchor-build",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:26:19Z"
+        },
+        {
+          "id": 121989742465,
+          "name": "fmt",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:21:34Z"
+        },
+        {
+          "id": 121989742479,
+          "name": "web",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:25:37Z"
+        },
+        {
+          "id": 121989742539,
+          "name": "clippy",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:23:07Z"
+        },
+        {
+          "id": 121989742544,
+          "name": "cu-math",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:23:04Z"
+        },
+        {
+          "id": 121991302952,
+          "name": "t-pot",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:31:43Z"
+        },
+        {
+          "id": 121991302959,
+          "name": "codama",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:26:56Z"
+        },
+        {
+          "id": 121991302983,
+          "name": "web-e2e",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:53:30Z"
+        },
+        {
+          "id": 121991303027,
+          "name": "program-tests",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T04:35:12Z"
+        },
+        {
+          "id": 121991303033,
+          "name": "m1-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:27:52Z"
+        },
+        {
+          "id": 121991303073,
+          "name": "verifiable-build",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:33:50Z"
+        },
+        {
+          "id": 121991303123,
+          "name": "t-size",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:29:28Z"
+        },
+        {
+          "id": 121991303148,
+          "name": "fuzz-smoke",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:28:38Z"
+        },
+        {
+          "id": 121991303153,
+          "name": "m2-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:28:22Z"
+        },
+        {
+          "id": 121991303156,
+          "name": "indexer",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:41:47Z"
+        },
+        {
+          "id": 121991303172,
+          "name": "m6-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:31:49Z"
+        },
+        {
+          "id": 121991303197,
+          "name": "m7-keeper-bench",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:33:25Z"
+        },
+        {
+          "id": 121991303198,
+          "name": "services",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:41:03Z"
+        },
+        {
+          "id": 121991303271,
+          "name": "m3-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:31:11Z"
+        },
+        {
+          "id": 121991303306,
+          "name": "m5-cu",
+          "conclusion": "success",
+          "completed_at": "2026-10-27T03:34:30Z"
+        },
+        {
+          "id": 121991304482,
+          "name": "fuzz-nightly",
+          "conclusion": "skipped",
+          "completed_at": "2026-10-27T03:26:20Z"
+        },
+        {
+          "id": 121991304945,
+          "name": "mutants",
+          "conclusion": "skipped",
+          "completed_at": "2026-10-27T03:26:20Z"
+        }
+      ],
+      "run_raw_sha256": "bcf4b092748aa65fc3119e272a2da8535fe1fe1e1c4d9d92775cc1ba1871a7a3",
+      "jobs_raw_sha256": "3210555064e832e3747a499f28b17a3989eedc8e13d5a4f31f17fb0add40dc67"
+    }
+  ],
+  "source_equivalence": [
+    {
+      "before": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+      "after": "658d8baafca01d751452d1c67b508747fe0671e2",
+      "changed_paths": [
+        "REUSE.toml",
+        "TODO.md",
+        "apps/web/e2e/specs/positions.spec.ts",
+        "docs/AUDIT.md",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/SHA256SUMS",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/README.md",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/artifact-list.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/artifact-verification.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/final-verification.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/jobs.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/mutants-success.log.gz",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/receipt-source-equivalence.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/run.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/service-regression-verification.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/services-job.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/services-success.log.gz",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/shortwin.build.log.gz",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/verifiable-hashes.txt.gz",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/REPORT.md",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/independent-review.json",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__account_len.rs.new.rs.gz",
+        "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__mod.rs.diff.gz",
+        "docs/deployment/MAINNET_OPERATIONS.md",
+        "docs/release/MAINNET-1.0.3.md"
+      ],
+      "no_program_fuzzer_fixture_lock_service_client_production_web_or_workflow_changes": true
+    },
+    {
+      "before": "658d8baafca01d751452d1c67b508747fe0671e2",
+      "after": "3fa558a1bba4cc5884ef8d1d5a44aa1a9b642714",
+      "changed_paths": [
+        "REUSE.toml",
+        "TODO.md",
+        "docs/audit/probes/token2022-qualification-2026-10-27/README.md",
+        "docs/audit/probes/token2022-qualification-2026-10-27/SHA256SUMS",
+        "docs/audit/probes/token2022-qualification-2026-10-27/benchmarks/all-reports.patch.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/benchmarks/independent-review.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/benchmarks/reconstruction.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/artifact-api.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/checkpoint.json.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/diff-check.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/focused-biome.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/fuzz-smoke-121978628949.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/independent-bench-budget-check.json.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/independent-scheduler-witness-review.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/indexer-121978628931.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/m1-cu-121978628834.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/m2-cu-121978628844.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/m3-cu-121978629166.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/m5-cu-121978629049.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/m6-cu-121978629014.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/m7-keeper-bench-121978629053.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/positions-clock-fix.patch.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/repair-source-equivalence.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/runtime-SHA256SUMS",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/runtime-fixture-sha256.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/runtime-provenance.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/services-121978629100.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/shortwin.build.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/successful-job-log-review.json.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/verifiable-hashes.txt.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/verification-2026-10-27.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/web-e2e-121978628851.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/web-failure-and-fix-review.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/web-tsc-includes-e2e.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/devnet-policy/SecurityPolicyPage-DBnSskG4.js.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/devnet-policy/deploy.log.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/devnet-policy/security.headers.txt.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/devnet-policy/security.html.gz",
+        "docs/audit/probes/token2022-qualification-2026-10-27/devnet-policy/verification.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/keeper-cost/independent-review.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/keeper-cost/keeper_cost.txt",
+        "docs/audit/probes/token2022-qualification-2026-10-27/keeper-cost/verification.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/preflight/diff.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/preflight/fixtures-live.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/preflight/fixtures-static.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/preflight/results.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/preflight/scope.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/WITNESS.md",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/independent-review.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/python-schedule.json",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/rust-schedule.csv",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/rustc.log",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/sources/tests/fuzz/src/rng.rs",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/verify-schedule.rs",
+        "docs/audit/probes/token2022-qualification-2026-10-27/scheduling/witness.json",
+        "docs/audit/token2022-qualification-1.0.3-2026-10-27.md",
+        "docs/design/ECONOMICS.md",
+        "docs/design/sim/keeper_cost.py",
+        "docs/release/MAINNET-1.0.3.md",
+        "tests/bench/m1_cu/results.md",
+        "tests/bench/m2_cu/results.md",
+        "tests/bench/m2_cu/trace.md",
+        "tests/bench/m3_cu/results.md",
+        "tests/bench/m3_cu/trace.md",
+        "tests/bench/m5_cu/results.md",
+        "tests/bench/m5_cu/trace.md",
+        "tests/bench/m6_cu/results.md",
+        "tests/bench/m6_cu/trace.md",
+        "tests/bench/m7_cascade/results.json",
+        "tests/bench/m7_cascade/results.md",
+        "tests/bench/m7_keeper/results.json",
+        "tests/bench/m7_keeper/results.md"
+      ],
+      "no_program_fuzzer_fixture_lock_service_client_production_web_or_workflow_changes": true
+    }
+  ],
+  "mutants": {
+    "log": {
+      "path": "/root/short.win-token2022-qualification/target/ci-40440067371-independent-log-review/mutants-121978629074.log",
+      "raw_bytes": 44585,
+      "raw_sha256": "39afb602e3b14ed5d4c9f157f39f2760d483413bbde4ae9c1b9755bdd78b8c31",
+      "gzip_bytes": 9441,
+      "gzip_sha256": "f66848dc56db697056bb49b48df2f4888fd9bf9f8840c1429c96753b7f7be32a",
+      "gzip_roundtrip_equal": true
+    },
+    "unique_selected": 19,
+    "all_selected_source_names_equal": true,
+    "test_kills": 19,
+    "also_fuzz_kills": 7,
+    "tests_only": 12,
+    "selected": [
+      {
+        "name": "d4-without-ema",
+        "line": 399,
+        "outcome": "fuzz (mock, 3m) killed (10 failures)"
+      },
+      {
+        "name": "fee-size-cap-doubled",
+        "line": 401,
+        "outcome": "fuzz (mock, 3m) killed (6 failures)"
+      },
+      {
+        "name": "wallet-cap-removed",
+        "line": 403,
+        "outcome": "fuzz (mock, 3m) killed (10 failures)"
+      },
+      {
+        "name": "tier-c-as-b",
+        "line": 405,
+        "outcome": "fuzz (mock, 3m) killed (119 failures)"
+      },
+      {
+        "name": "coverage-clear-immediate",
+        "line": 407,
+        "outcome": "fuzz (mock, 3m) killed (32 failures)"
+      },
+      {
+        "name": "curve-caps-live",
+        "line": 409,
+        "outcome": "fuzz (curve, 3m) killed (15 failures)"
+      },
+      {
+        "name": "pump-caps-live-fee",
+        "line": 411,
+        "outcome": "fuzz (pumpswap, 3m) killed (1 failures)"
+      },
+      {
+        "name": "ki65-skip-store-records",
+        "line": 413,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki65-rebase-without-owner",
+        "line": 415,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66-pot-skip-surplus",
+        "line": 417,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66full-walk-accrues-nothing",
+        "line": 419,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66full-open-full-accrual",
+        "line": 421,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66full-hold-accrues-again",
+        "line": 423,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66full-walk-per-touch-floor",
+        "line": 425,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66full-rehold",
+        "line": 427,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66full-jump-keeps-chain",
+        "line": 429,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki66full-park-keeps-chain",
+        "line": 431,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki67-close-with-pending",
+        "line": 433,
+        "outcome": "fuzz not run (tests only)"
+      },
+      {
+        "name": "ki67-close-parked",
+        "line": 435,
+        "outcome": "fuzz not run (tests only)"
+      }
+    ],
+    "new_pr_job_intentionally_skipped": true,
+    "credit_scope": "The19 selected mutants killed on4c runtime inputs; those program/fuzzer/fixture/lock inputs unchanged through658 and3fa. No broader mutation completeness claimed."
+  },
+  "new_program_tests": {
+    "log": {
+      "path": "/root/short.win-token2022-qualification/target/ci-40443684567-independent-log-review/program-tests-121991303027.log",
+      "raw_bytes": 290945,
+      "raw_sha256": "8ac2052596a51d3e2b57cce29fe068a2ff0881aeb0e269e9bdc7902c58ae5cf0",
+      "gzip_bytes": 63493,
+      "gzip_sha256": "e559ca176473837eaf27891d12638f2fcdc42a490a00795fd280cc115900e5c4",
+      "gzip_roundtrip_equal": true
+    },
+    "qualified_controls": [
+      {
+        "test": "harness::clock_is_under_test_control",
+        "proof": {
+          "line": 2133,
+          "text": "2026-10-27T03:41:00.9222816Z test harness::clock_is_under_test_control ... ok"
+        }
+      },
+      {
+        "test": "harness::historical_clock_replay_preserves_deltas_and_raw_bank_coordinates",
+        "proof": {
+          "line": 2134,
+          "text": "2026-10-27T03:41:01.5539662Z test harness::historical_clock_replay_preserves_deltas_and_raw_bank_coordinates ... ok"
+        }
+      },
+      {
+        "test": "harness::raw_clock_refuses_a_predeployment_bank - should panic",
+        "proof": {
+          "line": 2146,
+          "text": "2026-10-27T03:41:05.3472869Z test harness::raw_clock_refuses_a_predeployment_bank - should panic ... ok"
+        }
+      },
+      {
+        "test": "harness::token_2022_v11_0_and_v11_1_preserve_base_account_transfer_contract",
+        "proof": {
+          "line": 2151,
+          "text": "2026-10-27T03:41:06.8780251Z test harness::token_2022_v11_0_and_v11_1_preserve_base_account_transfer_contract ... ok"
+        }
+      },
+      {
+        "test": "both_token_2022_tlv_sizers_reject_unknown_and_truncated_headers",
+        "proof": {
+          "line": 2526,
+          "text": "2026-10-27T03:55:00.1177767Z test both_token_2022_tlv_sizers_reject_unknown_and_truncated_headers ... ok"
+        }
+      },
+      {
+        "test": "allowed_extensions_preserve_pool_vault_and_ata_sizing_on_both_elves",
+        "proof": {
+          "line": 2532,
+          "text": "2026-10-27T03:55:03.8772666Z test allowed_extensions_preserve_pool_vault_and_ata_sizing_on_both_elves ... ok"
+        }
+      },
+      {
+        "test": "sec_7_memo_required_destination_is_served",
+        "proof": {
+          "line": 3207,
+          "text": "2026-10-27T04:30:43.1012397Z test sec_7_memo_required_destination_is_served ... ok"
+        }
+      },
+      {
+        "test": "token_2022_old_and_new_fixture_pins_are_both_authenticated",
+        "proof": {
+          "line": 3208,
+          "text": "2026-10-27T04:30:43.2508034Z test token_2022_old_and_new_fixture_pins_are_both_authenticated ... ok"
+        }
+      },
+      {
+        "test": "t_memo_control_top_level_sibling_check",
+        "proof": {
+          "line": 3209,
+          "text": "2026-10-27T04:30:43.6777771Z test t_memo_control_top_level_sibling_check ... ok"
+        }
+      },
+      {
+        "test": "token_2022_v11_0_memo_required_destination_is_served",
+        "proof": {
+          "line": 3211,
+          "text": "2026-10-27T04:30:44.3042704Z test token_2022_v11_0_memo_required_destination_is_served ... ok"
+        }
+      },
+      {
+        "test": "token_2022_loader_switch_changes_the_executed_memo_id_rule",
+        "proof": {
+          "line": 3212,
+          "text": "2026-10-27T04:30:44.4042724Z test token_2022_loader_switch_changes_the_executed_memo_id_rule ... ok"
+        }
+      }
+    ],
+    "result_summaries": [
+      {
+        "line": 1089,
+        "text": "2026-10-27T03:27:56.1371323Z test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s"
+      },
+      {
+        "line": 1095,
+        "text": "2026-10-27T03:27:56.9808828Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 1734,
+        "text": "2026-10-27T03:29:36.8082986Z test result: ok. 84 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s"
+      },
+      {
+        "line": 1744,
+        "text": "2026-10-27T03:29:50.4261716Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.62s"
+      },
+      {
+        "line": 1769,
+        "text": "2026-10-27T03:30:03.7685339Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.33s"
+      },
+      {
+        "line": 1776,
+        "text": "2026-10-27T03:30:05.1763951Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.40s"
+      },
+      {
+        "line": 1783,
+        "text": "2026-10-27T03:30:08.9557763Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.78s"
+      },
+      {
+        "line": 1790,
+        "text": "2026-10-27T03:30:19.3820720Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.42s"
+      },
+      {
+        "line": 1800,
+        "text": "2026-10-27T03:30:21.6358952Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.25s"
+      },
+      {
+        "line": 1809,
+        "text": "2026-10-27T03:30:35.0692143Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.43s"
+      },
+      {
+        "line": 1843,
+        "text": "2026-10-27T03:35:48.5062064Z test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 313.42s"
+      },
+      {
+        "line": 1857,
+        "text": "2026-10-27T03:36:31.5688097Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 43.06s"
+      },
+      {
+        "line": 1875,
+        "text": "2026-10-27T03:36:47.0480973Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.47s"
+      },
+      {
+        "line": 1902,
+        "text": "2026-10-27T03:37:09.7118853Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.65s"
+      },
+      {
+        "line": 1923,
+        "text": "2026-10-27T03:37:19.1197777Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.40s"
+      },
+      {
+        "line": 1998,
+        "text": "2026-10-27T03:38:52.6767176Z test result: ok. 68 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 93.55s"
+      },
+      {
+        "line": 2018,
+        "text": "2026-10-27T03:38:59.9469896Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.26s"
+      },
+      {
+        "line": 2026,
+        "text": "2026-10-27T03:39:03.3725492Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.42s"
+      },
+      {
+        "line": 2039,
+        "text": "2026-10-27T03:39:45.0000989Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.62s"
+      },
+      {
+        "line": 2060,
+        "text": "2026-10-27T03:40:36.9584467Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.94s"
+      },
+      {
+        "line": 2066,
+        "text": "2026-10-27T03:40:36.9713929Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 2073,
+        "text": "2026-10-27T03:40:36.9735297Z test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 2101,
+        "text": "2026-10-27T03:40:51.5965237Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.62s"
+      },
+      {
+        "line": 2162,
+        "text": "2026-10-27T03:41:37.4450425Z test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.84s"
+      },
+      {
+        "line": 2187,
+        "text": "2026-10-27T03:41:46.3325284Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.88s"
+      },
+      {
+        "line": 2207,
+        "text": "2026-10-27T03:41:58.3500212Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.01s"
+      },
+      {
+        "line": 2219,
+        "text": "2026-10-27T03:42:57.9150773Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 59.56s"
+      },
+      {
+        "line": 2238,
+        "text": "2026-10-27T03:43:19.5511822Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.63s"
+      },
+      {
+        "line": 2251,
+        "text": "2026-10-27T03:43:36.0543977Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.49s"
+      },
+      {
+        "line": 2274,
+        "text": "2026-10-27T03:43:50.2074465Z test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.14s"
+      },
+      {
+        "line": 2284,
+        "text": "2026-10-27T03:44:02.9778968Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.76s"
+      },
+      {
+        "line": 2352,
+        "text": "2026-10-27T03:50:08.5329597Z test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 365.54s"
+      },
+      {
+        "line": 2374,
+        "text": "2026-10-27T03:50:32.0268475Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.49s"
+      },
+      {
+        "line": 2404,
+        "text": "2026-10-27T03:50:55.2046978Z test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.17s"
+      },
+      {
+        "line": 2410,
+        "text": "2026-10-27T03:50:55.2096430Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 2423,
+        "text": "2026-10-27T03:51:07.1799680Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.97s"
+      },
+      {
+        "line": 2448,
+        "text": "2026-10-27T03:53:18.1204125Z test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 130.93s"
+      },
+      {
+        "line": 2461,
+        "text": "2026-10-27T03:53:38.8470377Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.72s"
+      },
+      {
+        "line": 2477,
+        "text": "2026-10-27T03:54:11.9172367Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.06s"
+      },
+      {
+        "line": 2490,
+        "text": "2026-10-27T03:54:42.9811744Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.05s"
+      },
+      {
+        "line": 2518,
+        "text": "2026-10-27T03:54:58.4321508Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.44s"
+      },
+      {
+        "line": 2536,
+        "text": "2026-10-27T03:55:05.2636907Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.82s"
+      },
+      {
+        "line": 2560,
+        "text": "2026-10-27T03:56:05.4699327Z test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 60.20s"
+      },
+      {
+        "line": 2583,
+        "text": "2026-10-27T03:56:08.4848540Z test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.01s"
+      },
+      {
+        "line": 2668,
+        "text": "2026-10-27T03:58:30.6677511Z test result: ok. 78 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 142.18s"
+      },
+      {
+        "line": 2691,
+        "text": "2026-10-27T03:59:15.7188734Z test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 45.04s"
+      },
+      {
+        "line": 2737,
+        "text": "2026-10-27T03:59:40.2927858Z test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.57s"
+      },
+      {
+        "line": 2760,
+        "text": "2026-10-27T04:04:32.8695372Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 292.57s"
+      },
+      {
+        "line": 2772,
+        "text": "2026-10-27T04:06:42.5639757Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 129.69s"
+      },
+      {
+        "line": 2800,
+        "text": "2026-10-27T04:13:42.0105039Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 419.43s"
+      },
+      {
+        "line": 2806,
+        "text": "2026-10-27T04:13:42.0187471Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 2903,
+        "text": "2026-10-27T04:15:12.8569953Z test result: ok. 91 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 90.84s"
+      },
+      {
+        "line": 2941,
+        "text": "2026-10-27T04:19:41.2501185Z test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 268.37s"
+      },
+      {
+        "line": 2962,
+        "text": "2026-10-27T04:22:02.0674867Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 140.79s"
+      },
+      {
+        "line": 2970,
+        "text": "2026-10-27T04:22:22.0039864Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.92s"
+      },
+      {
+        "line": 3051,
+        "text": "2026-10-27T04:24:04.8638589Z test result: ok. 75 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 102.85s"
+      },
+      {
+        "line": 3074,
+        "text": "2026-10-27T04:25:30.8105752Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 85.94s"
+      },
+      {
+        "line": 3086,
+        "text": "2026-10-27T04:25:41.1424755Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.32s"
+      },
+      {
+        "line": 3103,
+        "text": "2026-10-27T04:27:06.0899698Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 84.94s"
+      },
+      {
+        "line": 3115,
+        "text": "2026-10-27T04:27:43.8993070Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.80s"
+      },
+      {
+        "line": 3123,
+        "text": "2026-10-27T04:27:53.5922790Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.68s"
+      },
+      {
+        "line": 3142,
+        "text": "2026-10-27T04:29:36.8717462Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 103.27s"
+      },
+      {
+        "line": 3153,
+        "text": "2026-10-27T04:29:50.5500658Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.67s"
+      },
+      {
+        "line": 3159,
+        "text": "2026-10-27T04:29:50.5562443Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 3168,
+        "text": "2026-10-27T04:29:52.1630981Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.60s"
+      },
+      {
+        "line": 3186,
+        "text": "2026-10-27T04:30:38.8912403Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.72s"
+      },
+      {
+        "line": 3214,
+        "text": "2026-10-27T04:30:44.4043712Z test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.51s"
+      },
+      {
+        "line": 3230,
+        "text": "2026-10-27T04:30:59.4787881Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.07s"
+      },
+      {
+        "line": 3253,
+        "text": "2026-10-27T04:31:35.8319349Z test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.35s"
+      },
+      {
+        "line": 3259,
+        "text": "2026-10-27T04:31:35.8361474Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 3275,
+        "text": "2026-10-27T04:31:41.3786858Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.54s"
+      },
+      {
+        "line": 3287,
+        "text": "2026-10-27T04:31:46.7996091Z test result: ok. 4 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 5.41s"
+      },
+      {
+        "line": 3306,
+        "text": "2026-10-27T04:32:11.4915382Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.68s"
+      },
+      {
+        "line": 3325,
+        "text": "2026-10-27T04:32:27.8228573Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.32s"
+      },
+      {
+        "line": 3344,
+        "text": "2026-10-27T04:33:09.9209523Z test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.09s"
+      },
+      {
+        "line": 3357,
+        "text": "2026-10-27T04:33:25.3366211Z test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.40s"
+      },
+      {
+        "line": 3375,
+        "text": "2026-10-27T04:33:48.9154518Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.57s"
+      },
+      {
+        "line": 3386,
+        "text": "2026-10-27T04:34:05.7069719Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.78s"
+      },
+      {
+        "line": 3396,
+        "text": "2026-10-27T04:34:21.6074771Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.89s"
+      },
+      {
+        "line": 3405,
+        "text": "2026-10-27T04:34:29.7550384Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.14s"
+      },
+      {
+        "line": 3413,
+        "text": "2026-10-27T04:34:53.0904124Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.33s"
+      },
+      {
+        "line": 3419,
+        "text": "2026-10-27T04:34:53.0978174Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 3498,
+        "text": "2026-10-27T04:34:53.2247474Z test result: ok. 73 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s"
+      },
+      {
+        "line": 3504,
+        "text": "2026-10-27T04:34:54.0929920Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 3510,
+        "text": "2026-10-27T04:34:54.2996281Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      },
+      {
+        "line": 3516,
+        "text": "2026-10-27T04:34:54.3440083Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      }
+    ],
+    "ignored_tests": [
+      {
+        "line": 2071,
+        "text": "2026-10-27T03:40:36.9733977Z test surfpool_mainnet_fork_graduation ... ignored, needs a running Surfpool 1.6 mainnet fork (SURFPOOL_RPC=host:port); module docs"
+      },
+      {
+        "line": 2435,
+        "text": "2026-10-27T03:51:29.1517460Z test m4r_explore_liquidation_grid ... ignored"
+      },
+      {
+        "line": 2658,
+        "text": "2026-10-27T03:58:18.9617689Z test v3_era::r_pfee_withdraw_probe ... ignored, R-PFEE: a read-only probe of pump-fees' withdraw; run with --ignored --nocapture"
+      },
+      {
+        "line": 3280,
+        "text": "2026-10-27T04:31:41.3872993Z test lockstep_a_mock_market_matches_the_pre_m4r_build ... ignored, needs SHORTWIN_PRE_M4R_TEST_VENUE_SO (the pre-M4R test-venue build)"
+      },
+      {
+        "line": 3281,
+        "text": "2026-10-27T04:31:41.3874608Z test lockstep_a_raydium_market_matches_the_pre_m4r_build ... ignored, needs SHORTWIN_PRE_M4R_SO (the pre-M4R release build)"
+      }
+    ],
+    "memo_compute_visibility": "Successful cargo tests do not use --nocapture: eprintln numerical memo/transfer CU is absent. Passing source asserts historical transfer2487, selected-new positive single transfer and whole withdrawal<=100000CU; no exact new transfer CU claimed."
+  },
+  "new_browser_tests": {
+    "log": {
+      "path": "/root/short.win-token2022-qualification/target/ci-40443684567-independent-log-review/web-e2e-121991302983.log",
+      "raw_bytes": 106273,
+      "raw_sha256": "3e6c0a9e53d9ddeb3887a2bde1ad6e1d9dc5ded8240c8594432078dfca2da0b8",
+      "gzip_bytes": 25185,
+      "gzip_sha256": "17617af4aa59b92231830562ab0410f106dadf46e0b99de357e2aadf941fec98",
+      "gzip_roundtrip_equal": true
+    },
+    "positions_pass": {
+      "line": 720,
+      "text": "2026-10-27T03:42:36.8757149Z   \u2713   43 [chain] \u203a e2e/specs/positions.spec.ts:23:5 \u203a positions dashboard \u203a row fields, the risk badge after a price move, time left @short (5.9s)"
+    },
+    "result_summaries": [
+      {
+        "line": 812,
+        "text": "2026-10-27T03:50:38.3437084Z   2 skipped"
+      },
+      {
+        "line": 813,
+        "text": "2026-10-27T03:50:38.3437409Z   125 passed (23.5m)"
+      },
+      {
+        "line": 891,
+        "text": "2026-10-27T03:53:21.9315029Z   19 skipped"
+      },
+      {
+        "line": 892,
+        "text": "2026-10-27T03:53:21.9315411Z   9 passed (2.7m)"
+      }
+    ],
+    "selected_elf_identity": [
+      {
+        "line": 651,
+        "text": "2026-10-27T03:27:40.8938405Z [e2e] mainnet SPL programs: Token-2022 ProgramData trimmed sha256 5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9, spl-memo v3 f520eaf096361abbb9639ea4dc3e5388a87b9330e121f476607b87c46ef67954 (BPFLoader2111111111111111111111111111111111)"
+      },
+      {
+        "line": 842,
+        "text": "2026-10-27T03:51:07.4808773Z [e2e] mainnet SPL programs: Token-2022 ProgramData trimmed sha256 5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9, spl-memo v3 f520eaf096361abbb9639ea4dc3e5388a87b9330e121f476607b87c46ef67954 (BPFLoader2111111111111111111111111111111111)"
+      }
+    ],
+    "skip_scope": "Main mode125passed+2flag-off tests skipped; flag-off mode9passed+19flag-on tests skipped. Opposite feature modes explain skips; these are execution counts, not unique-test or on-mainnet claims."
+  },
+  "limits": [
+    "CI green is qualifying automated source/fixture testing; no new24h all-profile campaign has been launched or duration credited.",
+    "Five documented program-test opt-ins remain ignored: Surfpool fork, exploratory liquidation grid, R-PFEE withdraw probe, two pre-M4R external-build locksteps. New Token22 regression controls are executed and passed.",
+    "Mutants covers exactly19 selected alterations, seven additionally with3m profile fuzz; no whole-program mutation completeness.",
+    "Replacement PR CI intentionally skips mutants and nightly;19-mutation result comes from source-equivalent prior workflow_dispatch, not falsely from this PR.",
+    "No real operator/funded-payer/mainnet deployment/tag/external-audit/funded-bounty evidence or claim.",
+    "No program/Jupiter architecture rewrite authorized or performed in this review."
+  ]
+}
