@@ -10,6 +10,7 @@
 
 import { dataValue, expect, need, requireTrading, T, test } from '../fixtures.ts';
 import { movePrice, shortPosition } from '../validator/actions.ts';
+import { clock } from '../validator/chain.ts';
 
 test.use({ wallet: 'holder' });
 
@@ -23,6 +24,12 @@ test.describe('positions dashboard', { tag: '@short' }, () => {
         requireTrading(state);
         const pos = need(state.positions, 'seeded positions').holder;
         const chainPos = need(await shortPosition(pos.position), 'holder position');
+        // The qualification validator warps its bank past Token-2022's deploy slot, so its
+        // Clock can be ahead of the host. Use that epoch while keeping the countdown ticking.
+        const chainTimeMs = Number((await clock()).unixTimestamp * 1_000n);
+        if (!Number.isSafeInteger(chainTimeMs) || chainTimeMs <= 0)
+            throw new Error(`invalid validator Clock unix milliseconds: ${chainTimeMs}`);
+        await app.page.clock.install({ time: chainTimeMs });
         await app.goto('/positions', 'positions');
         await app.connectWallet();
         await expect(app.id(T.positionsTable)).toBeVisible();
