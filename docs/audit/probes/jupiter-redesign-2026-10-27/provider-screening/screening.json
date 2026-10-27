@@ -1,0 +1,28 @@
+{
+  "saved_utc": "2026-10-27T09:51:24.061091+00:00",
+  "source_url": "https://switchboardxyz.medium.com/important-announcement-54dd6dbe9379",
+  "retrieval_type": "Prior successful web-tool primary-page extracted text; not raw HTML or raw HTTP response bytes",
+  "successful_tool_operation": {
+    "operation": "click",
+    "arguments": {
+      "ref_id": "turn74view3",
+      "id": 12
+    },
+    "result_reference": "turn76view0",
+    "returned_title": "Medium",
+    "returned_url": "https://switchboardxyz.medium.com/important-announcement-54dd6dbe9379",
+    "returned_content_type": "text/html",
+    "returned_total_lines": 231,
+    "returned_crawl_label": "2 weeks ago"
+  },
+  "exact_prior_retrieval_time": "Not independently retained; occurred during this agent turn on 2026-10-27 before the fresh failed attempt.",
+  "independent_agent_receipt_local_path": "target/provider-viability-2026-10-27/medium-source-receipt.json",
+  "independent_agent_receipt_sha256": "1597dad863f9a0f8c4d9b9d030ece30cd7d1edac230055dcb293499f3b0411ad",
+  "short_excerpt_sha256": "8aa32e3052075022c3b3c1d21001222262c78dbdf688d591334957abd3a660a2",
+  "limits": [
+    "The primary excerpt does not independently establish the Sept25supportdeadline or the full Foundationstatement; those details were obtained from attributedsecondaryreports.",
+    "No presentoperator/quorumavailability, universalnodehalt, servicecontinuation, source-to-ELFprovenance or causalconnectionbetweenourSDKreviewfindingsandtheannouncement is established.",
+    "The prior result appears cached/extracted by the web tool; a fresh webopen now fails, as does root directHTTP403. No raw primary response was obtained."
+  ],
+  "decision": "Exclude Switchboard from new deployment selection; preserve native and identity research. Generic signed-feed architecture remains selected; alternatives need qualification and owner settings review."
+}

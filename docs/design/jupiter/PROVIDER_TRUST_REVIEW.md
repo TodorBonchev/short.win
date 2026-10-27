@@ -7,13 +7,16 @@ setting. Mainnet remains postponed; new quote-risk markets remain disabled.
 
 ## Screening result: Switchboard excluded from deployment selection
 
-Switchboard's own [September18 announcement](https://switchboardxyz.medium.com/important-announcement-54dd6dbe9379)
-states that it is shutting down and links the
+Switchboard's own [September 18 announcement](https://switchboardxyz.medium.com/important-announcement-54dd6dbe9379)
+states that it is shutting down (as read in an earlier cached web-tool extraction) and links the
 [Foundation notice](https://x.com/SwitchboardFDN/status/2101088966640611478).
 Retain the SDK/identity work as historical candidate research; do not continue
 qualifying Switchboard for deployment on the basis of accessible code/accounts.
 This does not establish that every independent node stopped or that the SDK
-findings caused the shutdown. No official resumption evidence has been established.
+findings caused the shutdown. No official resumption evidence has been established. The
+[screening receipt](../../audit/probes/jupiter-redesign-2026-10-27/provider-screening/)
+discloses the cached extraction and failed fresh retrieval; no raw primary HTML
+was obtained.
 The detailed September25 support deadline remains attributed to secondary coverage;
 it was not independently read from the inaccessible X article here.
 

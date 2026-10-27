@@ -1,0 +1,7 @@
+Primary-source excerpt from an earlier cached web-tool extraction; not raw HTTP HTML.
+Author: Switchboard
+Title: Important Announcements
+Date: September18,2026
+Quoted statement: "Switchboard is shutting down."
+Source: https://switchboardxyz.medium.com/important-announcement-54dd6dbe9379
+Linked Foundation notice: https://x.com/SwitchboardFDN/status/2101088966640611478
