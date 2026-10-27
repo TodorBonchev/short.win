@@ -1,0 +1,33 @@
+{
+  "observed_utc": "2026-10-27T09:54:03.218659+00:00",
+  "runs": [
+    {
+      "id": 40476629768,
+      "source": "21db9fadb888e0a29f999e3346f18dc603b9b999",
+      "status": "in_progress",
+      "conclusion": null,
+      "success": 22,
+      "failure": 1,
+      "skipped": 2,
+      "active": [
+        "program-tests"
+      ]
+    },
+    {
+      "id": 40480767468,
+      "source": "3a35d6ee1827285901acb9fb01a5634e21b3d40c",
+      "status": "in_progress",
+      "conclusion": null,
+      "success": 21,
+      "failure": 0,
+      "skipped": 1,
+      "active": [
+        "services",
+        "web-e2e",
+        "mutants",
+        "program-tests"
+      ]
+    }
+  ],
+  "status": "dated checkpoint only; running jobs do not constitute full green CI"
+}
