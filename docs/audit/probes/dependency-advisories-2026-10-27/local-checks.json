@@ -1,0 +1,30 @@
+{
+  "normal": "Scoped dependency review current; expires 2026-11-27 UTC. Caller/feature/target changes still require review.",
+  "2026-11-27": {
+    "correctly_rejected": true,
+    "message": "Dependency review expired 2026-11-27 UTC: remove exceptions or retain a fresh scoped review (dependency-advisories-2026-10-27.md)."
+  },
+  "2026-11-28": {
+    "correctly_rejected": true,
+    "message": "Dependency review expired 2026-11-27 UTC: remove exceptions or retain a fresh scoped review (dependency-advisories-2026-10-27.md)."
+  },
+  "deny.toml": {
+    "explicit_deny_and_audit_ids_agree": true,
+    "count": 7
+  },
+  "services/deny.toml": {
+    "explicit_deny_and_audit_ids_agree": true,
+    "count": 10
+  },
+  "root_lock_unchanged": true,
+  "diff_check_exit": 0,
+  "diff_check_output": "",
+  "yaml_parse": "passed",
+  "expiry_guard_regressions": {
+    "active_current_passes": true,
+    "active_due_and_future_fail": true,
+    "removed_exceptions_pass_after_deadline": true,
+    "services_ctutils_ignore_rejected": true,
+    "missing_reason_date_rejected": true
+  }
+}

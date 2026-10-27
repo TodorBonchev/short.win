@@ -1,0 +1,63 @@
+{
+  "checked_utc": "2026-10-27T01:04:10.495505+00:00",
+  "run_id": 40345534308,
+  "head": "7f2af5b5787d62978c79e7630f5b0e1a3310d94e",
+  "jobs": {
+    "success": 22,
+    "failure": 2,
+    "skipped": 2
+  },
+  "failed_jobs": [
+    "deny",
+    "services"
+  ],
+  "tokio_patch": {
+    "manifest": "services/Cargo.lock",
+    "before": "1.53.1",
+    "after": "1.53.3",
+    "advisory": "RUSTSEC-2026-0386",
+    "locked_no_deps_metadata_exit": 0,
+    "full_offline_metadata_exit": 101,
+    "full_metadata_limitation": "error: failed to download `Inflector v0.11.4`\n\nCaused by:\n  attempting to make an HTTP request, but --offline was specified"
+  },
+  "source_changes": "Only services Tokio/ctutils dependency patch blocks plus documented current-usage exceptions in root/services policies and matching CI audit flags; root Cargo.lock, runtime, math, fuzzer and fixture inputs unchanged.",
+  "ctutils_patch": {
+    "manifest": "services/Cargo.lock",
+    "before": "0.4.2",
+    "after": "0.4.4",
+    "advisory": "RUSTSEC-2026-0385",
+    "locked_no_deps_metadata_exit": 0
+  },
+  "original_other_advisories": {
+    "crypto-bigint": [
+      "RUSTSEC-2026-0387"
+    ],
+    "ctutils": [
+      "RUSTSEC-2026-0385"
+    ],
+    "zstd": [
+      "RUSTSEC-2026-0391"
+    ],
+    "zstd-safe": [
+      "RUSTSEC-2026-0398",
+      "RUSTSEC-2026-0403"
+    ],
+    "zstd-sys": [
+      "RUSTSEC-2026-0410"
+    ]
+  },
+  "scoped_exception_ids": {
+    "root": [
+      "RUSTSEC-2026-0385",
+      "RUSTSEC-2026-0387"
+    ],
+    "services": [
+      "RUSTSEC-2026-0387",
+      "RUSTSEC-2026-0391",
+      "RUSTSEC-2026-0398",
+      "RUSTSEC-2026-0403",
+      "RUSTSEC-2026-0410"
+    ]
+  },
+  "review_expires_utc": "2026-11-27"
+}

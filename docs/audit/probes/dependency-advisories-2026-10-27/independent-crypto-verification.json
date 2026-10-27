@@ -1,0 +1,1830 @@
+{
+  "checked_utc": "2026-10-27T01:08:56.169020+00:00",
+  "root_lock_sha256": "0732c477fe1e6b38fd74d558e23b8e3ebda8790705a6ddff1de6fdaca72b316b",
+  "archives": [
+    {
+      "package": "anchor-syn",
+      "version": "1.2.0",
+      "archive_sha256": "1ef87b1d3ae59fbf265a9157a9082308af220b4ef5a64a360d8820dcf25b5a86",
+      "lock_checksum_matches": true,
+      "source_files": [
+        {
+          "file": "anchor-syn-1.2.0/Cargo.toml.orig",
+          "sha256": "e7016ef631f7f3d8878bc80c8e606ba865459bd701aedcf9eb5a3d47f7aac57c",
+          "hits": [
+            {
+              "line": 38,
+              "text": "sha2 = \"0.11\""
+            }
+          ]
+        },
+        {
+          "file": "anchor-syn-1.2.0/src/hash.rs",
+          "sha256": "8deb11bdcdf2e197f613d54ba23c91a66ed6e6aba4ae29c01898e6c69e69476c",
+          "hits": [
+            {
+              "line": 6,
+              "text": "sha2::{Digest, Sha256},"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "solana-message",
+      "version": "4.4.1",
+      "archive_sha256": "7e29e655f222a3a64145fedceacdca3e696ba7aded1dbd5391aa09d5fbfba53c",
+      "lock_checksum_matches": true,
+      "source_files": [
+        {
+          "file": "solana-message-4.4.1/Cargo.toml.orig",
+          "sha256": "3a91e9cfec49e0a645b0297ec5ac159e26af85972a5edc75c4d8051e02bd50a0",
+          "hits": [
+            {
+              "line": 20,
+              "text": "blake3 = [\"dep:blake3\"]"
+            },
+            {
+              "line": 21,
+              "text": "dev-context-only-utils = [\"blake3\", \"wincode\"]"
+            },
+            {
+              "line": 48,
+              "text": "blake3 = { workspace = true, features = [\"traits-preview\"], optional = true }"
+            }
+          ]
+        },
+        {
+          "file": "solana-message-4.4.1/src/legacy.rs",
+          "sha256": "11aa55c1715441f047cd741c9a8723f9396ca76546182b638665ba1d31c73071",
+          "hits": [
+            {
+              "line": 500,
+              "text": "/// Compute the blake3 hash of this transaction's message."
+            },
+            {
+              "line": 501,
+              "text": "#[cfg(all(feature = \"wincode\", feature = \"blake3\"))]"
+            },
+            {
+              "line": 504,
+              "text": "Self::hash_raw_message(&message_bytes)"
+            },
+            {
+              "line": 507,
+              "text": "/// Compute the blake3 hash of a raw transaction message."
+            },
+            {
+              "line": 508,
+              "text": "#[cfg(feature = \"blake3\")]"
+            },
+            {
+              "line": 509,
+              "text": "pub fn hash_raw_message(message_bytes: &[u8]) -> Hash {"
+            },
+            {
+              "line": 510,
+              "text": "use {blake3::traits::digest::Digest, solana_hash::HASH_BYTES};"
+            },
+            {
+              "line": 511,
+              "text": "let mut hasher = blake3::Hasher::new();"
+            }
+          ]
+        },
+        {
+          "file": "solana-message-4.4.1/src/versions/mod.rs",
+          "sha256": "38f62f3d981c9f3c0669ac1758ac1aaef0af684088658364026c97e5acb07e4b",
+          "hits": [
+            {
+              "line": 211,
+              "text": "#[cfg(all(feature = \"wincode\", feature = \"blake3\"))]"
+            },
+            {
+              "line": 212,
+              "text": "/// Compute the blake3 hash of this transaction's message"
+            },
+            {
+              "line": 215,
+              "text": "Self::hash_raw_message(&message_bytes)"
+            },
+            {
+              "line": 218,
+              "text": "#[cfg(feature = \"blake3\")]"
+            },
+            {
+              "line": 219,
+              "text": "/// Compute the blake3 hash of a raw transaction message"
+            },
+            {
+              "line": 220,
+              "text": "pub fn hash_raw_message(message_bytes: &[u8]) -> Hash {"
+            },
+            {
+              "line": 221,
+              "text": "use blake3::traits::digest::Digest;"
+            },
+            {
+              "line": 222,
+              "text": "let mut hasher = blake3::Hasher::new();"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "solana-blake3-hasher",
+      "version": "3.1.0",
+      "archive_sha256": "7116e1d942a2432ca3f514625104757ab8a56233787e95144c93950029e31176",
+      "lock_checksum_matches": true,
+      "source_files": [
+        {
+          "file": "solana-blake3-hasher-3.1.0/Cargo.toml.orig",
+          "sha256": "0c9f49e218e63aee6a808287573d6ec8795362609ac90ab33daecad05e6340b2",
+          "hits": [
+            {
+              "line": 2,
+              "text": "name = \"solana-blake3-hasher\""
+            },
+            {
+              "line": 4,
+              "text": "documentation = \"https://docs.rs/solana-blake3-hasher\""
+            },
+            {
+              "line": 18,
+              "text": "blake3 = [\"dep:blake3\"]"
+            },
+            {
+              "line": 27,
+              "text": "blake3 = { workspace = true, optional = true }"
+            },
+            {
+              "line": 30,
+              "text": "solana-blake3-hasher = { path = \".\", features = [\"blake3\"] }"
+            }
+          ]
+        },
+        {
+          "file": "solana-blake3-hasher-3.1.0/src/lib.rs",
+          "sha256": "0fbdba725a5c100d4ffcf52c27434e3d61c134fd6818524011965d6d09894245",
+          "hits": [
+            {
+              "line": 1,
+              "text": "//! Hashing with the [blake3] hash function."
+            },
+            {
+              "line": 3,
+              "text": "//! [blake3]: https://github.com/BLAKE3-team/BLAKE3"
+            },
+            {
+              "line": 11,
+              "text": "feature = \"blake3\","
+            },
+            {
+              "line": 15,
+              "text": "hasher: blake3::Hasher,"
+            },
+            {
+              "line": 19,
+              "text": "feature = \"blake3\","
+            },
+            {
+              "line": 43,
+              "text": "#[cfg(feature = \"blake3\")]"
+            },
+            {
+              "line": 49,
+              "text": "#[cfg(not(feature = \"blake3\"))]"
+            },
+            {
+              "line": 52,
+              "text": "panic!(\"hashv is only available on target `solana` or with the `blake3` feature enabled on this crate\")"
+            },
+            {
+              "line": 59,
+              "text": "// SAFETY: This is sound as sol_blake3 always fills all 32 bytes of our hash"
+            },
+            {
+              "line": 61,
+              "text": "solana_define_syscall::definitions::sol_blake3("
+            },
+            {
+              "line": 78,
+              "text": "#[cfg(feature = \"blake3\")]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "solana-secp256k1-recover",
+      "version": "3.3.0",
+      "archive_sha256": "ce0d2e8d53946f04e789476d6c407e4997b7fb412483df5fc10c075c65cb2edf",
+      "lock_checksum_matches": true,
+      "source_files": [
+        {
+          "file": "solana-secp256k1-recover-3.3.0/src/lib.rs",
+          "sha256": "ee5b7ae850ceb8faefb7f3fd48b1d1b06d01b93b872958b7aa67e82ab3ecc9f5",
+          "hits": [
+            {
+              "line": 447,
+              "text": "k256::ecdsa::VerifyingKey::recover_from_prehash(hash, &signature, recovery_id)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "blake3",
+      "version": "1.8.7",
+      "archive_sha256": "6d9e454fc11f76977dc803893aff6304ed33d6a26efae8696573bea74baa27ae",
+      "lock_checksum_matches": true,
+      "source_files": [
+        {
+          "file": "blake3-1.8.7/Cargo.toml.orig",
+          "sha256": "3f6fe4b92ec1ed1120aaa49aadc0482f275f62309035cb9757d8e316e0620a21",
+          "hits": [
+            {
+              "line": 2,
+              "text": "name = \"blake3\""
+            },
+            {
+              "line": 8,
+              "text": "documentation = \"https://docs.rs/blake3\""
+            },
+            {
+              "line": 118,
+              "text": "digest = { version = \"0.11.2\", features = [\"mac\"], optional = true }"
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/benches/bench.rs",
+          "sha256": "3c8cf54aaeb9fbef305c7e9c4496ea74e3ceec9eec1f5eeaca84cd4e7cad224d",
+          "hits": [
+            {
+              "line": 6,
+              "text": "use blake3::OUT_LEN;"
+            },
+            {
+              "line": 7,
+              "text": "use blake3::platform::{MAX_SIMD_DEGREE, Platform};"
+            },
+            {
+              "line": 8,
+              "text": "use blake3::{BLOCK_LEN, CHUNK_LEN};"
+            },
+            {
+              "line": 80,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 104,
+              "text": "blake3::IncrementCounter::Yes,"
+            },
+            {
+              "line": 138,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 146,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 152,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 175,
+              "text": "blake3::IncrementCounter::No,"
+            },
+            {
+              "line": 209,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 217,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 223,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 230,
+              "text": "b.iter(|| blake3::hash(input.get()));"
+            },
+            {
+              "line": 295,
+              "text": "b.iter(|| blake3::Hasher::new().update(input.get()).finalize());"
+            },
+            {
+              "line": 432,
+              "text": "b.iter(|| blake3::Hasher::new().update_rayon(input.get()).finalize());"
+            },
+            {
+              "line": 518,
+              "text": "let mut hasher = blake3::Hasher::new();"
+            },
+            {
+              "line": 530,
+              "text": "let mut xof = blake3::Hasher::new().finalize_xof();"
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/build.rs",
+          "sha256": "9ec9b359db417071b525a459a191b810e3dd79b9708ae66be4085b2efd2ba7d9",
+          "hits": [
+            {
+              "line": 201,
+              "text": "println!(\"cargo::rustc-cfg=blake3_sse2_rust\");"
+            },
+            {
+              "line": 202,
+              "text": "println!(\"cargo::rustc-cfg=blake3_sse41_rust\");"
+            },
+            {
+              "line": 203,
+              "text": "println!(\"cargo::rustc-cfg=blake3_avx2_rust\");"
+            },
+            {
+              "line": 210,
+              "text": "println!(\"cargo::rustc-cfg=blake3_sse2_ffi\");"
+            },
+            {
+              "line": 211,
+              "text": "println!(\"cargo::rustc-cfg=blake3_sse41_ffi\");"
+            },
+            {
+              "line": 212,
+              "text": "println!(\"cargo::rustc-cfg=blake3_avx2_ffi\");"
+            },
+            {
+              "line": 216,
+              "text": "build.file(\"c/blake3_sse2_x86-64_windows_msvc.asm\");"
+            },
+            {
+              "line": 217,
+              "text": "build.file(\"c/blake3_sse41_x86-64_windows_msvc.asm\");"
+            },
+            {
+              "line": 218,
+              "text": "build.file(\"c/blake3_avx2_x86-64_windows_msvc.asm\");"
+            },
+            {
+              "line": 220,
+              "text": "build.file(\"c/blake3_sse2_x86-64_windows_gnu.S\");"
+            },
+            {
+              "line": 221,
+              "text": "build.file(\"c/blake3_sse41_x86-64_windows_gnu.S\");"
+            },
+            {
+              "line": 222,
+              "text": "build.file(\"c/blake3_avx2_x86-64_windows_gnu.S\");"
+            },
+            {
+              "line": 228,
+              "text": "build.file(\"c/blake3_sse2_x86-64_unix.S\");"
+            },
+            {
+              "line": 229,
+              "text": "build.file(\"c/blake3_sse41_x86-64_unix.S\");"
+            },
+            {
+              "line": 230,
+              "text": "build.file(\"c/blake3_avx2_x86-64_unix.S\");"
+            },
+            {
+              "line": 232,
+              "text": "build.compile(\"blake3_sse2_sse41_avx2_assembly\");"
+            },
+            {
+              "line": 238,
+              "text": "println!(\"cargo::rustc-cfg=blake3_avx512_ffi\");"
+            },
+            {
+              "line": 240,
+              "text": "build.file(\"c/blake3_avx512.c\");"
+            },
+            {
+              "line": 251,
+              "text": "build.compile(\"blake3_avx512_intrinsics\");"
+            },
+            {
+              "line": 258,
+              "text": "println!(\"cargo::rustc-cfg=blake3_avx512_ffi\");"
+            },
+            {
+              "line": 263,
+              "text": "build.file(\"c/blake3_avx512_x86-64_windows_msvc.asm\");"
+            },
+            {
+              "line": 266,
+              "text": "build.file(\"c/blake3_avx512_x86-64_windows_gnu.S\");"
+            },
+            {
+              "line": 269,
+              "text": "build.file(\"c/blake3_avx512_x86-64_unix.S\");"
+            },
+            {
+              "line": 278,
+              "text": "build.compile(\"blake3_avx512_assembly\");"
+            },
+            {
+              "line": 283,
+              "text": "// Note that blake3_neon.c normally depends on the blake3_portable.c"
+            },
+            {
+              "line": 286,
+              "text": "build.file(\"c/blake3_neon.c\");"
+            },
+            {
+              "line": 293,
+              "text": "build.compile(\"blake3_neon\");"
+            },
+            {
+              "line": 300,
+              "text": "println!(\"cargo::rustc-cfg=blake3_wasm32_simd\");"
+            },
+            {
+              "line": 320,
+              "text": "\"blake3_sse2_ffi\","
+            },
+            {
+              "line": 321,
+              "text": "\"blake3_sse2_rust\","
+            },
+            {
+              "line": 322,
+              "text": "\"blake3_sse41_ffi\","
+            },
+            {
+              "line": 323,
+              "text": "\"blake3_sse41_rust\","
+            },
+            {
+              "line": 324,
+              "text": "\"blake3_avx2_ffi\","
+            },
+            {
+              "line": 325,
+              "text": "\"blake3_avx2_rust\","
+            },
+            {
+              "line": 326,
+              "text": "\"blake3_avx512_ffi\","
+            },
+            {
+              "line": 327,
+              "text": "\"blake3_neon\","
+            },
+            {
+              "line": 328,
+              "text": "\"blake3_wasm32_simd\","
+            },
+            {
+              "line": 369,
+              "text": "println!(\"cargo::rustc-cfg=blake3_neon\");"
+            },
+            {
+              "line": 395,
+              "text": "let _ = std::fs::remove_file(\"blake3_avx2_x86-64_windows_gnu.asm\");"
+            },
+            {
+              "line": 396,
+              "text": "let _ = std::fs::remove_file(\"blake3_avx512_x86-64_windows_gnu.asm\");"
+            },
+            {
+              "line": 397,
+              "text": "let _ = std::fs::remove_file(\"blake3_sse2_x86-64_windows_gnu.asm\");"
+            },
+            {
+              "line": 398,
+              "text": "let _ = std::fs::remove_file(\"blake3_sse41_x86-64_windows_gnu.asm\");"
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/ffi_avx2.rs",
+          "sha256": "8769cfe9d5cf98732a9e24c20e966a121f7db42afcdcda26d02b3492d52be871",
+          "hits": [
+            {
+              "line": 22,
+              "text": "ffi::blake3_hash_many_avx2("
+            },
+            {
+              "line": 39,
+              "text": "pub fn blake3_hash_many_avx2("
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/ffi_avx512.rs",
+          "sha256": "2afacbfac72c4886fcde647a549817493fd392d27a0768327f8c498b88796b65",
+          "hits": [
+            {
+              "line": 12,
+              "text": "ffi::blake3_compress_in_place_avx512("
+            },
+            {
+              "line": 32,
+              "text": "ffi::blake3_compress_xof_avx512("
+            },
+            {
+              "line": 60,
+              "text": "ffi::blake3_hash_many_avx512("
+            },
+            {
+              "line": 87,
+              "text": "ffi::blake3_xof_many_avx512("
+            },
+            {
+              "line": 101,
+              "text": "pub fn blake3_compress_in_place_avx512("
+            },
+            {
+              "line": 108,
+              "text": "pub fn blake3_compress_xof_avx512("
+            },
+            {
+              "line": 116,
+              "text": "pub fn blake3_hash_many_avx512("
+            },
+            {
+              "line": 129,
+              "text": "pub fn blake3_xof_many_avx512("
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/ffi_neon.rs",
+          "sha256": "ad9146e823497c3ad701556167b456ed084f0006664f1253fa779a74ad42469e",
+          "hits": [
+            {
+              "line": 19,
+              "text": "ffi::blake3_hash_many_neon("
+            },
+            {
+              "line": 34,
+              "text": "// blake3_neon.c normally depends on blake3_portable.c, because the NEON"
+            },
+            {
+              "line": 39,
+              "text": "pub extern \"C\" fn blake3_compress_in_place_portable("
+            },
+            {
+              "line": 59,
+              "text": "pub fn blake3_hash_many_neon("
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/ffi_sse2.rs",
+          "sha256": "60d3f6b881210ee67fb1003181b07ff72c7f20e501fb687adc8d13ec1a65551f",
+          "hits": [
+            {
+              "line": 12,
+              "text": "ffi::blake3_compress_in_place_sse2("
+            },
+            {
+              "line": 32,
+              "text": "ffi::blake3_compress_xof_sse2("
+            },
+            {
+              "line": 60,
+              "text": "ffi::blake3_hash_many_sse2("
+            },
+            {
+              "line": 77,
+              "text": "pub fn blake3_compress_in_place_sse2("
+            },
+            {
+              "line": 84,
+              "text": "pub fn blake3_compress_xof_sse2("
+            },
+            {
+              "line": 92,
+              "text": "pub fn blake3_hash_many_sse2("
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/ffi_sse41.rs",
+          "sha256": "82715fa59fd6870e33a8068f81516ea993616e7a3b6b8551692b2f4d1eea202b",
+          "hits": [
+            {
+              "line": 12,
+              "text": "ffi::blake3_compress_in_place_sse41("
+            },
+            {
+              "line": 32,
+              "text": "ffi::blake3_compress_xof_sse41("
+            },
+            {
+              "line": 60,
+              "text": "ffi::blake3_hash_many_sse41("
+            },
+            {
+              "line": 77,
+              "text": "pub fn blake3_compress_in_place_sse41("
+            },
+            {
+              "line": 84,
+              "text": "pub fn blake3_compress_xof_sse41("
+            },
+            {
+              "line": 92,
+              "text": "pub fn blake3_hash_many_sse41("
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/hazmat.rs",
+          "sha256": "e7f62a675a73c586e5e22086c84d0a4d16cdd62a976ee526c8392b2a18968d77",
+          "hits": [
+            {
+              "line": 15,
+              "text": "//! paper](https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf) to understand the"
+            },
+            {
+              "line": 16,
+              "text": "//! tree structure you need to maintain. Test your code against [`blake3::hash`](../fn.hash.html)"
+            },
+            {
+              "line": 52,
+              "text": "//! use blake3::{Hasher, CHUNK_LEN};"
+            },
+            {
+              "line": 53,
+              "text": "//! use blake3::hazmat::{merge_subtrees_non_root, merge_subtrees_root, Mode};"
+            },
+            {
+              "line": 54,
+              "text": "//! use blake3::hazmat::HasherExt; // an extension trait for Hasher"
+            },
+            {
+              "line": 86,
+              "text": "//! assert_eq!(root_hash, blake3::hash(&combined_input));"
+            },
+            {
+              "line": 97,
+              "text": "//! # use blake3::{Hasher, CHUNK_LEN};"
+            },
+            {
+              "line": 98,
+              "text": "//! # use blake3::hazmat::{Mode, HasherExt, merge_subtrees_non_root, merge_subtrees_root};"
+            },
+            {
+              "line": 130,
+              "text": "//! # use blake3::{Hasher, CHUNK_LEN};"
+            },
+            {
+              "line": 131,
+              "text": "//! # use blake3::hazmat::HasherExt;"
+            },
+            {
+              "line": 146,
+              "text": "//! paper](https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf). Note that the"
+            },
+            {
+              "line": 149,
+              "text": "//! catch mistakes with these is to compare your root output to the [`blake3::hash`](crate::hash)"
+            },
+            {
+              "line": 172,
+              "text": "/// use blake3::Hasher;"
+            },
+            {
+              "line": 173,
+              "text": "/// use blake3::hazmat::HasherExt;"
+            },
+            {
+              "line": 175,
+              "text": "/// let context_key = blake3::hazmat::hash_derive_key_context(\"foo\");"
+            },
+            {
+              "line": 180,
+              "text": "/// assert_eq!(derived_key, blake3::derive_key(\"foo\", b\"bar\"));"
+            },
+            {
+              "line": 194,
+              "text": "/// paper](https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf). Note that only"
+            },
+            {
+              "line": 337,
+              "text": "/// paper](https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf). For example, if an"
+            },
+            {
+              "line": 351,
+              "text": "/// use blake3::hazmat::{left_subtree_len, merge_subtrees_root, HasherExt, Mode};"
+            },
+            {
+              "line": 352,
+              "text": "/// use blake3::{Hasher, CHUNK_LEN};"
+            },
+            {
+              "line": 374,
+              "text": "/// assert_eq!(root_hash, blake3::hash(&input));"
+            },
+            {
+              "line": 404,
+              "text": "/// [`Hasher::new_keyed`]."
+            },
+            {
+              "line": 476,
+              "text": "/// [`blake3::hash`](crate::hash))."
+            },
+            {
+              "line": 499,
+              "text": "/// use blake3::hazmat::{merge_subtrees_root_xof, HasherExt, Mode};"
+            },
+            {
+              "line": 500,
+              "text": "/// use blake3::{Hasher, CHUNK_LEN};"
+            },
+            {
+              "line": 514,
+              "text": "/// // Obtain a blake3::OutputReader at the root and extract 1000 bytes."
+            },
+            {
+              "line": 550,
+              "text": "/// use blake3::Hasher;"
+            },
+            {
+              "line": 551,
+              "text": "/// use blake3::hazmat::HasherExt;"
+            },
+            {
+              "line": 553,
+              "text": "/// let context_key = blake3::hazmat::hash_derive_key_context(\"foo\");"
+            },
+            {
+              "line": 558,
+              "text": "/// assert_eq!(derived_key, blake3::derive_key(\"foo\", b\"bar\"));"
+            },
+            {
+              "line": 683,
+              "text": "Hasher::new_keyed(&key)"
+            },
+            {
+              "line": 689,
+              "text": "let left = Hasher::new_keyed(key).update(group0).finalize_non_root();"
+            },
+            {
+              "line": 690,
+              "text": "let right = Hasher::new_keyed(key)"
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/lib.rs",
+          "sha256": "a187904c4b12ea7c100557c0f167cc91a034e391ddeb56c9db65f7d400a4b566",
+          "hits": [
+            {
+              "line": 9,
+              "text": "//! let hash1 = blake3::hash(b\"foobarbaz\");"
+            },
+            {
+              "line": 12,
+              "text": "//! let mut hasher = blake3::Hasher::new();"
+            },
+            {
+              "line": 79,
+              "text": "//! [BLAKE3]: https://blake3.io"
+            },
+            {
+              "line": 105,
+              "text": "#[cfg(blake3_avx2_rust)]"
+            },
+            {
+              "line": 108,
+              "text": "#[cfg(blake3_avx2_ffi)]"
+            },
+            {
+              "line": 111,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 114,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 118,
+              "text": "#[cfg(blake3_sse2_rust)]"
+            },
+            {
+              "line": 121,
+              "text": "#[cfg(blake3_sse2_ffi)]"
+            },
+            {
+              "line": 124,
+              "text": "#[cfg(blake3_sse41_rust)]"
+            },
+            {
+              "line": 127,
+              "text": "#[cfg(blake3_sse41_ffi)]"
+            },
+            {
+              "line": 131,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 907,
+              "text": "/// let hash = blake3::hash(b\"foo\");"
+            },
+            {
+              "line": 910,
+              "text": "/// let hash = blake3::Hasher::new().update(b\"foo\").finalize();"
+            },
+            {
+              "line": 932,
+              "text": "/// For an incremental version that accepts multiple writes, see [`Hasher::new_keyed`],"
+            },
+            {
+              "line": 937,
+              "text": "/// let mac = blake3::keyed_hash(KEY, b\"foo\");"
+            },
+            {
+              "line": 940,
+              "text": "/// let mac = blake3::Hasher::new_keyed(KEY).update(b\"foo\").finalize();"
+            },
+            {
+              "line": 974,
+              "text": "/// and 7.8 of the [BLAKE3 paper](https://github.com/BLAKE3-team/BLAKE3-specs/blob/master/blake3.pdf)."
+            },
+            {
+              "line": 986,
+              "text": "/// let key = blake3::derive_key(CONTEXT, b\"key material, not a password\");"
+            },
+            {
+              "line": 989,
+              "text": "/// let key: [u8; 32] = blake3::Hasher::new_derive_key(CONTEXT)"
+            },
+            {
+              "line": 1049,
+              "text": "/// let mut hasher = blake3::Hasher::new();"
+            },
+            {
+              "line": 1053,
+              "text": "/// assert_eq!(hasher.finalize(), blake3::hash(b\"foobarbaz\"));"
+            },
+            {
+              "line": 1060,
+              "text": "/// assert_eq!(&output[..32], blake3::hash(b\"foobarbaz\").as_bytes());"
+            },
+            {
+              "line": 1097,
+              "text": "pub fn new_keyed(key: &[u8; KEY_LEN]) -> Self {"
+            },
+            {
+              "line": 1464,
+              "text": "/// let mut hasher = blake3::Hasher::new();"
+            },
+            {
+              "line": 1536,
+              "text": "/// let mut hasher = blake3::Hasher::new();"
+            },
+            {
+              "line": 1586,
+              "text": "/// let mut hasher = blake3::Hasher::new();"
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/platform.rs",
+          "sha256": "954e3564bb976c333cfaa68fc672a8543afc2e021c8b89e8d9393816b0ad90d1",
+          "hits": [
+            {
+              "line": 6,
+              "text": "if #[cfg(blake3_avx512_ffi)] {"
+            },
+            {
+              "line": 12,
+              "text": "} else if #[cfg(blake3_neon)] {"
+            },
+            {
+              "line": 14,
+              "text": "} else if #[cfg(blake3_wasm32_simd)] {"
+            },
+            {
+              "line": 28,
+              "text": "if #[cfg(blake3_avx512_ffi)] {"
+            },
+            {
+              "line": 34,
+              "text": "} else if #[cfg(blake3_neon)] {"
+            },
+            {
+              "line": 36,
+              "text": "} else if #[cfg(blake3_wasm32_simd)] {"
+            },
+            {
+              "line": 52,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 55,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 57,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 72,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 90,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 94,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 110,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 113,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 115,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 143,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 149,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 151,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 179,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 185,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 187,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 269,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 284,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 298,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 330,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 382,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            },
+            {
+              "line": 392,
+              "text": "#[cfg(blake3_neon)]"
+            },
+            {
+              "line": 398,
+              "text": "#[cfg(blake3_wasm32_simd)]"
+            },
+            {
+              "line": 407,
+              "text": "#[cfg(blake3_avx512_ffi)]"
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/test.rs",
+          "sha256": "cd3b835d00cd4f555aee1441451e63e89d3016c360cf16604844f55cc4e09cf2",
+          "hits": [
+            {
+              "line": 390,
+              "text": "let mut reference_hasher = reference_impl::Hasher::new_keyed(&TEST_KEY);"
+            },
+            {
+              "line": 402,
+              "text": "let mut hasher = crate::Hasher::new_keyed(&TEST_KEY);"
+            },
+            {
+              "line": 412,
+              "text": "let mut hasher = crate::Hasher::new_keyed(&TEST_KEY);"
+            },
+            {
+              "line": 473,
+              "text": "let mut reference_hasher = reference_impl::Hasher::new_keyed(&TEST_KEY);"
+            },
+            {
+              "line": 478,
+              "text": "let mut test_hasher = crate::Hasher::new_keyed(&TEST_KEY);"
+            },
+            {
+              "line": 688,
+              "text": "let mut keyed_hasher = crate::Hasher::new_keyed(key);"
+            }
+          ]
+        },
+        {
+          "file": "blake3-1.8.7/src/traits.rs",
+          "sha256": "73d3b543f69bfd111a3559a682c64ce531e26716524b9618fba9af14c2d4491d",
+          "hits": [
+            {
+              "line": 78,
+              "text": "impl digest::MacMarker for Hasher {}"
+            },
+            {
+              "line": 80,
+              "text": "impl digest::KeyInit for Hasher {"
+            },
+            {
+              "line": 84,
+              "text": "Hasher::new_keyed(&key_bytes)"
+            },
+            {
+              "line": 152,
+              "text": "let mut hasher1 = crate::Hasher::new_keyed(key);"
+            },
+            {
+              "line": 160,
+              "text": "let mut hasher2: crate::Hasher = digest::KeyInit::new(&generic_key);"
+            },
+            {
+              "line": 170,
+              "text": "fn expected_hmac_blake3(key: &[u8], input: &[u8]) -> [u8; 32] {"
+            },
+            {
+              "line": 196,
+              "text": "use hmac::{KeyInit, Mac, SimpleHmac};"
+            },
+            {
+              "line": 203,
+              "text": "let expected = expected_hmac_blake3(b\"key\", b\"data\");"
+            },
+            {
+              "line": 219,
+              "text": "let expected = expected_hmac_blake3(input, input);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "digest",
+      "version": "0.11.3",
+      "archive_sha256": "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2",
+      "lock_checksum_matches": true,
+      "source_files": [
+        {
+          "file": "digest-0.11.3/Cargo.toml.orig",
+          "sha256": "2ed5b0bcc71fea312bab365473c67af110be4d18a8dca67bfdf8e9d46556d830",
+          "hits": [
+            {
+              "line": 22,
+              "text": "ctutils = { version = \"0.4\", optional = true }"
+            },
+            {
+              "line": 26,
+              "text": "sha2 = \"0.11\""
+            },
+            {
+              "line": 34,
+              "text": "mac = [\"dep:ctutils\"] # Enable MAC traits"
+            }
+          ]
+        },
+        {
+          "file": "digest-0.11.3/src/block_api/ct_variable.rs",
+          "sha256": "74b99085e49d87417e38b6bc56f344e789092e501936767c47efd42edd071a09",
+          "hits": [
+            {
+              "line": 6,
+              "text": "use crate::MacMarker;"
+            },
+            {
+              "line": 47,
+              "text": "impl<T, OutSize> MacMarker for CtOutWrapper<T, OutSize>"
+            },
+            {
+              "line": 49,
+              "text": "T: VariableOutputCore + MacMarker,"
+            }
+          ]
+        },
+        {
+          "file": "digest-0.11.3/src/buffer_macros/fixed.rs",
+          "sha256": "53bc025e5a428d5340fd68e7b581840891fc62fea15cc08e8f6c16466b903160",
+          "hits": [
+            {
+              "line": 68,
+              "text": "// `Debug`, `BlockSizeUser`, `OutputSizeUser`, `CoreProxy`, `Update`, `FixedOutput`, `MacMarker`"
+            },
+            {
+              "line": 77,
+              "text": "BaseFixedTraits MacMarker $($trait_name)*;"
+            },
+            {
+              "line": 83,
+              "text": "// `MacMarker`, `Reset`, `FixedOutputReset`."
+            },
+            {
+              "line": 310,
+              "text": "// Implements `MacMarker` and asserts that `$core_ty` implements it"
+            },
+            {
+              "line": 315,
+              "text": "MacMarker $($trait_name:ident)*;"
+            },
+            {
+              "line": 317,
+              "text": "impl$(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::MacMarker for $name$(< $( $lt ),+ >)? {}"
+            },
+            {
+              "line": 319,
+              "text": "// Verify that `$core_ty` implements `MacMarker`"
+            },
+            {
+              "line": 322,
+              "text": "v as &dyn $crate::MacMarker;"
+            },
+            {
+              "line": 353,
+              "text": "// Implements `KeySizeUser` and `KeyInit`"
+            },
+            {
+              "line": 358,
+              "text": "KeyInit $($trait_name:ident)*;"
+            },
+            {
+              "line": 364,
+              "text": "impl$(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)? $crate::KeyInit for $name$(< $( $lt ),+ >)? {"
+            },
+            {
+              "line": 368,
+              "text": "core: <$core_ty as $crate::KeyInit>::new(key),"
+            },
+            {
+              "line": 375,
+              "text": "<$core_ty as $crate::KeyInit>::new_from_slice(key).map(|core|"
+            }
+          ]
+        },
+        {
+          "file": "digest-0.11.3/src/dev/mac.rs",
+          "sha256": "d25e9ae655824d2e8356c367c29e99fb1f76213f92f494053268366d7e65d0fb",
+          "hits": [
+            {
+              "line": 1,
+              "text": "use crate::{FixedOutputReset, Mac, common::KeyInit};"
+            },
+            {
+              "line": 26,
+              "text": "pub fn mac_test<M: Mac + KeyInit + Clone>("
+            },
+            {
+              "line": 30,
+              "text": "let Ok(mac0) = <M as KeyInit>::new_from_slice(key) else {"
+            },
+            {
+              "line": 78,
+              "text": "pub fn reset_mac_test<M: Mac + KeyInit + FixedOutputReset + Clone>("
+            },
+            {
+              "line": 82,
+              "text": "let Ok(mac0) = <M as KeyInit>::new_from_slice(key) else {"
+            }
+          ]
+        },
+        {
+          "file": "digest-0.11.3/src/lib.rs",
+          "sha256": "c64f18b3afb199a64d5908459168af95a31f7deae5c73728970c20fe61c584e3",
+          "hits": [
+            {
+              "line": 19,
+              "text": "//!   [`ExtendableOutputReset`], [`XofReader`], [`Reset`], [`KeyInit`], and [`InnerInit`]."
+            },
+            {
+              "line": 21,
+              "text": "//! - **Marker traits**: [`HashMarker`], [`MacMarker`]. Used to distinguish"
+            },
+            {
+              "line": 70,
+              "text": "pub use common::{InnerInit, InvalidLength, Key, KeyInit};"
+            },
+            {
+              "line": 73,
+              "text": "pub use mac::{CtOutput, Mac, MacError, MacMarker};"
+            }
+          ]
+        },
+        {
+          "file": "digest-0.11.3/src/mac.rs",
+          "sha256": "298379aef3cb001be81176fd522dfa15e2522cd752fd402b82ddcc6b67af6c94",
+          "hits": [
+            {
+              "line": 6,
+              "text": "use ctutils::CtEq;"
+            },
+            {
+              "line": 9,
+              "text": "pub trait MacMarker {}"
+            },
+            {
+              "line": 13,
+              "text": "/// This trait wraps [`Update`], [`FixedOutput`], and [`MacMarker`] traits"
+            },
+            {
+              "line": 23,
+              "text": "/// Obtain the result of a [`Mac`] computation as a [`CtOutput`] and consume"
+            },
+            {
+              "line": 25,
+              "text": "fn finalize(self) -> CtOutput<Self>;"
+            },
+            {
+              "line": 27,
+              "text": "/// Obtain the result of a [`Mac`] computation as a [`CtOutput`] and reset"
+            },
+            {
+              "line": 29,
+              "text": "fn finalize_reset(&mut self) -> CtOutput<Self>"
+            },
+            {
+              "line": 84,
+              "text": "impl<T: Update + FixedOutput + MacMarker> Mac for T {"
+            },
+            {
+              "line": 97,
+              "text": "fn finalize(self) -> CtOutput<Self> {"
+            },
+            {
+              "line": 98,
+              "text": "CtOutput::new(self.finalize_fixed())"
+            },
+            {
+              "line": 102,
+              "text": "fn finalize_reset(&mut self) -> CtOutput<Self>"
+            },
+            {
+              "line": 106,
+              "text": "CtOutput::new(self.finalize_fixed_reset())"
+            },
+            {
+              "line": 188,
+              "text": "pub struct CtOutput<T: OutputSizeUser> {"
+            },
+            {
+              "line": 192,
+              "text": "impl<T: OutputSizeUser> CtOutput<T> {"
+            },
+            {
+              "line": 193,
+              "text": "/// Create a new [`CtOutput`] value."
+            },
+            {
+              "line": 212,
+              "text": "impl<T: OutputSizeUser> From<Output<T>> for CtOutput<T> {"
+            },
+            {
+              "line": 219,
+              "text": "impl<'a, T: OutputSizeUser> From<&'a Output<T>> for CtOutput<T> {"
+            },
+            {
+              "line": 226,
+              "text": "impl<T: OutputSizeUser> PartialEq for CtOutput<T> {"
+            },
+            {
+              "line": 228,
+              "text": "fn eq(&self, other: &CtOutput<T>) -> bool {"
+            },
+            {
+              "line": 233,
+              "text": "impl<T: OutputSizeUser> Eq for CtOutput<T> {}"
+            },
+            {
+              "line": 235,
+              "text": "impl<T: OutputSizeUser> fmt::Debug for CtOutput<T> {"
+            },
+            {
+              "line": 237,
+              "text": "f.write_str(\"CtOutput { ... }\")"
+            },
+            {
+              "line": 241,
+              "text": "impl<T: OutputSizeUser> Drop for CtOutput<T> {"
+            },
+            {
+              "line": 253,
+              "text": "impl<T: OutputSizeUser> zeroize::ZeroizeOnDrop for CtOutput<T> {}"
+            }
+          ]
+        },
+        {
+          "file": "digest-0.11.3/src/xof_fixed.rs",
+          "sha256": "8e341ab1148563a508829e736a34136bbf6f2be3476629e3427c8c92d23c0cb4",
+          "hits": [
+            {
+              "line": 6,
+              "text": "use common::{BlockSizeUser, KeyInit, KeySizeUser, OutputSizeUser, Reset};"
+            },
+            {
+              "line": 49,
+              "text": "impl<T: ExtendableOutput + crate::MacMarker, S: ArraySize> crate::MacMarker"
+            },
+            {
+              "line": 69,
+              "text": "impl<T: ExtendableOutput + KeyInit, S: ArraySize> KeyInit for XofFixedWrapper<T, S> {"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "sha2",
+      "version": "0.11.0",
+      "archive_sha256": "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4",
+      "lock_checksum_matches": true,
+      "source_files": [
+        {
+          "file": "sha2-0.11.0/Cargo.toml.orig",
+          "sha256": "a89bc798ce45a942b765694d92169e86b551bf03ea69c8c445739ae147c0cd70",
+          "hits": [
+            {
+              "line": 2,
+              "text": "name = \"sha2\""
+            },
+            {
+              "line": 7,
+              "text": "documentation = \"https://docs.rs/sha2\""
+            },
+            {
+              "line": 11,
+              "text": "keywords = [\"sha2\", \"hash\", \"digest\"]"
+            },
+            {
+              "line": 38,
+              "text": "'cfg(sha2_backend, values(\"soft\", \"riscv-zknh\"))',"
+            },
+            {
+              "line": 39,
+              "text": "'cfg(sha2_256_backend, values(\"aarch64-sha2\", \"soft\", \"riscv-zknh\", \"x86-sha\"))',"
+            },
+            {
+              "line": 40,
+              "text": "'cfg(sha2_512_backend, values(\"aarch64-sha3\", \"soft\", \"riscv-zknh\", \"x86-avx2\"))',"
+            },
+            {
+              "line": 41,
+              "text": "'cfg(sha2_backend_soft, values(\"compact\"))',"
+            },
+            {
+              "line": 42,
+              "text": "'cfg(sha2_backend_riscv_zknh, values(\"compact\"))',"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/benches/mod.rs",
+          "sha256": "c32d9f91a541821ea988c14eee710963e623ef1edf69b02b41a29bc44e04ba95",
+          "hits": [
+            {
+              "line": 5,
+              "text": "use sha2::{Sha256, Sha512};"
+            },
+            {
+              "line": 10,
+              "text": "sha256_10 10;"
+            },
+            {
+              "line": 11,
+              "text": "sha256_100 100;"
+            },
+            {
+              "line": 12,
+              "text": "sha256_1000 1000;"
+            },
+            {
+              "line": 13,
+              "text": "sha256_10000 10000;"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/block_api.rs",
+          "sha256": "7d858102344cc8be2d22b207296c44087b91b2e7309c5598497c48c1182c89cc",
+          "hits": [
+            {
+              "line": 14,
+              "text": "pub use crate::{sha256::compress256, sha512::compress512};"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/lib.rs",
+          "sha256": "5529df80c102cb5d7240e47a5239565c8347a4dd79ee5a085e5f2d749657d49c",
+          "hits": [
+            {
+              "line": 11,
+              "text": "sha2_backend = \"riscv-zknh\","
+            },
+            {
+              "line": 12,
+              "text": "sha2_256_backend = \"riscv-zknh\","
+            },
+            {
+              "line": 13,
+              "text": "sha2_256_backend = \"riscv-zknh\","
+            },
+            {
+              "line": 31,
+              "text": "mod sha256;"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/aarch64_sha2.rs",
+          "sha256": "d9245fa28ba2a5cac5c2ba3015f422b7eca8e604aa21c9bece93766127c22451",
+          "hits": [
+            {
+              "line": 7,
+              "text": "compile_error!(\"aarch64-sha2 backend can be used only aarch64 target arches\");"
+            },
+            {
+              "line": 12,
+              "text": "#[target_feature(enable = \"sha2\")]"
+            },
+            {
+              "line": 14,
+              "text": "// SAFETY: Requires the sha2 feature."
+            },
+            {
+              "line": 35,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 36,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            },
+            {
+              "line": 41,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 42,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            },
+            {
+              "line": 47,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 48,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            },
+            {
+              "line": 53,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 54,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            },
+            {
+              "line": 58,
+              "text": "s0 = vsha256su1q_u32(vsha256su0q_u32(s0, s1), s2, s3);"
+            },
+            {
+              "line": 61,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 62,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            },
+            {
+              "line": 65,
+              "text": "s1 = vsha256su1q_u32(vsha256su0q_u32(s1, s2), s3, s0);"
+            },
+            {
+              "line": 68,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 69,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            },
+            {
+              "line": 72,
+              "text": "s2 = vsha256su1q_u32(vsha256su0q_u32(s2, s3), s0, s1);"
+            },
+            {
+              "line": 75,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 76,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            },
+            {
+              "line": 79,
+              "text": "s3 = vsha256su1q_u32(vsha256su0q_u32(s3, s0), s1, s2);"
+            },
+            {
+              "line": 82,
+              "text": "abcd = vsha256hq_u32(abcd_prev, efgh, tmp);"
+            },
+            {
+              "line": 83,
+              "text": "efgh = vsha256h2q_u32(efgh, abcd_prev, tmp);"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/riscv_zknh/compact.rs",
+          "sha256": "037d254980e6f30997e589536105c4672a66394b6c15b63bb3a3dd0320c9cec1",
+          "hits": [
+            {
+              "line": 1,
+              "text": "use super::{sha256sig0, sha256sig1, sha256sum0, sha256sum1};"
+            },
+            {
+              "line": 30,
+              "text": ".wrapping_add(sha256sig1(block[(r + 14) % 16]))"
+            },
+            {
+              "line": 32,
+              "text": ".wrapping_add(sha256sig0(block[(r + 1) % 16]));"
+            },
+            {
+              "line": 49,
+              "text": ".wrapping_add(sha256sum1(state[e]))"
+            },
+            {
+              "line": 55,
+              "text": ".wrapping_add(sha256sum0(state[a]))"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/riscv_zknh/unroll.rs",
+          "sha256": "cdea73a1cfff029b1922370d1b8e3b3894ea6856e8f2f1b84d3c7d18e52fa036",
+          "hits": [
+            {
+              "line": 1,
+              "text": "use super::{sha256sig0, sha256sig1, sha256sum0, sha256sum1};"
+            },
+            {
+              "line": 64,
+              "text": ".wrapping_add(sha256sig1(block[(R + 14) % 16]))"
+            },
+            {
+              "line": 66,
+              "text": ".wrapping_add(sha256sig0(block[(R + 1) % 16]));"
+            },
+            {
+              "line": 83,
+              "text": ".wrapping_add(sha256sum1(state[e]))"
+            },
+            {
+              "line": 89,
+              "text": ".wrapping_add(sha256sum0(state[a]))"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/riscv_zknh/utils.rs",
+          "sha256": "9970c93e9e9c180f836a0fc18d14b51c411e181b77b1002b5ec486da4492d630",
+          "hits": [
+            {
+              "line": 83,
+              "text": "#[cfg(not(sha2_backend_riscv_zknh = \"compact\"))]"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/riscv_zknh.rs",
+          "sha256": "5e34b50064e37c01c972c1d31324b2d92c0db9bad1f5d1f9c9097f752d15207a",
+          "hits": [
+            {
+              "line": 7,
+              "text": "use core::arch::riscv32::{sha256sig0, sha256sig1, sha256sum0, sha256sum1};"
+            },
+            {
+              "line": 9,
+              "text": "use core::arch::riscv64::{sha256sig0, sha256sig1, sha256sum0, sha256sum1};"
+            },
+            {
+              "line": 12,
+              "text": "if #[cfg(sha2_backend_riscv_zknh = \"compact\")] {"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/soft.rs",
+          "sha256": "60449b6df17909cd34d533ec4d82851841cb8b26e01c0907827b33343917a31c",
+          "hits": [
+            {
+              "line": 2,
+              "text": "if #[cfg(sha2_backend_soft = \"compact\")] {"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/wasm32_simd128.rs",
+          "sha256": "006a8667660283d340d44c91b7e2cc1bee866ef0fe13b58f5b65535542942acd",
+          "hits": [
+            {
+              "line": 56,
+              "text": "let y = sha256_update_x(x, k32);"
+            },
+            {
+              "line": 141,
+              "text": "unsafe fn sha256_update_x(x: &mut [v128; 4], k32: v128) -> v128 {"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256/x86_sha.rs",
+          "sha256": "19d8c7c15ffa081332e5b438e98809ce52f14706553ec8965d6c54c5fbf7cccf",
+          "hits": [
+            {
+              "line": 15,
+              "text": "let t1 = _mm_sha256msg1_epu32(v0, v1);"
+            },
+            {
+              "line": 18,
+              "text": "_mm_sha256msg2_epu32(t3, v3)"
+            },
+            {
+              "line": 26,
+              "text": "$cdgh = _mm_sha256rnds2_epu32($cdgh, $abef, t1);"
+            },
+            {
+              "line": 28,
+              "text": "$abef = _mm_sha256rnds2_epu32($abef, $cdgh, t2);"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha256.rs",
+          "sha256": "cb03fddc1325b60935409f097f2fab3ae51cfab15bed1254f4e93d13b28b7eff",
+          "hits": [
+            {
+              "line": 2,
+              "text": "if #[cfg(any(sha2_backend = \"soft\", sha2_256_backend = \"soft\"))] {"
+            },
+            {
+              "line": 5,
+              "text": "} else if #[cfg(any(sha2_backend = \"riscv-zknh\", sha2_256_backend = \"riscv-zknh\"))] {"
+            },
+            {
+              "line": 18,
+              "text": "} else if #[cfg(sha2_256_backend = \"x86-sha\")] {"
+            },
+            {
+              "line": 33,
+              "text": "} else if #[cfg(sha2_256_backend = \"aarch64-sha2\")] {"
+            },
+            {
+              "line": 34,
+              "text": "mod aarch64_sha2;"
+            },
+            {
+              "line": 36,
+              "text": "#[cfg(not(target_feature = \"sha2\"))]"
+            },
+            {
+              "line": 37,
+              "text": "compile_error!(\"aarch64-sha2 backend requires sha2 target feature\");"
+            },
+            {
+              "line": 41,
+              "text": "unsafe { aarch64_sha2::compress(state, blocks) }"
+            },
+            {
+              "line": 57,
+              "text": "mod aarch64_sha2;"
+            },
+            {
+              "line": 58,
+              "text": "cpufeatures::new!(sha2_hwcap, \"sha2\");"
+            },
+            {
+              "line": 70,
+              "text": "if sha2_hwcap::get() {"
+            },
+            {
+              "line": 71,
+              "text": "// SAFETY: we checked that `sha2` target feature is available"
+            },
+            {
+              "line": 72,
+              "text": "return unsafe { aarch64_sha2::compress(state, blocks) };"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha512/riscv_zknh/utils.rs",
+          "sha256": "7e34eb03b68a38e2de461086b3c6220a2a0bcece7b9b037aa697dd23dc91ead3",
+          "hits": [
+            {
+              "line": 132,
+              "text": "#[cfg(not(sha2_backend_riscv_zknh = \"compact\"))]"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha512/riscv_zknh.rs",
+          "sha256": "d48940806d6c6b4e5ec6bce09a0e0185e7a681aacf507d89fd44f9b2afdb8cf9",
+          "hits": [
+            {
+              "line": 7,
+              "text": "if #[cfg(sha2_backend_riscv_zknh = \"compact\")] {"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha512/soft.rs",
+          "sha256": "749b892d9cf9d5757adf1f6ec77840a899f47d1a62687d385230288858d86d8b",
+          "hits": [
+            {
+              "line": 2,
+              "text": "if #[cfg(sha2_backend_soft = \"compact\")] {"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/src/sha512.rs",
+          "sha256": "942a7d6180507d68a3feb9d953410a884314b8022d989a854838c5426a8ea1a0",
+          "hits": [
+            {
+              "line": 2,
+              "text": "if #[cfg(any(sha2_backend = \"soft\", sha2_256_backend = \"soft\"))] {"
+            },
+            {
+              "line": 5,
+              "text": "} else if #[cfg(any(sha2_backend = \"riscv-zknh\", sha2_256_backend = \"riscv-zknh\"))] {"
+            },
+            {
+              "line": 18,
+              "text": "} else if #[cfg(sha2_512_backend = \"x86-avx2\")] {"
+            },
+            {
+              "line": 28,
+              "text": "} else if #[cfg(sha2_512_backend = \"aarch64-sha3\")]  {"
+            }
+          ]
+        },
+        {
+          "file": "sha2-0.11.0/tests/mod.rs",
+          "sha256": "d417a8068dde4a83a1ab8ede2ebacfb38329f67118dd3327b33e73960c4ace79",
+          "hits": [
+            {
+              "line": 6,
+              "text": "use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256};"
+            },
+            {
+              "line": 8,
+              "text": "new_test!(sha224_kat, Sha224, fixed_reset_test);"
+            },
+            {
+              "line": 9,
+              "text": "new_test!(sha256_kat, Sha256, fixed_reset_test);"
+            },
+            {
+              "line": 15,
+              "text": "hash_serialization_test!(sha224_serialization, Sha224);"
+            },
+            {
+              "line": 16,
+              "text": "hash_serialization_test!(sha256_serialization, Sha256);"
+            },
+            {
+              "line": 23,
+              "text": "fn sha256_rand() {"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,14 @@ no-default-features = false
 unmaintained = "all"
 yanked = "deny"
 ignore = [
+    # Temporary native-Linux/current-caller nonapplicability; packages remain vulnerable.
+    # Independently checked 2026-10-27; expires 2026-11-27 (CI checks the date).
+    # No services ctutils exception: its potentially keyed paths use patched 0.4.4.
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint only through test-only public secp256k1 recovery; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0391", reason = "Solana decoder creates fresh zstd contexts, never reuses with_context; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0398", reason = "sole zstd-safe caller does not enable seekable, no Seekable API; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0403", reason = "Solana uses stream::read::Decoder, explicitly unaffected by this advisory; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
+    { id = "RUSTSEC-2026-0410", reason = "services run as native Linux binaries, outside affected wasm32 architecture; dependency-advisories-2026-10-27.md; expires 2026-11-27" },
     # The root deny.toml's exceptions (unmaintained, not vulnerable), which reach this workspace
     # through the same crates: anchor-lang 1.2.0 (bincode) and the LiteSVM 0.16 harness the
     # scenario tests link (tests/litesvm).

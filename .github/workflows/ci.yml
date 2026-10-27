@@ -145,6 +145,8 @@ jobs:
       - uses: taiki-e/install-action@4cef1412cce204788f482e778a0b9187f9626a29 # v2.87.21
         with:
           tool: cargo-deny@${{ env.CARGO_DENY_VERSION }},cargo-audit@${{ env.CARGO_AUDIT_VERSION }}
+      - name: Temporary advisory review remains current
+        run: python3 scripts/check_advisory_review.py
       - name: cargo deny (workspace and standalone bench lockfiles)
         run: |
           cargo deny --locked check
@@ -153,11 +155,11 @@ jobs:
             cargo deny --manifest-path "$manifest" --config deny.toml --locked check
             echo "::endgroup::"
           done
-      # Same exceptions as deny.toml (unmaintained, not vulnerable): bincode 1.3.3 via
-      # anchor-lang 1.2.0; ansi_term, derivative, paste, libsecp256k1 via the LiteSVM test harness.
+      # Same IDs as deny.toml: legacy unmaintained crates plus the dated public-operation
+      # nonapplicability review in docs/audit/dependency-advisories-2026-10-27.md.
       - name: cargo audit (workspace and the standalone bench lockfiles)
         run: |
-          ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161"
+          ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161 --ignore RUSTSEC-2026-0387 --ignore RUSTSEC-2026-0385"
           for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock tests/bench/m3_cu/Cargo.lock tests/bench/m5_cu/Cargo.lock tests/bench/m6_cu/Cargo.lock; do
             echo "::group::$lock"; cargo audit -f "$lock" --deny warnings $ignore; echo "::endgroup::"
           done
@@ -865,13 +867,17 @@ jobs:
       - run: cargo clippy --manifest-path services/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - name: The keeper on its release feature set (no test-venue)
         run: cargo clippy --manifest-path services/Cargo.toml -p shortwin-keeper --all-targets --locked -- -D warnings
+      - name: Temporary advisory review remains current
+        run: python3 scripts/check_advisory_review.py
       - name: cargo deny (services/deny.toml)
         run: cargo deny --manifest-path services/Cargo.toml --config services/deny.toml --locked check
-      - name: cargo audit (services lockfile; the root deny.toml's exceptions)
+      - name: cargo audit (services lockfile; dated usage-scoped exceptions)
         run: >-
           cargo audit -f services/Cargo.lock --deny warnings
           --ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388
           --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161
+          --ignore RUSTSEC-2026-0387 --ignore RUSTSEC-2026-0391 --ignore RUSTSEC-2026-0398
+          --ignore RUSTSEC-2026-0403 --ignore RUSTSEC-2026-0410
       - name: Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`)
         env:
           SHORTWIN_TEST_VENUE_SO: ${{ github.workspace }}/target/test-venue/deploy/shortwin.so

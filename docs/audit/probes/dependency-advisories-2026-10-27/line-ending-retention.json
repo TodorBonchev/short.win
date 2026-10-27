@@ -1,0 +1,58 @@
+[
+  {
+    "readable_file": "RUSTSEC-2026-0385.md",
+    "original_preserved_as": "RUSTSEC-2026-0385.md.original.gz",
+    "original_sha256": "6caf7952388f624807007f9a86fb66ffae2a7932dd26d6bdd1d6d1bcdd63fcab",
+    "normalized_sha256": "740cda311e8909e11ae85e31df3640168fed7ce4b426fa9987a2b53406ba4a11",
+    "normalization": "CRLF to LF only"
+  },
+  {
+    "readable_file": "RUSTSEC-2026-0386.md",
+    "original_preserved_as": "RUSTSEC-2026-0386.md.original.gz",
+    "original_sha256": "8a55a0a105704fd1dd0808fd6c9c3da45d095dbf756736adf109d5d9c283d4f5",
+    "normalized_sha256": "f92ab63fc1641af590f81babf9f211d77bdd7db14b82cb53a3a756a16864b520",
+    "normalization": "CRLF to LF only"
+  },
+  {
+    "readable_file": "RUSTSEC-2026-0387.md",
+    "original_preserved_as": "RUSTSEC-2026-0387.md.original.gz",
+    "original_sha256": "5b96e69d5d3589011f02f8bacc5ce30ea8339dfe7f7c1060be577cf1f3a9211d",
+    "normalized_sha256": "7c9f3f944105638e613e83e97690035198e453d701e56506ee911e1fbfcb46f3",
+    "normalization": "CRLF to LF only"
+  },
+  {
+    "readable_file": "RUSTSEC-2026-0391.md",
+    "original_preserved_as": "RUSTSEC-2026-0391.md.original.gz",
+    "original_sha256": "346689d47d5ec6dd7d0023b89920a085f0e6dd3c9be8512842116afcffecf7b9",
+    "normalized_sha256": "80b6c3a9c20db6c6c9b62fa9215905859493d02b376e1cc390e23f2f30fc0481",
+    "normalization": "CRLF to LF only"
+  },
+  {
+    "readable_file": "RUSTSEC-2026-0398.md",
+    "original_preserved_as": "RUSTSEC-2026-0398.md.original.gz",
+    "original_sha256": "c4c8d9fb4cd439f9e4a4137f1a442f9dac8a3971113e1e6986ae14c51e4e4d54",
+    "normalized_sha256": "04d6d98f826402766ae3bbdd7d395335f6503d071dbe158c9d271dd3c46c1d96",
+    "normalization": "CRLF to LF only"
+  },
+  {
+    "readable_file": "RUSTSEC-2026-0403.md",
+    "original_preserved_as": "RUSTSEC-2026-0403.md.original.gz",
+    "original_sha256": "2ca96f9d38c2239337823a8527ee5565046a1aee6c204d2dd417c9e1a8c437fb",
+    "normalized_sha256": "05ac3b7223d7837dae022a5a857185b891f89801d94468d65b214c747b0bf432",
+    "normalization": "CRLF to LF only"
+  },
+  {
+    "readable_file": "RUSTSEC-2026-0410.md",
+    "original_preserved_as": "RUSTSEC-2026-0410.md.original.gz",
+    "original_sha256": "b90ae92e90c7bb205c401df27a8674fc8fae982f85270c4b1d32655704c3baab",
+    "normalized_sha256": "5b7e7181131b2b3f5236f650229f62cb3c45e79ed5de2764ca3d5a6d47b81356",
+    "normalization": "CRLF to LF only"
+  },
+  {
+    "readable_file": "advisory-db-revision.txt",
+    "original_preserved_as": "advisory-db-revision.txt.original.gz",
+    "original_sha256": "8eef479fda5a22616c4f7b22674e855e8a7bc66d99722da782d80b0d7b66d785",
+    "normalized_sha256": "f2dd0613b88d0ccf53dbc7680a08ef7be9666abe9ba6672589b28d2148787564",
+    "normalization": "CRLF to LF only"
+  }
+]
