@@ -123,6 +123,54 @@ fn parse_args() -> anyhow::Result<Args> {
     parse_args_from(std::env::args().skip(1))
 }
 
+/// Startup context must not expose provider credentials in userinfo, path, query or fragment.
+/// Preserve only an HTTP(S) host and optional port; malformed inputs fail closed.
+fn rpc_endpoint_for_log(endpoint: &str) -> String {
+    const REDACTED: &str = "REDACTED";
+    let Some((scheme, rest)) = endpoint.split_once("://") else {
+        return REDACTED.to_string();
+    };
+    if !matches!(scheme, "http" | "https") {
+        return REDACTED.to_string();
+    }
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = authority
+        .rsplit_once('@')
+        .map_or(authority, |(_, host)| host);
+    let valid = if let Some(ipv6) = host.strip_prefix('[') {
+        ipv6.split_once(']').is_some_and(|(address, port)| {
+            address.parse::<std::net::Ipv6Addr>().is_ok()
+                && (port.is_empty()
+                    || port
+                        .strip_prefix(':')
+                        .is_some_and(|value| value.parse::<u16>().is_ok()))
+        })
+    } else {
+        let (name, port) = host.rsplit_once(':').unwrap_or((host, ""));
+        !name.is_empty()
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b".-_".contains(&b))
+            && (port.is_empty() && !host.ends_with(':') || port.parse::<u16>().is_ok())
+    };
+    if !valid {
+        return REDACTED.to_string();
+    }
+    format!("{scheme}://{host}")
+}
+
+fn log_observer_startup(rpc: &str) {
+    tracing::info!(rpc = %rpc_endpoint_for_log(rpc), "keeper observe starting without a keypair");
+}
+
+fn log_keeper_startup(payer: &solana_pubkey::Pubkey, rpc: &str) {
+    tracing::info!(%payer, rpc = %rpc_endpoint_for_log(rpc), "keeper starting");
+}
+
+fn log_discovery_endpoint(url: &str) {
+    tracing::info!(url = %rpc_endpoint_for_log(url), "pool discovery endpoint");
+}
+
 /// A read-only readiness snapshot. This path never creates a signer or transaction.
 async fn observe_tick(chain: &RpcChain) -> anyhow::Result<String> {
     let clock = chain.clock().await?;
@@ -203,7 +251,7 @@ async fn run_observer(args: &Args) -> anyhow::Result<()> {
             }
         });
     }
-    tracing::info!(rpc = %args.rpc, "keeper observe starting without a keypair");
+    log_observer_startup(&args.rpc);
     let mut interval = tokio::time::interval(Duration::from_millis(args.tick_ms.max(50)));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
@@ -304,10 +352,10 @@ async fn main() -> anyhow::Result<()> {
         );
     }
     if let Some(url) = discovery {
-        tracing::info!(%url, "pool discovery endpoint");
+        log_discovery_endpoint(&url);
         keeper = keeper.with_discovery_chain(RpcChain::new(url));
     }
-    tracing::info!(payer = %keeper.payer(), rpc = %args.rpc, "keeper starting");
+    log_keeper_startup(&keeper.payer(), &args.rpc);
 
     let text = Arc::new(Mutex::new(String::new()));
     if let Some(addr) = args.metrics.clone() {
@@ -362,9 +410,88 @@ async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::parse_args_from;
+    use std::sync::{Arc, Mutex};
 
     fn args(items: &[&str]) -> anyhow::Result<super::Args> {
         parse_args_from(items.iter().map(|s| (*s).to_string()))
+    }
+
+    #[derive(Clone)]
+    struct LogBuffer(Arc<Mutex<Vec<u8>>>);
+
+    impl std::io::Write for LogBuffer {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn startup_logs_keep_endpoint_context_without_provider_credentials() {
+        let bytes = Arc::new(Mutex::new(Vec::new()));
+        let writer = LogBuffer(bytes.clone());
+        let subscriber = tracing_subscriber::fmt()
+            .without_time()
+            .with_ansi(false)
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(move || writer.clone())
+            .finish();
+        let endpoint = "https://provider-user:provider-password@rpc.example.test:8443/secret-path-token?api-key=secret-api-key&session=x#secret-fragment";
+        let payer = solana_pubkey::Pubkey::new_from_array([7; 32]);
+        tracing::subscriber::with_default(subscriber, || {
+            super::log_observer_startup(endpoint);
+            super::log_keeper_startup(&payer, endpoint);
+            super::log_discovery_endpoint(endpoint);
+        });
+        let rendered = String::from_utf8(bytes.lock().unwrap().clone()).unwrap();
+        for event in [
+            "keeper observe starting without a keypair",
+            "keeper starting",
+            "pool discovery endpoint",
+        ] {
+            assert!(rendered.contains(event), "missing startup event {event}");
+        }
+        assert_eq!(rendered.matches("https://rpc.example.test:8443").count(), 3);
+        assert!(rendered.contains(&payer.to_string()));
+        for secret in [
+            "provider-user",
+            "provider-password",
+            "secret-path-token",
+            "api-key",
+            "secret-api-key",
+            "session=x",
+            "secret-fragment",
+        ] {
+            assert!(!rendered.contains(secret), "startup log exposed {secret}");
+        }
+    }
+
+    #[test]
+    fn endpoint_context_handles_root_ipv6_and_invalid_urls_without_echoing_input() {
+        for (endpoint, shown) in [
+            (
+                "https://mainnet.example.test/",
+                "https://mainnet.example.test",
+            ),
+            ("http://127.0.0.1:18899/?token=s", "http://127.0.0.1:18899"),
+            ("http://[::1]:18899/secret", "http://[::1]:18899"),
+            (
+                "https://user:password@[2001:db8::1]/?api-key=x",
+                "https://[2001:db8::1]",
+            ),
+            ("private-api-key", "REDACTED"),
+            ("https:///secret-path-token", "REDACTED"),
+            ("https://host:not-a-port/secret", "REDACTED"),
+            ("https://host:/secret", "REDACTED"),
+            ("https://host\nsecret/", "REDACTED"),
+            ("file://secret-path-token", "REDACTED"),
+        ] {
+            assert_eq!(super::rpc_endpoint_for_log(endpoint), shown);
+        }
     }
 
     #[test]
