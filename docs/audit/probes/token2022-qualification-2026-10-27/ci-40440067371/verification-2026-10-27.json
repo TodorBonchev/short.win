@@ -1,0 +1,155 @@
+{
+  "checked_utc": "2026-10-27T03:13:37.633273+00:00",
+  "review": "independent download/source/binary verification; no fuzz started, no build, no branch or tracked-file change",
+  "run_id": 40440067371,
+  "source_commit": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+  "source_tree": "29102ffde6a8ecf4b39cf6b06a471d271a6b148c",
+  "github_zip_digests": [
+    {
+      "name": "verifiable-build",
+      "artifact_id": 12705609267,
+      "zip_sha256": "13408bb50095368342daf0fe7e399ccd100cdebf138c29295be12db556a24512",
+      "matches_github_api": true,
+      "zip_crc_valid": true
+    },
+    {
+      "name": "shortwin-fuzz-runtime",
+      "artifact_id": 12705138672,
+      "zip_sha256": "2ea84dfa15b6820a426e982f4361489a7bf3dff4e6b53683cc60a03b87c09d42",
+      "matches_github_api": true,
+      "zip_crc_valid": true
+    },
+    {
+      "name": "shortwin-program",
+      "artifact_id": 12704959939,
+      "zip_sha256": "87f0904b3ef31194c172b98fc4a53f3500f74dcee840f63e078b4ad6bc0dad29",
+      "matches_github_api": true,
+      "zip_crc_valid": true
+    }
+  ],
+  "runtime_sha256sums_count": 10,
+  "runtime_sha256sums_exact_file_set_and_hashes_match": true,
+  "source_archive_sha256": "648b7cecdc0e9c6654841ddfd853b645671adb08d4ce49a2851436dadac37022",
+  "source_archive_commit_pax_matches": true,
+  "all_source_archive_blobs_match_git_commit": true,
+  "source_archive_blob_count": 2533,
+  "source_archive_modes_match": true,
+  "fixture_file_count": 337,
+  "fixture_manifest_exact_tracked_file_set": true,
+  "all_fixture_hashes_sizes_match_source_archive_and_git": true,
+  "new_token2022_fixture_inputs": [
+    {
+      "file": "tests/fixtures/accounts/spl_2026_10_27/token_2022_2026_10_27_program.bin",
+      "bytes": 36,
+      "sha256": "bae3e5d63e30c0c3e6fe788b9e027bf003ca5e5bb46d3a9627e034bb3002ea5c"
+    },
+    {
+      "file": "tests/fixtures/accounts/spl_2026_10_27/token_2022_2026_10_27_program_data_header.bin",
+      "bytes": 45,
+      "sha256": "44e7ffbcb92a5c82a85a0d77699294d89c57daea032fae4491c8522a092a52c0"
+    },
+    {
+      "file": "tests/fixtures/programs/token_2022_2026_10_27.so",
+      "bytes": 611056,
+      "sha256": "3dde54d202caa2d10514fd58a154df5f26f07643f9f5fd0402ff08084f0cb954"
+    }
+  ],
+  "root_lock_sha256": "af2b95498027686446121edf60d8e8a6aac40c648f1fb87fd867b0e98dc8b6a5",
+  "root_lock_ctutils": {
+    "version": "0.4.4",
+    "checksum": "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865",
+    "actual_lock_verification": "parsed exact source commit and copied lock; all five applicable bench locks also patched"
+  },
+  "artifacts": [
+    {
+      "name": "shortwin-fuzz",
+      "bytes": 11690504,
+      "sha256": "3ffb12b803f01c1cc60bd82bcc386834e8f148ac0e8fb934df533882953769c3",
+      "elf_machine": 62,
+      "elf_flags": 0
+    },
+    {
+      "name": "shortwin-release.so",
+      "bytes": 1644024,
+      "sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+      "elf_machine": 247,
+      "elf_flags": 3
+    },
+    {
+      "name": "shortwin-test-venue.so",
+      "bytes": 1675056,
+      "sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01",
+      "elf_machine": 247,
+      "elf_flags": 3
+    },
+    {
+      "name": "mock-cpamm.so",
+      "bytes": 281240,
+      "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9",
+      "elf_machine": 247,
+      "elf_flags": 3
+    }
+  ],
+  "release_matches_anchor_fuzz_bundle_and_verifier_bytes": true,
+  "release_matches_prior_canonical_hash": true,
+  "release_trimmed_executable_sha256": "f3d8dd7a5c62385abc6306e2da395ff666a1f69234ea50f2e7eb0523ab686250",
+  "anchor_idl_matches_source_commit": true,
+  "verifier_record_matches_source_and_bytes": true,
+  "toolchain": {
+    "rustc_verbose": "rustc 1.98.1 (48a229cea 2026-09-01)\nbinary: rustc\ncommit-hash: 48a229ceaefd4985c50990b14116b6d856af0985\ncommit-date: 2026-09-01\nhost: x86_64-unknown-linux-gnu\nrelease: 1.98.1\nLLVM version: 22.1.8",
+    "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+    "active": "1.98.1-x86_64-unknown-linux-gnu (overridden by '/home/runner/work/short.win/short.win/rust-toolchain.toml')",
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "machine": "x86_64"
+  },
+  "release_profile": {
+    "CARGO_PROFILE_RELEASE_LTO": "false",
+    "CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "16"
+  },
+  "local_head_before": "c865c38b297ec072d5a3d6dde25fb79e75ed950f",
+  "local_head_after": "c865c38b297ec072d5a3d6dde25fb79e75ed950f",
+  "current_runtime_harness_fixture_lock_source_equivalent_to_ci_commit": true,
+  "current_branch": "codex/token2022-qualification-1.0.3",
+  "tracked_status_observation": "",
+  "discrepancies": [],
+  "qualification_limits": [
+    "Smoke artifact is not a >=24h result.",
+    "Full workflow status and all other jobs are outside this artifact verification.",
+    "Fuzzer input baseline differs from the old completed run; old duration is not reused.",
+    "Executable mode must be restored after ZIP download before any separately authorized launch."
+  ],
+  "ctutils_qualification_lock_versions": [
+    {
+      "file": "Cargo.lock",
+      "version": "0.4.4",
+      "checksum": "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865"
+    },
+    {
+      "file": "tests/bench/m1_cu/Cargo.lock",
+      "version": "0.4.4",
+      "checksum": "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865"
+    },
+    {
+      "file": "tests/bench/m2_cu/Cargo.lock",
+      "version": "0.4.4",
+      "checksum": "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865"
+    },
+    {
+      "file": "tests/bench/m3_cu/Cargo.lock",
+      "version": "0.4.4",
+      "checksum": "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865"
+    },
+    {
+      "file": "tests/bench/m5_cu/Cargo.lock",
+      "version": "0.4.4",
+      "checksum": "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865"
+    },
+    {
+      "file": "tests/bench/m6_cu/Cargo.lock",
+      "version": "0.4.4",
+      "checksum": "12218662ccac37d9714f2191252553d67585b97df8c839cbe49e0bde278dc865"
+    }
+  ],
+  "release_profile_matches_committed_ci_workflow": true,
+  "reported_native_toolchain_matches_pinned_1_98_1": true
+}

@@ -1,0 +1,46 @@
+{
+  "reviewed_utc": "2026-10-27T03:27:52.558473+00:00",
+  "authorship": "Independent AI review by launch_policy_inventory",
+  "source_commit": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+  "model_sha256": "099a0e1a4ecc41447cf4f5946c55dc6b62a9de3d7a5b53b6fbbf6d915f355541",
+  "measured_json_sha256": "7a9772220ec6609b1952dd987996eb87c597ddc8177fd5e977dc947b3a5b2183",
+  "five_leaf_changes": [
+    {
+      "path": "CU.pumpswap.liquidate",
+      "before": 214617,
+      "after": 215808
+    },
+    {
+      "path": "CU.pumpswap.expire",
+      "before": 211508,
+      "after": 212700
+    },
+    {
+      "path": "CU.pump_curve.liquidate",
+      "before": 147212,
+      "after": 148679
+    },
+    {
+      "path": "CU.pump_curve.expire",
+      "before": 144410,
+      "after": 145876
+    },
+    {
+      "path": "SET_COVERAGE_PAUSE_CU",
+      "before": 8915,
+      "after": 8921
+    }
+  ],
+  "whole_module_ast_equal_after_replacing_only_two_constant_assignments": true,
+  "function_asts_and_other_assumptions_unchanged": true,
+  "all_five_values_equal_actual_json_maxima": true,
+  "cross_check": "constants cross-checked against tests/bench/m7_keeper/results.json (d6f4e092)",
+  "full_script_exit_code": 0,
+  "stdout_exactly_equal_retained": true,
+  "output_bytes": 17044,
+  "output_sha256": "71bc3a537d73a30fcdc705bc99bba23eb33f2b37c5394c5157d33dcc00ac31fc",
+  "historical_output_byte_identical": true,
+  "economics_change_only_one_dated_note": true,
+  "note_link": "../audit/probes/token2022-qualification-2026-10-27/keeper-cost/keeper_cost.txt",
+  "approval": "PASS measured-input refresh; no economic function/policy/default changes and no operational funding/mainnet execution claim."
+}

@@ -1,0 +1,37 @@
+{
+  "checked_utc": "2026-10-27T03:23:21.588226+00:00",
+  "artifact_source": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+  "repair_source": "658d8baafca01d751452d1c67b508747fe0671e2",
+  "committed_changed_paths": [
+    "REUSE.toml",
+    "TODO.md",
+    "apps/web/e2e/specs/positions.spec.ts",
+    "docs/AUDIT.md",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/SHA256SUMS",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/README.md",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/artifact-list.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/artifact-verification.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/final-verification.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/jobs.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/mutants-success.log.gz",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/receipt-source-equivalence.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/run.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/service-regression-verification.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/services-job.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/services-success.log.gz",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/shortwin.build.log.gz",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/verifiable-hashes.txt.gz",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/REPORT.md",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/independent-review.json",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__account_len.rs.new.rs.gz",
+    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__mod.rs.diff.gz",
+    "docs/deployment/MAINNET_OPERATIONS.md",
+    "docs/release/MAINNET-1.0.3.md"
+  ],
+  "runtime_harness_locks_fixtures_unchanged": true,
+  "limits": [
+    "Generated benchmark reports and current evidence are documentation, not executable fuzzer inputs.",
+    "Replacement full CI and a fresh >=24h campaign remain pending.",
+    "No tag, mainnet transaction, provisioning or longrun executed."
+  ]
+}

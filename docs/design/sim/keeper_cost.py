@@ -58,12 +58,13 @@ PRICES = (0, 1_000, 10_000, 100_000)
 VENUES = ("pumpswap", "pump_curve", "raydium_cpmm", "raydium_amm_v4")
 NAMES = {"pumpswap": "PumpSwap", "pump_curve": "curve", "raydium_cpmm": "CPMM", "raydium_amm_v4": "AMM v4"}
 # Requested CU (ceil(consumed x 1.1)), the costliest measured per kind (tests/bench/m7_keeper/results.json).
-# Re-baselined on short.win 1.0.2 (`a6ecd6f7…`, AI-review-2 candidate, 2026-10-18).
+# Measured on 1.0.3 qualification source 4c26706, CI 40440067371 (2026-10-27), with Token-2022 v11.1.0.
+# These are the exact recovered CI sample inputs; economic assumptions below are unchanged.
 CU = {
     "pumpswap": {"crank": 41_257, "sol_settle_keep": 66_248, "sol_settle_settle": 77_152,
-                 "liquidate": 214_617, "expire": 211_508},
+                 "liquidate": 215_808, "expire": 212_700},
     "pump_curve": {"crank": 38_159, "sol_settle_keep": 63_968, "sol_settle_settle": 74_775,
-                   "liquidate": 147_212, "expire": 144_410},
+                   "liquidate": 148_679, "expire": 145_876},
     "raydium_cpmm": {"crank": 32_676, "sol_settle_keep": 66_070, "sol_settle_settle": 78_646,
                      "liquidate": 124_955, "expire": 117_776},
     "raydium_amm_v4": {"crank": 32_610, "sol_settle_keep": 58_052, "sol_settle_settle": 68_985,
@@ -96,7 +97,7 @@ JUNK_PHI_BPS = 100               # its venue fee, one way
 TIER_D = {"cr_open": 40_000, "cr_liq": 17_500, "dur_days": 3, "rate_u0_bps": 10_000, "rate_u50_bps": 28_750}
 OPEN_FEE_BPS = 25
 PROTOCOL_RENT_BPS = 1_500
-SET_COVERAGE_PAUSE_CU = 8_915
+SET_COVERAGE_PAUSE_CU = 8_921
 CRANK_SOL_USD_CU = 7_212
 CRANK_SOL_USD_PER_DAY = 1_560    # a feed publishing every 55 s
 RATE80 = {"A": 5_000, "B": 10_000, "C": 20_000, "D": 40_000}   # APR bps at 80 % utilisation

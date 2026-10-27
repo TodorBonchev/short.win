@@ -83,7 +83,10 @@ allowlist. That is not a new-ELF execution test or a fresh local reproducible bu
 Complete the remaining Token-2022 initialization/ATA/memo/CPI execution tests,
 applicable fork tests and qualifying evidence before the final mainnet-ready tag.
 Stable `v1.0.3` remains pending that technical gate; audit-first timing is not the
-reason for this hold. The program ID itself had no mainnet account at finalized
+reason for this hold. The [new baseline qualification record](../audit/token2022-qualification-1.0.3-2026-10-27.md)
+retains the successful slot-461,913,288 live check, unchanged release bytes, partial
+CI results and the browser clock repair; the repaired full gate and fresh campaign
+remain pending. The program ID itself had no mainnet account at finalized
 slot 461,879,034, as recorded in the same evidence.
 
 Base for this preparation: main `7f2af5b5787d62978c79e7630f5b0e1a3310d94e`.

@@ -1,0 +1,82 @@
+{
+  "observed_run": 40440067371,
+  "source_commit": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+  "job": 121978628851,
+  "failure": "positions.spec.ts time-left bound; synthetic validator Clock ahead of browser host time",
+  "assertion": "time_left <= deadline - tOpen",
+  "observed_first_time_left": 729141,
+  "observed_retry_time_left": 729138,
+  "passed": 124,
+  "failed": 1,
+  "skipped": 2,
+  "traces": [
+    {
+      "attempt": "initial",
+      "trace_sha256": "d2ee6cc59d242e490dfdbb2a33ef554b6bb9dec418ff4c8ad3877633e147db43",
+      "trace_bytes": 446344,
+      "trace_wall_time_ms": 1793070100216,
+      "resource": "resources/7129c943f016f3e13a93c256e226443abf4a682e.json",
+      "position": "4CLkPSzuyk2gKzdSewCVM5xnfXZ1DVD14yPhv9ahwJ15",
+      "opened_ts": 1793194441,
+      "deadline": 1793799241,
+      "duration_seconds": 604800,
+      "expected_countdown_at_trace_start": 729141
+    },
+    {
+      "attempt": "retry1",
+      "trace_sha256": "8e371ee6e8f0d1560d9312132bba8dd83ba0dd2b311d9d1ff71020d43a6564f3",
+      "trace_bytes": 429910,
+      "trace_wall_time_ms": 1793070102436,
+      "resource": "resources/7129c943f016f3e13a93c256e226443abf4a682e.json",
+      "position": "4CLkPSzuyk2gKzdSewCVM5xnfXZ1DVD14yPhv9ahwJ15",
+      "opened_ts": 1793194441,
+      "deadline": 1793799241,
+      "duration_seconds": 604800,
+      "expected_countdown_at_trace_start": 729139
+    }
+  ],
+  "fix_scope": "Only positions E2E test: install progressing browser Clock from the actual validator before navigation; product clock and bounds unchanged",
+  "local_checks": [
+    {
+      "name": "focused-biome",
+      "argv": [
+        "/root/short.win-audit-review/apps/web/node_modules/.bin/biome",
+        "check",
+        "apps/web/e2e/specs/positions.spec.ts"
+      ],
+      "started_utc": "2026-10-27T03:19:13.565482+00:00",
+      "completed_utc": "2026-10-27T03:19:13.879248+00:00",
+      "exit_code": 0,
+      "output_sha256": "d6522cd435529de050cf5131239fa3e82d9c77486bdd1c7df2d2e11f69fdf273"
+    },
+    {
+      "name": "web-tsc-includes-e2e",
+      "argv": [
+        "/root/short.win-audit-review/apps/web/node_modules/.bin/tsc",
+        "-p",
+        "apps/web/tsconfig.json",
+        "--noEmit"
+      ],
+      "started_utc": "2026-10-27T03:19:13.879560+00:00",
+      "completed_utc": "2026-10-27T03:19:24.169299+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_utc": "2026-10-27T03:19:24.169411+00:00",
+      "completed_utc": "2026-10-27T03:19:24.179086+00:00",
+      "exit_code": 0,
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "local_full_e2e_run": false,
+  "requires_new_ci": true,
+  "authorship": "Independent AI source and CI log review",
+  "reviewed_utc": "2026-10-27T03:19:24.193378+00:00"
+}

@@ -1,0 +1,312 @@
+{
+  "created_utc": "2026-10-27T03:12:42.758846+00:00",
+  "later_review_commit": "c865c38b297ec072d5a3d6dde25fb79e75ed950f",
+  "scope": "Deterministic scheduler selection only. No fuzz run launched; no per-profile runtime counters or duration asserted.",
+  "source_files": {
+    "tests/fuzz/src/main.rs": {
+      "sha256": "0a43ed1e44dd503e0b2dd99abb3471efcfda50d945de42ce2a3deeb7cd9f8380",
+      "git_blob": "5d1b6cea34c76de962ace64b14b6255feff4c5f2",
+      "working_tree_equal": true,
+      "old_scheduler_source_equal": true
+    },
+    "tests/fuzz/src/action.rs": {
+      "sha256": "ec152b9247264245c5d4122d3c5bc107b4d538b25d95c0eee2c5f560915969ce",
+      "git_blob": "19fbe545019c583e82ff401e79077c2bc8833263",
+      "working_tree_equal": true,
+      "old_scheduler_source_equal": true
+    },
+    "tests/fuzz/src/rng.rs": {
+      "sha256": "5b7bb375bcc55ec66650278f433ad2dfda2839e7928ae3fe7ea22895b59c8943",
+      "git_blob": "15f4730506386fcfa6fd734ba1c1b410bb6e669f",
+      "working_tree_equal": true,
+      "old_scheduler_source_equal": true
+    },
+    "tests/fuzz/src/runner.rs": {
+      "sha256": "a4478db031c023299fa15e907e8e2ad1add094a607e3070d4da234830e0f84be",
+      "git_blob": "c8f10bd8e52db359173185862a1555014dc97d3a",
+      "working_tree_equal": true,
+      "old_scheduler_source_equal": true
+    },
+    "tests/fuzz/src/stats.rs": {
+      "sha256": "e1e53085da36f0784fee23a7161381ee3f8e9bc7f651086cbcd4593c3984dc7c",
+      "git_blob": "17f6252e44e1f26862d6bb54d7df59913a0476e4",
+      "working_tree_equal": true,
+      "old_scheduler_source_equal": true
+    }
+  },
+  "profiles_in_exact_order": [
+    "mock",
+    "mixed",
+    "curve",
+    "pumpswap",
+    "amm-v4",
+    "cpmm"
+  ],
+  "launch_specification": {
+    "argv": [
+      "bin/shortwin-fuzz",
+      "run",
+      "--profile",
+      "all",
+      "--duration",
+      "24h",
+      "--jobs",
+      "2",
+      "--actions",
+      "400",
+      "--seed",
+      "103410000",
+      "--out",
+      "BASE/results",
+      "--minimize"
+    ],
+    "duration_seconds": 86400,
+    "differential": true,
+    "avoid_known": true,
+    "runs_cap": null,
+    "actual_launch_identity_verified": false,
+    "reason": "Host choice/run creation pending; verify real process argv/cwd/input hashes after launch."
+  },
+  "first_occurrences": [
+    {
+      "profile": "mock",
+      "first_by_worker": [
+        {
+          "worker": 0,
+          "ordinal": 9,
+          "seed": 103410016,
+          "splitmix64": 9670143016638149232,
+          "index": 0,
+          "profile": "mock"
+        },
+        {
+          "worker": 1,
+          "ordinal": 2,
+          "seed": 103410003,
+          "splitmix64": 6484415801359526958,
+          "index": 0,
+          "profile": "mock"
+        }
+      ],
+      "combined_runs_sufficient": 10
+    },
+    {
+      "profile": "mixed",
+      "first_by_worker": [
+        {
+          "worker": 0,
+          "ordinal": 10,
+          "seed": 103410018,
+          "splitmix64": 521624293372004605,
+          "index": 1,
+          "profile": "mixed"
+        },
+        {
+          "worker": 1,
+          "ordinal": 20,
+          "seed": 103410039,
+          "splitmix64": 9259936278742821709,
+          "index": 1,
+          "profile": "mixed"
+        }
+      ],
+      "combined_runs_sufficient": 29
+    },
+    {
+      "profile": "curve",
+      "first_by_worker": [
+        {
+          "worker": 0,
+          "ordinal": 17,
+          "seed": 103410032,
+          "splitmix64": 4637514078385470608,
+          "index": 2,
+          "profile": "curve"
+        },
+        {
+          "worker": 1,
+          "ordinal": 5,
+          "seed": 103410009,
+          "splitmix64": 13695730168212374204,
+          "index": 2,
+          "profile": "curve"
+        }
+      ],
+      "combined_runs_sufficient": 21
+    },
+    {
+      "profile": "pumpswap",
+      "first_by_worker": [
+        {
+          "worker": 0,
+          "ordinal": 2,
+          "seed": 103410002,
+          "splitmix64": 7395320655804784029,
+          "index": 3,
+          "profile": "pumpswap"
+        },
+        {
+          "worker": 1,
+          "ordinal": 17,
+          "seed": 103410033,
+          "splitmix64": 11108736294466817187,
+          "index": 3,
+          "profile": "pumpswap"
+        }
+      ],
+      "combined_runs_sufficient": 18
+    },
+    {
+      "profile": "amm-v4",
+      "first_by_worker": [
+        {
+          "worker": 0,
+          "ordinal": 1,
+          "seed": 103410000,
+          "splitmix64": 16219920987053461768,
+          "index": 4,
+          "profile": "amm-v4"
+        },
+        {
+          "worker": 1,
+          "ordinal": 1,
+          "seed": 103410001,
+          "splitmix64": 277222183696765600,
+          "index": 4,
+          "profile": "amm-v4"
+        }
+      ],
+      "combined_runs_sufficient": 1
+    },
+    {
+      "profile": "cpmm",
+      "first_by_worker": [
+        {
+          "worker": 0,
+          "ordinal": 3,
+          "seed": 103410004,
+          "splitmix64": 16106222922190942997,
+          "index": 5,
+          "profile": "cpmm"
+        },
+        {
+          "worker": 1,
+          "ordinal": 4,
+          "seed": 103410007,
+          "splitmix64": 13340791808911718873,
+          "index": 5,
+          "profile": "cpmm"
+        }
+      ],
+      "combined_runs_sufficient": 6
+    }
+  ],
+  "tight_union_threshold": 29,
+  "single_worker_all_profiles_prefixes": [
+    17,
+    20
+  ],
+  "conservative_single_worker_prefix_threshold": 36,
+  "independent_recomputation": {
+    "python_equals_exact_rng_rust": true,
+    "draws_checked": 80,
+    "all_30_prefix_splits_at_29_pass": true,
+    "minimality_counterexample": {
+      "worker0_completed": 9,
+      "worker1_completed": 19,
+      "total": 28,
+      "missing": "mixed"
+    },
+    "rustc_version": "rustc 1.98.1 (48a229cea 2026-09-01)"
+  },
+  "old_witness": {
+    "path": "/root/short.win-audit-review/target/fuzz-monitor-verification-notes.md",
+    "sha256": "cbb1073351a8fe0b17e72f55a3a5fd17ce806354cdd64e97404373b16b8d6858",
+    "all_five_scheduler_source_files_identical_to_old_commit": true,
+    "old_duration_and_artifact_identity_not_credited": true
+  },
+  "assumptions": [
+    "Actual binary built from pinned source and authenticated inputs; real argv exactly matches approved specification, especially profile all, seed103410000, jobs2, no runs cap.",
+    "Each worker executes serially and starts at k0; no setup failures or other invariant/action/wind-down failures skip consumed seeds.",
+    "Final runs are merged complete ordinary runner outcomes only; preflight, minimization and replay counters are not included in summary runs.",
+    "Summary runs>=29, failures empty, failure_counts empty, anomalies empty, no crash/min artifacts; readable final summary and complete supervisor/log/artifact/source/fixture identity checks remain separate gates.",
+    "Workers finish in-flight scenarios naturally after global deadline; no equal allocation, per-profile totals, or24h per profile is inferred."
+  ],
+  "source_line_anchors": {
+    "tests/fuzz/src/main.rs": {
+      "\"--profile\" =>": [
+        83
+      ],
+      "Profile::ALL.to_vec()": [
+        65,
+        86
+      ],
+      "// Preflight:": [
+        313
+      ],
+      "let t0 = Instant::now();": [
+        325
+      ],
+      "for job in 0..jobs": [
+        337
+      ],
+      "let seed = base": [
+        360
+      ],
+      "let profile = profiles[": [
+        364
+      ],
+      "total.lock().expect(\"stats\").merge(&o.stats);": [
+        371
+      ],
+      "\"runs\": s.runs,": [
+        264
+      ],
+      "\"wall_seconds\": secs,": [
+        271
+      ],
+      "std::fs::write(&path": [
+        441,
+        528
+      ],
+      "i32::from(!f.is_empty())": [
+        443,
+        529
+      ]
+    },
+    "tests/fuzz/src/action.rs": {
+      "pub const ALL: [Profile; 6]": [
+        344
+      ]
+    },
+    "tests/fuzz/src/rng.rs": {
+      "pub fn splitmix64": [
+        5
+      ]
+    },
+    "tests/fuzz/src/runner.rs": {
+      "pub fn run_length": [
+        157
+      ],
+      "stats: Stats::default(),": [
+        185
+      ],
+      "world.stats.runs = 1;": [
+        195
+      ],
+      "pub fn parse_duration": [
+        402
+      ]
+    },
+    "tests/fuzz/src/stats.rs": {
+      "pub fn merge(&mut self, o: &Stats)": [
+        100
+      ],
+      "self.runs += o.runs;": [
+        54,
+        101
+      ]
+    }
+  },
+  "pinned_source_commit": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91"
+}

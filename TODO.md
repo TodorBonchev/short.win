@@ -34,6 +34,8 @@ opening-notional cap is 25 SOL per market, not a global TVL or loss cap. See the
       Do not tag a mainnet-ready release by silently repinning this dependency.
 - [ ] Finish the new Token-2022 baseline execution/bench/CI and fresh all-profile
       24-hour campaign, repeat current live identities, then select final `v1.0.3`.
+      [New-baseline qualification and browser clock repair](docs/audit/token2022-qualification-1.0.3-2026-10-27.md)
+      remain in progress; the reviewed new baseline passes the dated live check.
       [Preparation CI passed](docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/README.md)
       on `57bc1c845` with canonical bytes and 19 selected mutants killed; it still
       uses the old upstream fixture. A source tag does not prove funded operation.

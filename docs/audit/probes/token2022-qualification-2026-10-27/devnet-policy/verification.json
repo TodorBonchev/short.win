@@ -1,0 +1,43 @@
+{
+  "checked_utc": "2026-10-27T03:16:20.766671+00:00",
+  "workflow_run": 40442618297,
+  "source_commit": "a23a34283c9c83f6c35104867a0409baa7035617",
+  "url": "https://short.win/security",
+  "html_sha256": "b21d96d22dee3a96d5dc37f4c47192118e8e066fb72b3c5a55fdca63329b362f",
+  "assets": [
+    {
+      "url": "https://short.win/assets/index-DLrU_zaa.js",
+      "sha256": "17214f91b771ba29229aa333d719ab54cc18629efc7e31031675784b372bac1f",
+      "bytes": 231086,
+      "status": 200,
+      "terms": {
+        "No external security audit": false,
+        "25 SOL": false,
+        "uncapped": false,
+        "funded bug bounty": false,
+        "protocol fees": false
+      }
+    },
+    {
+      "url": "https://short.win/assets/SecurityPolicyPage-DBnSskG4.js",
+      "status": 200,
+      "bytes": 6119,
+      "sha256": "3ac4e3ed31b37f7e7d1614c525bc1e46963d666e50043094f052433c67237b52",
+      "terms": {
+        "No external security audit": true,
+        "25 SOL": true,
+        "uncapped": true,
+        "funded bug bounty": true,
+        "before": true,
+        "protocol fees": true
+      }
+    }
+  ],
+  "lazy_route_chain": [
+    "index-DLrU_zaa.js",
+    "App-C294Qda5.js",
+    "SecurityPolicyPage-DBnSskG4.js"
+  ],
+  "devnet_build_confirmed": true,
+  "policy_terms_verified": true
+}

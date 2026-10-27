@@ -1,0 +1,642 @@
+[
+  {
+    "worker": 0,
+    "ordinal": 1,
+    "seed": 103410000,
+    "splitmix64": 16219920987053461768,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 2,
+    "seed": 103410002,
+    "splitmix64": 7395320655804784029,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 3,
+    "seed": 103410004,
+    "splitmix64": 16106222922190942997,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 0,
+    "ordinal": 4,
+    "seed": 103410006,
+    "splitmix64": 17928359421824173611,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 5,
+    "seed": 103410008,
+    "splitmix64": 17643745942482719573,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 0,
+    "ordinal": 6,
+    "seed": 103410010,
+    "splitmix64": 3983804725633044693,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 7,
+    "seed": 103410012,
+    "splitmix64": 16224235788594867639,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 8,
+    "seed": 103410014,
+    "splitmix64": 16757214232894189468,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 9,
+    "seed": 103410016,
+    "splitmix64": 9670143016638149232,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 0,
+    "ordinal": 10,
+    "seed": 103410018,
+    "splitmix64": 521624293372004605,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 0,
+    "ordinal": 11,
+    "seed": 103410020,
+    "splitmix64": 5668650725925672905,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 0,
+    "ordinal": 12,
+    "seed": 103410022,
+    "splitmix64": 13544024392147663374,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 0,
+    "ordinal": 13,
+    "seed": 103410024,
+    "splitmix64": 7480179837070499293,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 0,
+    "ordinal": 14,
+    "seed": 103410026,
+    "splitmix64": 12403795196038476875,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 0,
+    "ordinal": 15,
+    "seed": 103410028,
+    "splitmix64": 2454663667195710219,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 16,
+    "seed": 103410030,
+    "splitmix64": 16498491604885631451,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 17,
+    "seed": 103410032,
+    "splitmix64": 4637514078385470608,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 0,
+    "ordinal": 18,
+    "seed": 103410034,
+    "splitmix64": 12963112708282541084,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 0,
+    "ordinal": 19,
+    "seed": 103410036,
+    "splitmix64": 3419344179478558053,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 20,
+    "seed": 103410038,
+    "splitmix64": 470440426764425454,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 0,
+    "ordinal": 21,
+    "seed": 103410040,
+    "splitmix64": 3464876641114708594,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 22,
+    "seed": 103410042,
+    "splitmix64": 9799259001282781486,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 23,
+    "seed": 103410044,
+    "splitmix64": 1018213221941608997,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 0,
+    "ordinal": 24,
+    "seed": 103410046,
+    "splitmix64": 658298193194851597,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 0,
+    "ordinal": 25,
+    "seed": 103410048,
+    "splitmix64": 2821742472760554448,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 26,
+    "seed": 103410050,
+    "splitmix64": 8102750633812298461,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 0,
+    "ordinal": 27,
+    "seed": 103410052,
+    "splitmix64": 4037256423282496404,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 0,
+    "ordinal": 28,
+    "seed": 103410054,
+    "splitmix64": 12528296590426754026,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 29,
+    "seed": 103410056,
+    "splitmix64": 8444304151265035744,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 30,
+    "seed": 103410058,
+    "splitmix64": 15273698815309594140,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 0,
+    "ordinal": 31,
+    "seed": 103410060,
+    "splitmix64": 10164037635380742154,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 32,
+    "seed": 103410062,
+    "splitmix64": 1015749703091604265,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 0,
+    "ordinal": 33,
+    "seed": 103410064,
+    "splitmix64": 3351021238360477861,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 0,
+    "ordinal": 34,
+    "seed": 103410066,
+    "splitmix64": 14153211791091739304,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 0,
+    "ordinal": 35,
+    "seed": 103410068,
+    "splitmix64": 6179173297757069667,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 0,
+    "ordinal": 36,
+    "seed": 103410070,
+    "splitmix64": 16938148263669402034,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 37,
+    "seed": 103410072,
+    "splitmix64": 4848313643458142206,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 0,
+    "ordinal": 38,
+    "seed": 103410074,
+    "splitmix64": 4238682706849671539,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 0,
+    "ordinal": 39,
+    "seed": 103410076,
+    "splitmix64": 8360752060710744608,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 0,
+    "ordinal": 40,
+    "seed": 103410078,
+    "splitmix64": 17092271247194754621,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 1,
+    "ordinal": 1,
+    "seed": 103410001,
+    "splitmix64": 277222183696765600,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 1,
+    "ordinal": 2,
+    "seed": 103410003,
+    "splitmix64": 6484415801359526958,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 3,
+    "seed": 103410005,
+    "splitmix64": 10261840804458468870,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 4,
+    "seed": 103410007,
+    "splitmix64": 13340791808911718873,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 5,
+    "seed": 103410009,
+    "splitmix64": 13695730168212374204,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 1,
+    "ordinal": 6,
+    "seed": 103410011,
+    "splitmix64": 3849286937858324699,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 7,
+    "seed": 103410013,
+    "splitmix64": 9782996484578709080,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 1,
+    "ordinal": 8,
+    "seed": 103410015,
+    "splitmix64": 4895708936007071111,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 9,
+    "seed": 103410017,
+    "splitmix64": 14550532615329524766,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 10,
+    "seed": 103410019,
+    "splitmix64": 8290121953935384252,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 11,
+    "seed": 103410021,
+    "splitmix64": 9723736835335281551,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 12,
+    "seed": 103410023,
+    "splitmix64": 16622536048743390890,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 1,
+    "ordinal": 13,
+    "seed": 103410025,
+    "splitmix64": 16874400225360280176,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 14,
+    "seed": 103410027,
+    "splitmix64": 5066069685126057492,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 15,
+    "seed": 103410029,
+    "splitmix64": 14825595370037008746,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 16,
+    "seed": 103410031,
+    "splitmix64": 12287777123306654542,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 1,
+    "ordinal": 17,
+    "seed": 103410033,
+    "splitmix64": 11108736294466817187,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 1,
+    "ordinal": 18,
+    "seed": 103410035,
+    "splitmix64": 16161250407871079915,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 19,
+    "seed": 103410037,
+    "splitmix64": 15564706405228988129,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 20,
+    "seed": 103410039,
+    "splitmix64": 9259936278742821709,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 1,
+    "ordinal": 21,
+    "seed": 103410041,
+    "splitmix64": 10915494500714149463,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 22,
+    "seed": 103410043,
+    "splitmix64": 17832223037589981813,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 1,
+    "ordinal": 23,
+    "seed": 103410045,
+    "splitmix64": 14759444932730024954,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 1,
+    "ordinal": 24,
+    "seed": 103410047,
+    "splitmix64": 16619257267988623377,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 1,
+    "ordinal": 25,
+    "seed": 103410049,
+    "splitmix64": 5395264946582791661,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 26,
+    "seed": 103410051,
+    "splitmix64": 11493851423792976780,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 27,
+    "seed": 103410053,
+    "splitmix64": 16358470249159115436,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 28,
+    "seed": 103410055,
+    "splitmix64": 6874839468670331878,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 1,
+    "ordinal": 29,
+    "seed": 103410057,
+    "splitmix64": 13211748962686886848,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 1,
+    "ordinal": 30,
+    "seed": 103410059,
+    "splitmix64": 12384127570674807090,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 31,
+    "seed": 103410061,
+    "splitmix64": 8037014780831576598,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 32,
+    "seed": 103410063,
+    "splitmix64": 15042503368824406024,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 1,
+    "ordinal": 33,
+    "seed": 103410065,
+    "splitmix64": 6239666995123943546,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 1,
+    "ordinal": 34,
+    "seed": 103410067,
+    "splitmix64": 2923098189260338512,
+    "index": 0,
+    "profile": "mock"
+  },
+  {
+    "worker": 1,
+    "ordinal": 35,
+    "seed": 103410069,
+    "splitmix64": 12516090995750506665,
+    "index": 3,
+    "profile": "pumpswap"
+  },
+  {
+    "worker": 1,
+    "ordinal": 36,
+    "seed": 103410071,
+    "splitmix64": 6651421064599313666,
+    "index": 2,
+    "profile": "curve"
+  },
+  {
+    "worker": 1,
+    "ordinal": 37,
+    "seed": 103410073,
+    "splitmix64": 8414687418075437611,
+    "index": 1,
+    "profile": "mixed"
+  },
+  {
+    "worker": 1,
+    "ordinal": 38,
+    "seed": 103410075,
+    "splitmix64": 3152268436299736229,
+    "index": 5,
+    "profile": "cpmm"
+  },
+  {
+    "worker": 1,
+    "ordinal": 39,
+    "seed": 103410077,
+    "splitmix64": 17471104633792570924,
+    "index": 4,
+    "profile": "amm-v4"
+  },
+  {
+    "worker": 1,
+    "ordinal": 40,
+    "seed": 103410079,
+    "splitmix64": 5555962245051581313,
+    "index": 3,
+    "profile": "pumpswap"
+  }
+]

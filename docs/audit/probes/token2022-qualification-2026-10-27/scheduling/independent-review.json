@@ -1,0 +1,112 @@
+{
+  "reviewed_utc": "2026-10-27T03:21:58.704287+00:00",
+  "reviewer": "independent peer /root/vps_operator_plan",
+  "result": "pass",
+  "pinned_source_commit": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+  "witness_inputs_sha256": {
+    "WITNESS.md": "0e41708dbef17d3c377470c96e891f1c23fa52aa3a1359632de6d07597ca04de",
+    "witness.json": "1bf790c383d571ddabd42ba2482f35793674ee5b5c271ec4fb63a126fb2dcb6f",
+    "python-schedule.json": "9c61a51b2fa589e5183855f6a09023d12ee9b2c04b4f45f10d88e64c182f4902",
+    "rust-schedule.csv": "26d77b27ea0a0d8acdef6bf45113a165c0f58d03508a486decd7400da2643939"
+  },
+  "source_verification": {
+    "tests/fuzz/src/main.rs": {
+      "sha256": "0a43ed1e44dd503e0b2dd99abb3471efcfda50d945de42ce2a3deeb7cd9f8380",
+      "git_blob": "5d1b6cea34c76de962ace64b14b6255feff4c5f2",
+      "copied_and_working_source_equal": true
+    },
+    "tests/fuzz/src/action.rs": {
+      "sha256": "ec152b9247264245c5d4122d3c5bc107b4d538b25d95c0eee2c5f560915969ce",
+      "git_blob": "19fbe545019c583e82ff401e79077c2bc8833263",
+      "copied_and_working_source_equal": true
+    },
+    "tests/fuzz/src/rng.rs": {
+      "sha256": "5b7bb375bcc55ec66650278f433ad2dfda2839e7928ae3fe7ea22895b59c8943",
+      "git_blob": "15f4730506386fcfa6fd734ba1c1b410bb6e669f",
+      "copied_and_working_source_equal": true
+    },
+    "tests/fuzz/src/runner.rs": {
+      "sha256": "a4478db031c023299fa15e907e8e2ad1add094a607e3070d4da234830e0f84be",
+      "git_blob": "c8f10bd8e52db359173185862a1555014dc97d3a",
+      "copied_and_working_source_equal": true
+    },
+    "tests/fuzz/src/stats.rs": {
+      "sha256": "e1e53085da36f0784fee23a7161381ee3f8e9bc7f651086cbcd4593c3984dc7c",
+      "git_blob": "17f6252e44e1f26862d6bb54d7df59913a0476e4",
+      "copied_and_working_source_equal": true
+    }
+  },
+  "independent_schedule": {
+    "method": "Separate Python unsigned-64 implementation using decimal constants; compared 80 complete rows against retained exact-Rust CSV and original Python JSON. No fuzzer launched.",
+    "draws_equal": 80,
+    "first_occurrences_by_worker": {
+      "mock": [
+        9,
+        2
+      ],
+      "mixed": [
+        10,
+        20
+      ],
+      "curve": [
+        17,
+        5
+      ],
+      "pumpswap": [
+        2,
+        17
+      ],
+      "amm-v4": [
+        1,
+        1
+      ],
+      "cpmm": [
+        3,
+        4
+      ]
+    },
+    "tight_union_threshold": 29,
+    "checked_29_splits": 30,
+    "counterexample_total_28": {
+      "worker0_prefix": 9,
+      "worker1_prefix": 19,
+      "missing": [
+        "mixed"
+      ]
+    },
+    "single_worker_all_six_prefixes": [
+      17,
+      20
+    ],
+    "conservative_single_worker_threshold": 36,
+    "all_37_splits_at_36_guarantee_one_full_worker_prefix": true,
+    "max_total_with_neither_full_prefix": 35
+  },
+  "count_semantics_review": [
+    "main.rs313-324 preflights run before t0 and before aggregate Stats allocation; preflight outcomes never merge into final summary.",
+    "main.rs350-371 advances each worker own serial seed, runs scenario, then merges exactly that returned Stats.",
+    "runner.rs175-195 returns default Stats on setup failure; after successful setup sets runs=1. The latter counts even failed actions or wind-down; therefore zero failure_counts AND empty failures are required before treating final runs as successful completed prefixes.",
+    "stats.rs100-101 adds ordinary outcome runs; other Deficits.runs and tmin local run counters are distinct; no min/replay counters merge into run totals.",
+    "Scoped threads join all in-flight work after deadline. A normal final summary describes complete returned outcomes; a checkpoint or process loss is insufficient.",
+    "Empty anomalies and full final provenance/timing checks remain separately mandatory. Expected refused transactions are not invariant failures."
+  ],
+  "assumptions_and_limits": [
+    "Exact authenticated binary/source/fixtures and actual launch argv must be verified at launch. Seed103410000, jobs2, all six profiles exact order, and serial worker prefixes are required.",
+    "No setup/action/wind-down failures and no anomalies. Final total must count completed ordinary outcomes; no old baseline duration is transferred.",
+    "Selection guarantee establishes no explicit per-profile counts, equal time allocation, or 24h per profile. Host choice and new run remain pending."
+  ],
+  "positions_clock_review": {
+    "path": "apps/web/e2e/specs/positions.spec.ts",
+    "sha256": "de3d4e068e3377f8dbde62dd0070fbb9646d09792eb73763f63e4b7cafb61764",
+    "result": "pass source review; runtime E2E remains CI evidence",
+    "clock_read": "chain.ts175-179 reads signed unixTimestamp from real Clock sysvar offset32. Positive safe integer milliseconds are checked before installing.",
+    "countdown": "Countdown.tsx uses nowSeconds(Date.now) and 1000 ms setInterval; passing the actual bank epoch before app.goto corrects warped bank versus host offset while preserving the countdown decrease test.",
+    "playwright_version": "1.63.0",
+    "local_source_root": "/root/short.win-audit-review/node_modules/.pnpm/playwright-core@1.63.0/node_modules/playwright-core",
+    "coreBundle_sha256": "549070af3acabb3efcc4f55bfe6210f9f7c2fcf633cf7eaa59bfe60719969171",
+    "types_sha256": "2806f6d7810fba0306066d500cd716a6d1128d90af2c3cf71723e3ea0a8904c4",
+    "install_vs_setSystemTime": "Both public methods call server _installIfNeeded which injects the same Date/timer/performance shims. Injection calls controller.resume. install sets nonfixed wall epoch and real performance elapsed advances timers and Date; setSystemTime is not a narrower Date-only replacement. No pause/fixed-time API used.",
+    "navigation": "Clock API stores initialization in BrowserContext init scripts before goto; first app render uses adjusted epoch. This test owns a fresh context, so the context-wide clock change does not leak to other tests.",
+    "not_verified": "No browser or validator process launched by this peer review; no product source modified."
+  }
+}

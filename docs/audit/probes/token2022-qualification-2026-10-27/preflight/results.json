@@ -1,0 +1,55 @@
+[
+  {
+    "label": "scope",
+    "command": [
+      "python3",
+      "scripts/audit_scope.py",
+      "check"
+    ],
+    "started_utc": "2026-10-27T03:11:14.153984+00:00",
+    "finished_utc": "2026-10-27T03:11:14.291264+00:00",
+    "exit_code": 0,
+    "bytes": 77,
+    "sha256": "eddeb5c812f6d5c07a6aaf83648868a2f8d2aee6b52b6fc16fafd13d4d24f1dd"
+  },
+  {
+    "label": "diff",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "started_utc": "2026-10-27T03:11:14.291333+00:00",
+    "finished_utc": "2026-10-27T03:11:14.296138+00:00",
+    "exit_code": 0,
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "fixtures-static",
+    "command": [
+      "python3",
+      "scripts/dump-fixtures.py",
+      "check"
+    ],
+    "started_utc": "2026-10-27T03:11:14.296179+00:00",
+    "finished_utc": "2026-10-27T03:11:14.589675+00:00",
+    "exit_code": 0,
+    "bytes": 121,
+    "sha256": "a0c0b3caea551b532a1e8e3c818cbfa1c0b105801533b29120d1fcfe7a415f0a"
+  },
+  {
+    "label": "fixtures-live",
+    "command": [
+      "python3",
+      "scripts/dump-fixtures.py",
+      "check",
+      "--live"
+    ],
+    "started_utc": "2026-10-27T03:11:14.589721+00:00",
+    "finished_utc": "2026-10-27T03:11:27.974282+00:00",
+    "exit_code": 0,
+    "bytes": 2343,
+    "sha256": "7cef5e3db72e4cbf8827559758fa8bd87b93ce85994e46ebcf22bdeed927b30d"
+  }
+]

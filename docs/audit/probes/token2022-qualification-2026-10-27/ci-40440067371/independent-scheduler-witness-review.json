@@ -1,0 +1,231 @@
+{
+  "reviewed_utc": "2026-10-27T03:20:28.499743+00:00",
+  "authorship": "Independent AI review by launch_policy_inventory",
+  "source_commit": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+  "witness_sha256": "1bf790c383d571ddabd42ba2482f35793674ee5b5c271ec4fb63a126fb2dcb6f",
+  "source_proofs": [
+    {
+      "path": "tests/fuzz/src/main.rs",
+      "sha256": "0a43ed1e44dd503e0b2dd99abb3471efcfda50d945de42ce2a3deeb7cd9f8380",
+      "matched_pinned_git_and_worktree": true
+    },
+    {
+      "path": "tests/fuzz/src/action.rs",
+      "sha256": "ec152b9247264245c5d4122d3c5bc107b4d538b25d95c0eee2c5f560915969ce",
+      "matched_pinned_git_and_worktree": true
+    },
+    {
+      "path": "tests/fuzz/src/rng.rs",
+      "sha256": "5b7bb375bcc55ec66650278f433ad2dfda2839e7928ae3fe7ea22895b59c8943",
+      "matched_pinned_git_and_worktree": true
+    },
+    {
+      "path": "tests/fuzz/src/runner.rs",
+      "sha256": "a4478db031c023299fa15e907e8e2ad1add094a607e3070d4da234830e0f84be",
+      "matched_pinned_git_and_worktree": true
+    },
+    {
+      "path": "tests/fuzz/src/stats.rs",
+      "sha256": "e1e53085da36f0784fee23a7161381ee3f8e9bc7f651086cbcd4593c3984dc7c",
+      "matched_pinned_git_and_worktree": true
+    }
+  ],
+  "independent_80_draws_match_rust": true,
+  "firsts": {
+    "mock": [
+      9,
+      2
+    ],
+    "mixed": [
+      10,
+      20
+    ],
+    "curve": [
+      17,
+      5
+    ],
+    "pumpswap": [
+      2,
+      17
+    ],
+    "amm-v4": [
+      1,
+      1
+    ],
+    "cpmm": [
+      3,
+      4
+    ]
+  },
+  "all_30_splits_at_29": [
+    {
+      "worker0": 0,
+      "worker1": 29,
+      "all_six": true
+    },
+    {
+      "worker0": 1,
+      "worker1": 28,
+      "all_six": true
+    },
+    {
+      "worker0": 2,
+      "worker1": 27,
+      "all_six": true
+    },
+    {
+      "worker0": 3,
+      "worker1": 26,
+      "all_six": true
+    },
+    {
+      "worker0": 4,
+      "worker1": 25,
+      "all_six": true
+    },
+    {
+      "worker0": 5,
+      "worker1": 24,
+      "all_six": true
+    },
+    {
+      "worker0": 6,
+      "worker1": 23,
+      "all_six": true
+    },
+    {
+      "worker0": 7,
+      "worker1": 22,
+      "all_six": true
+    },
+    {
+      "worker0": 8,
+      "worker1": 21,
+      "all_six": true
+    },
+    {
+      "worker0": 9,
+      "worker1": 20,
+      "all_six": true
+    },
+    {
+      "worker0": 10,
+      "worker1": 19,
+      "all_six": true
+    },
+    {
+      "worker0": 11,
+      "worker1": 18,
+      "all_six": true
+    },
+    {
+      "worker0": 12,
+      "worker1": 17,
+      "all_six": true
+    },
+    {
+      "worker0": 13,
+      "worker1": 16,
+      "all_six": true
+    },
+    {
+      "worker0": 14,
+      "worker1": 15,
+      "all_six": true
+    },
+    {
+      "worker0": 15,
+      "worker1": 14,
+      "all_six": true
+    },
+    {
+      "worker0": 16,
+      "worker1": 13,
+      "all_six": true
+    },
+    {
+      "worker0": 17,
+      "worker1": 12,
+      "all_six": true
+    },
+    {
+      "worker0": 18,
+      "worker1": 11,
+      "all_six": true
+    },
+    {
+      "worker0": 19,
+      "worker1": 10,
+      "all_six": true
+    },
+    {
+      "worker0": 20,
+      "worker1": 9,
+      "all_six": true
+    },
+    {
+      "worker0": 21,
+      "worker1": 8,
+      "all_six": true
+    },
+    {
+      "worker0": 22,
+      "worker1": 7,
+      "all_six": true
+    },
+    {
+      "worker0": 23,
+      "worker1": 6,
+      "all_six": true
+    },
+    {
+      "worker0": 24,
+      "worker1": 5,
+      "all_six": true
+    },
+    {
+      "worker0": 25,
+      "worker1": 4,
+      "all_six": true
+    },
+    {
+      "worker0": 26,
+      "worker1": 3,
+      "all_six": true
+    },
+    {
+      "worker0": 27,
+      "worker1": 2,
+      "all_six": true
+    },
+    {
+      "worker0": 28,
+      "worker1": 1,
+      "all_six": true
+    },
+    {
+      "worker0": 29,
+      "worker1": 0,
+      "all_six": true
+    }
+  ],
+  "tight_union_threshold": 29,
+  "counterexample_28": {
+    "worker0": 9,
+    "worker1": 19,
+    "missing": "mixed"
+  },
+  "single_worker_all_six_prefixes": [
+    17,
+    20
+  ],
+  "sufficient_single_worker_prefix_total": 36,
+  "approval": "Scheduling derivation approved conditionally on actual launch argv/identity and clean completed outcomes; no actual new campaign launched or credited.",
+  "source_logic_checked": [
+    "Preflight runs not merged into campaign totals.",
+    "Each worker consumes seed base+job+k*jobs serially; selection splitmix64(seed)%6.",
+    "Setup failures return default zero runs; successful setup marks runs=1; require zero setup/action/wind-down failures and anomalies so consumed prefixes have no skipped failed seeds.",
+    "Only completed normal outcomes merge into shared stats; no per-profile duration/counts exist.",
+    "No prior campaign duration or input identity borrowed."
+  ]
+}

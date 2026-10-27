@@ -1,0 +1,56 @@
+{
+  "at_utc": "2026-10-27T03:25:43.989977+00:00",
+  "ci_run": 40440067371,
+  "ci_source_commit": "4c26706cc60b6fce9a2f2eb0e93dd824c2575e91",
+  "source_json": "tests/bench/m7_keeper/results.json",
+  "source_json_sha256": "7a9772220ec6609b1952dd987996eb87c597ddc8177fd5e977dc947b3a5b2183",
+  "source_builds": {
+    "shortwin_so_sha256": "d6f4e092dd15639c502535d68bcdb6c428c423b66d49d08f4f89e9409af538bc",
+    "test_venue_so_sha256": "0a405deba60a521798820985cd4cec1a0e61e46ed9d0ee829fd037b010565a01"
+  },
+  "model_sha256_before": "f6be525332ca4c2b5681f23ce8f73a844d7572c134502c73c7b7d533c22e29e1",
+  "model_sha256_after": "099a0e1a4ecc41447cf4f5946c55dc6b62a9de3d7a5b53b6fbbf6d915f355541",
+  "changes": [
+    {
+      "input": "CU.pumpswap.liquidate",
+      "before": 214617,
+      "after": 215808,
+      "json_path": "cu.pumpswap.liquidate.requested_cu[1]"
+    },
+    {
+      "input": "CU.pumpswap.expire",
+      "before": 211508,
+      "after": 212700,
+      "json_path": "cu.pumpswap.expire.requested_cu[1]"
+    },
+    {
+      "input": "CU.pump_curve.liquidate",
+      "before": 147212,
+      "after": 148679,
+      "json_path": "cu.pump_curve.liquidate.requested_cu[1]"
+    },
+    {
+      "input": "CU.pump_curve.expire",
+      "before": 144410,
+      "after": 145876,
+      "json_path": "cu.pump_curve.expire.requested_cu[1]"
+    },
+    {
+      "input": "SET_COVERAGE_PAUSE_CU",
+      "before": 8915,
+      "after": 8921,
+      "json_path": "global_lines.set_coverage_pause.requested_cu[1]"
+    }
+  ],
+  "model_function_ast_equal": true,
+  "all_other_uppercase_assumptions_equal": true,
+  "cross_check": "constants cross-checked against tests/bench/m7_keeper/results.json (d6f4e092)",
+  "full_script_exit_code": 0,
+  "output_sha256": "71bc3a537d73a30fcdc705bc99bba23eb33f2b37c5394c5157d33dcc00ac31fc",
+  "output_bytes": 17044,
+  "historical_output_unmodified": "docs/design/sim/out/keeper_cost.txt",
+  "qualification_note": "docs/design/ECONOMICS.md \u00a75.8",
+  "intended_retained_output": "docs/audit/probes/token2022-qualification-2026-10-27/keeper-cost/keeper_cost.txt",
+  "diff_check_exit_code": 0,
+  "historical_ecON_tables_preserved": true
+}

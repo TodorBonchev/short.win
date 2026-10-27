@@ -1,0 +1,177 @@
+{
+  "reviewed_utc": "2026-10-27T03:22:05.714364+00:00",
+  "authorship": "Independent AI verification",
+  "run_id": 40440067371,
+  "checked_files": [
+    {
+      "path": "tests/bench/m1_cu/results.md",
+      "before_git_blob": "c8db9d8893f9d1ad8220661e312b60ca3b2014b3",
+      "after_git_blob": "0ff5cab98e8954770fbc13a1dae62af3017e4afa",
+      "raw_ci_prefixes": [
+        "c8db9d8",
+        "0ff5cab"
+      ],
+      "sha256": "343fd415258af419ae3b8c80cc5a208d0d75eafc13bd15a0d214ef37b70b7923",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m2_cu/results.md",
+      "before_git_blob": "735aa2d1a68d3d7fcc018de31c896fe154296ae0",
+      "after_git_blob": "5420479c58084b63dd7749d65a7fba74d62589ad",
+      "raw_ci_prefixes": [
+        "735aa2d",
+        "5420479"
+      ],
+      "sha256": "586c1ada6929669c52506284aa0f31a9baa0bfaf8d21afb120ed6a6479d0bd3d",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m2_cu/trace.md",
+      "before_git_blob": "749ac8738d8f0e06b4fc5a6aea016ca1d6147067",
+      "after_git_blob": "3a496a617af920a65011bd83b26a162a9e36d7bd",
+      "raw_ci_prefixes": [
+        "749ac87",
+        "3a496a6"
+      ],
+      "sha256": "989a819fd8353f504ae3754afa200006f2b61f42bd1b1a3d320032b203a53b71",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m3_cu/results.md",
+      "before_git_blob": "69fed7e49d75aee4659e6e77eaff5265c9418e19",
+      "after_git_blob": "0aa3191e976e8bf11494f4feb8ef0ba1149d9ac4",
+      "raw_ci_prefixes": [
+        "69fed7e",
+        "0aa3191"
+      ],
+      "sha256": "119dee3dc7f3b6103b608d294e8d4ec875b34d2c143d868a6c7b772ee9a5b1b8",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m3_cu/trace.md",
+      "before_git_blob": "665c439e31fc119f9754dafa42165463810b2610",
+      "after_git_blob": "d6ab1f82d4a34d018c45bc88995796e613a3445a",
+      "raw_ci_prefixes": [
+        "665c439",
+        "d6ab1f8"
+      ],
+      "sha256": "6b48ea0cb152548efe3daa2cedb02ff34abc36ae12bc1b2e393c3bd79e86d81e",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m5_cu/results.md",
+      "before_git_blob": "319f3a9ecaa6bfcf2fa2239d164dd6d5dd8b9e5b",
+      "after_git_blob": "05404c8eff5725bad55c8add9e2e65f894f75847",
+      "raw_ci_prefixes": [
+        "319f3a9",
+        "05404c8"
+      ],
+      "sha256": "029bfc1a3f3e3a78b48cc0749d499673a52133bbc17c0917a9db367de41f7fc1",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m5_cu/trace.md",
+      "before_git_blob": "d1a945e38aee22dd3d877c2f141d610d98fa46ec",
+      "after_git_blob": "db2d2991880622f99796ac0eb626429a5131b20f",
+      "raw_ci_prefixes": [
+        "d1a945e",
+        "db2d299"
+      ],
+      "sha256": "2cc474b82c76d3f9c420b428608a2652036a460cf1ae69cf18fb7a6ac180033e",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m6_cu/results.md",
+      "before_git_blob": "23a61eef68d4a530945843af8186ad46dde02d9d",
+      "after_git_blob": "7ea099ecdfa2a4b39fb6ce4e2c2b5b739ed6aec9",
+      "raw_ci_prefixes": [
+        "23a61ee",
+        "7ea099e"
+      ],
+      "sha256": "53acde51123da84754ca3aa3accea5457a54b554cf89e3d33a5fd4d854cc2a8f",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m6_cu/trace.md",
+      "before_git_blob": "717f1a37e1e957d08e9ceaa011847a5413d4a9ec",
+      "after_git_blob": "6f7b7775b52404369e52b43404131149e0efc17d",
+      "raw_ci_prefixes": [
+        "717f1a3",
+        "6f7b777"
+      ],
+      "sha256": "14e509744bc45a3307cbf3d5bd943363a34caed927776b88f151969b777ac664",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m7_cascade/results.json",
+      "before_git_blob": "737ab634c338385d2d1669c659f042a7e423df3e",
+      "after_git_blob": "3579cf1642d6dbd3a3b0dde98f550609bdb396bd",
+      "raw_ci_prefixes": [
+        "737ab63",
+        "3579cf1"
+      ],
+      "sha256": "ac03e3eaa2b5c99b637ddd37841c6751f958b4d3d4731e184421da4fe484f2a4",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m7_cascade/results.md",
+      "before_git_blob": "d51aea3054b27144037ff0fdf5f61c3b51b7f87a",
+      "after_git_blob": "08ba406d30237a3b551a1630f53cdbe3892347ad",
+      "raw_ci_prefixes": [
+        "d51aea3",
+        "08ba406"
+      ],
+      "sha256": "7eca9869b2a8c2946f6a857b3eb4181f1f7f36d3021bd429c134335614c2e0f0",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m7_keeper/results.json",
+      "before_git_blob": "fb6ab01189cf1425ad2e615528479332793afb64",
+      "after_git_blob": "4299993e5d0e71737548c93dc7eb8318b2f82a7a",
+      "raw_ci_prefixes": [
+        "fb6ab01",
+        "4299993"
+      ],
+      "sha256": "7a9772220ec6609b1952dd987996eb87c597ddc8177fd5e977dc947b3a5b2183",
+      "matched": true
+    },
+    {
+      "path": "tests/bench/m7_keeper/results.md",
+      "before_git_blob": "ccf85178451b13ec4fc95f99456c809db29daf6a",
+      "after_git_blob": "1ba1a7900eeb4900cd3d2d4daa68afa2ec5d6830",
+      "raw_ci_prefixes": [
+        "ccf8517",
+        "1ba1a79"
+      ],
+      "sha256": "dcd14ced7ef7bb5f7a2efb646787b5e1395c8a0891f2dff2db254b4c1d863233",
+      "matched": true
+    }
+  ],
+  "independently_extracted_log_patches_reverse_check": [
+    {
+      "path": "m1-cu-121978628834-generated.patch",
+      "exit_code": 0
+    },
+    {
+      "path": "m2-cu-121978628844-generated.patch",
+      "exit_code": 0
+    },
+    {
+      "path": "m3-cu-121978629166-generated.patch",
+      "exit_code": 0
+    },
+    {
+      "path": "m5-cu-121978629049-generated.patch",
+      "exit_code": 0
+    },
+    {
+      "path": "m6-cu-121978629014-generated.patch",
+      "exit_code": 0
+    },
+    {
+      "path": "m7-keeper-bench-121978629053-generated.patch",
+      "exit_code": 0
+    }
+  ],
+  "conclusion": "All13 current report files match actual raw CI after-blob prefixes and complete before-source blobs; six independently extracted unified patches reverse-check against current files. No execution rerun or all-CI-green claim."
+}
