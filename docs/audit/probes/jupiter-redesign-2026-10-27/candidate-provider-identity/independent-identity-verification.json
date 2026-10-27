@@ -1,0 +1,72 @@
+{
+  "verified_utc": "2026-10-27T09:31:22.008293+00:00",
+  "reviewer": "independent AI execution-design agent",
+  "result": "PASS for retained-response consistency, loader bindings/fingerprints and source-derived queue key offset only",
+  "input_sha256": {
+    "accounts-response.json": "94d540230c288a5fcb446f2ae4e689927e526b2b95e6a3bee99b02241bf70988",
+    "programdata-response.json": "a2de441cb71aedf4e4462483e6be4feb42c6fc1f45b1c58c23acb0f650a05039",
+    "identity.json": "db02c53a0c48a70083aca9d0f8982fca6b89f5eb309ed3a188378208d40c807e",
+    "programdata-and-queue.json": "d2b2674c7bd9f73553132b9f97a0f8330d20a610910ac2cd46801eb021feec6d"
+  },
+  "source_archive_sha256": {
+    "switchboard-on-demand-0.13.0.crate": "bc7a36809592252cc73f9ec01623b89628654a2fba00dbf5c339c286eb040d40",
+    "solana-pubkey-4.2.1.crate": "6ab5a422939ca3b81180f79c87f43600728e4c5513d6034902675f96df25d033",
+    "solana-address-2.6.1.crate": "39c93e262f671bf402e1040e4a7e40b05d81da5956c7681948c975a0997517bb"
+  },
+  "source_file_sha256": {
+    "queue.rs": "5f5c16d0a79bfc5bb9622eef693913a6dc82fd637a4edaf6c25ec559939fa7dc",
+    "solana_compat.rs": "ced1332ab990ecd9935b662dbf957f7269265af19047d61d1454c446b61fcae3",
+    "program_id.rs": "9f454bf9859735cd622e585ba7d7e8246e39e5451f3e523c8908c2b25373cabf",
+    "utils.rs": "2b48c489d4a347b7e77c363042364c705ec58c08034a715f733de3aa26a964e1",
+    "solana-pubkey/src/lib.rs": "b174f53f848c0c2e92b0f2a40bdbc19f281408e072bc91e885d1faa35d5318b8",
+    "solana-address/src/lib.rs": "c93a7d9fb216e2778fba29a478ebe17ff9a538a7691aeed22e35264f32624904"
+  },
+  "context_slots": [
+    462019610,
+    462019879
+  ],
+  "programs": [
+    {
+      "program": "SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv",
+      "programdata": "EW3AZYxoQrYWBvTmrCmiDpm6oBCNpAqN2kekDjuYFmsB",
+      "derived_programdata_bump": 255,
+      "deploy_slot": 420822344,
+      "upgrade_authority": "DREcTwxxuehtUVgnGwDpTcKT9zTK5uDmdLbnRY7cijEx",
+      "account_sha256": "b503e2adf6427c2682286bb7bf80284c342cc7f2fad736b01535bcb9b77935ea",
+      "elf_capacity_sha256": "2705af9e532904b6f15139e08fb3afba4d3d8d183d3f9c98bd2c8d1e1c88d163",
+      "trimmed_elf_sha256": "ab59c70a8a17a224342eb23ee26985acc088fde26f80d40b6b07ddd1223503df",
+      "trimmed_elf_bytes": 1065833
+    },
+    {
+      "program": "orac1eFjzWL5R3RbbdMV68K9H6TaCVVcL6LjvQQWAbz",
+      "programdata": "61qUnCDSzWvuhXNLK4GfECJTEr4WzZYwFfn8oeW5y833",
+      "derived_programdata_bump": 255,
+      "deploy_slot": 438467619,
+      "upgrade_authority": "31Sof5r1xi7dfcaz4x9Kuwm8J9ueAdDduMcme59sP8gc",
+      "account_sha256": "35953f724d981a3c49a197afeb092d88e3826f6b5f1a76d3f1d9b449b73a9b4e",
+      "elf_capacity_sha256": "c8439f9546ccde5eea6dc6e317cdaa2fbd2ddd7909f65a1d368def4d2066aefc",
+      "trimmed_elf_sha256": "f0eb4451b84c47b712be2bbd855f86d24f90c8f2ebcd4fb89709903e92a5d59c",
+      "trimmed_elf_bytes": 88985
+    }
+  ],
+  "queue": {
+    "address": "A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w",
+    "owner": "SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv",
+    "data_sha256": "11d9fbc3a11e672e3e7121154781f729db154a63011aef6474c79a23a7f76168",
+    "discriminator_hex": "d9c2377fb8538a01",
+    "authority": "DREcTwxxuehtUVgnGwDpTcKT9zTK5uDmdLbnRY7cijEx",
+    "ed25519_relative_struct_offset": 4192,
+    "ed25519_account_offset": 4200,
+    "offset_derivation": "repr(C) QueueAccountData prefix = Pubkey32 + [u8;32]*32 + Pubkey32*78 + u8*40 + [u8;20]*30 = 4192. Pinned Pubkey reexports repr(transparent) Address([u8;32]), size32/alignment1; every prefix field alignment1, so no C padding. Add8-byte discriminator=4200. Source proof, no offset_of compilation performed.",
+    "nonzero_signing_keys": 12,
+    "distinct_nonzero_signing_keys": 12
+  },
+  "limitations": [
+    "Saved RPC response bytes were checked offline; no independent RPC request was made. Recorded finalized commitment and observation timestamps come from root metadata, not a commitment proof inside JSON-RPC responses.",
+    "The two context slots differ; these are not one atomic program/queue snapshot.",
+    "Data-order/address associations use the root-recorded request list, crosschecked against published SDK constants, Program-state embedded ProgramData addresses and independently derived canonical loader PDAs.",
+    "rstrip-zero ELF fingerprints reproduce the recorded definition; they do not establish source-to-ELF provenance or deployment safety.",
+    "Twelve distinct nonzero key slots do not establish active oracle nodes, operator independence, live quorum availability, approved keys/settings, feed qualification or provider admission.",
+    "The SDK verifier remains quarantined; no signatures, SBF execution, feed operations, transactions, payments or production baseline changes occurred."
+  ]
+}

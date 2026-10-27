@@ -29,7 +29,8 @@ trust/settings reviewed before deployment. Unchecked keeper JSON remains forbidd
 new tokens stay disabled until feed/size/liquidation requirements qualify.
 
 - [ ] Specify and validate the selected signed-feed pricing, quantity/depth and failure rules.
-      Native component ABI checks passed, but the candidate SDK verifier is
+      Switchboard is excluded following its shutdown announcement; retain the
+      native component ABI research. Its SDK verifier is
       [quarantined for source-level safety issues](docs/audit/jupiter-oracle-sdk-review-2026-10-27.md).
       Complete the [exact-quantity producer contract](docs/design/jupiter/QUOTE_PRODUCER_CONTRACT.md)
       and separately authenticated lower-reference policy; upper-only routes cannot force liquidation.

@@ -27,8 +27,8 @@ The exact feature graph and resolved versions must be inspected from CI evidence
 
 There are ZERO successful valid-attestation tests: no private keys or real signatures
 are available or requested. Synthetic helper tests never replace SDK verification.
-The complete reader function compiled in manual run40478037582 on c70aa259;
-all11 Rust tests, two runner fault tests, fmt and strict Clippy passed with the
+The complete reader function compiled in manual run 40478037582 on c70aa259;
+all 11 Rust tests, two runner fault tests, fmt and strict Clippy passed with the
 pinned graph. Its independently checked artifact ZIP SHA256 is
 `d167529b7046b2811a8fe15a161d2591df3bc80123077c2167a127153c5b77ee`.
 That success precedes the safe-envelope additions below; those need their own receipt. No happy-path onchain Ed25519 result, queue
@@ -60,7 +60,7 @@ The actual resolved Decimal version/source is retained with the standalone lock.
 
 The manual-only `.github/workflows/jupiter-oracle-compat.yml` runs native checks on
 a GitHub runner. The committed standalone Cargo.lock comes from the initial manual
-run40476628349 at21db9fadb888e0a29f999e3346f18dc603b9b999. Its SHA256 is
+run 40476628349 at21db9fadb888e0a29f999e3346f18dc603b9b999. Its SHA256 is
 `bedbb8980c823eef135d4ecd1dc7e06bba937884b435e9c61618f1ec594afc8a`.
 That run's ZIP digest,304 internal hashes,2648 source blobs/modes and280 downloaded
 registry archives were independently verified. SDK source/feature checks passed;
@@ -121,11 +121,18 @@ attestation. None of these tests enables a market or authenticates an API price.
 ## Verifier quarantine
 
 Independent review found a wrong byte-slice-to-SlotHash slice extent and original
-instruction-buffer alignment assumptions in published0.13.0. See the
+instruction-buffer alignment assumptions in published 0.13.0. See the
 [source-level review](../../docs/audit/jupiter-oracle-sdk-review-2026-10-27.md).
 The current read_verified_raw_output always returns ProviderVerifierQuarantined
 after identity checks; it never returns a verified value or calls SDK verification.
 The financial-policy helpers are synthetic test-only code. Native ABI success is
 retained accurately, but production verifier qualification requires a reviewed
 repair or separately reviewed safe consumer plus actual runtime evidence. No SBF
-exploit is asserted. Valid-attestation and SBF success counts remain0.
+exploit is asserted. Valid-attestation and SBF success counts remain 0.
+
+The later safe-envelope/quarantine source3a35d6ee1827285901acb9fb01a5634e21b3d40c
+passed manual CI 40480763900:24 Rust tests, two runner fault tests, fmt and strict
+Clippy. Artifact ZIP SHA256 is
+`8ece6bc5ec42f997b339d7d1595710feced0c74d03fb58b46211c8c04c3d91bd`.
+Independent source/registry/lock verification is retained in the review receipts.
+This verifies the explicit refusal path and format checks, not a repaired provider verifier.

@@ -1,6 +1,6 @@
 # Pump curves and broad Jupiter execution — design proposal
 
-**Status: design work; not implemented, qualified or approved for deployment.**
+**Status: design and isolated prototypes; production integration is unimplemented.**
 The owner [postponed first mainnet](../audit/owner-jupiter-redesign-decision-2026-10-27.md)
 for this redesign. The owner selected signed Jupiter-derived feeds for new markets; concrete
 provider/trust/settings remain subject to review before deployment. The deployed
@@ -199,3 +199,24 @@ an [exact-quantity producer contract](jupiter/QUOTE_PRODUCER_CONTRACT.md), prese
 separate candidate upper costs and explicitly attested economic lower references.
 No new market activation, live feed, final fuzz qualification or deployment follows
 from these prototypes or the unchanged legacy ELF.
+
+The [provider trust worksheet](jupiter/PROVIDER_TRUST_REVIEW.md) gives the observed
+candidate identities and exact settings/evidence still needed before deployment.
+It does not select a live queue or numeric risk policy. Proposed trust flow:
+
+```mermaid
+flowchart LR
+    API[Jupiter Build API] --> SEARCH[Fixed-q search and bounded simulation]
+    SEARCH --> REPORT[Candidate upper-cost report]
+    POLICY[Reviewed lower and central reference policy] --> REPORT
+    REPORT --> SIGN[Authenticated provider transport]
+    SIGN --> HISTORY[Verified identity, freshness and completed history]
+    HISTORY --> BOUNDS[Protocol financial bounds]
+    API --> ROUTE[Untrusted route instructions]
+    ROUTE --> EXEC[Isolated bounded executor]
+    BOUNDS --> EXEC
+    EXEC --> DELTA[Checked vault deltas and local refunds]
+```
+
+These are proposed integration components. Current pure prototypes and native
+format/refusal tests do not establish the signed report, history or routed SBF path.

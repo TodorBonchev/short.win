@@ -1,0 +1,36 @@
+{
+  "started_utc": "2026-10-27T09:27:47.860205+00:00",
+  "finished_utc": "2026-10-27T09:27:48.053765+00:00",
+  "commitment": "finalized",
+  "context_slot": 462019610,
+  "rpc_host": "api.mainnet-beta.solana.com",
+  "source_sdk": "switchboard-on-demand0.13.0",
+  "accounts": [
+    {
+      "address": "SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "executable": true,
+      "data_bytes": 36,
+      "data_sha256": "985bf0caacc829e46848d074de0fa01adaaa7e29f2556c2354c11c6fc0b00153",
+      "lamports": 11141440
+    },
+    {
+      "address": "orac1eFjzWL5R3RbbdMV68K9H6TaCVVcL6LjvQQWAbz",
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "executable": true,
+      "data_bytes": 36,
+      "data_sha256": "81b8bb0f1324f5d46b26d0d69ce60f32ba9ef28d80a5e5b8b32658398e288f7f",
+      "lamports": 1141440
+    },
+    {
+      "address": "A43DyUGA7s8eXPxqEjJY6EBu1KKbNgfxF8h17VAHn13w",
+      "owner": "SBondMDrcV3K4kxZR1HNVT7osZxAHVHgYXL5Ze1oMUv",
+      "executable": false,
+      "data_bytes": 6280,
+      "data_sha256": "11d9fbc3a11e672e3e7121154781f729db154a63011aef6474c79a23a7f76168",
+      "lamports": 44599680
+    }
+  ],
+  "raw_response_sha256": "94d540230c288a5fcb446f2ae4e689927e526b2b95e6a3bee99b02241bf70988",
+  "status": "read-only identity observation; no provider admission or authority approval"
+}
