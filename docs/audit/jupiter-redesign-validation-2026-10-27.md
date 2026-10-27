@@ -11,7 +11,7 @@ is approved or performed by this checkpoint.
 - Pure no_std route-header/fixed-meta and exact-quantity math checks passed, including
   the independently retained slippage/interval exhaustive cases. Header validation
   is not route authorization; candidate upper costs are not forced-action lower references.
-- Manual native CI40480763900 on3a35d6ee1827285901acb9fb01a5634e21b3d40c
+- Manual native CI 40480763900 on 3a35d6ee1827285901acb9fb01a5634e21b3d40c
   passed24 Rust tests, two runner fault tests, formatting and strict Clippy. Artifact,
   exact source/modes, all280 active registry archives, SDK features and unchanged
   pinned/production locks were independently verified. The24 count already includes
@@ -37,7 +37,7 @@ is approved or performed by this checkpoint.
 Observed UTC: 2026-10-27T09:54:03.218659+00:00.
 
 - Run40476629768 on21db9fadb888e0a29f999e3346f18dc603b9b999: in_progress, conclusion=None; 22success/1failed/2skipped. Active: program-tests.
-- Run40480767468 on3a35d6ee1827285901acb9fb01a5634e21b3d40c: in_progress, conclusion=None; 21success/0failed/1skipped. Active: services, web-e2e, mutants, program-tests.
+- Run40480767468 on 3a35d6ee1827285901acb9fb01a5634e21b3d40c: in_progress, conclusion=None; 21success/0failed/1skipped. Active: services, web-e2e, mutants, program-tests.
 
 The original PR run's WebSocket failure is retained; it is not called green. The
 new manual full run includes the repaired test and selected mutation checks. Its
@@ -67,3 +67,22 @@ provider authentication/qualification, complete risk/history/admission/settlemen
 and keeper/client/indexer integration, fresh final-runtime regression/review/fuzz
 and funded monitored operation remain open. No historical fuzz duration is credited
 to a new program or fixture baseline. No protocol audit finding is closed here.
+
+## Terminal CI follow-up
+
+Manual [CI 40480767468](https://github.com/TodorBonchev/short.win/actions/runs/40480767468)
+completed successfully on 3a35d6ee1827285901acb9fb01a5634e21b3d40c: 25 jobs
+passed, zero failed, one intentional fuzz-nightly skip. Independently checked logs
+confirm 19 unique selected mutants killed (12 tests-only;7 tests plus 3 minute fuzz),
+all 10 quote-math groups, 8 header groups, 11 named Token22/clock controls and the
+repaired WebSocket and browser cases. The program job records 86 zero-failure result
+summaries; five explicit opt-in manual/exploratory/historical cases remain ignored.
+This is bounded CI evidence, not a qualifying 24-hour run or broad Jupiter integration.
+
+Original PR CI 40476629768 completed with 23 passed, one original indexer WebSocket
+failure and two intentional skips. It remains recorded as failed; the fresh manual
+run supplies the repaired full gate. The earlier checkpoint above remains its dated
+observation. [Terminal APIs and independent receipts](probes/jupiter-redesign-2026-10-27/ci-final/)
+retain exact sources, ZIP/log hashes and scope. Later changes are documentation and
+evidence only; no exact-head full-green or completed provider/runtime integration
+is claimed for them.

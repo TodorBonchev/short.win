@@ -1,0 +1,684 @@
+{
+  "authorship": "Independent AI evidence retention by /root/launch_policy_inventory; no external audit or qualification claim",
+  "verified_at": "2026-10-27T10:57:05.122444+00:00",
+  "run": 40480767468,
+  "head_sha": "3a35d6ee1827285901acb9fb01a5634e21b3d40c",
+  "run_attempt": 1,
+  "event": "workflow_dispatch",
+  "workflow_path": ".github/workflows/ci.yml",
+  "status": "completed",
+  "conclusion": "success",
+  "created_at": "2026-10-27T09:26:17Z",
+  "run_started_at": "2026-10-27T09:26:17Z",
+  "updated_at": "2026-10-27T10:55:21Z",
+  "job_counts": {
+    "success": 25,
+    "skipped": 1
+  },
+  "failed": [],
+  "skipped": [
+    {
+      "name": "fuzz-nightly",
+      "id": 122115066911
+    }
+  ],
+  "zip_crc_validation": "all entries passed",
+  "zip_members": [
+    {
+      "name": "0_m7-keeper-bench.txt",
+      "bytes": 218959,
+      "crc": 2964608589
+    },
+    {
+      "name": "m7-keeper-bench/system.txt",
+      "bytes": 728,
+      "crc": 1296633375
+    },
+    {
+      "name": "1_program-tests.txt",
+      "bytes": 291287,
+      "crc": 3834328632
+    },
+    {
+      "name": "program-tests/system.txt",
+      "bytes": 726,
+      "crc": 2967142651
+    },
+    {
+      "name": "program-tests/1_Set up job.txt",
+      "bytes": 2450,
+      "crc": 3289131008
+    },
+    {
+      "name": "program-tests/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 8589,
+      "crc": 1710277569
+    },
+    {
+      "name": "program-tests/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 1417526675
+    },
+    {
+      "name": "program-tests/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4874,
+      "crc": 179033311
+    },
+    {
+      "name": "program-tests/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3017,
+      "crc": 2573371213
+    },
+    {
+      "name": "program-tests/6_Run actions_setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97.txt",
+      "bytes": 1732,
+      "crc": 3815121949
+    },
+    {
+      "name": "program-tests/7_Mainnet fixtures match their recorded checksums (tests_fixtures_manifest.json).txt",
+      "bytes": 2139,
+      "crc": 1198093654
+    },
+    {
+      "name": "program-tests/8_T-LAYOUT wasm32 leg.txt",
+      "bytes": 34735,
+      "crc": 2046079750
+    },
+    {
+      "name": "program-tests/9_shortwin unit tests without test-venue.txt",
+      "bytes": 26081,
+      "crc": 2366850259
+    },
+    {
+      "name": "program-tests/10_Run cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked.txt",
+      "bytes": 197899,
+      "crc": 1958825346
+    },
+    {
+      "name": "program-tests/18_Post Run actions_setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97.txt",
+      "bytes": 50,
+      "crc": 3609700555
+    },
+    {
+      "name": "program-tests/19_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3764,
+      "crc": 1712428297
+    },
+    {
+      "name": "program-tests/20_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 4171777545
+    },
+    {
+      "name": "program-tests/21_Complete job.txt",
+      "bytes": 61,
+      "crc": 687783247
+    },
+    {
+      "name": "2_codama.txt",
+      "bytes": 37319,
+      "crc": 2904499069
+    },
+    {
+      "name": "codama/system.txt",
+      "bytes": 719,
+      "crc": 4279140069
+    },
+    {
+      "name": "3_mutants.txt",
+      "bytes": 44885,
+      "crc": 2587849925
+    },
+    {
+      "name": "mutants/system.txt",
+      "bytes": 890,
+      "crc": 417907551
+    },
+    {
+      "name": "mutants/1_Set up job.txt",
+      "bytes": 2436,
+      "crc": 4148334392
+    },
+    {
+      "name": "mutants/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9074,
+      "crc": 1411076817
+    },
+    {
+      "name": "mutants/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 2268,
+      "crc": 2202812029
+    },
+    {
+      "name": "mutants/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 5445,
+      "crc": 4030607014
+    },
+    {
+      "name": "mutants/5_Cache Agave, platform-tools and the Anchor CLI.txt",
+      "bytes": 3460,
+      "crc": 1496372172
+    },
+    {
+      "name": "mutants/7_Select Agave 4.1.2.txt",
+      "bytes": 2763,
+      "crc": 1407930221
+    },
+    {
+      "name": "mutants/9_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3502,
+      "crc": 2171245079
+    },
+    {
+      "name": "mutants/10_The review's mutants must be killed.txt",
+      "bytes": 7693,
+      "crc": 716236670
+    },
+    {
+      "name": "mutants/18_Post Cache Agave, platform-tools and the Anchor CLI.txt",
+      "bytes": 283,
+      "crc": 2751448720
+    },
+    {
+      "name": "mutants/19_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3781,
+      "crc": 2244599181
+    },
+    {
+      "name": "mutants/20_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 618991349
+    },
+    {
+      "name": "mutants/21_Complete job.txt",
+      "bytes": 61,
+      "crc": 3742390233
+    },
+    {
+      "name": "4_m2-cu.txt",
+      "bytes": 1142696,
+      "crc": 1566456701
+    },
+    {
+      "name": "m2-cu/system.txt",
+      "bytes": 718,
+      "crc": 3797810668
+    },
+    {
+      "name": "5_web-e2e.txt",
+      "bytes": 132655,
+      "crc": 2085694412
+    },
+    {
+      "name": "web-e2e/system.txt",
+      "bytes": 720,
+      "crc": 206573382
+    },
+    {
+      "name": "web-e2e/1_Set up job.txt",
+      "bytes": 2764,
+      "crc": 2628259092
+    },
+    {
+      "name": "web-e2e/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 8650,
+      "crc": 3850301339
+    },
+    {
+      "name": "web-e2e/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1844,
+      "crc": 297039857
+    },
+    {
+      "name": "web-e2e/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4825,
+      "crc": 429355936
+    },
+    {
+      "name": "web-e2e/5_wasm-bindgen CLI (the crate's exact pin).txt",
+      "bytes": 27484,
+      "crc": 3313471854
+    },
+    {
+      "name": "web-e2e/6_Cache Agave.txt",
+      "bytes": 2467,
+      "crc": 1258928206
+    },
+    {
+      "name": "web-e2e/8_Select Agave 4.1.2.txt",
+      "bytes": 2567,
+      "crc": 4206552249
+    },
+    {
+      "name": "web-e2e/9_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3078,
+      "crc": 3231520820
+    },
+    {
+      "name": "web-e2e/10_The test-venue build (A49) and the mock venue are present.txt",
+      "bytes": 1674,
+      "crc": 2207331112
+    },
+    {
+      "name": "web-e2e/11_Run jdx_mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c.txt",
+      "bytes": 5957,
+      "crc": 3995082754
+    },
+    {
+      "name": "web-e2e/12_Run pnpm install --frozen-lockfile.txt",
+      "bytes": 3036,
+      "crc": 2559421540
+    },
+    {
+      "name": "web-e2e/13_Run pnpm --filter @shortwin_math-wasm build.txt",
+      "bytes": 3925,
+      "crc": 97418720
+    },
+    {
+      "name": "web-e2e/14_Playwright's Chromium (user cache, no --with-deps).txt",
+      "bytes": 9609,
+      "crc": 252960871
+    },
+    {
+      "name": "web-e2e/15_E2E (profile chain).txt",
+      "bytes": 32648,
+      "crc": 1144339594
+    },
+    {
+      "name": "web-e2e/16_E2E, the Mobile Wallet Adapter built off (O-6; the Android project, a rebuilt app).txt",
+      "bytes": 11052,
+      "crc": 2837170724
+    },
+    {
+      "name": "web-e2e/17_Screenshots of every page (e2e_specs_screens.spec.ts).txt",
+      "bytes": 3071,
+      "crc": 2362603047
+    },
+    {
+      "name": "web-e2e/34_Post Cache Agave.txt",
+      "bytes": 219,
+      "crc": 718732072
+    },
+    {
+      "name": "web-e2e/35_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3629,
+      "crc": 1686079900
+    },
+    {
+      "name": "web-e2e/36_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 4015654928
+    },
+    {
+      "name": "web-e2e/37_Complete job.txt",
+      "bytes": 61,
+      "crc": 2214998794
+    },
+    {
+      "name": "6_indexer.txt",
+      "bytes": 192954,
+      "crc": 2635240784
+    },
+    {
+      "name": "indexer/system.txt",
+      "bytes": 720,
+      "crc": 2627821700
+    },
+    {
+      "name": "8_services.txt",
+      "bytes": 2803672,
+      "crc": 996260508
+    },
+    {
+      "name": "services/system.txt",
+      "bytes": 721,
+      "crc": 3209078800
+    },
+    {
+      "name": "services/1_Set up job.txt",
+      "bytes": 2442,
+      "crc": 4103616611
+    },
+    {
+      "name": "services/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 8589,
+      "crc": 4291772787
+    },
+    {
+      "name": "services/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 848061195
+    },
+    {
+      "name": "services/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4473,
+      "crc": 2913267128
+    },
+    {
+      "name": "services/5_Run taiki-e_install-action@4cef1412cce204788f482e778a0b9187f9626a29.txt",
+      "bytes": 6853,
+      "crc": 3862569935
+    },
+    {
+      "name": "services/6_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3017,
+      "crc": 460369135
+    },
+    {
+      "name": "services/7_Run cargo fmt --manifest-path services_Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm -p shortwin-ops --check.txt",
+      "bytes": 1643,
+      "crc": 3379109375
+    },
+    {
+      "name": "services/8_Run cargo clippy --manifest-path services_Cargo.toml --workspace --all-targets --locked -- -D warnings.txt",
+      "bytes": 99038,
+      "crc": 85178758
+    },
+    {
+      "name": "services/9_The keeper on its release feature set (no test-venue).txt",
+      "bytes": 16981,
+      "crc": 4278849439
+    },
+    {
+      "name": "services/10_Temporary advisory review remains current.txt",
+      "bytes": 1480,
+      "crc": 1414584235
+    },
+    {
+      "name": "services/11_cargo deny (services_deny.toml).txt",
+      "bytes": 2370021,
+      "crc": 3407730987
+    },
+    {
+      "name": "services/12_cargo audit (services lockfile; dated usage-scoped exceptions).txt",
+      "bytes": 2906,
+      "crc": 2480369865
+    },
+    {
+      "name": "services/13_Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`).txt",
+      "bytes": 242745,
+      "crc": 4112577016
+    },
+    {
+      "name": "services/14_The keeper binary has no mock venue (A49).txt",
+      "bytes": 34125,
+      "crc": 2364225690
+    },
+    {
+      "name": "services/27_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3411,
+      "crc": 1200952468
+    },
+    {
+      "name": "services/28_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 3859289158
+    },
+    {
+      "name": "services/29_Complete job.txt",
+      "bytes": 61,
+      "crc": 682504121
+    },
+    {
+      "name": "9_t-pot.txt",
+      "bytes": 111824,
+      "crc": 2537093072
+    },
+    {
+      "name": "t-pot/system.txt",
+      "bytes": 718,
+      "crc": 3484986172
+    },
+    {
+      "name": "10_m1-cu.txt",
+      "bytes": 872190,
+      "crc": 2302638525
+    },
+    {
+      "name": "m1-cu/system.txt",
+      "bytes": 718,
+      "crc": 1136504045
+    },
+    {
+      "name": "11_t-size.txt",
+      "bytes": 137617,
+      "crc": 4074057224
+    },
+    {
+      "name": "t-size/system.txt",
+      "bytes": 719,
+      "crc": 482918031
+    },
+    {
+      "name": "12_fuzz-smoke.txt",
+      "bytes": 139078,
+      "crc": 3469375404
+    },
+    {
+      "name": "fuzz-smoke/system.txt",
+      "bytes": 723,
+      "crc": 3425819343
+    },
+    {
+      "name": "13_m6-cu.txt",
+      "bytes": 4211588,
+      "crc": 530470602
+    },
+    {
+      "name": "m6-cu/system.txt",
+      "bytes": 718,
+      "crc": 3694967938
+    },
+    {
+      "name": "14_m3-cu.txt",
+      "bytes": 3384888,
+      "crc": 887318531
+    },
+    {
+      "name": "m3-cu/system.txt",
+      "bytes": 718,
+      "crc": 732332994
+    },
+    {
+      "name": "15_m5-cu.txt",
+      "bytes": 4681636,
+      "crc": 3025457343
+    },
+    {
+      "name": "m5-cu/system.txt",
+      "bytes": 718,
+      "crc": 3731795549
+    },
+    {
+      "name": "16_verifiable-build.txt",
+      "bytes": 108709,
+      "crc": 819724151
+    },
+    {
+      "name": "verifiable-build/system.txt",
+      "bytes": 729,
+      "crc": 2304932383
+    },
+    {
+      "name": "17_wasm.txt",
+      "bytes": 28996,
+      "crc": 1219212238
+    },
+    {
+      "name": "wasm/system.txt",
+      "bytes": 717,
+      "crc": 2068182310
+    },
+    {
+      "name": "18_clippy.txt",
+      "bytes": 106335,
+      "crc": 597627765
+    },
+    {
+      "name": "clippy/system.txt",
+      "bytes": 719,
+      "crc": 4285591282
+    },
+    {
+      "name": "19_test.txt",
+      "bytes": 89301,
+      "crc": 2878263382
+    },
+    {
+      "name": "test/system.txt",
+      "bytes": 717,
+      "crc": 2915458409
+    },
+    {
+      "name": "20_cu-math.txt",
+      "bytes": 104601,
+      "crc": 2091929395
+    },
+    {
+      "name": "cu-math/system.txt",
+      "bytes": 720,
+      "crc": 1655761682
+    },
+    {
+      "name": "21_web.txt",
+      "bytes": 138376,
+      "crc": 470517644
+    },
+    {
+      "name": "web/system.txt",
+      "bytes": 716,
+      "crc": 3109852837
+    },
+    {
+      "name": "22_vectors.txt",
+      "bytes": 28926,
+      "crc": 3136879794
+    },
+    {
+      "name": "vectors/system.txt",
+      "bytes": 720,
+      "crc": 3610930990
+    },
+    {
+      "name": "23_fmt.txt",
+      "bytes": 19095,
+      "crc": 4241448818
+    },
+    {
+      "name": "fmt/system.txt",
+      "bytes": 716,
+      "crc": 3643250274
+    },
+    {
+      "name": "24_anchor-build.txt",
+      "bytes": 187455,
+      "crc": 2396610572
+    },
+    {
+      "name": "anchor-build/system.txt",
+      "bytes": 795,
+      "crc": 1217891737
+    },
+    {
+      "name": "25_deny.txt",
+      "bytes": 9628782,
+      "crc": 960256001
+    },
+    {
+      "name": "deny/system.txt",
+      "bytes": 717,
+      "crc": 1263721012
+    }
+  ],
+  "gzip_decompression_checks": [
+    {
+      "raw_file": "anchor-build-122110204276.log",
+      "raw_sha256": "52a60d738062d1749251d499dcb0b79e8562119e80ecbd039321b0a174894886",
+      "raw_bytes": 187455,
+      "gzip_file": "anchor-build-122110204276.log.gz",
+      "gzip_sha256": "bb6e582e70c74921893c4045dbfc4b244782f42e7e7aa8d854e2ad50bfacce74",
+      "gzip_bytes": 35835
+    },
+    {
+      "raw_file": "indexer-122115063321.log",
+      "raw_sha256": "5c6a984ba3cd30e951f0f2bd267f57ddc1d0d9d374c739194a9f1799ce8481da",
+      "raw_bytes": 192954,
+      "gzip_file": "indexer-122115063321.log.gz",
+      "gzip_sha256": "2ac334f71c0ff9eb9d9ce3c960b24b970fde47b6958085a52931bbb570a9a1f7",
+      "gzip_bytes": 40276
+    },
+    {
+      "raw_file": "mutants-122115063480.log",
+      "raw_sha256": "468007125c7fe44cbb177fb45ae87f159387a32b905ad21bc450e00a2830c3b5",
+      "raw_bytes": 44885,
+      "gzip_file": "mutants-122115063480.log.gz",
+      "gzip_sha256": "cc3f146a97dc7316814a7fb4114efa91ddcde68694a89f3822ee40f96f610ce7",
+      "gzip_bytes": 9503
+    },
+    {
+      "raw_file": "program-tests-122115063526.log",
+      "raw_sha256": "c0da7f017fa3505c0745a86848d7a0dfc6ff3c11d1362c9bb6afd839df40e509",
+      "raw_bytes": 291287,
+      "gzip_file": "program-tests-122115063526.log.gz",
+      "gzip_sha256": "e3d3e54134fecaec54166d15802f892621dfbb58c5b2108c8d56672b45a9bc36",
+      "gzip_bytes": 63225
+    },
+    {
+      "raw_file": "test-122110204516.log",
+      "raw_sha256": "6f09d46aff670041247f41342c6987b792f172cfd677245b41c4d43668cfca99",
+      "raw_bytes": 89301,
+      "gzip_file": "test-122110204516.log.gz",
+      "gzip_sha256": "5453a2efe5ac02c7418b223fb6fef92f9556064962903ac65d42778a900d3b66",
+      "gzip_bytes": 20596
+    },
+    {
+      "raw_file": "verifiable-build-122115063165.log",
+      "raw_sha256": "296199198e1b254d71a54af14b59748e8d452983b09fdc10f9579b3f5efa8859",
+      "raw_bytes": 108709,
+      "gzip_file": "verifiable-build-122115063165.log.gz",
+      "gzip_sha256": "2e142f1acf2d820a007f444f04e116597e34db67ddff790430f9f63520d694a2",
+      "gzip_bytes": 23186
+    },
+    {
+      "raw_file": "web-e2e-122115063329.log",
+      "raw_sha256": "bbdf267c8ad2febb9e6273c62ae63d39520d849f9e7bed80ca78719b38ecb49c",
+      "raw_bytes": 132655,
+      "gzip_file": "web-e2e-122115063329.log.gz",
+      "gzip_sha256": "e1a4dd513e94687fca8951495f7b7739dcf38ac3120ef37e608a70c9515559fd",
+      "gzip_bytes": 30217
+    }
+  ],
+  "core_hashes": {
+    "run-terminal.json": "f5ae9d26152d8cd98fcec2f5ba88fba8f5c04ec21b1ff9995e99890225a3ec85",
+    "jobs-terminal.json": "3603bd8b99a6245d66f1f6a7b6b0d2ae6138b1844c7c801a540bf04b237d4dc5",
+    "logs-terminal.zip": "f4bbf44b05044d4c2280b2dd51489ce74da35d5c6638709cbda505b4af0559d0",
+    "test-independent-observation.json": "f43a9efa09b7d8296cd758b95a18526eaa9bd497e9ba84d9c630c7d1d806edc3",
+    "web-e2e-independent-observation.json": "1c1ae6afa98f92475caa277c8b87807a35e062cff14d35167f49dccbcbc36eca",
+    "mutants-independent-observation.json": "e8ddceb2b988f6fa89355894d06d7d40cbb1897b08ed3c8eb32a94d8f40bed39",
+    "program-tests-independent-observation.json": "6669d6982b909df5d663e7a9a2bf7a518eaee46a8a5a1294b00ad7927f5d19da",
+    "ci-workflow-source.yml": "39cadbd3157ce9ecad7dfdb1ada7e5db9e8e76a0bcad12898527bbbfc3fdad30",
+    "mutants-script-source.sh": "bd39d3d4b5ca30c42fdfc6a15f89b08b5e28eb0517735c83d08c7b9c8b8c88f4"
+  },
+  "explicit_controls": {
+    "quote_math_groups": 10,
+    "route_header_tests": 8,
+    "unique_selected_mutants": 19,
+    "mutant_duplicate_summary_lines_not_extra": 19,
+    "mutants_tests_only": 12,
+    "mutants_tests_plus_3m_fuzz": 7,
+    "program_test_summaries": 86,
+    "program_summaries_failed": 0,
+    "token2022_and_clock_named_controls": 11,
+    "explicit_ignored_program_tests": 5,
+    "browser_chain_tests": 125,
+    "browser_mobile_adapter_off_tests": 9,
+    "positions_pass_duration_seconds": 5.2
+  },
+  "limitations": [
+    "This receipt identifies exact head 3a35d6ee1827285901acb9fb01a5634e21b3d40c only; it does not assert coverage of later branch commits.",
+    "fuzz-nightly was skipped under the pinned workflow conditional; neither this run nor the 3-minute mutant checks establish a fresh 24-hour qualification.",
+    "Selected mutants exercise the existing program/math paths, not full Jupiter execution authorization or signed oracle integration.",
+    "No live valid provider attestation, SBF verifier, deployed feed, production operation, financial risk defaults, external audit, bounty funding or mainnet qualification is established.",
+    "No dispatch, rerun, cancellation, source mutation or third-party contact was performed by this monitor."
+  ]
+}

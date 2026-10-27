@@ -1,0 +1,1254 @@
+{
+  "authorship": "Independent AI evidence retention by /root/launch_policy_inventory; no external audit or qualification claim",
+  "verified_at": "2026-10-27T10:06:40.490531+00:00",
+  "run": 40476629768,
+  "head_sha": "21db9fadb888e0a29f999e3346f18dc603b9b999",
+  "event": "pull_request",
+  "status": "completed",
+  "conclusion": "failure",
+  "created_at": "2026-10-27T08:52:58Z",
+  "run_started_at": "2026-10-27T08:52:58Z",
+  "updated_at": "2026-10-27T10:04:39Z",
+  "job_counts": {
+    "success": 23,
+    "failure": 1,
+    "skipped": 2
+  },
+  "failed": [
+    {
+      "name": "indexer",
+      "id": 122100809989,
+      "completed_at": "2026-10-27T09:09:59Z"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "fuzz-nightly",
+      "id": 122100811614
+    },
+    {
+      "name": "mutants",
+      "id": 122100812219
+    }
+  ],
+  "zip_crc_validation": "all entries passed",
+  "zip_members": [
+    {
+      "name": "0_verifiable-build.txt",
+      "bytes": 109415,
+      "crc": 2755432428
+    },
+    {
+      "name": "verifiable-build/system.txt",
+      "bytes": 705,
+      "crc": 2269953752
+    },
+    {
+      "name": "verifiable-build/1_Set up job.txt",
+      "bytes": 2443,
+      "crc": 2171600013
+    },
+    {
+      "name": "verifiable-build/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 3224412117
+    },
+    {
+      "name": "verifiable-build/3_Rust toolchain from rust-toolchain.toml (to install solana-verify).txt",
+      "bytes": 1783,
+      "crc": 3109862696
+    },
+    {
+      "name": "verifiable-build/4_Cache solana-verify 0.5.2.txt",
+      "bytes": 1626,
+      "crc": 2459361864
+    },
+    {
+      "name": "verifiable-build/5_Install solana-verify 0.5.2.txt",
+      "bytes": 65139,
+      "crc": 1103331295
+    },
+    {
+      "name": "verifiable-build/6_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 2974,
+      "crc": 4009456524
+    },
+    {
+      "name": "verifiable-build/7_Verifiable build of shortwin; byte-equal to the anchor-build artifact.txt",
+      "bytes": 13894,
+      "crc": 59587803
+    },
+    {
+      "name": "verifiable-build/8_Only the pinned image was used.txt",
+      "bytes": 1591,
+      "crc": 1275288965
+    },
+    {
+      "name": "verifiable-build/9_Verifiable artifacts have no mock venue and no test-venue code path (A49).txt",
+      "bytes": 2084,
+      "crc": 749034713
+    },
+    {
+      "name": "verifiable-build/10_Job summary.txt",
+      "bytes": 1465,
+      "crc": 1432695144
+    },
+    {
+      "name": "verifiable-build/11_Run actions_upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a.txt",
+      "bytes": 2694,
+      "crc": 3952883753
+    },
+    {
+      "name": "verifiable-build/21_Post Cache solana-verify 0.5.2.txt",
+      "bytes": 397,
+      "crc": 4042578263
+    },
+    {
+      "name": "verifiable-build/22_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 4036734925
+    },
+    {
+      "name": "verifiable-build/23_Complete job.txt",
+      "bytes": 61,
+      "crc": 2607989602
+    },
+    {
+      "name": "1_m2-cu.txt",
+      "bytes": 1144715,
+      "crc": 3122875522
+    },
+    {
+      "name": "m2-cu/system.txt",
+      "bytes": 694,
+      "crc": 4198457938
+    },
+    {
+      "name": "m2-cu/1_Set up job.txt",
+      "bytes": 2270,
+      "crc": 152099563
+    },
+    {
+      "name": "m2-cu/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 3370315600
+    },
+    {
+      "name": "m2-cu/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 1812440451
+    },
+    {
+      "name": "m2-cu/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3985,
+      "crc": 2614810808
+    },
+    {
+      "name": "m2-cu/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 527979120
+    },
+    {
+      "name": "m2-cu/6_Run cargo fmt --manifest-path tests_bench_m2_cu_Cargo.toml -p m2-cu-bench --check.txt",
+      "bytes": 1415,
+      "crc": 3691936215
+    },
+    {
+      "name": "m2-cu/7_Run cargo clippy --manifest-path tests_bench_m2_cu_Cargo.toml --all-targets --locked -- -D warnings.txt",
+      "bytes": 64466,
+      "crc": 1795268486
+    },
+    {
+      "name": "m2-cu/8_Budgets and T-TRACE (fails above a budget, above 64 trace entries, or on a failed case).txt",
+      "bytes": 1043712,
+      "crc": 757249150
+    },
+    {
+      "name": "m2-cu/9_results.md and trace.md are current (informational).txt",
+      "bytes": 7971,
+      "crc": 1610295724
+    },
+    {
+      "name": "m2-cu/17_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 2766,
+      "crc": 3727916512
+    },
+    {
+      "name": "m2-cu/18_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 2889461684
+    },
+    {
+      "name": "m2-cu/19_Complete job.txt",
+      "bytes": 61,
+      "crc": 4053562836
+    },
+    {
+      "name": "2_t-pot.txt",
+      "bytes": 112510,
+      "crc": 1065142983
+    },
+    {
+      "name": "t-pot/system.txt",
+      "bytes": 694,
+      "crc": 650562518
+    },
+    {
+      "name": "t-pot/1_Set up job.txt",
+      "bytes": 2270,
+      "crc": 2735284435
+    },
+    {
+      "name": "t-pot/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 3774245731
+    },
+    {
+      "name": "t-pot/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 1339114168
+    },
+    {
+      "name": "t-pot/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4818,
+      "crc": 3067756150
+    },
+    {
+      "name": "t-pot/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 792165302
+    },
+    {
+      "name": "t-pot/6_T-POT, every trace (SHORTWIN_TRACES=full).txt",
+      "bytes": 83639,
+      "crc": 514453217
+    },
+    {
+      "name": "t-pot/11_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3644,
+      "crc": 3052246949
+    },
+    {
+      "name": "t-pot/12_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 1271065063
+    },
+    {
+      "name": "t-pot/13_Complete job.txt",
+      "bytes": 61,
+      "crc": 3397333726
+    },
+    {
+      "name": "3_m5-cu.txt",
+      "bytes": 4682858,
+      "crc": 1501047294
+    },
+    {
+      "name": "m5-cu/system.txt",
+      "bytes": 694,
+      "crc": 1013560273
+    },
+    {
+      "name": "m5-cu/1_Set up job.txt",
+      "bytes": 2427,
+      "crc": 1510266717
+    },
+    {
+      "name": "m5-cu/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 2284935657
+    },
+    {
+      "name": "m5-cu/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 2462170819
+    },
+    {
+      "name": "m5-cu/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4117,
+      "crc": 2744201224
+    },
+    {
+      "name": "m5-cu/5_Cache Agave and platform-tools.txt",
+      "bytes": 2965,
+      "crc": 2130761919
+    },
+    {
+      "name": "m5-cu/7_Select Agave 4.1.2.txt",
+      "bytes": 2278,
+      "crc": 2099434767
+    },
+    {
+      "name": "m5-cu/8_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 2906139046
+    },
+    {
+      "name": "m5-cu/9_Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed).txt",
+      "bytes": 3579,
+      "crc": 1371449153
+    },
+    {
+      "name": "m5-cu/10_Run cargo fmt --manifest-path tests_bench_m5_cu_Cargo.toml --all --check.txt",
+      "bytes": 1397,
+      "crc": 3720566154
+    },
+    {
+      "name": "m5-cu/11_Run cargo clippy --manifest-path tests_bench_m5_cu_Cargo.toml --workspace --all-targets --locked -- -D warnings.txt",
+      "bytes": 33341,
+      "crc": 2682364502
+    },
+    {
+      "name": "m5-cu/12_Budgets, T-TRACE, sizes and depth (fails above a budget or CU limit, off the expected trace, peak or depth, above 64 entries or 1,232 B v0, or on a failed case).txt",
+      "bytes": 4609667,
+      "crc": 2642497680
+    },
+    {
+      "name": "m5-cu/13_results.md, trace.md and depth.md are current (informational).txt",
+      "bytes": 1693,
+      "crc": 1055513745
+    },
+    {
+      "name": "m5-cu/24_Post Cache Agave and platform-tools.txt",
+      "bytes": 235,
+      "crc": 3300072686
+    },
+    {
+      "name": "m5-cu/25_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3041,
+      "crc": 2781547381
+    },
+    {
+      "name": "m5-cu/26_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 3354680237
+    },
+    {
+      "name": "m5-cu/27_Complete job.txt",
+      "bytes": 61,
+      "crc": 2462429721
+    },
+    {
+      "name": "4_t-size.txt",
+      "bytes": 138100,
+      "crc": 118130941
+    },
+    {
+      "name": "t-size/system.txt",
+      "bytes": 695,
+      "crc": 2431790911
+    },
+    {
+      "name": "t-size/1_Set up job.txt",
+      "bytes": 2441,
+      "crc": 4091912983
+    },
+    {
+      "name": "t-size/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 3351380931
+    },
+    {
+      "name": "t-size/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 1156078715
+    },
+    {
+      "name": "t-size/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 5741,
+      "crc": 1992556371
+    },
+    {
+      "name": "t-size/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 3341540814
+    },
+    {
+      "name": "t-size/6_T-SIZE, Raydium (v0 through the protocol ALT, executed on the fork).txt",
+      "bytes": 74281,
+      "crc": 3587564653
+    },
+    {
+      "name": "t-size/7_T-SIZE, the pump curve (v0 through the protocol ALT, executed on the fork).txt",
+      "bytes": 12605,
+      "crc": 2202574259
+    },
+    {
+      "name": "t-size/8_T-SIZE, PumpSwap (v0 through the protocol ALT, executed on the fork).txt",
+      "bytes": 11149,
+      "crc": 2418269248
+    },
+    {
+      "name": "t-size/9_The protocol ALT's static part (scripts_build-alt.sh print).txt",
+      "bytes": 6402,
+      "crc": 2726169224
+    },
+    {
+      "name": "t-size/10_Run actions_upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a.txt",
+      "bytes": 2671,
+      "crc": 2514303010
+    },
+    {
+      "name": "t-size/19_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4683,
+      "crc": 2735695436
+    },
+    {
+      "name": "t-size/20_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 891762034
+    },
+    {
+      "name": "t-size/21_Complete job.txt",
+      "bytes": 61,
+      "crc": 771885732
+    },
+    {
+      "name": "5_services.txt",
+      "bytes": 2804066,
+      "crc": 4255421674
+    },
+    {
+      "name": "services/system.txt",
+      "bytes": 697,
+      "crc": 2507368789
+    },
+    {
+      "name": "services/1_Set up job.txt",
+      "bytes": 2440,
+      "crc": 1688113975
+    },
+    {
+      "name": "services/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 2899901719
+    },
+    {
+      "name": "services/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 3922466990
+    },
+    {
+      "name": "services/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4473,
+      "crc": 4192607021
+    },
+    {
+      "name": "services/5_Run taiki-e_install-action@4cef1412cce204788f482e778a0b9187f9626a29.txt",
+      "bytes": 6853,
+      "crc": 1464850980
+    },
+    {
+      "name": "services/6_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 3145509560
+    },
+    {
+      "name": "services/7_Run cargo fmt --manifest-path services_Cargo.toml -p shortwin-services-common -p shortwin-keeper -p shortwin-keeper-litesvm -p shortwin-indexer -p shortwin-indexer-litesvm -p shortwin-ops --check.txt",
+      "bytes": 1643,
+      "crc": 3524231594
+    },
+    {
+      "name": "services/8_Run cargo clippy --manifest-path services_Cargo.toml --workspace --all-targets --locked -- -D warnings.txt",
+      "bytes": 99038,
+      "crc": 1867652139
+    },
+    {
+      "name": "services/9_The keeper on its release feature set (no test-venue).txt",
+      "bytes": 16981,
+      "crc": 933447570
+    },
+    {
+      "name": "services/10_Temporary advisory review remains current.txt",
+      "bytes": 1480,
+      "crc": 1078648237
+    },
+    {
+      "name": "services/11_cargo deny (services_deny.toml).txt",
+      "bytes": 2370021,
+      "crc": 210863223
+    },
+    {
+      "name": "services/12_cargo audit (services lockfile; dated usage-scoped exceptions).txt",
+      "bytes": 2906,
+      "crc": 771881299
+    },
+    {
+      "name": "services/13_Keeper and shortwin-gov unit tests, LiteSVM scenarios and T-OPS (the indexer crates run in `indexer`).txt",
+      "bytes": 242662,
+      "crc": 3745709449
+    },
+    {
+      "name": "services/14_The keeper binary has no mock venue (A49).txt",
+      "bytes": 34125,
+      "crc": 2895055314
+    },
+    {
+      "name": "services/27_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3329,
+      "crc": 3734853248
+    },
+    {
+      "name": "services/28_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 1180928672
+    },
+    {
+      "name": "services/29_Complete job.txt",
+      "bytes": 61,
+      "crc": 638487313
+    },
+    {
+      "name": "6_fuzz-smoke.txt",
+      "bytes": 139639,
+      "crc": 1665358162
+    },
+    {
+      "name": "fuzz-smoke/system.txt",
+      "bytes": 699,
+      "crc": 1112094445
+    },
+    {
+      "name": "fuzz-smoke/1_Set up job.txt",
+      "bytes": 2443,
+      "crc": 1271703836
+    },
+    {
+      "name": "fuzz-smoke/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9636,
+      "crc": 3131829143
+    },
+    {
+      "name": "fuzz-smoke/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 2268,
+      "crc": 1172613524
+    },
+    {
+      "name": "fuzz-smoke/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 5442,
+      "crc": 1059828943
+    },
+    {
+      "name": "fuzz-smoke/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3501,
+      "crc": 2596100283
+    },
+    {
+      "name": "fuzz-smoke/6_Fuzz smoke, corpus replays, harness self-tests.txt",
+      "bytes": 92260,
+      "crc": 3216914239
+    },
+    {
+      "name": "fuzz-smoke/8_Build and retain source-pinned fuzz runtime.txt",
+      "bytes": 12524,
+      "crc": 267800719
+    },
+    {
+      "name": "fuzz-smoke/9_Source-pinned standalone fuzz runtime for qualification host.txt",
+      "bytes": 3527,
+      "crc": 4146941747
+    },
+    {
+      "name": "fuzz-smoke/17_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3855,
+      "crc": 2236105210
+    },
+    {
+      "name": "fuzz-smoke/18_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 415170338
+    },
+    {
+      "name": "fuzz-smoke/19_Complete job.txt",
+      "bytes": 61,
+      "crc": 2902865418
+    },
+    {
+      "name": "7_m7-keeper-bench.txt",
+      "bytes": 218207,
+      "crc": 949566679
+    },
+    {
+      "name": "m7-keeper-bench/system.txt",
+      "bytes": 704,
+      "crc": 1882527413
+    },
+    {
+      "name": "m7-keeper-bench/1_Set up job.txt",
+      "bytes": 2277,
+      "crc": 2448729701
+    },
+    {
+      "name": "m7-keeper-bench/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 4183779607
+    },
+    {
+      "name": "m7-keeper-bench/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 760943240
+    },
+    {
+      "name": "m7-keeper-bench/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4522,
+      "crc": 3415668885
+    },
+    {
+      "name": "m7-keeper-bench/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 112142587
+    },
+    {
+      "name": "m7-keeper-bench/6_Keeper cost inputs, PumpSwap 4-extras T-SIZE, T-CASCADE (release).txt",
+      "bytes": 144181,
+      "crc": 291780838
+    },
+    {
+      "name": "m7-keeper-bench/7_The committed figures are current (informational).txt",
+      "bytes": 45726,
+      "crc": 753654449
+    },
+    {
+      "name": "m7-keeper-bench/13_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3365,
+      "crc": 447660684
+    },
+    {
+      "name": "m7-keeper-bench/14_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 1433953712
+    },
+    {
+      "name": "m7-keeper-bench/15_Complete job.txt",
+      "bytes": 61,
+      "crc": 884753724
+    },
+    {
+      "name": "8_m6-cu.txt",
+      "bytes": 4214247,
+      "crc": 1464270309
+    },
+    {
+      "name": "m6-cu/system.txt",
+      "bytes": 694,
+      "crc": 2351552756
+    },
+    {
+      "name": "m6-cu/1_Set up job.txt",
+      "bytes": 2427,
+      "crc": 2393584808
+    },
+    {
+      "name": "m6-cu/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 1090786740
+    },
+    {
+      "name": "m6-cu/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 1860629854
+    },
+    {
+      "name": "m6-cu/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4117,
+      "crc": 37896521
+    },
+    {
+      "name": "m6-cu/5_Cache Agave and platform-tools.txt",
+      "bytes": 2647,
+      "crc": 3620918148
+    },
+    {
+      "name": "m6-cu/7_Select Agave 4.1.2.txt",
+      "bytes": 2278,
+      "crc": 3067002803
+    },
+    {
+      "name": "m6-cu/8_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 1147497147
+    },
+    {
+      "name": "m6-cu/9_Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed).txt",
+      "bytes": 3579,
+      "crc": 1812727752
+    },
+    {
+      "name": "m6-cu/10_Run cargo fmt --manifest-path tests_bench_m6_cu_Cargo.toml --all --check.txt",
+      "bytes": 1397,
+      "crc": 4289775216
+    },
+    {
+      "name": "m6-cu/11_Run cargo clippy --manifest-path tests_bench_m6_cu_Cargo.toml --workspace --all-targets --locked -- -D warnings.txt",
+      "bytes": 33341,
+      "crc": 2129239819
+    },
+    {
+      "name": "m6-cu/12_Budgets, T-TRACE, sizes and depth (fails above a budget or CU limit, off the expected trace, peak or depth, above 64 entries or 1,232 B v0, or on a failed case).txt",
+      "bytes": 4137091,
+      "crc": 3304720276
+    },
+    {
+      "name": "m6-cu/13_results.md, trace.md and depth.md are current (informational).txt",
+      "bytes": 6125,
+      "crc": 7480432
+    },
+    {
+      "name": "m6-cu/24_Post Cache Agave and platform-tools.txt",
+      "bytes": 235,
+      "crc": 3264386935
+    },
+    {
+      "name": "m6-cu/25_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 2892,
+      "crc": 641771540
+    },
+    {
+      "name": "m6-cu/26_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 1948211997
+    },
+    {
+      "name": "m6-cu/27_Complete job.txt",
+      "bytes": 61,
+      "crc": 429176222
+    },
+    {
+      "name": "9_m3-cu.txt",
+      "bytes": 3385490,
+      "crc": 1701418863
+    },
+    {
+      "name": "m3-cu/system.txt",
+      "bytes": 694,
+      "crc": 4062505970
+    },
+    {
+      "name": "m3-cu/1_Set up job.txt",
+      "bytes": 2428,
+      "crc": 1221082786
+    },
+    {
+      "name": "m3-cu/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 2524662150
+    },
+    {
+      "name": "m3-cu/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 1114654083
+    },
+    {
+      "name": "m3-cu/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4117,
+      "crc": 2632960993
+    },
+    {
+      "name": "m3-cu/5_Cache Agave and platform-tools.txt",
+      "bytes": 2893,
+      "crc": 2126719509
+    },
+    {
+      "name": "m3-cu/7_Select Agave 4.1.2.txt",
+      "bytes": 2278,
+      "crc": 3820543663
+    },
+    {
+      "name": "m3-cu/8_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 3841026108
+    },
+    {
+      "name": "m3-cu/9_Build the TEST-ONLY CPI wrapper (platform-tools v1.57, SBPF v3; never deployed).txt",
+      "bytes": 3579,
+      "crc": 3869805582
+    },
+    {
+      "name": "m3-cu/10_Run cargo fmt --manifest-path tests_bench_m3_cu_Cargo.toml --all --check.txt",
+      "bytes": 1397,
+      "crc": 4036007985
+    },
+    {
+      "name": "m3-cu/11_Run cargo clippy --manifest-path tests_bench_m3_cu_Cargo.toml --workspace --all-targets --locked -- -D warnings.txt",
+      "bytes": 33341,
+      "crc": 3391859644
+    },
+    {
+      "name": "m3-cu/12_Budgets, T-TRACE and depth (fails above a budget, off the expected trace or depth, above 64 entries, or on a failed case).txt",
+      "bytes": 3312450,
+      "crc": 2159872135
+    },
+    {
+      "name": "m3-cu/13_results.md, trace.md and depth.md are current (informational).txt",
+      "bytes": 1693,
+      "crc": 604463393
+    },
+    {
+      "name": "m3-cu/24_Post Cache Agave and platform-tools.txt",
+      "bytes": 235,
+      "crc": 3583243878
+    },
+    {
+      "name": "m3-cu/25_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 2961,
+      "crc": 248826810
+    },
+    {
+      "name": "m3-cu/26_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 3308941956
+    },
+    {
+      "name": "m3-cu/27_Complete job.txt",
+      "bytes": 61,
+      "crc": 2068598564
+    },
+    {
+      "name": "10_program-tests.txt",
+      "bytes": 290862,
+      "crc": 3675008415
+    },
+    {
+      "name": "program-tests/system.txt",
+      "bytes": 702,
+      "crc": 3486634042
+    },
+    {
+      "name": "program-tests/1_Set up job.txt",
+      "bytes": 2443,
+      "crc": 3442978552
+    },
+    {
+      "name": "program-tests/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 4225692699
+    },
+    {
+      "name": "program-tests/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 2209628382
+    },
+    {
+      "name": "program-tests/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4874,
+      "crc": 4053375240
+    },
+    {
+      "name": "program-tests/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 2673415341
+    },
+    {
+      "name": "program-tests/6_Run actions_setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97.txt",
+      "bytes": 1732,
+      "crc": 3143945805
+    },
+    {
+      "name": "program-tests/7_Mainnet fixtures match their recorded checksums (tests_fixtures_manifest.json).txt",
+      "bytes": 2139,
+      "crc": 320451026
+    },
+    {
+      "name": "program-tests/8_T-LAYOUT wasm32 leg.txt",
+      "bytes": 34735,
+      "crc": 3247536601
+    },
+    {
+      "name": "program-tests/9_shortwin unit tests without test-venue.txt",
+      "bytes": 26081,
+      "crc": 1592035735
+    },
+    {
+      "name": "program-tests/10_Run cargo test -p shortwin -p shortwin-venue-state -p shortwin-litesvm-tests --locked.txt",
+      "bytes": 196920,
+      "crc": 2893021893
+    },
+    {
+      "name": "program-tests/18_Post Run actions_setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97.txt",
+      "bytes": 50,
+      "crc": 1165295737
+    },
+    {
+      "name": "program-tests/19_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3764,
+      "crc": 1279237857
+    },
+    {
+      "name": "program-tests/20_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 235048891
+    },
+    {
+      "name": "program-tests/21_Complete job.txt",
+      "bytes": 61,
+      "crc": 168836339
+    },
+    {
+      "name": "11_m1-cu.txt",
+      "bytes": 872001,
+      "crc": 4147257646
+    },
+    {
+      "name": "m1-cu/system.txt",
+      "bytes": 694,
+      "crc": 218467749
+    },
+    {
+      "name": "m1-cu/1_Set up job.txt",
+      "bytes": 2267,
+      "crc": 1276564195
+    },
+    {
+      "name": "m1-cu/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9151,
+      "crc": 2842454532
+    },
+    {
+      "name": "m1-cu/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1783,
+      "crc": 2177065932
+    },
+    {
+      "name": "m1-cu/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3985,
+      "crc": 2752679706
+    },
+    {
+      "name": "m1-cu/5_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3016,
+      "crc": 3935236494
+    },
+    {
+      "name": "m1-cu/6_Run cargo fmt --manifest-path tests_bench_m1_cu_Cargo.toml -p m1-cu-bench --check.txt",
+      "bytes": 1415,
+      "crc": 3740537701
+    },
+    {
+      "name": "m1-cu/7_Run cargo clippy --manifest-path tests_bench_m1_cu_Cargo.toml --all-targets --locked -- -D warnings.txt",
+      "bytes": 64466,
+      "crc": 3432443454
+    },
+    {
+      "name": "m1-cu/8_Budgets (fails above a budget or on a failed case).txt",
+      "bytes": 773368,
+      "crc": 3767756046
+    },
+    {
+      "name": "m1-cu/9_results.md is current (informational).txt",
+      "bytes": 5604,
+      "crc": 814811638
+    },
+    {
+      "name": "m1-cu/17_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 2766,
+      "crc": 1641360998
+    },
+    {
+      "name": "m1-cu/18_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 2954738454
+    },
+    {
+      "name": "m1-cu/19_Complete job.txt",
+      "bytes": 61,
+      "crc": 4089059265
+    },
+    {
+      "name": "12_web-e2e.txt",
+      "bytes": 137221,
+      "crc": 3301376892
+    },
+    {
+      "name": "web-e2e/system.txt",
+      "bytes": 696,
+      "crc": 576973993
+    },
+    {
+      "name": "web-e2e/1_Set up job.txt",
+      "bytes": 2764,
+      "crc": 3083662663
+    },
+    {
+      "name": "web-e2e/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9212,
+      "crc": 581623882
+    },
+    {
+      "name": "web-e2e/3_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 1844,
+      "crc": 3485050701
+    },
+    {
+      "name": "web-e2e/4_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4825,
+      "crc": 3524476586
+    },
+    {
+      "name": "web-e2e/5_wasm-bindgen CLI (the crate's exact pin).txt",
+      "bytes": 27484,
+      "crc": 1800713101
+    },
+    {
+      "name": "web-e2e/6_Cache Agave.txt",
+      "bytes": 2467,
+      "crc": 2988342178
+    },
+    {
+      "name": "web-e2e/8_Select Agave 4.1.2.txt",
+      "bytes": 2567,
+      "crc": 3941102208
+    },
+    {
+      "name": "web-e2e/9_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3077,
+      "crc": 2329143678
+    },
+    {
+      "name": "web-e2e/10_The test-venue build (A49) and the mock venue are present.txt",
+      "bytes": 1674,
+      "crc": 1194518085
+    },
+    {
+      "name": "web-e2e/11_Run jdx_mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c.txt",
+      "bytes": 6038,
+      "crc": 3888789521
+    },
+    {
+      "name": "web-e2e/12_Run pnpm install --frozen-lockfile.txt",
+      "bytes": 3034,
+      "crc": 2507315085
+    },
+    {
+      "name": "web-e2e/13_Run pnpm --filter @shortwin_math-wasm build.txt",
+      "bytes": 3925,
+      "crc": 2626494269
+    },
+    {
+      "name": "web-e2e/14_Playwright's Chromium (user cache, no --with-deps).txt",
+      "bytes": 9609,
+      "crc": 2864853272
+    },
+    {
+      "name": "web-e2e/15_E2E (profile chain).txt",
+      "bytes": 36575,
+      "crc": 3889216047
+    },
+    {
+      "name": "web-e2e/16_E2E, the Mobile Wallet Adapter built off (O-6; the Android project, a rebuilt app).txt",
+      "bytes": 11051,
+      "crc": 2240765281
+    },
+    {
+      "name": "web-e2e/17_Screenshots of every page (e2e_specs_screens.spec.ts).txt",
+      "bytes": 3071,
+      "crc": 808807338
+    },
+    {
+      "name": "web-e2e/34_Post Cache Agave.txt",
+      "bytes": 219,
+      "crc": 1537307522
+    },
+    {
+      "name": "web-e2e/35_Post Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 3629,
+      "crc": 2906593829
+    },
+    {
+      "name": "web-e2e/36_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 3388064750
+    },
+    {
+      "name": "web-e2e/37_Complete job.txt",
+      "bytes": 61,
+      "crc": 460409583
+    },
+    {
+      "name": "13_indexer.txt",
+      "bytes": 136000,
+      "crc": 2874358896
+    },
+    {
+      "name": "indexer/system.txt",
+      "bytes": 696,
+      "crc": 2316164328
+    },
+    {
+      "name": "indexer/1_Set up job.txt",
+      "bytes": 2429,
+      "crc": 923290065
+    },
+    {
+      "name": "indexer/2_Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 9501,
+      "crc": 2566733716
+    },
+    {
+      "name": "indexer/3_Free runner disk space.txt",
+      "bytes": 2060,
+      "crc": 1149672296
+    },
+    {
+      "name": "indexer/4_Rust toolchain from rust-toolchain.toml.txt",
+      "bytes": 2133,
+      "crc": 718294132
+    },
+    {
+      "name": "indexer/5_Run Swatinem_rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6.txt",
+      "bytes": 4816,
+      "crc": 3322489937
+    },
+    {
+      "name": "indexer/6_Cache the embedded PostgreSQL binaries (INDEXER.md \u00a711.1).txt",
+      "bytes": 2049,
+      "crc": 332597592
+    },
+    {
+      "name": "indexer/7_Cache Agave (solana-test-validator).txt",
+      "bytes": 2829,
+      "crc": 1396109206
+    },
+    {
+      "name": "indexer/9_Select Agave 4.1.2.txt",
+      "bytes": 2628,
+      "crc": 4274776997
+    },
+    {
+      "name": "indexer/10_Run actions_download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c.txt",
+      "bytes": 3366,
+      "crc": 2492752706
+    },
+    {
+      "name": "indexer/11_The embedded-Postgres fixture (downloads the binaries on a cold cache).txt",
+      "bytes": 83034,
+      "crc": 2913168245
+    },
+    {
+      "name": "indexer/12_Indexer \u2014 unit and decoder tests, ingest, analytics, the API contract (seed and replayed sessions), the security review's regressions and its 30-day load test.txt",
+      "bytes": 16978,
+      "crc": 3210085340
+    },
+    {
+      "name": "indexer/32_Post Run actions_checkout@3d3c42e5aac5ba805825da76410c181273ba90b1.txt",
+      "bytes": 4152,
+      "crc": 3329869868
+    },
+    {
+      "name": "indexer/33_Complete job.txt",
+      "bytes": 61,
+      "crc": 2637829034
+    },
+    {
+      "name": "14_codama.txt",
+      "bytes": 38662,
+      "crc": 488450103
+    },
+    {
+      "name": "codama/system.txt",
+      "bytes": 695,
+      "crc": 2035735432
+    },
+    {
+      "name": "17_clippy.txt",
+      "bytes": 106897,
+      "crc": 3481665013
+    },
+    {
+      "name": "clippy/system.txt",
+      "bytes": 695,
+      "crc": 559211704
+    },
+    {
+      "name": "18_cu-math.txt",
+      "bytes": 105162,
+      "crc": 3936852253
+    },
+    {
+      "name": "cu-math/system.txt",
+      "bytes": 696,
+      "crc": 3096565390
+    },
+    {
+      "name": "19_deny.txt",
+      "bytes": 9629344,
+      "crc": 3619235225
+    },
+    {
+      "name": "deny/system.txt",
+      "bytes": 693,
+      "crc": 157940653
+    },
+    {
+      "name": "20_wasm.txt",
+      "bytes": 29480,
+      "crc": 799206218
+    },
+    {
+      "name": "wasm/system.txt",
+      "bytes": 693,
+      "crc": 3728206169
+    },
+    {
+      "name": "21_web.txt",
+      "bytes": 139653,
+      "crc": 294076477
+    },
+    {
+      "name": "web/system.txt",
+      "bytes": 692,
+      "crc": 2526056360
+    },
+    {
+      "name": "22_anchor-build.txt",
+      "bytes": 187797,
+      "crc": 326079358
+    },
+    {
+      "name": "anchor-build/system.txt",
+      "bytes": 771,
+      "crc": 771562334
+    },
+    {
+      "name": "23_fmt.txt",
+      "bytes": 19655,
+      "crc": 142378061
+    },
+    {
+      "name": "fmt/system.txt",
+      "bytes": 692,
+      "crc": 3625092460
+    },
+    {
+      "name": "24_test.txt",
+      "bytes": 96528,
+      "crc": 2369233507
+    },
+    {
+      "name": "test/system.txt",
+      "bytes": 693,
+      "crc": 416962120
+    },
+    {
+      "name": "25_vectors.txt",
+      "bytes": 29485,
+      "crc": 308203382
+    },
+    {
+      "name": "vectors/system.txt",
+      "bytes": 696,
+      "crc": 2744005876
+    }
+  ],
+  "core_hashes": {
+    "run-terminal.json": "75e86bbc26988bf24fb475f7f2b62384cd058046607165c2646990cb90deda74",
+    "jobs-terminal.json": "2b616f0f62a4bf509175b93be07003d35a208d7d62cb6e1ddcd559496b4676e5",
+    "logs-terminal.zip": "b9e24f34db95a6c327fb8d541835792b332cbb54d8f67b433b0c6657ad5f0463",
+    "indexer-122100809989.log": "822c3b27a664acc094703a350241f1327116fb01765cae6b2fc2de1a75ae3f7f",
+    "program-tests-122100810003.log": "fec14a0d80821be9ab22b8ac8b4dc9aa577fc7d24182bfdc0a3905884e094756"
+  },
+  "limitations": [
+    "Terminal CI evidence for exact head only; later commits not covered by this identity.",
+    "Known indexer WS test failure remains recorded; no rerun or cancellation.",
+    "No provider, external audit, deployment, live attestation, SBF verifier or 24-hour fuzz qualification is claimed."
+  ]
+}
