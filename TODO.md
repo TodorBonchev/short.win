@@ -28,17 +28,17 @@ opening-notional cap is 25 SOL per market, not a global TVL or loss cap. See the
 [current release plan](docs/release/MAINNET-1.0.3.md) and
 [dated decision](docs/audit/owner-mainnet-decision-1.0.3-2026-10-27.md).
 
-- [ ] Review and qualify the newly changed Token-2022 executable (deploy slot
-      460,497,271; live check failed on October 27), preserving the old fixture and
-      frozen evidence. [Current diagnostic evidence](docs/audit/probes/mainnet-preparation-2026-10-27/README.md).
-      Do not tag a mainnet-ready release by silently repinning this dependency.
-- [ ] Finish the new Token-2022 baseline execution/bench/CI and fresh all-profile
-      24-hour campaign, repeat current live identities, then select final `v1.0.3`.
-      [New-baseline qualification and browser clock repair](docs/audit/token2022-qualification-1.0.3-2026-10-27.md)
-      remain in progress; the reviewed new baseline passes the dated live check.
-      [Preparation CI passed](docs/audit/probes/mainnet-preparation-2026-10-27/ci-40434130363/README.md)
-      on `57bc1c845` with canonical bytes and 19 selected mutants killed; it still
-      uses the old upstream fixture. A source tag does not prove funded operation.
+- [ ] After the pending Jupiter architecture decision, qualify the selected release
+      inputs and repeat current live identities before selecting final `v1.0.3`.
+      The [Token-2022 engineering follow-up](docs/audit/token2022-qualification-1.0.3-2026-10-27.md)
+      is complete: repaired PR CI 40443684567 passed 24 jobs with two intentional
+      skips; source-equivalent dispatch 40440067371 killed all 19 selected mutants
+      and failed only its subsequently repaired browser test. This combines two
+      accurately scoped runs, not one 25-job repaired manual run.
+      The fresh all-profile 24-hour campaign is **NOT STARTED/on hold** because
+      the owner postponed mainnet for the Jupiter redesign decision. No long-run
+      host choice is required for this pre-redesign baseline. Changed redesign
+      inputs need their own qualifying evidence; a source tag proves no funded operation.
 - [ ] Commission the [VPS operator stack](docs/deployment/MAINNET_OPERATIONS.md):
       actual mainnet RPC, covered markets, payer funding/top-ups, active keeper
       coverage and oracle, independently delivered alerts, private database,

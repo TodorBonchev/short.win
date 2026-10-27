@@ -1,7 +1,9 @@
 # Token-2022 qualification evidence — 2026-10-27
 
-This is preparation and partial execution evidence, not a release approval or a
-new 24-hour result. The source/provenance review is retained separately in the
+This is completed engineering follow-up for the dated baseline, not release
+approval or a new 24-hour result. The owner postponed mainnet while deciding the
+Jupiter redesign scope; the fresh campaign is **NOT STARTED/on hold**, with no
+long-run host choice currently required for this pre-redesign baseline. The source/provenance review is retained separately in the
 [mainnet preparation record](../mainnet-preparation-2026-10-27/token-2022-source-review/REPORT.md).
 The candidate and remaining gates are in the [qualification record](../../token2022-qualification-1.0.3-2026-10-27.md).
 
@@ -16,12 +18,28 @@ The candidate and remaining gates are in the [qualification record](../../token2
   `3ffb12b803f01c1cc60bd82bcc386834e8f148ac0e8fb934df533882953769c3`.
   All ZIP digests, runtime checksums, 2,533 source blobs and **337 tracked fixture
   files** were independently verified. The managed fixture-entry count and file
-  count describe different inventories. The compressed workflow checkpoint is
-  deliberately partial/failed, not a successful full gate. Raw successful bench,
+  count describe different inventories. The earlier compressed workflow
+  checkpoint remains an unchanged partial observation. Added terminal APIs show
+  **24 jobs passed, only web-e2e failed, one nightly skip**. The completed mutation
+  log proves **19 unique selected mutants killed**, seven also by three-minute
+  profile fuzz and twelve tests-only; duplicate summary lines are not extra cases.
+  Raw successful bench,
   service, indexer and smoke logs, exact measured budget tables, and the failed
   browser log/diagnosis are retained compressed. Larger diagnostic trace
   archives remain in ignored `target/`; the review receipt records their identity.
   Reviews here are independent AI-assisted checks, not an external firm's audit.
+- `ci-40443684567/` retains exact terminal API responses and compressed raw
+  program/browser logs for repaired source `658d8baaf`: **24 jobs passed and two
+  intentional workflow skips** (mutants/nightly). The independent terminal
+  receipt binds this PR result to the source-equivalent 19-mutation result from
+  the earlier dispatch; it does not invent one 25-pass repaired manual run.
+  Eleven targeted new Token-2022 controls actually passed, including all-six/
+  combined extension CPI sizing, old/new memo and cache rules, TLV negatives and
+  clock behavior. Five other documented program opt-ins remain skipped. The
+  repaired positions test passed; browser feature-mode execution totals and
+  opposite-mode skips are recorded precisely. Passing tests enforce the new
+  withdrawal budget but suppress its numeric memo/transfer diagnostic without
+  `--nocapture`; no exact new transfer CU is claimed visible.
 - `benchmarks/` records exact reconstruction of 13 generated reports from the six
   successful CI job diffs (M1/M2/M3/M5/M6/M7), including before/after Git blobs,
   raw-output bindings and independent review. All 254 printed instruction cases
@@ -38,7 +56,8 @@ The candidate and remaining gates are in the [qualification record](../../token2
   six profiles; 36 conservatively guarantee one worker's whole all-six prefix.
   This needs the specified two-worker command, seed, successful setup/run/wind-down
   assumptions and actual launch identity. It proves neither equal allocation nor
-  24 hours for each profile. No new campaign has started.
+  24 hours for each profile. No new campaign has started; this baseline's long
+  campaign is held for the architecture decision.
 - `devnet-policy/` retains the successful manual website deployment and served
   security-route byte/hash observations. Run
   [40442618297](https://github.com/TodorBonchev/short.win/actions/runs/40442618297)

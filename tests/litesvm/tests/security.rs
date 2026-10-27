@@ -554,8 +554,9 @@ fn consumed_at(logs: &[String], program: &Pubkey, depth: usize) -> Vec<u64> {
 /// mainnet runs ([`assert_mainnet_spl`]): the logs show spl-memo v3's `invoke [2]` before
 /// Token-2022's `invoke [2]`, the memo at 7,928 CU (asserted above 5,000), `transfer_checked` at
 /// historically 2,487 on v11.0.0, whose exact control is retained. The v11.1.0
-/// fingerprint is recorded independently and the whole withdrawal must meet ARCH §6.1's
-/// 100,000 CU budget. On LiteSVM's bundled builds (`SHORTWIN_BUNDLED_SPL=1`, the CU
+/// fingerprint is printed with --nocapture (or on failure); ordinary passing CI output
+/// suppresses it. The whole withdrawal must meet ARCH §6.1's 100,000 CU budget.
+/// On LiteSVM's bundled builds (`SHORTWIN_BUNDLED_SPL=1`, the CU
 /// assertions skipped) the same figures are 287, 2,470 and about 35,000. A plain destination
 /// needs no memo program, and a zero-token withdrawal moves nothing, so it needs none either.
 #[test]
@@ -636,8 +637,10 @@ fn memo_required_destination_contract(historical: bool) {
                 "historical Token-2022 transfer_checked fingerprint changed"
             );
         } else {
-            // The new compiler/ELF receives its own measured fingerprint in the
-            // retained CI log. Never infer it from the historical 2487 CU value.
+            // The new ELF must execute a transfer within the existing withdrawal budget.
+            // Its exact CU is printed with --nocapture (or on failure); ordinary passing
+            // CI output does not retain that numeric fingerprint. Never infer it from
+            // the historical 2487 CU value.
             assert_eq!(xfer_cu.len(), 1, "one executed Token-2022 transfer CPI");
             assert!(xfer_cu[0] > 0, "the transfer CPI consumed compute");
             assert!(
