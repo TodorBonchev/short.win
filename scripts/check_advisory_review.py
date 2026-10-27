@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REVIEW_DUE = date(2026, 11, 27)
 REVIEW = "dependency-advisories-2026-10-27.md"
 SCOPED = {
-    "deny.toml": {"RUSTSEC-2026-0385", "RUSTSEC-2026-0387"},
+    "deny.toml": {"RUSTSEC-2026-0387"},
     "services/deny.toml": {
         "RUSTSEC-2026-0387", "RUSTSEC-2026-0391", "RUSTSEC-2026-0398",
         "RUSTSEC-2026-0403", "RUSTSEC-2026-0410",

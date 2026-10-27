@@ -159,7 +159,7 @@ jobs:
       # nonapplicability review in docs/audit/dependency-advisories-2026-10-27.md.
       - name: cargo audit (workspace and the standalone bench lockfiles)
         run: |
-          ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161 --ignore RUSTSEC-2026-0387 --ignore RUSTSEC-2026-0385"
+          ignore="--ignore RUSTSEC-2025-0141 --ignore RUSTSEC-2021-0139 --ignore RUSTSEC-2024-0388 --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2025-0161 --ignore RUSTSEC-2026-0387"
           for lock in Cargo.lock tests/bench/cu_math/Cargo.lock tests/bench/m1_cu/Cargo.lock tests/bench/m2_cu/Cargo.lock tests/bench/m3_cu/Cargo.lock tests/bench/m5_cu/Cargo.lock tests/bench/m6_cu/Cargo.lock; do
             echo "::group::$lock"; cargo audit -f "$lock" --deny warnings $ignore; echo "::endgroup::"
           done
@@ -1078,6 +1078,130 @@ jobs:
           name: fuzz-smoke-crashes
           path: target/tmp/fuzz-smoke
           if-no-files-found: ignore
+      # Freeze the standalone native runner and its exact inputs for an independently supervised
+      # >=24-hour run. Smoke success is not long-run qualification; do not rebuild on the host.
+      - name: Build and retain source-pinned fuzz runtime
+        run: |
+          cargo build --release --locked -p shortwin-fuzz --bin shortwin-fuzz
+          python3 - <<'PY'
+          from datetime import datetime, timezone
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import platform
+          import shutil
+          import subprocess
+          import tarfile
+
+          def command(*args):
+              return subprocess.check_output(args, text=True).strip()
+
+          def sha256(path):
+              with path.open("rb") as stream:
+                  return hashlib.file_digest(stream, "sha256").hexdigest()
+
+          root = Path.cwd()
+          if command("git", "status", "--porcelain", "--untracked-files=no"):
+              raise SystemExit("Tracked source changed during smoke; refusing a mismatched source archive")
+          bundle = root / f"target/fuzz-runtime-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}"
+          bundle.mkdir(parents=True, exist_ok=False)
+          (bundle / "bin").mkdir()
+          (bundle / "inputs").mkdir(exist_ok=True)
+          inputs = {
+              "shortwin-fuzz": root / "target/release/shortwin-fuzz",
+              "shortwin-release.so": Path(os.environ["SHORTWIN_SO"]),
+              "shortwin-test-venue.so": Path(os.environ["SHORTWIN_TEST_VENUE_SO"]),
+              "mock-cpamm.so": Path(os.environ["MOCK_CPAMM_SO"]),
+          }
+          artifacts = {}
+          for name, source in inputs.items():
+              if not source.is_file() or source.is_symlink():
+                  raise SystemExit(f"Missing or symlinked fuzz runtime input: {source}")
+              destination = bundle / "bin" / name
+              shutil.copy2(source, destination)
+              artifacts[name] = {"file": f"bin/{name}", "bytes": destination.stat().st_size,
+                                 "sha256": sha256(destination)}
+          for name in ("Cargo.lock", "rust-toolchain.toml"):
+              shutil.copy2(root / name, bundle / "inputs" / name)
+          fixture_paths = subprocess.check_output(
+              ["git", "ls-files", "-z", "--", "tests/fixtures"]
+          ).decode().split("\0")
+          fixtures = []
+          for name in sorted(filter(None, fixture_paths)):
+              path = root / name
+              if not path.is_file() or path.is_symlink():
+                  raise SystemExit(f"Missing or symlinked fixture: {name}")
+              fixtures.append({"file": name, "bytes": path.stat().st_size,
+                               "sha256": sha256(path)})
+          if not fixtures:
+              raise SystemExit("No tracked fixtures found")
+          (bundle / "inputs/fixture-sha256.json").write_text(json.dumps(fixtures, indent=2) + "\n")
+          subprocess.run(["git", "archive", "--format=tar.gz",
+                          f"--output={bundle / 'source.tar.gz'}", "HEAD"], check=True)
+          with tarfile.open(bundle / "source.tar.gz", "r:gz") as archive:
+              for fixture in fixtures:
+                  try:
+                      member = archive.getmember(fixture["file"])
+                  except KeyError:
+                      raise SystemExit(f"Fixture missing from committed source archive: {fixture['file']}")
+                  if not member.isfile() or member.size != fixture["bytes"]:
+                      raise SystemExit(f"Fixture type/length mismatch in source archive: {fixture['file']}")
+                  with archive.extractfile(member) as stream:
+                      if hashlib.file_digest(stream, "sha256").hexdigest() != fixture["sha256"]:
+                          raise SystemExit(f"Fixture bytes differ from committed source archive: {fixture['file']}")
+          event_path = os.environ.get("GITHUB_EVENT_PATH")
+          event = json.loads(Path(event_path).read_text()) if event_path else {}
+          provenance = {
+              "schema_version": 1,
+              "created_utc": datetime.now(timezone.utc).isoformat(),
+              "qualification": "smoke passed; no >=24-hour qualification claimed",
+              "source": {"commit": command("git", "rev-parse", "HEAD"),
+                         "tree": command("git", "rev-parse", "HEAD^{tree}"),
+                         "pull_request_head": event.get("pull_request", {}).get("head", {}).get("sha"),
+                         "archive": "source.tar.gz", "archive_sha256": sha256(bundle / "source.tar.gz")},
+              "github": {key: os.environ.get(key) for key in (
+                  "GITHUB_REPOSITORY", "GITHUB_REF", "GITHUB_SHA", "GITHUB_EVENT_NAME",
+                  "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB", "GITHUB_WORKFLOW_REF")},
+              "toolchain": {"rustc_verbose": command("rustc", "-Vv"),
+                            "cargo": command("cargo", "--version"),
+                            "active": command("rustup", "show", "active-toolchain"),
+                            "platform": platform.platform(), "machine": platform.machine()},
+              "build_command": ["cargo", "build", "--release", "--locked", "-p", "shortwin-fuzz",
+                                "--bin", "shortwin-fuzz"],
+              "smoke_command": ["cargo", "test", "--release", "--locked", "-p", "shortwin-fuzz",
+                                "--", "--nocapture"],
+              "release_profile": {key: os.environ[key] for key in (
+                  "CARGO_PROFILE_RELEASE_LTO", "CARGO_PROFILE_RELEASE_CODEGEN_UNITS")},
+              "artifacts": artifacts, "fixture_count": len(fixtures),
+              "fixture_manifest": "inputs/fixture-sha256.json",
+              "fixtures_match_committed_source_archive": True,
+              "root_lock_sha256": sha256(root / "Cargo.lock"),
+          }
+          (bundle / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+          (bundle / "README.txt").write_text(
+              "CI smoke evidence and frozen inputs, not a completed 24-hour run.\n"
+              "Verify SHA256SUMS before use; extract source.tar.gz for the source/fixture tree.\n"
+              "Artifact download may strip executable mode: chmod +x bin/shortwin-fuzz.\n"
+              "Only shortwin-release.so is deployable; other binaries are test-only evidence.\n"
+              "Use an independently supervised all-profile run and retain its actual command,\n"
+              "completion, summary, log bytes/hashes and immutable fixture/artifact identities.\n"
+          )
+          files = sorted(path for path in bundle.rglob("*") if path.is_file()
+                         and path.name != "SHA256SUMS")
+          (bundle / "SHA256SUMS").write_text("".join(
+              f"{sha256(path)}  {path.relative_to(bundle)}\n" for path in files))
+          print(json.dumps({"commit": provenance["source"]["commit"],
+                            "fuzzer_sha256": artifacts["shortwin-fuzz"]["sha256"],
+                            "fixture_count": len(fixtures)}, indent=2))
+          PY
+      - name: Source-pinned standalone fuzz runtime for qualification host
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shortwin-fuzz-runtime
+          path: target/fuzz-runtime-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 90
 
   m7-keeper-bench:
     # M7 keeper economics (ARCH §6.6, §7.1, §8.2 T-CASCADE / T-SIZE; ECON §5.8): the real keeper
