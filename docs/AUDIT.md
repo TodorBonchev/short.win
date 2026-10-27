@@ -1704,6 +1704,14 @@ These are where we would look first. They are not limits on the scope.
 
 ## 12. Logistics and change policy
 
+**Later owner scope decision, 2026-10-27:** first mainnet is postponed for the
+[broad Jupiter redesign](design/JUPITER_REDESIGN.md), as recorded in the
+[new decision](audit/owner-jupiter-redesign-decision-2026-10-27.md). The pricing
+trust model remains open; asking about Jupiter quotes is not risk-feed approval.
+Preserve 1.0.3 evidence as its exact baseline; qualify the new program separately.
+The pre-redesign Token-2022-only long campaign is not started and stays on hold.
+Audit/bounty funding timing below otherwise remains the owner's chosen policy.
+
 **Current initial-mainnet policy (owner, 2026-10-27):** launch with existing
 per-market borrowing limits before an external audit and a funded bug bounty;
 accumulate earned protocol fee revenue toward those later engagements. The owner

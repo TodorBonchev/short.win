@@ -1,5 +1,10 @@
 # short.win
 
+**Development scope update (2026-10-27): first mainnet is postponed for broad
+Jupiter support.** See the [recorded decision](docs/audit/owner-jupiter-redesign-decision-2026-10-27.md)
+and [design proposal](docs/design/JUPITER_REDESIGN.md). The pricing/oracle trust
+model is still under design; no Jupiter integration or new release is deployed.
+
 [![Discord](https://img.shields.io/badge/Discord-Join%20ShortWin-5865F2?logo=discord&logoColor=white)](https://discord.gg/sTcSSXDZqK)
 
 A Solana protocol for permissionless peer-to-peer token lending, built to short memecoins,

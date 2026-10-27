@@ -1,0 +1,26 @@
+{
+  "at_utc": "2026-10-27T07:58:51.101112+00:00",
+  "source_commit": "3fa558a1bba4cc5884ef8d1d5a44aa1a9b642714",
+  "status": "Draft architecture options only; no oracle trust choice or program change authorized by this design. No deployment/audit acceptance asserted.",
+  "source_files": {
+    "programs/shortwin/src/venues/mod.rs": "f0de0b5a34f040877e2397d8398c40095a4f5ff52edf717fad88861ee1935114",
+    "programs/shortwin/src/state/market.rs": "01744d327bd91143970f32d27f2d393542f78a665294e60a05a6001d7828b4ef",
+    "programs/shortwin/src/state/position.rs": "34362c7f33542ced09af26b788a7e97467d405e1b0ec390022b7aab29176f49d",
+    "programs/shortwin/src/instructions/open_short.rs": "c1919bdb59fd2f04053ed9d2cc99877d04ca4f7023defbc39d2239b17a1b4a9a",
+    "programs/shortwin/src/instructions/liquidate.rs": "3d5d9a4e4d2bf476c0f40ecbc3354bafe0080fdf81ded217d71632ee4a8d79ff",
+    "programs/shortwin/src/instructions/close_short.rs": "78099acf6983cdeb4f70d3b015948b292a9f7501580b2f43b9e4d0af0e39c89e",
+    "programs/shortwin/src/engine/arming.rs": "bf08a095826a07eadf7cf52a0e9f9ebba9ce5885e0523373c90b81c2c896e4be",
+    "programs/shortwin/src/engine/caps.rs": "f65d5324adda85b489ff35776926bb50194063a378f5f3f13d0b5b286a404f04",
+    "programs/shortwin/src/engine/tier.rs": "c15b62e2e81b44aa0cc9179ddb48d2b6459d46e3cc47f0849a2527f9d049aec3",
+    "programs/shortwin/src/engine/route.rs": "2d8c9f98cfa4adc86c12c712972686c7c7f1348d935d254249a4102cfaeeab2b",
+    "crates/shortwin-math/src/risk.rs": "edf48c5343a5a71a1a0b13981bcc8ae6fd281eeef9ae739770180052ceb474c0",
+    "crates/shortwin-math/src/settle.rs": "cdc0d98e36decab61b0d03496c8f8ae55d0894e03ef7b4aef23fb47a522c6df1",
+    "crates/shortwin-math/src/bounds.rs": "40e797f8fa54c3301efa9cb97ee3ca3f2a65633cd6274862311ef9606ff3da14",
+    "crates/shortwin-venue-state/src/mint.rs": "dd64a25a49ec69864c4b9d2ad9357ffd81f1e07e6a12bd5df85837c377d028d9",
+    "docs/research/jupiter-cpi.md": "b8b1ec564eedcb2dc283cd0a784ebc11382f034ddf0b1b765ed6dd64ecf31a8a"
+  },
+  "official_api_references": [
+    "https://developers.jup.ag/docs/swap/build",
+    "https://developers.jup.ag/docs/swap/migration/metis-to-build"
+  ]
+}

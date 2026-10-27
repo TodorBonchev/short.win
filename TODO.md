@@ -19,7 +19,23 @@ readiness. The owner subsequently selected the mainnet preparation policy below.
 The final candidate also includes the AI3-FR01 quarantine and the owner-selected
 complete SHA-256 VenueGuard correction for first deployment.
 
-## 1.0.3 mainnet preparation
+## Jupiter redesign before first mainnet
+
+The owner postponed first mainnet on 2026-10-27 for broad Jupiter support. Follow
+the [recorded decision](docs/audit/owner-jupiter-redesign-decision-2026-10-27.md) and
+[design proposal](docs/design/JUPITER_REDESIGN.md). The pricing trust model remains
+open: the owner asked whether Jupiter quotes can be used; this is not acceptance
+of unchecked keeper JSON or of a new oracle authority.
+
+- [ ] Select and specify authenticated pricing, quantity/depth and failure rules.
+- [ ] Implement bounded Jupiter execution, risk integration and compatible services.
+- [ ] Independently review and qualify final code/fixtures, then run fresh fuzz.
+- [ ] Select the new release version and complete funded mainnet commissioning.
+
+The old Token-2022-only 24h campaign is unstarted/onhold; retain its actual
+CI/bench evidence. Do not spend a new 24h qualifying the superseded launch scope.
+
+## Preserved 1.0.3 mainnet preparation baseline
 
 The owner selected **mainnet before an external audit and a funded bug bounty**,
 funded later from protocol fees, and explicitly accepted **existing per-market

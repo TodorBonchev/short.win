@@ -1,0 +1,119 @@
+{
+  "reviewed_utc": "2026-10-27T07:48:42.561117+00:00",
+  "reviewer": "/root/vps_operator_plan",
+  "scope": "Read-only primary-documentation/schema inspection of current standard Jupiter SwapV2 and PriceV3 REST interfaces. This is not a survey-proof that Jupiter has no private, separate, future or undocumented attestation product. No product policy selected or implemented.",
+  "source_worktree_head": "3fa558a1bba4cc5884ef8d1d5a44aa1a9b642714",
+  "response_schema_checks": {
+    "order": {
+      "documented_properties": [
+        "error",
+        "errorCode",
+        "errorMessage",
+        "expireAt",
+        "feeBps",
+        "feeMint",
+        "gasless",
+        "inAmount",
+        "inUsdValue",
+        "inputMint",
+        "lastValidBlockHeight",
+        "maker",
+        "mode",
+        "otherAmountThreshold",
+        "outAmount",
+        "outUsdValue",
+        "outputMint",
+        "platformFee",
+        "priceImpact",
+        "priceImpactPct",
+        "prioritizationFeeLamports",
+        "prioritizationFeePayer",
+        "quoteId",
+        "referralAccount",
+        "rentFeeLamports",
+        "rentFeePayer",
+        "requestId",
+        "routePlan",
+        "router",
+        "signatureFeeLamports",
+        "signatureFeePayer",
+        "slippageBps",
+        "swapMode",
+        "swapType",
+        "swapUsdValue",
+        "taker",
+        "totalTime",
+        "transaction",
+        "transactionVersion"
+      ],
+      "explicit_price_attestation_property_documented": false
+    },
+    "build": {
+      "documented_properties": [
+        "addressesByLookupTableAddress",
+        "blockhashWithMetadata",
+        "cleanupInstruction",
+        "computeBudgetInstructions",
+        "computeUnitPrice",
+        "inAmount",
+        "inputMint",
+        "otherAmountThreshold",
+        "otherInstructions",
+        "outAmount",
+        "outputMint",
+        "priceImpactPct",
+        "routePlan",
+        "setupInstructions",
+        "slippageBps",
+        "swapInstruction",
+        "swapMode",
+        "tipInstruction",
+        "transactionVersion"
+      ],
+      "explicit_price_attestation_property_documented": false
+    },
+    "price": {
+      "documented_properties": [
+        "blockId",
+        "createdAt",
+        "decimals",
+        "liquidity",
+        "priceChange24h",
+        "usdPrice"
+      ],
+      "explicit_price_attestation_property_documented": false
+    }
+  },
+  "observations": [
+    "SwapV2 /build documents amounts, otherAmountThreshold, route instructions and blockhash metadata; no documented signature over quote values, oracle verification key or onchain quote-attestation verifier in this interface.",
+    "SwapV2 /order additionally documents optional serialized transaction, requestId, quoteId, maker and expireAt. quoteId/maker/expiry identify RFQ execution; signatureFeeLamports/signatureFeePayer describe transaction costs/payer, not a price signature. A transaction signature authorizes its message, not a general collateral-risk price.",
+    "PriceV3 documents createdAt, liquidity, usdPrice, blockId, decimals and priceChange24h, with no documented signed price payload/proof. blockId is nullable in the OpenAPI schema; createdAt means token creation, not price publication time.",
+    "Price docs derive reference USD price from the last swap, anchored on reliable oracle-priced tokens and filtered with liquidity, holder/trading/OrganicScore heuristics. Price updates follow swap activity rather than a fixed interval. Tokens can be omitted for reliability or no swap within7days; no null key is returned for omitted tokens.",
+    "PriceV3 reference spot USD value has no trade-size parameter and is not itself the all-in SOL cost to repurchase q after fees, impact and routing limits. It is useful input/display data but does not automatically implement the existing Bhat obligation."
+  ],
+  "engineering_inferences": [
+    "Jupiter quotes can supply execution proposals and offchain pricing inputs. A program cannot authenticate arbitrary relayed JSON as Jupiter-origin data merely because it contains a route, quoteId, blockId or a borrower signature.",
+    "Using Jupiter-derived values in a signed onchain risk feed requires a separately specified trusted attester/oracle interface: configured keys/quorum, canonical mint/amount/currency/domain payload, observed time or slot and expiry, replay protection, freshness/deviation/failure rules, plus onchain verification. Signatures authenticate the attesters; they do not make manipulated data intrinsically fair.",
+    "Independent onchain pool pricing/guard bounds could be an alternative or additional check. No decision between those architectures is made by this review.",
+    "Successful atomic swap plus min-output and postbalance checks establishes what was actually exchanged. It does not prove route optimality, fair market price, robust liquidation valuation or resistance to a manipulated shallow pool."
+  ],
+  "qualification_to_prior_report": {
+    "path": "programs/shortwin/src/instructions/close_short.rs",
+    "sha256": "78099acf6983cdeb4f70d3b015948b292a9f7501580b2f43b9e4d0af0e39c89e",
+    "verified_lines": [
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      277,
+      278,
+      279,
+      280
+    ],
+    "statement": "Existing close accepts >=q, bounded spending and donated surplus. ExactIn is not inherently incompatible. Prior wording implying an unchanged exactly-q interface prevents integration is superseded. Remaining work is generic route authority/account validation, independently justified Bhat/risk pricing, and buyback/liquidation liveness."
+  },
+  "no_attestation_documentation_claim_scope": "Only the three currently inspected public standard response contracts; extra response properties may exist because schema absence is not a universal API nonexistence proof. No cryptographic signing service was discovered in inspected docs; obtain a specific signed-feed specification before claiming one is available."
+}

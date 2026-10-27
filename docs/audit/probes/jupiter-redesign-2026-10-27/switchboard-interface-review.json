@@ -1,0 +1,187 @@
+{
+  "reviewed_utc": "2026-10-27T07:56:58.432873+00:00",
+  "reviewer": "/root/vps_operator_plan",
+  "scope": "Read-only current official Switchboard task schema/docs and Solana verifier-path inspection. No provider chosen, dependencies installed, feed stored/created, signatures requested, transaction signed or payment sent.",
+  "source_pins": {
+    "sdk_commit": "029ccad49d14be079562e2982f0c6fbcf29f9939",
+    "docs_commit": "6262810ebbc7feed25f04f6e98fcdeb53eaec833",
+    "npm_common_current": "5.8.5",
+    "sdk_common_version": "5.8.5",
+    "npm_on_demand_current": "3.10.6"
+  },
+  "verified_source_files": {
+    "sdk/protos/job_schemas.proto": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/protos/job_schemas.proto",
+      "sha256": "97f4356aaaca51215e9abd2d040421b5ec952f99c7c5087e8c0d322c5a4a35a1",
+      "git_blob": "569f928c6fc12567f4b4dd23b5271af92cc252ec",
+      "git_tree_blob_matches": true
+    },
+    "sdk/solana/rust/switchboard-on-demand/src/on_demand/oracle_quote/feed_info.rs": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/solana/rust/switchboard-on-demand/src/on_demand/oracle_quote/feed_info.rs",
+      "sha256": "360f7df964e1c44697f94521709bda1a7f793c6d147e4deebfe3fe30b48d4f1e",
+      "git_blob": "8455e9161de4475893535256a888c224135ea51b",
+      "git_tree_blob_matches": true
+    },
+    "sdk/solana/rust/switchboard-on-demand/src/on_demand/oracle_quote/quote_verifier.rs": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/solana/rust/switchboard-on-demand/src/on_demand/oracle_quote/quote_verifier.rs",
+      "sha256": "4e17641c4e11d833ae369fef178869fdb80aa75e4a8e264a7a4a7c2fadf3a567",
+      "git_blob": "57291aa28b837dd774ab5a8770c65204411a4e01",
+      "git_tree_blob_matches": true
+    },
+    "sdk/solana/rust/switchboard-on-demand/src/on_demand/oracle_quote/quote.rs": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/solana/rust/switchboard-on-demand/src/on_demand/oracle_quote/quote.rs",
+      "sha256": "82fa3887e01ba0a91d1018eb3daed4570dfb11ea315b63e20f3f488254743bdc",
+      "git_blob": "6ce009d45d8ce0be91a9e174868f4523c528a4c9",
+      "git_tree_blob_matches": true
+    },
+    "sdk/javascript/common/package.json": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/javascript/common/package.json",
+      "sha256": "9d004fc51468012c57471436867a0a4408c9423db2ae0a30a5f5fca13f2e5f75",
+      "git_blob": "662c94701a75c530182023420dc188a9aa7f82ab",
+      "git_tree_blob_matches": true
+    },
+    "sdk/javascript/common/src/feed-hash.ts": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/javascript/common/src/feed-hash.ts",
+      "sha256": "4808476ff595ea174df78426389f46501a53c0ed390f4ece9aa4cc4bb86e1f8d",
+      "git_blob": "80bf67a7712d83c80015bf994633316071371259",
+      "git_tree_blob_matches": true
+    },
+    "sdk/javascript/common/src/crossbar-client.ts": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/javascript/common/src/crossbar-client.ts",
+      "sha256": "9739330e40fdd9d93b78083c4c8161abce3c6413897798086fe954d9d62d0b4d",
+      "git_blob": "c1759ddbcfa004d68243c65f181f9e101aade85f",
+      "git_tree_blob_matches": true
+    },
+    "sdk/javascript/common/src/protos.ts": {
+      "github_url": "https://github.com/switchboard-xyz/switchboard-sdk/blob/029ccad49d14be079562e2982f0c6fbcf29f9939/javascript/common/src/protos.ts",
+      "sha256": "e29a07b8f84537e9d4e2b7e7415e45a7540f65bfe5e46fac4a3009fa5f2db100",
+      "git_blob": "333f8cb8948e273ce05855a6d54ebf5e9e366b1b",
+      "git_tree_blob_matches": true
+    },
+    "docs/custom-feeds/task-types.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/custom-feeds/task-types.md",
+      "sha256": "4f3bf6561a87d4aae0c7b723bc2ecedabc227fc3930df728a9aa8681db5d6fde",
+      "git_blob": "95789705ccf2ddf471d9f1c9ebbdc64a3f69f01f",
+      "git_tree_blob_matches": true
+    },
+    "docs/tooling/crossbar/README.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/tooling/crossbar/README.md",
+      "sha256": "ee497eb3ddb023b71775053070941f284cd52eb91cb51b6c9c1ccc5bba5c6d9f",
+      "git_blob": "e397d2fb18729583a3eaa4d08601309f23b91914",
+      "git_tree_blob_matches": true
+    },
+    "docs/tooling/crossbar/api-endpoints.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/tooling/crossbar/api-endpoints.md",
+      "sha256": "23aa6e5b5488472abc7f578f8948b577049673a4b7a37a6805d2af4997ddbd05",
+      "git_blob": "afeb84f9b12cad96e10218b60a3b5bf857d54db9",
+      "git_tree_blob_matches": true
+    },
+    "docs/custom-feeds/build-and-deploy-feed/build-with-typescript.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/custom-feeds/build-and-deploy-feed/build-with-typescript.md",
+      "sha256": "4cd9bd79738f873bbc6c01e6c9d9ea82f650cd32c477142246574c33f8d05470",
+      "git_blob": "2aabf81dfadb27dabc9c168833977a05f73467f0",
+      "git_tree_blob_matches": true
+    },
+    "docs/custom-feeds/advanced-feed-configuration/rest-apis-with-httptask.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/custom-feeds/advanced-feed-configuration/rest-apis-with-httptask.md",
+      "sha256": "9a026bf287708a3f8f061222961beee792dd108a7c4c14d1e7aa5aaae37d03ca",
+      "git_blob": "6d4e894fd0f574f95433ea3b8a349de28f447b45",
+      "git_tree_blob_matches": true
+    },
+    "docs/custom-feeds/advanced-feed-configuration/data-feed-variable-overrides.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/custom-feeds/advanced-feed-configuration/data-feed-variable-overrides.md",
+      "sha256": "de3b39d18b5273945ec5f8114b4c02ef1917df6e167e5ab7e437363671bfa5d5",
+      "git_blob": "ee89ceb7b90c15e998ab5244134c154570d5359d",
+      "git_tree_blob_matches": true
+    },
+    "docs/custom-feeds/advanced-feed-configuration/decentralized-exchanges.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/custom-feeds/advanced-feed-configuration/decentralized-exchanges.md",
+      "sha256": "bf48b02a546d6b3fdb8574a69757e582aaeb16a2b6d675dba19efa98d4bebb11",
+      "git_blob": "b13a6c45cb45acb153c0353a6e0e221e84333a4b",
+      "git_tree_blob_matches": true
+    },
+    "docs/custom-feeds/advanced-feed-configuration/how-feeds-are-resolved.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/custom-feeds/advanced-feed-configuration/how-feeds-are-resolved.md",
+      "sha256": "740a85bf46423851ad34956a0ba6ab84f3d78cde1df847d593c957a380824b08",
+      "git_blob": "ac52423a0e6953fba8e475aae69e46165859b8d5",
+      "git_tree_blob_matches": true
+    },
+    "docs/docs-by-chain/solana-svm/price-feeds/basic-price-feed.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/docs-by-chain/solana-svm/price-feeds/basic-price-feed.md",
+      "sha256": "b3444db6117dddd38da0fd28fb5225d215597e191a45e9c23a519f78a2c861c5",
+      "git_blob": "53bc88b0d1646c3b5a1dbbd0a08867c7f3ebe5f5",
+      "git_tree_blob_matches": true
+    },
+    "docs/docs-by-chain/solana-svm/price-feeds/quote-program-accounts.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/docs-by-chain/solana-svm/price-feeds/quote-program-accounts.md",
+      "sha256": "7c167a7d950dee7a851aea391f4ab28f8bb11afbb7c1dbff5fcb063985bd0392",
+      "git_blob": "e66f633d36d7976d77050bbc259dfb1d8dee27bc",
+      "git_tree_blob_matches": true
+    },
+    "docs/docs-by-chain/solana-svm/price-feeds/advanced-price-feed.md": {
+      "github_url": "https://github.com/switchboard-xyz/gitbook-on-demand/blob/6262810ebbc7feed25f04f6e98fcdeb53eaec833/docs-by-chain/solana-svm/price-feeds/advanced-price-feed.md",
+      "sha256": "fc3352ceafd42111e00a59a2efcf5294ff36c87c25ee49c4b6d830d1697f2045",
+      "git_blob": "53684fa4462390647c394f9110ab4503eae7e495",
+      "git_tree_blob_matches": true
+    }
+  },
+  "findings": [
+    {
+      "status": "verified source/schema/docs",
+      "claim": "JupiterSwapTask remains a current documented task. Current proto defines mint pair, base/quote amounts including string forms, allow/deny filters, slippage, direct-route flag, VersionV1/V2 and optional APIkey.",
+      "anchors": [
+        "protos/job_schemas.proto775-829",
+        "custom-feeds/task-types.md1285-1357",
+        "custom-feeds/advanced-feed-configuration/decentralized-exchanges.md7-37"
+      ]
+    },
+    {
+      "status": "not established",
+      "claim": "The proto enum named VERSION_V2 does not by itself establish which current Jupiter HTTP endpoint the deployed task runner uses. Public SDK tree contains schema and clients but no Jupiter task-runner handler. No successful live task execution or V2-handler compatibility is claimed.",
+      "anchors": [
+        "simulation-observation.json"
+      ]
+    },
+    {
+      "status": "verified generic capability; endpoint composition candidate unexecuted",
+      "claim": "HttpTask supports fixed GET/POST URLs, headers and bodies; JsonParseTask extracts a numeric JSONPath result. A canonical job can therefore explicitly request current Jupiter /swap/v2/build and parse outAmount (or another defined field), independent of built-in Jupiter handler version. Exact fixed query mint/amount/taker/limits, units, error/freshness handling and output math still need an integration test.",
+      "anchors": [
+        "protos/job_schemas.proto46-112",
+        "custom-feeds/advanced-feed-configuration/rest-apis-with-httptask.md"
+      ]
+    },
+    {
+      "status": "verified current documented onchain path",
+      "claim": "New Solana feed-hash integrations use managed updates: Ed25519 oracle signature verification, quote-program storage, then consuming program read in same transaction. FeedID/canonical account/queue and consumer freshness/business bounds must be pinned and enforced. SDK QuoteVerifier also exposes authorized oracle-key and slot-age/slothash checks.",
+      "anchors": [
+        "docs-by-chain/solana-svm/price-feeds/basic-price-feed.md33-49",
+        "solana/rust/switchboard-on-demand/src/on_demand/oracle_quote/quote_verifier.rs1057-1134"
+      ]
+    },
+    {
+      "status": "verified critical constraint",
+      "claim": "Request variableOverrides are execution-scoped and are NOT included in the feedID or signed checksum. For permissionless updates, keep URL, mint pair, quantity, extraction path and calculations fixed in the canonical definition; only nonsemantic credentials should normally be overridden. A dynamic unbound quantity or token under one feedID is unsuitable as proof of which risk request was priced.",
+      "anchors": [
+        "custom-feeds/advanced-feed-configuration/data-feed-variable-overrides.md11-22"
+      ]
+    },
+    {
+      "status": "verified canonical-version requirement",
+      "claim": "Current docs require common5.8.5+ for feed hashing/serialization and on-demand3.10.6+ for JS updates, to preserve canonical Rust/prost declaration order and optional defaults. This is newer than the5.2.2 generated-doc starting point.",
+      "anchors": [
+        "custom-feeds/advanced-feed-configuration/how-feeds-are-resolved.md61-80"
+      ]
+    }
+  ],
+  "engineering_conclusion": "Switchboard-attested Jupiter quote jobs are a concrete positive architecture candidate. Signatures would be Switchboard oracle/network attestations over job results, not a native Jupiter signed price feed. This does not establish independent source diversity or make thin/manipulated Jupiter liquidity fair. Fixed quote size, all-in buyback cost/fees/impact, token units, freshness, quorum, bounds, unavailable-route behavior and total compute/account budget need explicit design and qualification. Existing close accepts>=q with bounded spending; no exactly-q incompatibility claimed.",
+  "read_only_probe": {
+    "endpoint": "https://crossbar.switchboard.xyz/simulate/jobs",
+    "read_only_simulation_only": true,
+    "requested_utc": "2026-10-27T07:55:18.475090+00:00",
+    "request_sha256": "a75b412f97c13f50c15cb3963fb8c7f4c19ac3b8e93c498a61027c6614cb235e",
+    "error": "<urlopen error [Errno -5] No address associated with hostname>"
+  },
+  "probe_limitation": "Public Crossbar simulation POST could not connect because crossbar.switchboard.xyz did not resolve in this environment. No task ran, no runtime or attestation proof obtained. docs.switchboard.xyz also failed DNS; current source docs were successfully fetched and hash-verified from official GitHub repository instead.",
+  "jupiter_openapi_url_verified": "https://developers.jup.ag/docs/openapi-spec/swap/v2/swap.yaml",
+  "jupiter_openapi_retained_sha256": "6fbde9bc19f82a1fba724181103d759fbe35f58f4aae865b4d943f01c1e26e6b"
+}
