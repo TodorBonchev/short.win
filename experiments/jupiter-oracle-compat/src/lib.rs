@@ -51,13 +51,15 @@ pub enum ProbeError {
 
 /// A compile-time identity check against the real published SDK alias.
 /// It deliberately has no transmute or unchecked byte bridge.
-pub fn anchor_account_as_sdk<'a>(
-    account: &anchor_lang::prelude::AccountInfo<'a>,
-) -> &sb::AccountInfo<'a> {
+pub fn anchor_account_as_sdk<'info, 'borrow>(
+    account: &'borrow anchor_lang::prelude::AccountInfo<'info>,
+) -> &'borrow sb::AccountInfo<'info> {
     account
 }
 
-pub fn pinned_account_as_sdk<'a>(account: &AccountInfo<'a>) -> &sb::AccountInfo<'a> {
+pub fn pinned_account_as_sdk<'info, 'borrow>(
+    account: &'borrow AccountInfo<'info>,
+) -> &'borrow sb::AccountInfo<'info> {
     account
 }
 

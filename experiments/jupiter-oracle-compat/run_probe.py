@@ -41,6 +41,8 @@ def validate_config()->dict:
     for name,version in EXPECTED['pinned_root_component_versions'].items():
         spec=data['dependencies'][name]
         assert (spec['version'] if isinstance(spec,dict) else spec)=='='+version
+    assert LOCK.is_file(), 'pinned standalone Cargo.lock is required; never resolve a replacement silently'
+    assert sha(LOCK)==EXPECTED['locked_resolution']['lock_sha256'], 'standalone lock differs from independently verified baseline'
     return data
 
 def retain_sources(evidence:Path,metadata:dict)->dict:
@@ -127,9 +129,9 @@ def main()->int:
             subprocess.run(['git','archive','--format=tar.gz',head],cwd=REPO,stdout=out,check=True)
         (evidence/'prepared.json').write_text(json.dumps({'prepared_utc':now(),'source_commit':head,'status':'toolchain/checks have not run'},indent=2)+'\n')
         return 0
-    protected=[REPO/x for x in ['Cargo.lock','Cargo.toml','services/Cargo.lock','pnpm-lock.yaml','programs/shortwin/Cargo.toml'] if (REPO/x).exists()]
+    protected=[REPO/x for x in ['Cargo.lock','Cargo.toml','services/Cargo.lock','pnpm-lock.yaml','programs/shortwin/Cargo.toml'] if (REPO/x).exists()]+[LOCK]
     before={str(x.relative_to(REPO)):sha(x) for x in protected}
-    report={'started_utc':now(),'status':'running','steps':[],'valid_attestation_success_tests':0,'signatures_generated':0,'oracle_or_transaction_network_calls':0,'SBF_builds':0,'lock_status':'not yet resolved/verified','protected_before':before,'platform':platform.platform(),'github':{k:os.environ.get(k) for k in ['GITHUB_SHA','GITHUB_REF','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_EVENT_NAME']}}
+    report={'started_utc':now(),'status':'running','steps':[],'valid_attestation_success_tests':0,'signatures_generated':0,'oracle_or_transaction_network_calls':0,'SBF_builds':0,'lock_status':'pinned independently verified initial graph; current-run verification pending','protected_before':before,'platform':platform.platform(),'github':{k:os.environ.get(k) for k in ['GITHUB_SHA','GITHUB_REF','GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_EVENT_NAME']}}
     exit_code=1
     try:
         source=evidence/'probe-source';shutil.copytree(PROBE,source,dirs_exist_ok=True,ignore=shutil.ignore_patterns('Cargo.lock','target','evidence','__pycache__'))
@@ -144,14 +146,13 @@ def main()->int:
             raise RuntimeError('tracked source must be clean before native probe')
         with (evidence/'repository-source.tar.gz').open('wb') as out:
             subprocess.run(['git','archive','--format=tar.gz',head],cwd=REPO,stdout=out,check=True)
-        step=command(['cargo','generate-lockfile','--manifest-path',str(MANIFEST)],evidence/'cargo-generate-lockfile.log');report['steps'].append(step)
-        if step['exit_code']:raise RuntimeError('standalone lock resolution failed')
-        shutil.copyfile(LOCK,evidence/'Cargo.lock');report['resolved_lock_sha256']=sha(LOCK)
+        shutil.copyfile(LOCK,evidence/'Cargo.lock');report['input_lock_sha256']=sha(LOCK);report['resolved_lock_sha256']=sha(LOCK)
+        assert report['input_lock_sha256']==EXPECTED['locked_resolution']['lock_sha256']
         step=command(['cargo','metadata','--locked','--format-version','1','--manifest-path',str(MANIFEST)],evidence/'cargo-metadata.json',json_output=True);report['steps'].append(step)
         if step['exit_code']:raise RuntimeError('locked metadata failed')
         metadata=json.loads((evidence/'cargo-metadata.json').read_text())
         report['resolution']=retain_sources(evidence,metadata)
-        report['lock_status']='resolved and checked locally on this runner; artifact independent review still required'
+        report['lock_status']='committed standalone lock reused with --locked and current-run source/feature checks; initial independently verified graph preserved'
         for argv,name in [
             (['cargo','tree','--locked','--manifest-path',str(MANIFEST),'-e','features'],'cargo-feature-tree.log'),
             (['cargo','fmt','--manifest-path',str(MANIFEST),'--','--check'],'cargo-fmt.log'),
@@ -176,7 +177,7 @@ def main()->int:
         after={str(x.relative_to(REPO)):sha(x) for x in protected};report['protected_after']=after
         if after!=before:report['protected_files_changed']=True;exit_code=1;report['status']='failed'
         report['finished_utc']=now()
-        report['reproducibility_limit']='Initial lockfile was resolved during this manual run, then used with --locked; no reproducibility or release evidence is claimed until source, registry archives and retained lock are independently verified.'
+        report['reproducibility_limit']='This run reuses the independently verified initial standalone lock with --locked and checks its unchanged hash. Source/graph reproducibility is distinct from native ABI success, SBF qualification, oracle attestation and release approval.'
         (evidence/'report.json').write_text(json.dumps(report,indent=2)+'\n')
         (evidence/'SHA256SUMS').write_text(''.join(sha(f)+'  '+str(f.relative_to(evidence))+'\n'for f in sorted(evidence.rglob('*'))if f.is_file()and f.name!='SHA256SUMS'))
     return exit_code

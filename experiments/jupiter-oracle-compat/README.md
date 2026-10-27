@@ -55,14 +55,25 @@ The actual resolved Decimal version/source is retained with the standalone lock.
 ## Run and retain
 
 The manual-only `.github/workflows/jupiter-oracle-compat.yml` runs native checks on
-a GitHub runner. It resolves an isolated ignored Cargo.lock, then uses --locked for
-metadata, feature tree, test and clippy. It retains that lock, versions, raw output,
-exact repository and probe source, published SDK archive, all selected downloaded
-registry source archives, source hashes and diagnostics even on failure.
+a GitHub runner. The committed standalone Cargo.lock comes from the initial manual
+run40476628349 at21db9fadb888e0a29f999e3346f18dc603b9b999. Its SHA256 is
+`bedbb8980c823eef135d4ecd1dc7e06bba937884b435e9c61618f1ec594afc8a`.
+That run's ZIP digest,304 internal hashes,2648 source blobs/modes and280 downloaded
+registry archives were independently verified. SDK source/feature checks passed;
+native compilation failed in the probe's two ambiguous borrow lifetime declarations.
+The follow-up distinguishes the outer borrow lifetime and reuses that exact graph.
 
-Initial resolution is not reproducibility evidence by itself. Review the retained
-lock, source identity, actual feature graph and artifacts before reusing it. No root,
-service or pnpm lockfile is changed; the script hashes protected files before/after.
+The runner never regenerates a missing/different lock silently: it requires the
+pinned hash, uses --locked for metadata/tree/test/clippy, and protects its before/after
+hash alongside production locks/manifests. It retains the lock, versions, raw output,
+exact repository and probe source, published SDK archive, all available downloaded
+registry source archives and diagnostics, including on metadata or feature failures.
+The initial failed receipt is retained separately; it is not called an ABI success.
+Source/graph verification does not imply SBF, valid attestation or release approval.
+
+The folder's Cargo.lock ignore rule only prevents accidental new bootstrap locks;
+the independently verified known file is deliberately tracked. Root stages that file
+explicitly. No root, service or pnpm lockfile is changed by this experiment.
 
 Local source/config-only validation (no resolution/build):
 

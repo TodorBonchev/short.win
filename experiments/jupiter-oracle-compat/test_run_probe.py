@@ -15,12 +15,6 @@ if name=='git':
 elif name=='rustc':print('OFFLINE_FAULT_TEST_RUSTC')
 elif name=='cargo':
     if '--version'in args:print('OFFLINE_FAULT_TEST_CARGO')
-    elif 'generate-lockfile'in args:
-        raw=b'OFFLINE_FAULT_TEST_CRATE_BYTES'
-        checksum=hashlib.sha256(raw).hexdigest()
-        pathlib.Path('Cargo.lock').write_text('version = 4\n[[package]]\nname = "fault-fixture"\nversion = "0.0.0"\nchecksum = "'+checksum+'"\n')
-        archive=pathlib.Path(os.environ['CARGO_HOME'])/'registry/cache/fault-test/fault-fixture-0.0.0.crate'
-        archive.parent.mkdir(parents=True,exist_ok=True);archive.write_bytes(raw)
     elif 'metadata'in args:
         if os.environ['FAULT_MODE']=='metadata-exit':
             print('OFFLINE_FAULT_TEST_METADATA_FAILURE',file=sys.stderr);sys.exit(7)
@@ -33,11 +27,14 @@ class FailureEvidenceTests(unittest.TestCase):
     def check_fault(self,mode):
         with tempfile.TemporaryDirectory(prefix='shortwin-oracle-compat-fault-') as temp:
             base=Path(temp);copy=base/'repo/experiments/jupiter-oracle-compat'
-            shutil.copytree(PROBE,copy,ignore=shutil.ignore_patterns('Cargo.lock','target','evidence','__pycache__'))
+            shutil.copytree(PROBE,copy,ignore=shutil.ignore_patterns('target','evidence','__pycache__'))
             tools=base/'tools';tools.mkdir()
             for name in ['git','cargo','rustc']:
                 executable=tools/name;executable.write_text(FAKE_COMMAND);executable.chmod(0o755)
             env=os.environ.copy();env.update(PATH=str(tools)+os.pathsep+env.get('PATH',''),CARGO_HOME=str(base/'cargo'),FAULT_MODE=mode)
+            archive=base/'cargo/registry/cache/fault-test/fault-fixture-0.0.0.crate'
+            archive.parent.mkdir(parents=True,exist_ok=True);archive.write_bytes(b'OFFLINE_FAULT_TEST_CRATE_BYTES')
+            lock_before=hashlib.sha256((copy/'Cargo.lock').read_bytes()).hexdigest()
             env.pop('GITHUB_SHA',None)
             evidence=base/'evidence'
             result=subprocess.run([sys.executable,str(copy/'run_probe.py'),'--evidence-dir',str(evidence)],env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,check=False)
@@ -50,7 +47,8 @@ class FailureEvidenceTests(unittest.TestCase):
             archive=evidence/'dependency-archives/fault-fixture-0.0.0.crate'
             self.assertEqual(archive.read_bytes(),b'OFFLINE_FAULT_TEST_CRATE_BYTES')
             self.assertEqual(snapshot['archives'][0]['sha256'],hashlib.sha256(archive.read_bytes()).hexdigest())
-            self.assertTrue((evidence/'Cargo.lock').exists())
+            self.assertEqual(hashlib.sha256((evidence/'Cargo.lock').read_bytes()).hexdigest(),lock_before)
+            self.assertEqual(hashlib.sha256((copy/'Cargo.lock').read_bytes()).hexdigest(),lock_before)
             self.assertTrue((evidence/'probe-source/.gitignore').exists())
             self.assertIn('dependency-archives/fault-fixture-0.0.0.crate',(evidence/'SHA256SUMS').read_text())
             if mode=='metadata-exit':

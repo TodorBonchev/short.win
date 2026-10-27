@@ -49,5 +49,16 @@
     "transaction_submissions": 0,
     "SBF_builds": 0,
     "builder_limitation": "ParsedEd25519Instruction::to_instruction_bytes is unimplemented in published SDK. Test documents expected panic; it is never used as a runtime builder. Managed-update JS builder remains separate qualification."
+  },
+  "locked_resolution": {
+    "source_run_id": 40476628349,
+    "source_commit": "21db9fadb888e0a29f999e3346f18dc603b9b999",
+    "lock_sha256": "bedbb8980c823eef135d4ecd1dc7e06bba937884b435e9c61618f1ec594afc8a",
+    "artifact_id": 12720767594,
+    "github_zip_sha256": "789a4fe3267405f734a1f0a27ea1a23f60232640b08fee12d6d037d23255c6fc",
+    "independent_verification_sha256": "b4bbe236f480fa27657f5909d85158f1177ff68292ad94848146795bc5e9789f",
+    "packages": 281,
+    "active_registry_archives_verified": 280,
+    "status": "Source/registry/feature graph independently verified; initial native run failed only in probe lifetime declarations (E0106). This is not a successful ABI test or attestation."
   }
 }
