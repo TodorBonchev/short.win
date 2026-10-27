@@ -1,0 +1,41 @@
+name: Jupiter oracle SDK compatibility (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jupiter-oracle-compat-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-compat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare source evidence before toolchain setup
+        run: python3 experiments/jupiter-oracle-compat/run_probe.py --prepare-only --evidence-dir "${RUNNER_TEMP}/jupiter-oracle-compat-evidence"
+      - name: Install exact native probe toolchain
+        run: |
+          set -o pipefail
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy 2>&1 | tee "${RUNNER_TEMP}/jupiter-oracle-compat-evidence/rustup-install.log"
+      - name: Resolve isolated lock and run native SDK checks
+        env:
+          CARGO_HOME: ${{ runner.temp }}/jupiter-oracle-compat-cargo
+          CARGO_TARGET_DIR: ${{ runner.temp }}/jupiter-oracle-compat-target
+          CARGO_TERM_COLOR: never
+          RUST_BACKTRACE: "1"
+        run: python3 experiments/jupiter-oracle-compat/run_probe.py --evidence-dir "${RUNNER_TEMP}/jupiter-oracle-compat-evidence"
+      - name: Retain source, lock, registry archives and diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jupiter-oracle-compat-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/jupiter-oracle-compat-evidence
+          if-no-files-found: error
+          retention-days: 90
