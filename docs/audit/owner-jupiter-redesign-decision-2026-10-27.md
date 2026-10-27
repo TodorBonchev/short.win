@@ -42,3 +42,31 @@ compatibility and real funded/monitored operation are still required.
 
 No program rewrite, source tag, deployment, financial transaction, oracle feed
 creation, new signer authority or long fuzz run is claimed by this record.
+
+## Later owner selection: in-house pricing and a simple initial host
+
+After the operator-price trust distinction was explained, the owner selected:
+
+> Lets go with the in house and keep things simpler. Would the price service fit in the recommended vps
+
+The implementation direction is now a short.win-operated price producer and
+authorized on-chain report updates, with our own keeper orchestrating atomic
+Jupiter swaps. A separate oracle company and hosted Jupiter Trigger custody are
+not selected. The RedStone capability inquiry remains unsent and is closed as an
+unused draft; no outreach or financial commitment was authorized or made.
+
+Use ordinary Solana transaction signatures and scoped reporter authorization for
+the initial design, rather than introducing a third-party oracle SDK or detached
+signature framework. Keep the price worker in the keeper's Rust codebase with
+separate supervision/reporting credentials, bounded work and shared clients/types.
+One initial VPS is an operational simplicity choice, not independent quorum or
+high availability. Its price-reporting authority is a disclosed financial trust
+role even though it cannot directly withdraw protocol vault funds.
+
+The recommended 4 dedicated vCPU / 16 GiB host is a starting engineering estimate
+for remote Jupiter quotes and remote RPC simulation, not measured capacity. It
+does not run a full validator or local Jupiter routing engine. Measure the actual
+combined workload and request budgets before activation. Exact reporter keys,
+financial/reference/failure parameters, production service limits and deployment
+still require their concrete review and qualification. First mainnet remains
+postponed; the existing mint, lender and borrowing protections remain required.

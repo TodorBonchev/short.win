@@ -16,8 +16,8 @@ to build and test the code, what the code relies on, and what we already know ab
   requirement for this initial phase, and neither is represented as completed.
   [Full preparation CI 40434130363](https://github.com/TodorBonchev/short.win/actions/runs/40434130363) passed on `57bc1c845`: 25 jobs, zero failed, one intentional nightly skip; all 19 selected mutants killed and canonical Anchor/verifier bytes matched.
   The later owner decision **postpones first mainnet for the broad Jupiter redesign**,
-  selecting signed Jupiter-derived feeds with concrete provider/trust/settings
-  review before deployment. The Token-2022 engineering baseline is preserved;
+  selecting in-house Jupiter-derived price reports with concrete reporter/risk
+  settings review before deployment. The Token-2022 engineering baseline is preserved;
   its superseded standalone long run remains unstarted/on hold. No new final
   version is selected. See the [decision](audit/owner-jupiter-redesign-decision-2026-10-27.md),
   [implementation plan](design/jupiter/IMPLEMENTATION_PLAN.md) and
@@ -1711,8 +1711,9 @@ These are where we would look first. They are not limits on the scope.
 **Later owner scope decision, 2026-10-27:** first mainnet is postponed for the
 [broad Jupiter redesign](design/JUPITER_REDESIGN.md), as recorded in the
 [new decision](audit/owner-jupiter-redesign-decision-2026-10-27.md). The owner
-selected signed Jupiter-derived feeds, with concrete trust/settings reviewed
-before deployment; raw API/keeper responses are not authoritative risk prices.
+selected in-house Jupiter-derived price reporting, with concrete reporter/risk
+settings reviewed before deployment; raw caller/API responses are not authoritative
+risk prices. Our reporting operators are the price authority.
 Preserve 1.0.3 evidence as its exact baseline; qualify the new program separately.
 The pre-redesign Token-2022-only long campaign is not started and stays on hold.
 Audit/bounty funding timing below otherwise remains the owner's chosen policy.

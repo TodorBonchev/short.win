@@ -1,8 +1,9 @@
 # Capped mainnet operations — short.win 1.0.3
 
 **Current development scope (owner, 2026-10-27): first mainnet is postponed
-for the [broad Jupiter redesign](../design/JUPITER_REDESIGN.md).** Its signed quote-oracle architecture is
-selected; concrete provider/risk settings and implementation need qualification. The existing 1.0.3 specification, measurements
+for the [broad Jupiter redesign](../design/JUPITER_REDESIGN.md).**
+The owner selected an in-house price producer and our own keeper with
+Jupiter swaps; exact reporter/risk settings and implementation need qualification. The existing 1.0.3 specification, measurements
 and operator commands below remain baseline evidence, not deployment approval
 for the new design. Audit/bounty funding timing otherwise remains unchanged.
 
@@ -18,15 +19,14 @@ records it. The existing reviewed per-market borrowing limits are the selected
 caps; deposits and the number of permissionlessly created markets are uncapped.
 A keeper allowlist or website limit cannot make those two quantities capped.
 
-**Current technical hold (2026-10-27):** the read-only live fixture check found a
-new Token-2022 deployment with different executable bytes, at slot 460,497,271
-rather than the tested slot 427,147,035. The scoped interface/layout/CPI/extension
-compatibility review and applicable qualifying evidence remain pending. Do not
-promote the new fixture or describe the final mainnet-ready tag as qualified by
-the old upstream bytes. See the retained
-[mainnet preparation observations](../audit/probes/mainnet-preparation-2026-10-27/README.md)
-and [current release plan](../release/MAINNET-1.0.3.md). This technical hold is
-separate from the owner's decision to launch before external audit/bounty.
+**Current engineering hold (2026-10-27):** Token-2022 baseline engineering checks
+are complete and retained in the [qualification record](../audit/token2022-qualification-1.0.3-2026-10-27.md).
+First mainnet is now postponed for the selected in-house Jupiter redesign. The
+prototype [full CI](../audit/jupiter-redesign-validation-2026-10-27.md) passed 25 jobs
+on its recorded source; price reporting, routed execution and the new financial
+model are not implemented/qualified by that result. Final runtime integration,
+current upstream compatibility, fresh qualifying fuzz and actual funded operation
+remain required before a mainnet-ready tag or activation.
 
 ## Host selection and budget
 
@@ -70,6 +70,77 @@ query latency, memory and RPC usage with the actual covered markets. Uncapped
 market creation means a permanently small host is not guaranteed sufficient.
 Build images/binaries separately from active keeper operation; do not run a large
 Rust build on the production host while relying on its observation timing.
+
+## In-house price worker on the initial host
+
+The owner selected a short.win-operated price producer and a simple initial
+setup. Keep the recommended **4 dedicated vCPU / 16 GiB RAM / roughly 150–200 GiB
+total usable SSD** host for the first measured workload. This is an engineering
+starting estimate, not a market-count or throughput guarantee. The regular 50 GiB
+boot disk alone is not the full storage recommendation.
+
+The planned worker calls remote Jupiter APIs, performs bounded parsing/math and
+submits authenticated reports; swap simulations run on the remote RPC. It shares
+the keeper's Rust clients/types and build tooling, but runs as a separately
+supervised process with its own scoped reporting key. Quote timeouts/restarts must
+not stall the execution keeper. This process/CLI is not implemented yet. Reuse the
+existing PostgreSQL/indexer deployment and bounded local work queues/cache; no
+additional distributed service infrastructure is needed just to publish prices.
+
+The combined host therefore runs pricing, keeper execution, protocol-scoped
+indexing/API, PostgreSQL and monitoring. Do not place a full Solana validator,
+local Jupiter routing engine, whole-chain trade archive or large Rust build on
+this host while relying on it for price/exit duty. No GPU is needed for the chosen
+remote quote/simulation design.
+
+The price worker is expected to be relatively light on RAM. API/RPC quota and
+latency, PostgreSQL/cache/query use and retention growth are likely earlier limits.
+Keep the worker bounded rather than creating unbounded per-market tasks. Cache
+reuse must obey the exact mint/quantity/policy/freshness contract. Reserve request
+and execution capacity for exits; pace backfill and nonessential public queries
+before delaying risk/exit work.
+
+A planning formula is:
+
+```
+quote HTTP requests/s ~= active markets * actual quote requests per market refresh
+                         / refresh interval in seconds
+```
+
+The request count includes all required quantities, search candidates and directions;
+add retries, source-reference calls, simulations and execution traffic separately.
+For illustration, 10 markets with 4 actual HTTP requests each every 5 seconds already use
+8 quote requests/s before that extra traffic. This is arithmetic, not an approved
+pricing cadence, an assertion that 4 requests are enough to price a market, or a
+benchmark of 10 supported markets.
+
+Jupiter currently lists 1 request/s on Free and 10 requests/s on Developer. Measure
+actual endpoint credit consumption and monthly usage as well as peak RPS before
+selecting an API plan; a VPS with free RAM does not increase that allowance.
+Budget report-update RPC/sends and transaction fees explicitly. The existing
+1.0.3 execution-keeper budget does not automatically cover the planned price worker.
+[Current Jupiter plans](https://developers.jup.ag/pricing).
+
+Retain compact accepted-report records and a bounded raw-source archive with a
+reviewed retention/backup policy. Do not retain every unsuccessful candidate
+response forever or assume quote archives fit within the existing invocation-row
+estimate. Index relevant protocol market activity, rather than every Solana DEX
+trade. The 25 SOL borrowing limit is per market and does not bound market count or
+infrastructure demand. The redesigned quote backend must enforce report/history
+readiness before new opens; that admission gate is not implemented by this plan.
+
+Before activation, run the combined worker/keeper/ingest/backfill/API workload and
+record CPU, RSS/swap, queue/tick delay, quote/simulation p95/p99, rate-limit errors,
+last accepted report age and required quantity coverage, daily credits and disk
+increase. Rehearse restart/reconciliation and source/RPC outages. The operating
+limits must meet the reviewed report-freshness and exit requirements. No successful
+host load test or provisioned/funded operation is claimed here.
+
+One host is one availability and administrative failure domain. Keep monitoring
+capable of detecting host loss off-host; use separate report/execution OS accounts
+and permissions without calling them independent oracle operators. The host now
+contains a financial price-reporting authority, so it is not accurately described
+as having only a harmless fee payer. Governance/deployment keys remain off-host.
 
 ## RPC service and network identity
 
@@ -135,13 +206,15 @@ Suggested operator layout (placeholders until provisioned):
 | `/etc/shortwin/keeper.env` | Private `SHORTWIN_KEEPER_RPC_URL` (and optional discovery URL), readable only by the operator/service. |
 | `/etc/shortwin/secrets/keeper-payer.json` | Small hot fee payer, with no protocol authority. |
 | `/etc/shortwin/secrets/coverage.json` | Separate designated coverage authority; exactly one active pauser. |
+| Planned `/etc/shortwin/secrets/reporter.json` | Scoped in-house report authority, read only by the price worker; no direct vault withdrawal/governance permission. Exact key/configuration not selected or provisioned. |
 | `shortwin_ingest` PostgreSQL role | Migrations, live ingestion and rollups. |
 | `shortwin_api` PostgreSQL role | Read-only API queries; 2-second statement timeout. |
 | Offline governance/emergency holders | Upgrade, configuration and durable emergency-pause decisions; their signers stay off the VPS. |
 
-Separate OS service accounts and restrictive directory/file permissions are required;
-only the keeper service account may read its hot signing files. The indexer has
-no chain signing wallet. Keep deployment, governance and emergency signing keys off
+Separate OS service accounts and restrictive directory/file permissions are required.
+The execution keeper reads its own hot payer/coverage files; the planned price worker
+alone reads its report credential. These roles remain distinct even on one host.
+The indexer has no chain signing wallet. Keep deployment, governance and emergency signing keys off
 this host. Keep PostgreSQL, API upstream ports and keeper metrics private; expose
 only SSH from approved management addresses and HTTPS/WSS through a TLS reverse
 proxy. Use SSH keys, firewall rules, OS security updates and bounded log retention.

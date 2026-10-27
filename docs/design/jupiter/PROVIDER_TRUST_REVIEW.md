@@ -1,5 +1,10 @@
 # Candidate provider trust and settings worksheet
 
+**Superseded for the current implementation:** the owner selected in-house price
+reporting and a simple initial host. This external-candidate material is retained
+as research; the capability inquiry was never sent. Follow the
+[in-house design](INHOUSE_PRICING_AND_LIQUIDATION.md) for current work.
+
 The owner authorized signed Jupiter-derived feeds and concrete review before
 deployment. This worksheet records provider screening, historical candidate
 identities and exact open configuration work. It approves no provider, queue, authority, quorum or financial

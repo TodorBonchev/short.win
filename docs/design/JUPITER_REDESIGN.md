@@ -2,8 +2,9 @@
 
 **Status: design and isolated prototypes; production integration is unimplemented.**
 The owner [postponed first mainnet](../audit/owner-jupiter-redesign-decision-2026-10-27.md)
-for this redesign. The owner selected signed Jupiter-derived feeds for new markets; concrete
-provider/trust/settings remain subject to review before deployment. The deployed
+for this redesign. The owner selected in-house Jupiter-derived price reporting and our own keeper
+with atomic Jupiter swaps. Concrete reporter/risk settings remain subject to review
+before deployment. The deployed
 program remains the 1.0.3 baseline. The initial prototype CI reproduced its exact
 Anchor/verifier bytes; this does not qualify future integration changes. No final
 version is selected.
@@ -39,8 +40,8 @@ proof of fair price. An executed swap proves exchanged amounts, not best price o
 manipulation resistance. A size-independent last-swap USD price is not the cost
 of buying back the whole debt.
 
-The following alternatives were considered; the owner selected the externally
-attested architecture for new markets. Pump retains its established reference
+The following alternatives were considered; the owner selected authenticated
+quote observations for new markets, now operated in-house. Pump retains its established reference
 backend, and any direct/reference fallback remains explicit:
 
 | Risk source | Implementation consequence | Admission consequence |
@@ -48,15 +49,19 @@ backend, and any direct/reference fallback remains explicit:
 | Independently verified on-chain pool/oracle data | Keep existing readers, add correct concentrated/bin-liquidity readers or existing authenticated feeds; Jupiter handles execution separately. | Assets need a supported reference source; add families progressively. |
 | Externally attested Jupiter-derived risk observations | Introduce an explicitly trusted oracle/verifier, immutable feed/job identity, signer/queue rules, amount-aware quote data and separate failure semantics. | Broader routing coverage is possible, but feed availability, manipulation controls and the new trust model still constrain admission. |
 
-The later explicit owner answer selects signed Jupiter-derived feeds. The earlier
-quote question alone was not treated as acceptance. Provider/queue/quorum/feed
-identities and final financial settings still need a concrete reviewed packet.
+The later explicit owner answer selects in-house pricing. Our authorized reporter
+transactions supply observations; the operators become the price authority. Exact
+reporter permissions and final financial settings still need a reviewed packet.
 Signing a quote authenticates who supplied it; it does not prove that underlying
 liquidity was not manipulated. Several signers querying one API are not several
 independent price sources. A third-party oracle integration needs its own current
 compatibility/provenance spike; no provider is selected or represented as deployed.
 
-## Candidate for Jupiter-derived signed feeds
+## Historical external-candidate research; not the selected runtime
+
+This first candidate was excluded; the selected implementation now uses our own
+reporting operators and ordinary Solana transaction authorization. Details below
+preserve what was evaluated and are not instructions to integrate that SDK.
 
 Switchboard's current published task schema documents `JupiterSwapTask`, and its
 current Solana guide documents verifying Ed25519 updates, storing verified quotes
@@ -93,7 +98,7 @@ persistence, `B_ref` bounds and S1/S2/S3 settlement. Total CLMM/DLMM reserves ca
 be substituted into constant-product formulas. An oracle observation must not be
 disguised as fabricated `X/Y` reserves.
 
-For an external quote-based design, specify all of the following before wiring
+For the selected off-chain report design, specify all of the following before wiring
 program instructions:
 
 - What debt sizes and sell/buy directions are covered, how token decimals and
@@ -220,3 +225,13 @@ flowchart LR
 
 These are proposed integration components. Current pure prototypes and native
 format/refusal tests do not establish the signed report, history or routed SBF path.
+
+## Selected simple in-house implementation
+
+Follow the [in-house design](jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md). Start with
+one bounded price worker in the keeper's Rust codebase, separately supervised with
+a scoped report key. Use ordinary Solana transaction signatures and program state
+for report authorization/history. Keep atomic buyback execution and raw HTTP inputs
+separate from financial eligibility. The [initial host estimate](../deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host)
+assumes remote Jupiter routing and remote RPC simulation; it is not measured capacity.
+The external capability inquiry remains unsent and is not an implementation gate.

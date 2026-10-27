@@ -24,16 +24,18 @@ complete SHA-256 VenueGuard correction for first deployment.
 The owner postponed first mainnet on 2026-10-27 for broad Jupiter support. Follow
 the [recorded decision](docs/audit/owner-jupiter-redesign-decision-2026-10-27.md) and
 [design proposal](docs/design/JUPITER_REDESIGN.md). The owner selected
-signed Jupiter-derived risk feeds, evaluating Switchboard first, with concrete
-trust/settings reviewed before deployment. Unchecked keeper JSON remains forbidden;
-new tokens stay disabled until feed/size/liquidation requirements qualify.
+in-house Jupiter-derived risk observations with ordinary Solana reporter
+transaction authorization. Keep the initial price worker in the keeper codebase,
+separately supervised on the proposed VPS. Concrete reporter/risk settings still
+need review before deployment; unsigned caller/API JSON remains forbidden as
+permissionless financial authority. New tokens stay disabled until qualified.
 
-- [ ] Specify and validate the selected signed-feed pricing, quantity/depth and failure rules.
-      Switchboard is excluded following its shutdown announcement; retain the
-      native component ABI research. Its SDK verifier is
-      [quarantined for source-level safety issues](docs/audit/jupiter-oracle-sdk-review-2026-10-27.md).
-      Complete the [exact-quantity producer contract](docs/design/jupiter/QUOTE_PRODUCER_CONTRACT.md)
-      and separately authenticated lower-reference policy; upper-only routes cannot force liquidation.
+- [ ] Implement and validate the [in-house price producer](docs/design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md),
+      exact-quantity references, authorized on-chain updates, history and failure rules.
+      The [producer contract](docs/design/jupiter/QUOTE_PRODUCER_CONTRACT.md) preserves
+      the distinction between candidate upper cost and forced-action lower evidence.
+- [ ] Measure the combined price-worker/keeper/indexer/database workload and API/RPC
+      budget on the [initial host](docs/deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host).
 - [ ] Implement bounded Jupiter execution, risk integration and compatible services.
 - [ ] Independently review and qualify final code/fixtures, then run fresh fuzz.
 - [ ] Select the new release version and complete funded mainnet commissioning.

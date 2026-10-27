@@ -1,9 +1,10 @@
-# In-house pricing and liquidation option — 2026-10-27
+# Selected in-house pricing and liquidation direction — 2026-10-27
 
-The owner asked whether Jupiter limit orders and ordinary Jupiter quotes could
-replace a separate oracle provider, with the keeper, indexer and program operated
-in-house. This is a feasibility proposal. It does not select production reporter
-keys, financial settings or a changed liquidation contract. No inquiry was sent.
+The owner selected the in-house direction after reviewing the feasibility and
+operator-price trust distinction. See the [recorded decision](../../audit/owner-jupiter-redesign-decision-2026-10-27.md).
+Use a short.win price worker, our own keeper and atomic Jupiter execution. Concrete
+reporter keys, financial settings and changed liquidation terms still need review
+before deployment. No external inquiry was sent.
 
 ## Recommended shape
 
@@ -80,3 +81,18 @@ The practical in-house option removes a separate oracle vendor. Jupiter/RPC and
 market-liquidity dependencies, transaction/API costs and operator-price trust remain.
 Concrete reporter/key controls and financial/failure settings still require review
 before deployment, and new markets remain disabled until qualification.
+
+## Simple initial deployment
+
+Reuse keeper clients/types and build tooling, with pricing as a separately
+supervised worker from the same Rust codebase. This is planned work; no new CLI
+or service binary is claimed to exist. Keep a distinct scoped report key and
+separate execution payer permissions. One host remains one administrative and
+availability failure domain, regardless of process/key count.
+
+The [operations plan](../../deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host)
+uses the existing 4-dedicated-vCPU/ 16 GiB starting recommendation, remote Jupiter
+routing and remote RPC simulations. Bounded request queues, shared caching and
+exit-priority budgets avoid adding a message broker, separate microservice cluster
+or full validator merely to collect and publish prices. Host capacity and oracle
+financial/reference correctness are separate qualification questions.

@@ -1,5 +1,10 @@
 # Maintained-provider capability request — unsent draft
 
+**Superseded for the current implementation:** the owner selected in-house price
+reporting and a simple initial host. This external-candidate material is retained
+as research; the capability inquiry was never sent. Follow the
+[in-house design](INHOUSE_PRICING_AND_LIQUIDATION.md) for current work.
+
 Proposed recipient: RedStone integrations team through its
 [official contact page](https://www.redstone.finance/contact/).
 RedStone documents Solana and custom integrations, but no evidence yet establishes

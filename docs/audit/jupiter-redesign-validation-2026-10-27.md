@@ -12,7 +12,7 @@ is approved or performed by this checkpoint.
   the independently retained slippage/interval exhaustive cases. Header validation
   is not route authorization; candidate upper costs are not forced-action lower references.
 - Manual native CI 40480763900 on 3a35d6ee1827285901acb9fb01a5634e21b3d40c
-  passed24 Rust tests, two runner fault tests, formatting and strict Clippy. Artifact,
+  passed 24 Rust tests, two runner fault tests, formatting and strict Clippy. Artifact,
   exact source/modes, all280 active registry archives, SDK features and unchanged
   pinned/production locks were independently verified. The24 count already includes
   the10 wire groups; it is not34. Successful authentic-attestation and SBF tests remain0.
@@ -86,3 +86,15 @@ observation. [Terminal APIs and independent receipts](probes/jupiter-redesign-20
 retain exact sources, ZIP/log hashes and scope. Later changes are documentation and
 evidence only; no exact-head full-green or completed provider/runtime integration
 is claimed for them.
+
+## Later owner choice: in-house price reporting
+
+The owner selected the in-house direction and a simple initial host after the
+operator-price trust distinction was explained. This supersedes external-provider
+onboarding as the next implementation gate. The RedStone inquiry remains unsent
+and is an unused draft. The selected implementation shares the keeper codebase
+but separately supervises a scoped price worker, using ordinary Solana reporter
+transaction authorization and program-maintained history. Exact keys/risk settings,
+worker code, host capacity, final financial qualification and deployment remain
+open. See the [decision](owner-jupiter-redesign-decision-2026-10-27.md) and
+[initial host estimate](../deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host).

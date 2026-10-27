@@ -1,46 +1,50 @@
 # Jupiter redesign implementation milestones
 
-The owner selected signed Jupiter-derived risk feeds for new markets, evaluating
-Switchboard first and reviewing concrete trust/settings before deployment. Mainnet
-is postponed. The working branch name 1.1 is provisional; no final tag exists.
+The owner selected signed Jupiter-derived risk observations and then explicitly
+selected an in-house price producer, keeper and program implementation. Use a
+simple initial host and ordinary Solana reporter transaction authorization.
+Reporter keys and concrete financial/failure settings need review before deployment.
+Mainnet is postponed; the working branch name 1.1 remains provisional.
 
 | Phase | Work | Current status |
 |---|---|---|
-| 0 | Record scope, architecture alternatives, selected trust direction and mathematical contracts. | Drafts and decision recorded; provider/settings not approved. |
-| 1 | Pure Jupiter V2 header/fixed-account parser and typed finite quantity-cost math. | Implemented prototypes; no production dependency or instruction wiring. Local focused checks and independent review retained. |
-| 2 | Verify canonical fixed quote-job identity; compile actual oracle verifier/type bridge; obtain authentic signed updates and resource measurements. | Offline identity spike and pinned native ABI probe passed. Switchboard excluded after its shutdown announcement; SDK verifier quarantined after independent source-level safety findings. Safe format/refusal checks passed24 native tests. No live feed, repaired verifier or signature/SBF proof yet. |
-| 3 | Isolated bounded execution SBF probe on actual pinned Jupiter, with hostile account/route tests and measured limits. | Not implemented; parser tests are not a routed swap. |
-| 4 | On-chain provider/risk state, history/admission/failure rules, keeper and client/indexer integration; enable only qualified markets. | Not implemented. Ordinary API JSON never supplies authoritative prices. |
-| 5 | Full source/ABI/fork/regression/CU verification and independent integration review; freeze final runtime inputs and fresh qualifying fuzz. | Not started. Prior 1.0.3 duration does not qualify new code. |
-| 6 | Review provider keys/queue/quorum/feed IDs, risk terms/costs and funded operations; choose version/tag and actual transaction packet. | Pending concrete review. No deployment or financial execution. |
+| 0 | Record architecture, operator-price trust direction and mathematical contracts. | In-house direction selected; exact production settings/keys are not approved. |
+| 1 | Pure V2 header/fixed-meta parser and exact-quantity cost math. | Implemented unwired prototypes; focused tests and independent review retained. |
+| 2 | Build the in-house fixed-q producer and authorized report/update contract; measure remote quote/simulation workload. | Producer contract and deployment shape drafted. No production worker/update instruction or live report is implemented. |
+| 3 | Isolated bounded execution SBF probe on pinned Jupiter, hostile account/route tests and measured limits. | Not implemented; header parsing is not routed execution. |
+| 4 | Program report/risk state, history/admission/failure rules and keeper/client/indexer integration. | Not implemented. New markets stay disabled until qualified. |
+| 5 | Full source/ABI/fork/regression/CU verification and independent integration review; freeze runtime and fresh qualifying fuzz. | Prototype full CI passed 25 jobs on its recorded source. Final integration/fuzz remains open; old duration does not qualify new inputs. |
+| 6 | Review exact reporter permissions, risk terms, API/RPC costs and funded operations; choose version/tag/transaction packet. | Pending concrete review. No deployment or financial execution. |
 
-The mathematical prototype requires exact supported quantities and treats unknown,
-stale and attested-no-route as distinct from finite cost. A larger grid node's
-upper mark is not reused as an exact-size forced-liquidation lower bound.
-Endpoint-only fair-value checks are insufficient where fee branches change.
+The [in-house design](INHOUSE_PRICING_AND_LIQUIDATION.md) uses ordinary Solana
+transaction signatures and a scoped on-chain reporter allowlist. This removes a
+separate oracle vendor, not operator-price trust or Jupiter/RPC dependencies.
+The proposed price worker shares the keeper codebase but runs under separate
+supervision so source requests do not stall exit execution. There is no new CLI yet.
 
-The route prototype certifies only header scalars and fixed account/meta bindings.
-The opaque route plan, arbitrary writable accounts, executable program identity,
-PDA/mint authority, actual spend/output and CPI isolation remain unimplemented
-authorization work. No current handler accepts this type or admits a new asset.
+The [fixed-q producer contract](QUOTE_PRODUCER_CONTRACT.md) still applies. A candidate
+ask upper is not a financial lower reference for forced decisions. The pure math
+requires exact supported position quantities and distinct finite/unknown/no-route
+statuses; a larger grid node's upper mark cannot become an exact-q liquidation lower
+edge. Financial history belongs in program state, not an arbitrary indexer snapshot.
 
-New-market oracle configuration must fail closed until the verifier, immutable
-feed identity, units/quantities, freshness/epoch coherence and financial policy
-are established. The initial actor/provider/settings remain reviewable even
-though the owner authorized the architecture and implementation.
+The route prototype checks only header scalars and fixed metas. Remaining accounts,
+actual privileges, route behavior, executable/mint identity, scratch authority,
+net spend/output and CPI isolation remain authorization work. No existing handler
+accepts the prototype as route authorization or admits a new asset.
 
-The next producer step follows the [fixed-quantity contract](QUOTE_PRODUCER_CONTRACT.md).
-Fixed-input outAmount jobs do not yet supply B_hat(q), and a candidate ask upper
-cannot supply an economic lower reference for forced actions. The candidate SDK's
-[native pass and qualification blockers](../../audit/jupiter-oracle-sdk-review-2026-10-27.md)
-are separate evidence. Keep its verifier disabled pending reviewed repair/runtime proof.
+The [initial-host plan](../../deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host)
+is an engineering estimate requiring combined-load measurements. Keep report roles,
+source/policy/quantity binding, freshness, sequence and completed-epoch history,
+outage repayment and admission gates explicit before production.
 
-The [candidate provider trust worksheet](PROVIDER_TRUST_REVIEW.md) records observed
-program/queue/authority identities and the evidence needed for concrete settings
-review. It approves no live provider, quorum, age bound, financial policy or spend.
+## Preserved candidate research
 
-Switchboard evaluation is retained as research after the provider's shutdown notice.
-Evaluate a maintained report provider or an explicitly reviewed attester network;
-no alternative provider, signer authority or business commitment is yet selected.
-The capability request is prepared and unsent. This changes no selected financial
-risk settings and does not restart or qualify the old long campaign.
+Switchboard was evaluated first, then excluded after its shutdown announcement.
+Its standalone native ABI/format/refusal results and source-level SDK safety findings
+remain research receipts, not the selected runtime or a dependency to repair/promote
+for this in-house design. No production service/program links that SDK. The
+[review](../../audit/jupiter-oracle-sdk-review-2026-10-27.md) and
+[candidate screening worksheet](PROVIDER_TRUST_REVIEW.md) preserve that history.
+The RedStone capability request is an unused, unsent draft. No third-party outreach,
+provider contract, new signer authority or payment has been performed.
