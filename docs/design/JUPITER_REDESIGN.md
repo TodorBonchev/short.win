@@ -4,8 +4,11 @@
 The owner [postponed first mainnet](../audit/owner-jupiter-redesign-decision-2026-10-27.md)
 for this redesign. The owner selected in-house Jupiter-derived price reporting and our own keeper
 with atomic Jupiter swaps. Concrete reporter/risk settings remain subject to review
-before deployment. The deployed
-program remains the 1.0.3 baseline. The initial prototype CI reproduced its exact
+before deployment. Under the owner's later delegation, use the
+[whole-position atomic liquidation contract](jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice)
+for the first release: full debt-token credit or rollback, with separate qualified
+default settlement. Hosted orders and partial/mixed repayment are outside this
+release scope. The deployed program remains the 1.0.3 baseline. The initial prototype CI reproduced its exact
 Anchor/verifier bytes; this does not qualify future integration changes. No final
 version is selected.
 

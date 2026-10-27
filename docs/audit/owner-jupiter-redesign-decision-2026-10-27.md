@@ -70,3 +70,28 @@ combined workload and request budgets before activation. Exact reporter keys,
 financial/reference/failure parameters, production service limits and deployment
 still require their concrete review and qualification. First mainnet remains
 postponed; the existing mint, lender and borrowing protections remain required.
+
+## Later delegation: choose the simplest liquidation model
+
+After discussing hosted Jupiter limit orders, partial fills and repayment in a
+mixture of tokens and SOL, the owner instructed:
+
+> Ok decide what you think will be best for the project and simplest
+
+Under that delegation, select whole-position atomic buyback/repayment with the
+existing actual-cost waterfall as the implementation baseline. Use bounded,
+isolated protocol-funded Jupiter execution, program-authorized eligibility and
+actual net receipt of all `q` debt tokens. An underfilled/invalid attempt rolls
+back; keeper retries must use fresh evidence within existing limits and budgets.
+Do not introduce hosted Trigger custody, asynchronous liquidation orders or
+partial/mixed token-SOL repayment in the first release. Internal route splitting
+is compatible with the whole-debt atomic postcondition.
+
+A genuine collateral gap can leave lenders unable to replace all owed tokens.
+Cash/default settlement remains a distinct path, with explicit eligibility,
+valuation, persistence and loss accounting; quote/swap failure alone cannot
+activate it. The existing S1/S2/S3 rules require review and qualification for the
+new reference backend. Admit no new market until its normal exit and recovery
+policy are specified and tested. This engineering selection adds no numerical
+risk/settlement terms, deployment authorization or principal guarantee. See the
+[selected liquidation contract](../design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice).

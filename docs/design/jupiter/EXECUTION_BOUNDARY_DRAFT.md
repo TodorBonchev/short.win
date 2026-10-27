@@ -40,8 +40,12 @@ authorization. Include malicious CPI targets/routes that spend less/more, change
 recipient/authority/delegate, duplicate protocol keys, steal rent, replay accounts,
 or attempt re-entry. No fake oracle amount enters open_short/liquidate/sol_settle.
 
-The owner selected externally verified Jupiter-derived feeds for new-market risk.
-The bounded executor can be tested before that feed supplies financial authority.
+The owner selected in-house authorized Jupiter-derived reports for new-market risk,
+then delegated the simple first-release liquidation model: bounded isolated
+protocol-funded whole-debt buyback, preserving the actual-cost waterfall. The
+[selected contract](INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice)
+requires atomic full repayment or rollback, not a persisted partial fill. The
+bounded executor can be tested before the report backend supplies financial authority.
 An existing reference backend remains a possible regression/test bound source;
 this does not replace the selected new-market architecture.
 

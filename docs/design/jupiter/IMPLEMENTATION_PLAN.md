@@ -4,7 +4,12 @@ The owner selected signed Jupiter-derived risk observations and then explicitly
 selected an in-house price producer, keeper and program implementation. Use a
 simple initial host and ordinary Solana reporter transaction authorization.
 Reporter keys and concrete financial/failure settings need review before deployment.
-Mainnet is postponed; the working branch name 1.1 remains provisional.
+Mainnet is postponed; the working branch name 1.1 remains provisional. The owner
+subsequently delegated the liquidation model: use the existing-shaped actual-cost,
+whole-position atomic buyback/repayment contract for the first release. Hosted
+orders and partial/mixed repayment are excluded from that scope; separate default
+and outage recovery must qualify before any new market is admitted. See the
+[selected contract](INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice).
 
 | Phase | Work | Current status |
 |---|---|---|

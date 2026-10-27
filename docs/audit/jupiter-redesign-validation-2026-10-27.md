@@ -98,3 +98,29 @@ transaction authorization and program-maintained history. Exact keys/risk settin
 worker code, host capacity, final financial qualification and deployment remain
 open. See the [decision](owner-jupiter-redesign-decision-2026-10-27.md) and
 [initial host estimate](../deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host).
+
+## Delegated liquidation model follow-up
+
+The owner delegated the simplest project-appropriate choice after discussing partial
+hosted-order fills. Select whole-position atomic buyback/repayment against the
+existing actual-cost waterfall, with isolated bounded protocol-funded execution.
+Full net `q` token delivery or rollback is the ordinary liquidation contract;
+hosted orders and partial/mixed repayment are outside the first-release scope.
+The [selection](../design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice)
+keeps cash/default settlement separate and requires its explicit new-backend
+qualification before market admission. A collateral gap remains a potential lender
+principal loss; no liquidity/repayment guarantee follows from atomic execution.
+
+This follow-up changes documentation only. It implements no Jupiter liquidation
+handler, selected settlement settings, new reporter authority or deployment, and
+closes no runtime qualification or audit finding. Full CI remains scoped to the
+recorded 3a35d6ee source; final integration and fresh fuzz remain open.
+
+Documentation validation passed: audit scope classification, whitespace, relative
+links and the new liquidation anchors. All 44 archived probe checksums and the
+primary `fork_seed.rs` / completed frozen-run metadata anchors remain unchanged.
+Executable sources and fixtures were not changed; no new runtime CI is claimed.
+
+An independent AI agent reviewed the eight-file documentation diff against current
+liquidation/settlement accounting and found no material inconsistency. This was a
+read-only design consistency review, not a firm audit or integration qualification.

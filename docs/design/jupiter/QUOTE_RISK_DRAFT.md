@@ -252,9 +252,13 @@ repayment/fallback design; signatures do not solve liveness automatically.
 A: independent on-chain reference risk, slower asset expansion as reference families
 are qualified; Jupiter is the execution layer.
 
-B (SELECTED architecture): external quote oracle reference risk, broader execution-family coverage without
-per-family on-chain quoting, but producer/search/censorship/lag risk becomes part of
+B (SELECTED architecture, now operated in-house): authorized Jupiter-derived
+report reference risk, broader execution-family coverage without per-family
+on-chain quoting, but operator/producer/search/censorship/lag risk becomes part of
 the financial trust model and the current cap/tier/S2/settlement evidence is redesigned.
+The [delegated first-release liquidation choice](INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice)
+retains whole-position atomic token repayment, with separate qualified default
+settlement; it does not adopt partial/mixed repayment or turn UNKNOWN into S3.
 
 The implementation direction is a versioned risk-source abstraction and
 the selected signed-feed backend, not pretending a URL quote is an on-chain price. Pump can retain

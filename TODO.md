@@ -36,7 +36,13 @@ permissionless financial authority. New tokens stay disabled until qualified.
       the distinction between candidate upper cost and forced-action lower evidence.
 - [ ] Measure the combined price-worker/keeper/indexer/database workload and API/RPC
       budget on the [initial host](docs/deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host).
-- [ ] Implement bounded Jupiter execution, risk integration and compatible services.
+- [ ] Implement the [selected whole-position atomic liquidation](docs/design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice):
+      bounded isolated buyback, actual full-debt token credit, rollback and budgeted
+      fresh-route retries. No hosted liquidation orders or partial/mixed repayment.
+- [ ] Specify and qualify separate gap/no-route settlement and outage recovery for
+      new markets; failed quotes/swaps alone cannot authorize default. Keep markets
+      disabled until these rules and lender loss accounting are tested.
+- [ ] Integrate compatible keeper, client and indexer behavior.
 - [ ] Independently review and qualify final code/fixtures, then run fresh fuzz.
 - [ ] Select the new release version and complete funded mainnet commissioning.
 

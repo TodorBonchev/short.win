@@ -6,6 +6,51 @@ Use a short.win price worker, our own keeper and atomic Jupiter execution. Concr
 reporter keys, financial settings and changed liquidation terms still need review
 before deployment. No external inquiry was sent.
 
+## First-release liquidation choice
+
+The owner delegated this choice after considering partial Jupiter limit fills:
+"Ok decide what you think will be best for the project and simplest". Select
+full-position, atomic buyback and token repayment for ordinary liquidation. This
+is the delegated engineering selection, not a claim that the owner separately
+specified new financial parameters or approved production deployment.
+
+- Keep the current actual-cost liquidation waterfall as the baseline. The program
+  computes eligibility and spend bounds from accepted risk observations/history;
+  a reporter cannot replace those checks with a submitted `liquidatable=true`.
+  It funds an isolated executor within its absolute debit/rent limits and requires
+  the pool's actual net credit
+  to be at least the entire position debt `q` before releasing that debt. Surplus
+  follows the existing donation policy. Jupiter may split a route internally;
+  the complete transaction must still satisfy the whole-debt postcondition.
+- If output is short or another postcondition fails, revert the entire transaction.
+  No partial token repayment, reduced debt, partial collateral payment or pending
+  hosted order survives that attempt. A failed landed transaction can still cost
+  the submitting payer a network fee. The keeper refreshes evidence/routes and
+  retries only within the program's current bounds and its operating budget;
+  it cannot raise limits without authorization or wait indefinitely without alerts.
+- Do not use Jupiter Trigger custody or asynchronous limit/stop orders for protocol
+  liquidation in the first release. Avoid outstanding-order reservations,
+  cancellation/refund races and mixed token/SOL debt accounting. Liquidator-funded
+  delivery remains a later alternative, because a new payout rule would change
+  the existing actual-cost accounting.
+- A price gap can make all remaining collateral insufficient to replace `q` tokens.
+  That is lender token-principal shortfall/default, even if the SOL payout is larger
+  than an earlier SOL valuation. Do not describe remaining SOL as full token repayment.
+  Keep cash/default settlement a separate, explicitly authorized path with its own
+  eligibility, persistence, valuation, loss waterfall and accounting. The current
+  S1/S2/S3 contracts are the baseline to review; they are not automatically qualified
+  for a Jupiter-derived reference. A failed quote, failed swap or unfilled order
+  alone must never authorize that path or establish no route.
+- Before admitting any new market, qualify both the normal full-debt exit and the
+  selected gap/no-route recovery policy, including stale-report behavior, deliberate
+  margin-addition/token-repayment paths and operator alerts. If that recovery policy
+  is not specified and tested, the market stays disabled. No new partial-repayment
+  state machine or numerical settlement/risk setting is selected here.
+
+This deliberately limits the first integration to the existing whole-position
+accounting model. It reduces integration state; it does not guarantee liquidity,
+continuous keeper/report availability or recovery of all lender token principal.
+
 ## Recommended shape
 
 Operate the quantity-specific price producer ourselves. It collects Jupiter quote
