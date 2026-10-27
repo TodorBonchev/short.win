@@ -29,7 +29,12 @@ describe('disclosures', () => {
 
     it('requires an acknowledgement for the lender and borrower risk disclosures', () => {
         const acked = (Object.keys(DISCLOSURES) as DisclosureId[]).filter((id) => DISCLOSURES[id].ack !== null);
-        expect(acked).toEqual(['lender.solRepayment', 'lender.exitForfeitsVest', 'borrower.liquidation']);
+        expect(acked).toEqual([
+            'lender.solRepayment',
+            'lender.exitForfeitsVest',
+            'borrower.liquidation',
+            'borrower.tokenRepay',
+        ]);
     });
 
     it('carries borrower.liquidation ¶3 as the owner amended it on 2026-10-11 (thirteenth round)', () => {

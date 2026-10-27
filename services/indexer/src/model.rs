@@ -46,9 +46,9 @@ macro_rules! spec {
     };
 }
 
-/// Every short.win event (`programs/shortwin/src/events.rs`, the IDL's 36 events), in the
+/// Every short.win event (`programs/shortwin/src/events.rs`, the IDL's event catalog), in the
 /// order of INDEXER.md §5.3.
-pub const SHORTWIN_EVENTS: [EventSpec; 36] = {
+pub const SHORTWIN_EVENTS: [EventSpec; 37] = {
     use shortwin::events as e;
     [
         spec!(e::MarketCreated, "MarketCreated", Cpi),
@@ -59,6 +59,7 @@ pub const SHORTWIN_EVENTS: [EventSpec; 36] = {
         spec!(e::LenderSynced, "LenderSynced", Cpi),
         spec!(e::Open, "Open", Cpi),
         spec!(e::Close, "Close", Cpi),
+        spec!(e::Repay, "Repay", Cpi),
         spec!(e::Liquidate, "Liquidate", Cpi),
         spec!(e::Expire, "Expire", Cpi),
         spec!(e::SolSettle, "SolSettle", Cpi),

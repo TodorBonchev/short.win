@@ -1,0 +1,223 @@
+{
+  "retained_utc": "2026-10-27T17:57:15.296778+00:00",
+  "scope": "incremental evidence; individual receipts identify their own source/build inputs, not final release qualification",
+  "files": [
+    {
+      "source": "target/price-report-verification/phase2-handoff.json",
+      "archive": "price-report-verification-phase2-handoff.json.gz",
+      "source_bytes": 3677,
+      "source_sha256": "3d9056a863fa1d72793fb95b59947ea206bdd4cf8db487b25ab7f01ae3347d2a",
+      "archive_sha256": "009e874b62ae85c35979b7b41c5e195a7f2add082de4e5d611f6548e5cfe9ccc"
+    },
+    {
+      "source": "target/price-report-verification/host-checks.json",
+      "archive": "price-report-verification-host-checks.json.gz",
+      "source_bytes": 5790,
+      "source_sha256": "001fc26c2af58d1eb1a881762ac469df6c4805b2c7b174cc89857022a104c371",
+      "archive_sha256": "4a9550c4531221c17acc319889ed4b00bb0b7eda3e6dbf892983ecd1bf7595bf"
+    },
+    {
+      "source": "target/price-report-verification/sbf-build.log",
+      "archive": "price-report-verification-sbf-build.log.gz",
+      "source_bytes": 415,
+      "source_sha256": "0e1bd5862ac3fe2323806755db971918b312704b61d48b076319b870a9cc1a21",
+      "archive_sha256": "9d9f40ecf2202ae10dbc55deb0c2b29ee2c16e229173057a9a2fb7dccfd83532"
+    },
+    {
+      "source": "target/price-report-verification/sbf-tests.log",
+      "archive": "price-report-verification-sbf-tests.log.gz",
+      "source_bytes": 884,
+      "source_sha256": "d942d2b76d5977bf1f0442eacf80d5682c795a133d64aa639cb50b3c29abd419",
+      "archive_sha256": "12a1f2da9ab67c2d5ea82f2b0efc16f3f2e1ca2abd7bcca1b2c5506c60aad4b8"
+    },
+    {
+      "source": "target/price-report-verification/sbf-stack-failure-excerpt-2026-10-27.log",
+      "archive": "price-report-verification-sbf-stack-failure-excerpt-2026-10-27.log.gz",
+      "source_bytes": 842,
+      "source_sha256": "2a4ab8905fc1376c72a5a22887e56d61c05eee2974d678941991e8291da86565",
+      "archive_sha256": "9018f2fc6eb80660f8ddc1646075d73535ea9b8e5505a68aee970fd4f20a7cfe"
+    },
+    {
+      "source": "target/quote-rent-verification/all-math-tests.log",
+      "archive": "quote-rent-verification-all-math-tests.log.gz",
+      "source_bytes": 12065,
+      "source_sha256": "3e29e5aedd26885af552993ffe8eb740088911321e9f3972e0fc4a11f0b71460",
+      "archive_sha256": "e77cbe9ead03af1404b9380ab18ee14273aa8f4e12fb0861935fdd355d776df9"
+    },
+    {
+      "source": "target/quote-rent-verification/unit-tests.log",
+      "archive": "quote-rent-verification-unit-tests.log.gz",
+      "source_bytes": 1046,
+      "source_sha256": "899a90f2fc1e364c330b3a225431ce1e6fbdd14a1b3bad7bb8de434a3a22f08d",
+      "archive_sha256": "ecf8467291a6279874509284faeb423ee0e0371fce48a0996652dafe693d12cf"
+    },
+    {
+      "source": "target/quote-rent-verification/python-vectors.json",
+      "archive": "quote-rent-verification-python-vectors.json.gz",
+      "source_bytes": 11472,
+      "source_sha256": "cb24c493feb96253ee0b89d3ae4d0e9d87c8b71d90c17f0672a1a149529f894c",
+      "archive_sha256": "e56a5093ac6e32281204fc1546a28f4203a986c4e6cc014f64d2bc3d876fb2d3"
+    },
+    {
+      "source": "target/quote-rent-verification/clippy.log",
+      "archive": "quote-rent-verification-clippy.log.gz",
+      "source_bytes": 150,
+      "source_sha256": "430973ce8f7b0c5fb1a6cd2ec8dd66e6b0a4b73c66331c600521ce38f728e180",
+      "archive_sha256": "83453e101a31929b19d405ddef57c1221b2f9b17de8a985085e7795304f487c9"
+    },
+    {
+      "source": "target/quote-rent-verification/no-std.log",
+      "archive": "quote-rent-verification-no-std.log.gz",
+      "source_bytes": 150,
+      "source_sha256": "660f20841b51f878696dfc05c72db87e81cad51816c839d28f6f5300f53aa301",
+      "archive_sha256": "20379357368974a7cbfaa4843412dc59c3c29f4c7edd23715a9936a587dce5c8"
+    },
+    {
+      "source": "target/repay-short-qualification/actual-sbf-db-replay.log",
+      "archive": "repay-short-qualification-actual-sbf-db-replay.log.gz",
+      "source_bytes": 870,
+      "source_sha256": "88b83297e11e1c9567a5075f67c1c5c24e3c37e343a80d19267b1a3cbd44aaa8",
+      "archive_sha256": "725e6b7b77f5d05d4861686517f4641b54a23937da089d9cfd78004af52c9c7e"
+    },
+    {
+      "source": "target/repay-short-qualification/actual-sbf-db-replay-identity.json",
+      "archive": "repay-short-qualification-actual-sbf-db-replay-identity.json.gz",
+      "source_bytes": 1236,
+      "source_sha256": "2b29eba895072335a22c28716acca32a6afc71a59216e3ddc06d49227a416280",
+      "archive_sha256": "fa761af20b60c2cab924e451e8d57c71dfeb7b22e5f82be03ebfda2dd91ae693"
+    },
+    {
+      "source": "target/repay-short-qualification/recorded-repay-replay-model.log",
+      "archive": "repay-short-qualification-recorded-repay-replay-model.log.gz",
+      "source_bytes": 1065,
+      "source_sha256": "ee3c4108656168376c7623b5996a124ff1f5e48b92c92aea90939dcb3d67b1ad",
+      "archive_sha256": "0c96df9ee57bd26ebe89820d37ae60afc0778d39bab848c9d3eadbf3342417e8"
+    },
+    {
+      "source": "target/repay-short-qualification/engine-report-combined.log",
+      "archive": "repay-short-qualification-engine-report-combined.log.gz",
+      "source_bytes": 6547,
+      "source_sha256": "715d6e30bcfa78c7904317859d515d816488ac940ba03aff1b69679040b8e756",
+      "archive_sha256": "f4f8660c8652e6b0ee93299c870694f5d16dc00567cc2399742d4e23025b59de"
+    },
+    {
+      "source": "target/repay-ui-verification-2026-10-27/validation.json",
+      "archive": "repay-ui-verification-2026-10-27-validation.json.gz",
+      "source_bytes": 955,
+      "source_sha256": "cd4ea9cc1891101c9dbfa3779604f09198a59dfa4fc7a8ab068e7e12211a614e",
+      "archive_sha256": "a942be7aa1ad47a3f53f73a565f276418f6ef7d4f2d371b1eb1e1167b18bee1f"
+    },
+    {
+      "source": "target/repay-ui-verification-2026-10-27/authorship-and-source.json",
+      "archive": "repay-ui-verification-2026-10-27-authorship-and-source.json.gz",
+      "source_bytes": 3562,
+      "source_sha256": "5653d570757b5c180cbb1e1c4f4dfd36a9e656aa07cd70769cef8864dd19290e",
+      "archive_sha256": "b8ab99fe52c53bb0aaa8a186d155a69dfe9b71607a83e01d2fd0b7c3ff4b370e"
+    },
+    {
+      "source": "target/repay-ui-verification-2026-10-27/full-web.json",
+      "archive": "repay-ui-verification-2026-10-27-full-web.json.gz",
+      "source_bytes": 389918,
+      "source_sha256": "72eaf03ffee0f39d166b09b7d489f32401628bf2bcef74015b7783fcb58e89a2",
+      "archive_sha256": "da29e0e5ef6a4e975af169fd72b121cbb3be4ce9fa0496f96bacfd8faae64870"
+    },
+    {
+      "source": "target/repay-indexer-verification/handoff.json",
+      "archive": "repay-indexer-verification-handoff.json.gz",
+      "source_bytes": 6503,
+      "source_sha256": "65c73918cf87bca4ff1e9a1f0f9641124035d05ccb52da18e5ce5407897f11eb",
+      "archive_sha256": "6b503437d153c94f9440df097be6904c3beb1fafe2bbaead62a9c46276d4c168"
+    },
+    {
+      "source": "target/repay-indexer-verification/pg-checks.json",
+      "archive": "repay-indexer-verification-pg-checks.json.gz",
+      "source_bytes": 1734,
+      "source_sha256": "6490312b9ab557f1c195d28a7c0dd5c9e629fd0e11a50eb1bcaa6e6f1324af8d",
+      "archive_sha256": "7a2fd61642199f94f3cbc385147249a94acc5e2787c108059df6686b12b85796"
+    },
+    {
+      "source": "target/mainnet-prep-build/release.log",
+      "archive": "mainnet-prep-build-release.log.gz",
+      "source_bytes": 1464,
+      "source_sha256": "cb2597de5695dac520586a8098cd01fd989cb3c8901469d6a7f59105623b780e",
+      "archive_sha256": "a4d0ef3f3fed851e71f15c9a1afb0ac63d6c8d5e83019ab00ef0e39c48e02263"
+    },
+    {
+      "source": "target/mainnet-prep-build/idl.log",
+      "archive": "mainnet-prep-build-idl.log.gz",
+      "source_bytes": 363,
+      "source_sha256": "a3542a7f4be50176bcfb7c1a39e1a7947833c28dcd7fab81a0912bd7010a3c93",
+      "archive_sha256": "af72208699d5c19a44aff61ebcd411a88adf0649223852dd358b527c81371a3e"
+    },
+    {
+      "source": "target/mainnet-prep-build/client-abi-check.log",
+      "archive": "mainnet-prep-build-client-abi-check.log.gz",
+      "source_bytes": 2455,
+      "source_sha256": "d0958a1441ec55989040c7e2dc5caf90443d1a7bb158f111fa9f7b1225052a26",
+      "archive_sha256": "a1e399f783b7d2e29e3e4a8ed3c08570c9af10e98dd6febc541bae7c79ed1e20"
+    },
+    {
+      "source": "target/mainnet-prep-build/artifact-identity.json",
+      "archive": "mainnet-prep-build-artifact-identity.json.gz",
+      "source_bytes": 942,
+      "source_sha256": "eaf1c114179c92e5c8e338223354b958b8fa141772e8274149f0260160038346",
+      "archive_sha256": "d61c9d2dc5db2e7d15fc0b0bc9abdc4fd6b9aa109e8edd67e95ae3158e092e3f"
+    },
+    {
+      "source": "target/mainnet-prep-build/fixtures-check.log",
+      "archive": "mainnet-prep-build-fixtures-check.log.gz",
+      "source_bytes": 121,
+      "source_sha256": "a0c0b3caea551b532a1e8e3c818cbfa1c0b105801533b29120d1fcfe7a415f0a",
+      "archive_sha256": "8b6c3bfee0a1156198323d78db73507f901e4a731443f22bd7866d08baf9de31"
+    },
+    {
+      "source": "target/mainnet-prep-build/live-fixtures-check.log",
+      "archive": "mainnet-prep-build-live-fixtures-check.log.gz",
+      "source_bytes": 2343,
+      "source_sha256": "5b8581ec192897942dcd668edca0ab08d4c977d16a430908784f41c1ddf203f1",
+      "archive_sha256": "826e1e4fa20daa58ef3b248da67ff990f95d95942b269f8eb0921b929846c34c"
+    },
+    {
+      "source": "target/mainnet-prep-build/live-fixtures-check-identity.json",
+      "archive": "mainnet-prep-build-live-fixtures-check-identity.json.gz",
+      "source_bytes": 326,
+      "source_sha256": "9a17af0ffdaa3193f0b190517945373fa769376ec69bf1b12f5e2cd09406d472",
+      "archive_sha256": "a0549c3088174551366f888a2981c47b2cc341ba88df72c59cf84d39c726d57d"
+    },
+    {
+      "source": "target/quote-rent-verification/handoff.json",
+      "archive": "quote-rent-verification-handoff.json.gz",
+      "source_bytes": 4208,
+      "source_sha256": "2c09241786b7f07a60d46804677fe319df817c5ff3c18ffb7b5b425cad148c2b",
+      "archive_sha256": "d9f8c61663f0d5802f15ad4a11e54839ca79c45924f152aa987ccf1d1840eb75"
+    },
+    {
+      "source": "target/price-budget-verification-2026-10-27/validation.json",
+      "archive": "price-budget-verification-2026-10-27-validation.json.gz",
+      "source_bytes": 1793,
+      "source_sha256": "e3154789da9ed1f311955a9bfc4e542938610427a933ccab4261858c32c7ca94",
+      "archive_sha256": "94a8bfe6fb55e1db52bb544e4abe257cb5d49c9c101d761029ef3ddb382568b0"
+    },
+    {
+      "source": "target/price-budget-verification-2026-10-27/keeper-clippy.log",
+      "archive": "price-budget-verification-2026-10-27-keeper-clippy.log.gz",
+      "source_bytes": 426,
+      "source_sha256": "f5a0cf2f6f6e549ff30ad8671b53ece8f4030015967ba548fda1e8e434f1b4a1",
+      "archive_sha256": "3fe76b7f39de15c65ec26766a3b76a26c7e914660fa4f7871b46a3996ae70591"
+    },
+    {
+      "source": "target/price-budget-verification-2026-10-27/keeper-lib.log",
+      "archive": "price-budget-verification-2026-10-27-keeper-lib.log.gz",
+      "source_bytes": 12301,
+      "source_sha256": "5c160b2f9b9125bbdf7e15f638c14870b74e42fffc97befb59f2a393193ff2dd",
+      "archive_sha256": "557a7120ef20ad8ca234a686b4c11392bc2c8b23f89041a603f77577416c15e5"
+    },
+    {
+      "source": "target/price-budget-verification-2026-10-27/probe.log",
+      "archive": "price-budget-verification-2026-10-27-probe.log.gz",
+      "source_bytes": 1049,
+      "source_sha256": "e0beb64213f27e2e9ced32277fbbfabce574d6ca6daa84e41b9d5183b2f9b331",
+      "archive_sha256": "993bc9bcc6aa4c72fb466ceb59aaefd79e56ffbb0d2be72dea534b5727f8ee6c"
+    }
+  ]
+}

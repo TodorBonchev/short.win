@@ -1067,7 +1067,7 @@ pub async fn read_model(pool: &PgPool) -> anyhow::Result<Vec<String>> {
         (
             "position events: position = the event's",
             "SELECT signature || ' ' || kind FROM events \
-             WHERE kind IN ('Open', 'Close', 'MarginAdded', 'SettleArmed', 'SettleDisarmed') \
+             WHERE kind IN ('Open', 'Close', 'Repay', 'MarginAdded', 'SettleArmed', 'SettleDisarmed') \
                AND position IS DISTINCT FROM (data->>'position')",
         ),
         (

@@ -70,6 +70,7 @@ fn check_program_layout(kind: &str, body: &[u8]) -> anyhow::Result<usize> {
         LenderSynced,
         Open,
         Close,
+        Repay,
         Liquidate,
         Expire,
         SolSettle,
@@ -199,7 +200,7 @@ pub fn position_of(data: &Value) -> Option<Pubkey> {
     key_field(data, "position")
 }
 
-/// `events.actor` (§5.2 rule 4): `owner` for the lender events, `borrower` for `Open`/`Close`,
+/// `events.actor` (§5.2 rule 4): `owner` for the lender events, `borrower` for `Open`/`Close`/`Repay`,
 /// `keeper` for `Liquidate`/`Expire`/`SolSettle`, `by` for `CoveragePauseSet`/`PauseSet`/
 /// `ConfigCancelled`, the fee payer for `PriceCranked`, else none.
 pub fn actor_of(kind: &str, data: &Value, fee_payer: &Pubkey) -> Option<Pubkey> {
@@ -207,7 +208,7 @@ pub fn actor_of(kind: &str, data: &Value, fee_payer: &Pubkey) -> Option<Pubkey> 
         "Deposit" | "Withdraw" | "ClaimSol" | "DeficitCovered" | "LenderSynced" => {
             key_field(data, "owner")
         }
-        "Open" | "Close" => key_field(data, "borrower"),
+        "Open" | "Close" | "Repay" => key_field(data, "borrower"),
         "Liquidate" | "Expire" | "SolSettle" => key_field(data, "keeper"),
         "CoveragePauseSet" | "PauseSet" | "ConfigCancelled" => key_field(data, "by"),
         "PriceCranked" => Some(*fee_payer),
@@ -431,6 +432,20 @@ pub(crate) mod tests {
                     borrower_payout: 40,
                     b_live: 95,
                     token_surplus: 0,
+                },
+            ),
+            enc(
+                "Repay",
+                e::Repay {
+                    market,
+                    slot: 10,
+                    ts: 20,
+                    position: k(8),
+                    borrower: k(9),
+                    q: 100,
+                    rent: 3,
+                    rent_protocol: 1,
+                    borrower_payout: 135,
                 },
             ),
             enc(

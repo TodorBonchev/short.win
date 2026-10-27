@@ -29,6 +29,7 @@ export * from "./poolSwitchCancelled.ts";
 export * from "./poolSwitched.ts";
 export * from "./priceCranked.ts";
 export * from "./protocolFeesSwept.ts";
+export * from "./repay.ts";
 export * from "./routeBrokenSet.ts";
 export * from "./routeChainChanged.ts";
 export * from "./settleArmed.ts";

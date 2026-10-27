@@ -506,14 +506,14 @@ async fn position_row(
          disarm_count, status, exit_slot, exit_ts, exit_signature, exit_keeper, buyback_cost, \
          b_live_exit, rent_paid, rent_protocol, penalty, expiry_fee, keeper_paid, \
          borrower_payout, token_surplus, liquidated_expired, settle_condition, borrower_pnl, \
-         duration_s) \
+         duration_s, exit_kind) \
          VALUES ($1, $2, $3, $4::numeric, $5, $6, $7::numeric, $8::numeric, $9::numeric, \
                  $10::numeric, $11::numeric, $12::numeric, $13::numeric, $14::numeric, \
                  $15::numeric, $16::numeric, $17::numeric, $18::numeric, $19::numeric, \
                  $20::numeric, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, \
                  $33::numeric, $34, $35, $36, $37, $38, $39, $40, $41, $42::numeric, \
                  $43::numeric, $44::numeric, $45::numeric, $46::numeric, $47::numeric, \
-                 $48::numeric, $49::numeric, $50::numeric, $51, $52, $53::numeric, $54)",
+                 $48::numeric, $49::numeric, $50::numeric, $51, $52, $53::numeric, $54, $55)",
     )
     .bind(k(&p.position))
     .bind(k(&p.market))
@@ -569,6 +569,7 @@ async fn position_row(
     .bind(p.settle_condition.map(small))
     .bind(p.borrower_pnl().map(n))
     .bind(p.exit_ts.map(|e| e - p.opened_ts))
+    .bind(p.exit_kind)
     .execute(&mut **db)
     .await
     .with_context(|| format!("positions {}", p.position))?;

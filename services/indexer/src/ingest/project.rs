@@ -1119,7 +1119,7 @@ async fn apply_to_market(
             )
             .await?;
         }
-        "Close" | "Liquidate" | "Expire" | "SolSettle" => {
+        "Close" | "Repay" | "Liquidate" | "Expire" | "SolSettle" => {
             apply_exit(conn, m, market, ev).await?;
         }
         "SettleArmed" | "SettleDisarmed" => {
@@ -1373,7 +1373,7 @@ async fn coverage_row(
     Ok(())
 }
 
-/// Close / Liquidate / Expire / SolSettle (§5.3, §6.4, §6.5, §8.4).
+/// Close / Repay / Liquidate / Expire / SolSettle (§5.3, §6.4, §6.5, §8.4).
 #[allow(clippy::too_many_lines)]
 async fn apply_exit(
     conn: &mut PgConnection,
@@ -1397,7 +1397,7 @@ async fn apply_exit(
     let p_bps = pos.rent_protocol_bps.unwrap_or(0);
     let derived_rp = formulas::rent_protocol_share(rent, p_bps);
     let (status, borrower_payout, keeper_paid) = match kind {
-        "Close" => ("closed", u64_field(d, "borrower_payout"), None),
+        "Close" | "Repay" => ("closed", u64_field(d, "borrower_payout"), None),
         "Liquidate" => (
             "liquidated",
             u64_field(d, "borrower_payout"),
@@ -1415,18 +1415,21 @@ async fn apply_exit(
         ),
     };
     let rent_protocol = match kind {
-        "Close" => Some(u64_field(d, "rent_protocol")),
+        "Close" | "Repay" => Some(u64_field(d, "rent_protocol")),
         "Liquidate" | "Expire" => Some(derived_rp),
         _ => None,
     };
-    let pnl = formulas::borrower_pnl(borrower_payout, pos.m, pos.margin_added, pos.fee_open);
+    // A borrower supplied tokens bought outside the protocol. Its acquisition cost is unknown;
+    // the retained sale proceeds in borrower_payout must never become an invented profit.
+    let pnl = (kind != "Repay")
+        .then(|| formulas::borrower_pnl(borrower_payout, pos.m, pos.margin_added, pos.fee_open));
     sqlx::query(
         "UPDATE positions SET status = $2, exit_slot = $3, exit_ts = $4, exit_signature = $5, \
            exit_keeper = $6, buyback_cost = $7::numeric, b_live_exit = $8::numeric, \
            rent_paid = $9::numeric, rent_protocol = $10::numeric, penalty = $11::numeric, \
            expiry_fee = $12::numeric, keeper_paid = $13::numeric, borrower_payout = $14::numeric, \
            token_surplus = $15::numeric, liquidated_expired = $16, settle_condition = $17, \
-           borrower_pnl = $18::numeric, duration_s = $19, armed = FALSE \
+           borrower_pnl = $18::numeric, duration_s = $19, armed = FALSE, exit_kind = $20 \
          WHERE position = $1",
     )
     .bind(position.to_string())
@@ -1435,8 +1438,10 @@ async fn apply_exit(
     .bind(ev.ev_ts)
     .bind(&ev.signature)
     .bind(opt_key(keeper))
-    .bind((kind != "SolSettle").then(|| u64_field(d, "buyback_cost").to_string()))
-    .bind(u64_field(d, "b_live").to_string())
+    .bind(
+        (!matches!(kind, "SolSettle" | "Repay")).then(|| u64_field(d, "buyback_cost").to_string()),
+    )
+    .bind((kind != "Repay").then(|| u64_field(d, "b_live").to_string()))
     .bind((kind != "SolSettle").then(|| rent.to_string()))
     .bind(opt_text(rent_protocol))
     .bind((kind == "Liquidate").then(|| u64_field(d, "penalty").to_string()))
@@ -1446,15 +1451,16 @@ async fn apply_exit(
     .bind((kind != "SolSettle").then(|| u64_field(d, "token_surplus").to_string()))
     .bind((kind == "Liquidate").then(|| bool_field(d, "expired")))
     .bind((kind == "SolSettle").then(|| i16_of(u8_field(d, "condition"))))
-    .bind(pnl.to_string())
+    .bind(pnl.map(|amount| amount.to_string()))
     .bind(ev.ev_ts - pos.opened_ts)
+    .bind(kind)
     .execute(&mut *conn)
     .await
     .context("positions (exit)")?;
     remove_position(m, &pos);
     let pos_key = Some(position);
     match kind {
-        "Close" => {
+        "Close" | "Repay" => {
             let rp = u64_field(d, "rent_protocol");
             let rl = rent.saturating_sub(rp);
             m.tokens_free = m.tokens_free.saturating_add(pos.q);

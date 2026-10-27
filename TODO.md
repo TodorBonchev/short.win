@@ -34,6 +34,10 @@ permissionless financial authority. New tokens stay disabled until qualified.
       exact-quantity references, authorized on-chain updates, history and failure rules.
       The [producer contract](docs/design/jupiter/QUOTE_PRODUCER_CONTRACT.md) preserves
       the distinction between candidate upper cost and forced-action lower evidence.
+  The report/history core, immutable authenticated account boundary and bounded
+  read-only quote-search/HTTP probe now have focused checks. The [engineering
+  record](docs/audit/mainnet-preparation-2026-10-27.md) separates these from the
+  still-open quote-native financial integration and final qualification.
 - [ ] Measure the combined price-worker/keeper/indexer/database workload and API/RPC
       budget on the [initial host](docs/deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host).
 - [ ] Implement the [selected whole-position atomic liquidation](docs/design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice):
@@ -41,7 +45,9 @@ permissionless financial authority. New tokens stay disabled until qualified.
       fresh-route retries. No hosted liquidation orders or partial/mixed repayment.
 - [ ] Specify and qualify separate gap/no-route settlement and outage recovery for
       new markets; failed quotes/swaps alone cannot authorize default. Keep markets
-      disabled until these rules and lender loss accounting are tested.
+      disabled until these rules and lender loss accounting are tested. The owner's
+      choice on the proposed overdue-default backstop in the [financial contract](docs/design/jupiter/QUOTE_NATIVE_FINANCIAL_CONTRACT.md)
+      is pending; infrastructure budget approval does not select that financial policy.
 - [ ] Integrate compatible keeper, client and indexer behavior.
 - [ ] Independently review and qualify final code/fixtures, then run fresh fuzz.
 - [ ] Select the new release version and complete funded mainnet commissioning.
@@ -70,6 +76,8 @@ opening-notional cap is 25 SOL per market, not a global TVL or loss cap. See the
       host choice is required for this pre-redesign baseline. Changed redesign
       inputs need their own qualifying evidence; a source tag proves no funded operation.
 - [ ] Commission the [VPS operator stack](docs/deployment/MAINNET_OPERATIONS.md):
+      The owner approved the [initial infrastructure budget](docs/deployment/VPS_PURCHASE_AND_SETUP_2026_10_27.md);
+      provider sign-in/provisioning and measured operation remain pending.
       actual mainnet RPC, covered markets, payer funding/top-ups, active keeper
       coverage and oracle, independently delivered alerts, private database,
       off-host backup/restore, and exact indexer/client artifact identities.

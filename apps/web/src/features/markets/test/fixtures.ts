@@ -104,6 +104,8 @@ export function detail(over: Partial<MarketDetail> = {}): MarketDetail {
             avg_open_impact_bps: 120,
             avg_exit_slippage_bps: 80,
             borrower_pnl: '-150000000',
+            borrower_pnl_known_exits: 6,
+            borrower_pnl_unknown_exits: 0,
         },
         lender_loss: {
             settlements: 1,

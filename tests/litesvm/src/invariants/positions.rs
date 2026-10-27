@@ -3,13 +3,13 @@
 //!
 //! | # | Where | What is checked |
 //! |---|---|---|
-//! | I3 | `check_ix` | a position's lamports fall (or it closes) only in an instruction that emitted an exit event for it (`Close`, `Liquidate`, `Expire`, `SolSettle`); a position an exit event names is gone afterwards; a surviving position's tracked `v` never falls, rises only with `m` by the same amount (`add_margin`) and never by more than its lamports; a new position appears only with this instruction's `Open` event, whose figures it stores |
+//! | I3 | `check_ix` | a position's lamports fall (or it closes) only in an instruction that emitted an exit event for it (`Close`, `Repay`, `Liquidate`, `Expire`, `SolSettle`); a position an exit event names is gone afterwards; a surviving position's tracked `v` never falls, rises only with `m` by the same amount (`add_margin`) and never by more than its lamports; a new position appears only with this instruction's `Open` event, whose figures it stores |
 //! | A26 | `check_ix` | the snapshot rules: every field of a surviving position except `v`, `m` and the settlement arming state (`s_armed`, `s_count`, `s_since`, `s_last`) is unchanged — the locked terms, `deadline`, `r_min`, `j_open`, `q`, `s`, `n_open`, `fee_open`, `entry_price`, tier, venue, nonce, bump, status |
 //! | I5 | `check_ix` | after every `Open`: `ΣB_Q·10⁴ ≤ util_cap_bps·(T + ΣB_Q)` |
 //! | I6 | `check_all` | `ΣB_Q` = Σ open positions' `q` (and by tier); `open_positions`, `total_notional_open`, `rent_aggr` (`Σ q·coef_j·(10⁴ − p_pos)`) match the positions; `max_release ≥` every position's `release_at`; every `WalletExposure` of the market sits at its PDA with `q_open` = Σ `q` of its wallet's positions and `q_open > 0` (closed at 0), and every borrower with a position has one |
 //! | I7 | `check_ix` + `check_all` | after every instruction that ran a leg (`Open`, `Close`, `Liquidate`, `Expire`): `trader` 0 lamports, System-owned, no data; `trader_wsol` System-owned with no data, holding nothing after a WSOL leg and unchanged lamports after a pump-curve leg (which never names it; FUZZ-M7-1); `pool_vault` has no delegate — the last also after **every** instruction (`check_all`: the delegate exists only inside a Raydium sell leg); a pump market's `trader_base_ata` holds 0 tokens, is owned by `trader`, with no delegate and no close authority |
 //! | I9 | `check_ix` | every waterfall conserves `V` (ECON I-E4), read off its event against the position's `V` just before: `Close` (`B + R + borrower`, and `rent_protocol = ⌊R·rent_protocol_bps_pos/10⁴⌋`), `Liquidate` (`B + r + π + top-up + borrower`), `Expire` (`B + r + e + K_e + borrower`), `SolSettle` (`K_s + lenders + borrower`) |
-//! | I10 | `check_ix` | an exit (`Close`, `Liquidate`, `Expire`, `SolSettle`) names neither `oracle_cache` nor `venue_guard` among its accounts |
+//! | I10 | `check_ix` | an exit (`Close`, `Repay`, `Liquidate`, `Expire`, `SolSettle`) names neither `oracle_cache` nor `venue_guard` among its accounts |
 //! | I11 | `check_ix` (event part) | a liquidation's spend `≤ ⌊B̂_ref·(10⁴ + δ_liq)/10⁴⌋` with the position's locked δ, an expiry's `≤ ⌊B̂_ref·(10⁴ + δ_exp)/10⁴⌋`; `B ≤ max_in + ert` and `max_in ≤` that fixed bound; penalty / expiry fee `≤ ⌈rate·min(B̂_live,risk, B̂_ref)/10⁴⌉`; an expiry's `π_ref = ⌈fee·B̂_ref/10⁴⌉`, its `K_e = min(fixed + ⌊bps·B̂_ref/10⁴⌋, cap, V − B − r − e)`, and its rent (`R_due` on the post-accrual basis) and fee paid in full whenever `V − R − π_ref − ert ≥ ⌊B̂_ref·(10⁴ + ε)/10⁴⌋`. The liveness clause (I-E11) is a scenario test (`tests/liquidate_it.rs`, `tests/attacks_exit_it.rs`) |
 //! | I12 | `check_ix` (event part and the state around it) | S1 take `= V − K_s`; an S2/S3 take inside `[x_lo, x_hi]` (±2) with the corners within `fv_dev_bps`; `K_s` = the locked terms' reward; a liquidation that leaves the borrower equity pays the keeper `≥ K_s`; S1/S2 only on a live clock (armed, last evaluation within `settle_arm_gap_s`) that has run `settle_persist_n` EMA updates (the position's `s_count` before, the market's `ema_count` after); S3 only on a continuous no-route chain observed now and at least `s3_wait_s` (and the graduation / migration timers) long, with the position's locked terms; `p'` per corner: the penalty on both corners of a position not expired, and on an expired one the expiry fee at the dearer corner `(P_hi, L_lo)` only if the cheaper corner has it too |
 //! | I13 | `check_all` + `check_ix` | every ring entry's `(x, y) = reprice(l, p)`; the newest ring entry is the EMA state (`ts = ema_ts`, `p = P_ema`, `l = L_ema`); no decision state holds the current second (`lb_sec <` now, `b_sec ≤` now, `ema_ts ≤` now, with now = `max(clock, last_accrual_ts)`: the one-second lag); a venue charge ∈ `[B̂ − 5, B̂]` for `Close`, `Liquidate`, `Expire` (on a curve exit past `rT`, pump-final §5.2's bound in place of 5; on the curve `B` less the venue-side rent of the pre-state — a short curve's growth to the size of the build pump's ProgramData holds — 166 bytes since its 2026-10-08 redeploy, 141 on the 2026-10-02 build, 125 before, `fork::PumpDeploy::held` —, ≤ `ert`, `VenueView::venue_rent` — T-RENT); on every venue the harness has a view of — the mock, the Raydium venues, the curve and PumpSwap (M6) — an `Open`'s proceeds ∈ `[S_exp, S_exp + 5]` (the curve: `S` + that rent; PumpSwap: `S` + the rent of a pool's growth to 287 bytes — 271 on the 2026-09 build, by the build PumpSwap's ProgramData holds —, which `Open.venue_rent` reports, R-VEN H8) and a `Close`'s `b_live` = `B̂_live(q)` (the curve: `B̂_v3` past `rT`), both re-quoted (`quote::cpmm` / `quote::ray_v4` / `quote::sol_leg` on the readers' state, `venue_view`) on the venue just before the instruction; one EMA integration of a confirmed state (`ema_warm = 0`, M4R) moves `P_ema` and `L_ema` within their single-step bounds |
@@ -23,7 +23,7 @@ use std::cell::Cell;
 use anchor_lang::AccountDeserialize;
 use anchor_lang::prelude::Pubkey;
 use litesvm::LiteSVM;
-use shortwin::events::{Close, Expire, Liquidate, Open, PoolSwitched, SolSettle};
+use shortwin::events::{Close, Expire, Liquidate, Open, PoolSwitched, Repay, SolSettle};
 use shortwin::state::{
     GlobalConfig, MARKET_FLAG_ROUTE_BROKEN, Market, ShortPosition, VenueKind, WalletExposure,
 };
@@ -57,6 +57,8 @@ fn injected_borrower_side() -> bool {
 /// One market's position-side state before an instruction.
 #[derive(Clone)]
 pub struct MarketPositions {
+    /// Actual lender-vault tokens before the instruction (in-kind repayment net-credit check).
+    pub pool_vault_tokens: u64,
     pub market: Pubkey,
     pub state: Market,
     pub positions: Vec<(Pubkey, ShortPosition, u64)>,
@@ -83,6 +85,7 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> PositionsSnapshot {
             .filter_map(|k| {
                 let m = read::zc::<Market>(svm, k)?;
                 Some(MarketPositions {
+                    pool_vault_tokens: read::token_amount(svm, &m.pool_vault).unwrap_or(0),
                     market: *k,
                     state: m,
                     positions: positions_of(svm, k),
@@ -344,6 +347,7 @@ fn ring_reprojection(key: &Pubkey, m: &Market) -> Result<(), Violation> {
 pub struct IxFacts<'a> {
     pub opens: &'a [Open],
     pub closes: &'a [Close],
+    pub repays: &'a [Repay],
     pub liquidations: &'a [Liquidate],
     pub expiries: &'a [Expire],
     pub settlements: &'a [SolSettle],
@@ -364,6 +368,7 @@ pub struct IxFacts<'a> {
 impl IxFacts<'_> {
     fn exits_position(&self, position: &Pubkey) -> bool {
         self.closes.iter().any(|e| e.position == *position)
+            || self.repays.iter().any(|e| e.position == *position)
             || self.liquidations.iter().any(|e| e.position == *position)
             || self.expiries.iter().any(|e| e.position == *position)
             || self.settlements.iter().any(|e| e.position == *position)
@@ -402,6 +407,7 @@ impl IxFacts<'_> {
 
     fn is_exit(&self) -> bool {
         !(self.closes.is_empty()
+            && self.repays.is_empty()
             && self.liquidations.is_empty()
             && self.expiries.is_empty()
             && self.settlements.is_empty())
@@ -490,6 +496,28 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
                     })?;
                 }
             }
+        }
+        let repaid_q: u128 = ix
+            .repays
+            .iter()
+            .filter(|e| e.market == mp.market)
+            .map(|e| u128::from(e.q))
+            .sum();
+        if repaid_q > 0 {
+            let after_tokens = read::token_amount(svm, &mp.state.pool_vault).unwrap_or(0);
+            ensure(
+                after_tokens
+                    .checked_sub(mp.pool_vault_tokens)
+                    .map(u128::from)
+                    == Some(repaid_q),
+                "I9",
+                || {
+                    format!(
+                        "repayment on {} lacks exact net lender-vault token credit",
+                        mp.market
+                    )
+                },
+            )?;
         }
         exit_waterfalls(mp, post.as_ref(), ix)?;
         // I13: liquidation and expiry charges within [B̂ − 5, B̂] too (after the I9 / I11 /
@@ -1048,6 +1076,31 @@ fn exit_waterfalls(
 ) -> Result<(), Violation> {
     for (pk, p, _) in &mp.positions {
         let v = u128::from(p.v);
+        for e in ix.repays.iter().filter(|e| e.position == *pk) {
+            ensure(
+                e.q == p.q && e.borrower == p.borrower && e.market == mp.market,
+                "I9",
+                || format!("repayment of {pk}: identity or full debt mismatch"),
+            )?;
+            ensure(
+                u128::from(e.rent) + u128::from(e.borrower_payout) == v,
+                "I9",
+                || format!("repayment of {pk}: rent + borrower != V"),
+            )?;
+            let protocol = u128::from(e.rent) * u128::from(p.rent_protocol_bps) / 10_000;
+            ensure(u128::from(e.rent_protocol) == protocol, "I9", || {
+                format!("repayment of {pk}: locked protocol rent split mismatch")
+            })?;
+            if let Some(m) = post {
+                let due = rent::due(&p.pos_rent(), &m.basis()).map_err(|err| Violation {
+                    invariant: "I9",
+                    detail: format!("repayment of {pk}: rent error {err:?}"),
+                })?;
+                ensure(e.rent == due, "I9", || {
+                    format!("repayment of {pk}: full accrued rent not paid")
+                })?;
+            }
+        }
         for e in ix.liquidations.iter().filter(|e| e.position == *pk) {
             let total = u128::from(e.buyback_cost)
                 + u128::from(e.rent)

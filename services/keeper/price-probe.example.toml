@@ -1,0 +1,59 @@
+# shortwin-price-probe --config price-probe.toml --once
+# Diagnostic only: no keypair, transaction simulation/send, risk reference or report publication.
+# This template deliberately refuses: replace every placeholder and explicitly review settings.
+# The API key is a separate bounded regular file (up to 4096 bytes), never an inline TOML value.
+api_key_file = "<private-api-key-file>"
+# Optional: a NEW directory whose parent exists. Existing paths are refused; files use create_new.
+# output_directory = "/var/lib/shortwin/price-probe-unique-run"
+
+# Public identity supplied by the operator; this diagnostic does not verify on-chain admission.
+chain_genesis = "<base58-genesis-hash>"
+program = "<shortwin-program-public-key>"
+configuration = "<configuration-public-key>"
+market = "<market-public-key>"
+input_mint = "So11111111111111111111111111111111111111112"
+input_token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+input_decimals = 9
+output_mint = "<base-mint-public-key>"
+output_token_program = "<Token-or-Token2022-program-public-key>"
+output_decimals = 6
+exact_debt_raw = "<exact-registered-raw-debt-quantity>"
+# Public taker only; the probe does not load its keypair or spend its funds.
+taker = "<public-taker-key>"
+
+# Lowercase 64 hex digests of reviewed immutable policy mappings; no defaults/attestation implied.
+policy_digest_hex = "<reviewed-policy-sha256>"
+policy_version = 0
+account_policy_digest_hex = "<reviewed-account-policy-sha256>"
+model_epoch = 0
+observation_epoch = 0
+report_sequence = 0
+
+# Illustrative search bounds, not approved cadence, cost, capacity, slippage or risk settings.
+# Inputs are unique raw WSOL lamports. No monotonicity is assumed; each costs one Build request.
+candidate_input_lamports = ["10000000", "20000000", "40000000", "80000000"]
+max_input_lamports = "80000000"
+max_requests = 4
+max_response_bytes = 262144
+request_timeout_ms = 2500
+search_window_ms = 15000
+slippage_bps = 50
+
+# Local pacing arithmetic only: (60-30)=30 probe requests/minute allows at most one start per 2000 ms.
+# Actual provider quota and every other process/key user must be reconciled before operation;
+# this one-shot process cannot enforce or prove an account-wide exit reservation.
+declared_account_requests_per_minute = 60
+reserved_exit_requests_per_minute = 30
+min_request_spacing_ms = 2500
+
+# Shared local rolling 1 s request reservations, required for the diagnostic client.
+# All cooperating price/keeper processes for this provider account must share this
+# absolute path, identical limits and OS service user. Pre-create the parent as 0700;
+# the state file is 0600. Never rename/delete/reset an active or corrupt quota file.
+# Illustrative candidate pilot limits ONLY; provider/account settings still need review.
+# Outside API consumers and monthly credits are not counted by this local throttle.
+[request_budget]
+state_file = "/var/lib/shortwin/jupiter-request-budget/requests.state"
+total_per_second = 10
+background_per_second = 6
+reserved_exit_per_second = 3

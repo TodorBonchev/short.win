@@ -202,6 +202,22 @@ pub mod shortwin {
 
     // ---- oracle (ARCH §3.9) ----
 
+    /// Governance creates immutable exact-q report persistence; this admits no financial action.
+    pub fn initialize_price_report(
+        ctx: Context<InitializePriceReport>,
+        args: InitializePriceReportArgs,
+    ) -> Result<()> {
+        instructions::initialize_price_report::handler(ctx, args)
+    }
+
+    /// An authorized runtime signer publishes finite/Unknown evidence without financial authority.
+    pub fn publish_price_report(
+        ctx: Context<PublishPriceReport>,
+        args: PublishPriceReportArgs,
+    ) -> Result<()> {
+        instructions::publish_price_report::handler(ctx, args)
+    }
+
     /// Anyone refreshes the cached SOL/USD price.
     pub fn crank_sol_usd(ctx: Context<CrankSolUsd>) -> Result<()> {
         instructions::crank_sol_usd::handler(ctx)
@@ -277,6 +293,12 @@ pub mod shortwin {
     /// credits the wipe record and sets `wipe_trader_swept` (ARCH §3.9; M2-SEC-4).
     pub fn sweep_trader<'info>(ctx: Context<'info, SweepTrader<'info>>) -> Result<()> {
         instructions::sweep_trader::handler(ctx)
+    }
+
+    /// Borrower returns all owed tokens in-kind, paying accrued rent within max_rent.
+    /// No swap route, oracle or price history is required.
+    pub fn repay_short<'info>(ctx: Context<'info, RepayShort<'info>>, max_rent: u64) -> Result<()> {
+        instructions::repay_short::handler(ctx, max_rent)
     }
 
     // ---- Raydium pool selection (ARCH §2.6, §3.9; M4) ----

@@ -1,0 +1,117 @@
+name: jupiter-exec-probe
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'tests/jupiter_exec_probe/**'
+      - 'tests/litesvm/tests/jupiter_exec_probe.rs'
+      - 'tests/litesvm/Cargo.toml'
+      - 'crates/shortwin-jupiter-route/**'
+      - 'scripts/build-jupiter-exec-probe.sh'
+      - 'scripts/materialize-jupiter-probe.py'
+      - '.github/workflows/jupiter-exec-probe.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'programs/shortwin/**'
+      - 'tests/litesvm/src/**'
+      - 'tests/fixtures/**'
+  push:
+    branches: [main, codex/jupiter-redesign-1.1]
+    paths:
+      - 'tests/jupiter_exec_probe/**'
+      - 'tests/litesvm/tests/jupiter_exec_probe.rs'
+      - 'tests/litesvm/Cargo.toml'
+      - 'crates/shortwin-jupiter-route/**'
+      - 'scripts/build-jupiter-exec-probe.sh'
+      - 'scripts/materialize-jupiter-probe.py'
+      - '.github/workflows/jupiter-exec-probe.yml'
+      - 'Cargo.lock'
+      - 'Cargo.toml'
+      - 'programs/shortwin/**'
+      - 'tests/litesvm/src/**'
+      - 'tests/fixtures/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jupiter-exec-probe-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  CARGO_BUILD_JOBS: '2'
+  CARGO_INCREMENTAL: '0'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
+  AGAVE_VERSION: '4.1.2'
+  AGAVE_INSTALL_INIT_SHA256: '383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98'
+  AGAVE_RELEASE_SHA256: '5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770'
+  PLATFORM_TOOLS: 'v1.57'
+
+jobs:
+  hostile-sbf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Pinned host Rust
+        run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: jupiter-exec-probe
+          workspaces: . -> target/jupiter-exec-probe/host
+      - name: Cache pinned SBF tools
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/${{ env.PLATFORM_TOOLS }}
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-${{ env.AGAVE_RELEASE_SHA256 }}-${{ env.PLATFORM_TOOLS }}-${{ runner.os }}
+      - name: Install pinned Agave
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: bash .github/workflows/scripts/install-agave.sh
+      - name: Select pinned Agave
+        run: |
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/share/solana/install/active_release/bin/agave-install" init "$AGAVE_VERSION"
+      - name: Format and native wire checks
+        run: |
+          mkdir -p target/jupiter-exec-probe
+          cargo fmt --manifest-path tests/jupiter_exec_probe/Cargo.toml --check
+          rustfmt --edition 2024 --check tests/litesvm/tests/jupiter_exec_probe.rs
+          cargo test --manifest-path tests/jupiter_exec_probe/Cargo.toml --lib --locked --target-dir target/jupiter-exec-probe/probe-host
+          cargo clippy --manifest-path tests/jupiter_exec_probe/Cargo.toml --all-targets --locked --target-dir target/jupiter-exec-probe/probe-host -- -D warnings
+      - name: Build TEST-ONLY SBF artifact
+        run: |
+          set -o pipefail
+          scripts/build-jupiter-exec-probe.sh 2>&1 | tee target/jupiter-exec-probe/build.log
+      - name: Require focused test discovery, then actual SBF execution
+        env:
+          SHORTWIN_JUPITER_EXEC_PROBE_SO: ${{ github.workspace }}/target/jupiter-exec-probe/deploy/shortwin_jupiter_exec_probe.so
+        run: |
+          set -o pipefail
+          cargo test -p shortwin-litesvm-tests --test jupiter_exec_probe --features jupiter-exec-probe --locked --target-dir target/jupiter-exec-probe/host -- --list > target/jupiter-exec-probe/test-list.log
+          grep -Fq 'actual_sbf_whole_debt_and_lower_consumption_refund_surplus: test' target/jupiter-exec-probe/test-list.log
+          grep -Fq 'postcondition_failure_after_transfers_and_refunds_rolls_everything_back: test' target/jupiter-exec-probe/test-list.log
+          grep -Fq 'actual_pinned_jupiter_cpmm_route_credits_full_debt_and_refunds_scratch: test' target/jupiter-exec-probe/test-list.log
+          cargo test -p shortwin-litesvm-tests --test jupiter_exec_probe --features jupiter-exec-probe --locked --target-dir target/jupiter-exec-probe/host -- --nocapture 2>&1 | tee target/jupiter-exec-probe/sbf-tests.log
+          grep -Fq "test result: ok. 8 passed; 0 failed; 0 ignored;" target/jupiter-exec-probe/sbf-tests.log
+      - name: Focused host lint
+        run: cargo clippy -p shortwin-litesvm-tests --test jupiter_exec_probe --features jupiter-exec-probe --locked --target-dir target/jupiter-exec-probe/host -- -D warnings
+      - name: Retain only explicit non-secret evidence paths
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: jupiter-exec-probe-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            target/jupiter-exec-probe/deploy/*.so
+            target/jupiter-exec-probe/build-identity.json
+            target/jupiter-exec-probe/build.log
+            target/jupiter-exec-probe/test-list.log
+            target/jupiter-exec-probe/sbf-tests.log
+            target/jupiter-exec-probe/jupiter-candidate/accounts.json
+            target/jupiter-exec-probe/jupiter-candidate/jupiter.so
+            tests/jupiter_exec_probe/Cargo.lock

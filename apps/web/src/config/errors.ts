@@ -364,6 +364,12 @@ const ROWS: readonly Row[] = [
         'blocked',
         'This empty pool contains unassigned income from earlier shares. Deposits are blocked until the accounting is reviewed. Sweeping or retrying will not unblock deposits.',
     ],
+    [
+        6111,
+        'RepaymentRentAboveMax',
+        'adjust',
+        'Accrued rent is above the maximum you entered. Refresh the estimate and choose a new rent limit.',
+    ],
 ];
 
 export const PROGRAM_ERRORS: ReadonlyMap<number, ProgramErrorInfo> = new Map(

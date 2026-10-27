@@ -561,6 +561,8 @@ export class IndexerMock {
                 avg_open_impact_bps: null,
                 avg_exit_slippage_bps: null,
                 borrower_pnl: zero,
+                borrower_pnl_known_exits: 0,
+                borrower_pnl_unknown_exits: 0,
             },
             lender_loss: {
                 settlements: 0,
@@ -693,6 +695,7 @@ export class IndexerMock {
                       ...p,
                       status: 'closed',
                       exit: {
+                          kind: 'Close',
                           ts: s.time,
                           signature: '1'.repeat(64),
                           keeper: null,

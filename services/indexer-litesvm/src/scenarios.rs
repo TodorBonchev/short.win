@@ -16,7 +16,7 @@
 //!
 //! | Session | Build, venue | Covers |
 //! |---|---|---|
-//! | [`mock_lifecycle`] | test-venue, mock | lenders, close, `add_margin`, CR liquidation, S1, S2, S3, expiry, `CoverageGap`, fee sweep, `claim_sol` / `withdraw` / `cover_deficit` / `sync_lender`, a full wipe with the record donation and `sweep_trader`, a flushing rebase with the record donation, a vest flush without a roll, the last shares leaving a running vest, pauses, route-broken flags, the latch, `disable_venue`, `flag_unsafe_mint` |
+//! | [`mock_lifecycle`] | test-venue, mock | lenders, close, in-kind repayment, `add_margin`, CR liquidation, S1, S2, S3, expiry, `CoverageGap`, fee sweep, `claim_sol` / `withdraw` / `cover_deficit` / `sync_lender`, a full wipe with the record donation and `sweep_trader`, a flushing rebase with the record donation, a vest flush without a roll, the last shares leaving a running vest, pauses, route-broken flags, the latch, `disable_venue`, `flag_unsafe_mint` |
 //! | [`mock_admin`] | test-venue, mock | every `ConfigChange` kind through the timelock, a cancel, locked terms across a `Params` change, `disable_venue` followed by an unrelated change (the bit stays cleared) then `EnableVenues`, the coverage key's pause / clear and the Emergency's clear, `set_venue_extras`, `SettleArmed` → `SettleDisarmed` |
 //! | [`keeper_liquidation`] | test-venue, mock | the keeper's v1 batches, per-second cranks, its liquidation |
 //! | [`keeper_coverage_pause`] | test-venue, mock | O17's drill: an outage, the keeper's pause, a liquidation under it, the automatic unpause |
@@ -359,6 +359,37 @@ pub fn mock_lifecycle() -> Session {
     env.tick(&m1, 20);
     ok(env.close(&m1, &a, na));
     env.tick(&m1, 5);
+
+    // Whole-q in-kind repayment: real program event and checkpoints for indexer replay.
+    // Token acquisition is deliberately external, so this exit has no known P&L cost.
+    let (repaid, repaid_nonce) = open(&mut env, &m1, Q / 10);
+    env.tick(&m1, 2);
+    let payer = env.payer.insecure_clone();
+    let source = tokens::create_token_account(
+        &mut env.svm,
+        &payer,
+        &m1.mint(),
+        &repaid.key(),
+        m1.spec.program,
+    );
+    tokens::mint_to(
+        &mut env.svm,
+        &payer,
+        &m1.mint(),
+        &source,
+        &m1.pool.mint_authority,
+        Q / 10,
+        m1.spec.program,
+    );
+    let repay = shortwin_litesvm_tests::engine::repay_short_ix(
+        &m1,
+        &repaid.key(),
+        &source,
+        repaid_nonce,
+        u64::MAX,
+    );
+    ok(env.send(&[repay], &[&repaid.kp]));
+    env.tick(&m1, 2);
 
     // A CR liquidation after a ×2.3 pump.
     let (b, nb) = open(&mut env, &m1, Q);

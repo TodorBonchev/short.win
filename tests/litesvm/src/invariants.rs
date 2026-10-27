@@ -33,7 +33,7 @@ use litesvm::LiteSVM;
 use litesvm::types::TransactionMetadata;
 use shortwin::events::{
     ClaimSol, Close, DeficitCovered, Deposit, Expire, LenderSynced, Liquidate, MarketCreated, Open,
-    PoolProposed, PoolSwitchCancelled, PoolSwitched, SettleArmed, SettleDisarmed, SolSettle,
+    PoolProposed, PoolSwitchCancelled, PoolSwitched, Repay, SettleArmed, SettleDisarmed, SolSettle,
     VenueStateChanged, Withdraw,
 };
 use shortwin::state::{LenderPosition, Market, MarketVault, ShortPosition, VenueGuard, VenueKind};
@@ -451,6 +451,7 @@ pub struct IxEvents {
     pub syncs: Vec<LenderSynced>,
     pub opens: Vec<Open>,
     pub closes: Vec<Close>,
+    pub repays: Vec<Repay>,
     pub liquidations: Vec<Liquidate>,
     pub expiries: Vec<Expire>,
     pub settlements: Vec<SolSettle>,
@@ -492,6 +493,7 @@ impl IxEvents {
             syncs: events::of_ix(meta, ix),
             opens: events::of_ix(meta, ix),
             closes: events::of_ix(meta, ix),
+            repays: events::of_ix(meta, ix),
             liquidations: events::of_ix(meta, ix),
             expiries: events::of_ix(meta, ix),
             settlements: events::of_ix(meta, ix),
@@ -564,6 +566,7 @@ impl IxEvents {
         positions::IxFacts {
             opens: &self.opens,
             closes: &self.closes,
+            repays: &self.repays,
             liquidations: &self.liquidations,
             expiries: &self.expiries,
             settlements: &self.settlements,

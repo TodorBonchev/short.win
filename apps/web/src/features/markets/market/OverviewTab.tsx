@@ -186,7 +186,10 @@ function Exits({ d }: { d: MarketDetail }) {
                     ['Average duration', e.avg_duration_s === null ? '—' : formatDuration(e.avg_duration_s)],
                     bpsRow('Average open impact', e.avg_open_impact_bps),
                     bpsRow('Average exit slippage', e.avg_exit_slippage_bps),
-                    pnl('Borrowers’ P&L', big(e.borrower_pnl)),
+                    e.borrower_pnl === null
+                        ? ['Borrowers’ P&L', 'Unavailable (external token cost)']
+                        : pnl('Borrowers’ P&L', big(e.borrower_pnl)),
+                    ['Positions with unknown P&L', String(e.borrower_pnl_unknown_exits)],
                 ]}
             />
         </section>

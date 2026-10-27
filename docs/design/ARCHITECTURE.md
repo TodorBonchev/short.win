@@ -7,6 +7,13 @@ Jupiter swaps; exact reporter/risk settings and implementation need qualificatio
 and operator commands below remain baseline evidence, not deployment approval
 for the new design. Audit/bounty funding timing otherwise remains unchanged.
 
+**Unreleased implementation:** the in-house exact-q report core has a canonical
+codec and immutable program-owned report account with governance initialization
+and runtime-signer publication. It supplies no admission/health/settlement authority.
+The new borrower `repay_short(max_rent)` path uses actual full token credit and the
+existing rent/close accounting without venue/oracle accounts. The executor prototype
+is still test-only. [Engineering scope and evidence](../audit/mainnet-preparation-2026-10-27.md).
+
 **Current launch policy (owner, 2026-10-27): capped mainnet before an external audit
 and a funded bug bounty**, with protocol fees intended to accumulate funding for
 both. The owner chose the existing `market_max_notional` default: **25 SOL of

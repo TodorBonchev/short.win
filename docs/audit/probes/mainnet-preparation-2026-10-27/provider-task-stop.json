@@ -1,0 +1,41 @@
+{
+  "at_utc": "2026-10-27T17:10:49.341364+00:00",
+  "task": "/root/launch_policy_inventory",
+  "scope": "Isolated Jupiter executor implementation and qualification subtask; stopped during final follow-up, not an external firm audit.",
+  "status": "provider_stopped",
+  "provider_message": "This content was flagged for possible cybersecurity risk.",
+  "disposition": "Preserve already produced source and functional evidence. Do not retry/rephrase the stopped review task or mark its unfinished review work complete.",
+  "mainnet_ready": false,
+  "retained_evidence": [
+    {
+      "file": "jupiter-exec-probe-sbf-tests.log.gz",
+      "bytes": 44646,
+      "decoded_sha256": "b3cf6cc7d12bc02cab240e974e204101c92314d67c1530dec6d05944c88f0f14",
+      "packaged_sha256": "39cd2b880c376a73d62f1caf6ccd264a21e5ef4df954ee15a6e787df37edc766"
+    },
+    {
+      "file": "jupiter-exec-probe-initial-build-identity.json.gz",
+      "bytes": 1602,
+      "decoded_sha256": "29192389c09919b7d64bbedfb7da8de02de31ebb94ba9be403b9e2cefdad65e8",
+      "packaged_sha256": "c4245126ef9ad855f803fd165e2e6246ca8b8d117d49facffdd0f5a870d81b8e"
+    },
+    {
+      "file": "jupiter-exec-probe-build-identity.json.gz",
+      "bytes": 3112,
+      "decoded_sha256": "a4cc56398885b3a0279a078f2dbc1fca3c622c0504544c573385ad00f1ab22f6",
+      "packaged_sha256": "a77e58c8f7fa7b51b17c42625340c303ebb57fc8bcdfc610b0ca76a50faf7dfc"
+    },
+    {
+      "file": "repay-short-qualification-engine-all.log.gz",
+      "bytes": 6053,
+      "decoded_sha256": "302c82109abcb5079d8380687756bec5ab7be66cfaf2ea7b4766a2ea7e20d055",
+      "packaged_sha256": "89bc5389e989b3cd9b0868f2ac92850c7d59e0a3baaaaa9529441f6184232edc"
+    },
+    {
+      "file": "repay-short-qualification-checkpoint-before-price-account.json.gz",
+      "bytes": 1638,
+      "decoded_sha256": "f30aa5f7b7ec12a51b4feff5e384f047ae577f42a43b5d55b5169919215a5cf0",
+      "packaged_sha256": "509f009979998029574772957015159d56f6dd63053ef7a6aff5ac3397bf6d2a"
+    }
+  ]
+}

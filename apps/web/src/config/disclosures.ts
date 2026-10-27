@@ -25,6 +25,7 @@ export type DisclosureId =
     | 'lender.claimCloses'
     | 'borrower.liquidation'
     | 'borrower.residuals'
+    | 'borrower.tokenRepay'
     | 'market.creatorSelfDealing'
     | 'market.tierAge'
     | 'market.coveragePause'
@@ -236,6 +237,18 @@ export const DISCLOSURES: Readonly<Record<DisclosureId, Disclosure>> = {
         ack: 'I understand my position can be liquidated or settled in SOL.',
         severity: 'danger',
         source: 'SPEC §4, §5, §5.3, §6.1; ARCH §3.4–§3.8; ¶3: expire.rs (precondition: not CR-liquidatable, else `UseLiquidate`: the penalty through liquidate, ECON §8.4), amended by the owner on 2026-10-11 (thirteenth round)',
+    }),
+    'borrower.tokenRepay': d({
+        id: 'borrower.tokenRepay',
+        title: 'Repay the full debt with your tokens',
+        body: [
+            'This transaction returns the full debt of {q} tokens ({qRaw} raw units) from your selected token account. It does not buy tokens or use a live swap quote.',
+            'You authorize at most {maxRent} SOL ({maxRentLamports} lamports) of accrued rent from the position vault. The rest of the vault and refundable account rent return to you; you also pay the network fee.',
+            'The cost of obtaining these tokens outside short.win is unknown. The returned SOL is not a profit figure, so economic P&L is unavailable for this repayment.',
+        ],
+        ack: 'I understand that the full token debt will be repaid and external token acquisition costs are not included.',
+        severity: 'warn',
+        source: 'repay_short whole-debt transfer, explicit max_rent, and Repay event cost semantics',
     }),
     'borrower.residuals': d({
         id: 'borrower.residuals',

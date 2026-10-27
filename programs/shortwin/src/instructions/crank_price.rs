@@ -199,7 +199,7 @@ fn redetect(
         // venue short.win cannot read: the market stays list-only, and `propose_pool` /
         // `execute_pool_switch` keep Raydium out (D1).
         PumpClass::PumpPoolUnreadable | PumpClass::GraduatedElsewhere | PumpClass::NotPump => {
-            return Ok(None)
+            return Ok(None);
         }
     };
     let Some(curve) = pump_curve::parse_curve(bc) else {

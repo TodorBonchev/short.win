@@ -77,12 +77,15 @@ macro_rules! position_json {
          'open_signature', p.open_signature::text, 'armed', p.armed, \
          'exit', CASE WHEN p.status = 'open' THEN NULL ELSE jsonb_build_object(\
              'ts', COALESCE(p.exit_ts, 0), 'signature', p.exit_signature::text, \
+             'kind', COALESCE(p.exit_kind, CASE p.status WHEN 'closed' THEN 'Close' \
+                 WHEN 'liquidated' THEN 'Liquidate' WHEN 'expired' THEN 'Expire' \
+                 WHEN 'settled' THEN 'SolSettle' END), \
              'keeper', p.exit_keeper::text, 'buyback_cost', p.buyback_cost::text, \
              'rent_paid', p.rent_paid::text, 'penalty', p.penalty::text, \
              'expiry_fee', p.expiry_fee::text, 'keeper_paid', p.keeper_paid::text, \
              'borrower_payout', COALESCE(p.borrower_payout, 0)::text, \
              'settle_condition', sw_api_condition(p.settle_condition), \
-             'borrower_pnl', COALESCE(p.borrower_pnl, 0)::text, \
+             'borrower_pnl', p.borrower_pnl::text, \
              'duration_s', COALESCE(p.duration_s, p.exit_ts - p.opened_ts, 0)) END)"
     };
 }

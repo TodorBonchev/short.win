@@ -920,7 +920,7 @@ components:
     EventKind:
       type: string
       enum: [MarketCreated, Deposit, Withdraw, ClaimSol, DeficitCovered, LenderSynced, Open,
-             Close, Liquidate, Expire, SolSettle, SettleArmed, SettleDisarmed, EpochRolled,
+             Close, Repay, Liquidate, Expire, SolSettle, SettleArmed, SettleDisarmed, EpochRolled,
              ProtocolFeesSwept, MarginAdded, PriceCranked, VenueStateChanged, RouteChainChanged,
              PoolProposed, PoolSwitched, PoolSwitchCancelled, TraderSwept, VenueRewardsClaimed,
              MintSafetyTripped, VenueUpgradeFlagged, VenueRevalidated, CoverageGap,
@@ -1087,7 +1087,8 @@ components:
       required: [positions, open, closes, liquidations_cr, liquidations_expired, expiries,
                  settlements_s1, settlements_s2, settlements_s3, exits, avg_duration_s,
                  close_rate_bps, liquidation_rate_bps, expiry_rate_bps, settlement_rate_bps,
-                 avg_open_impact_bps, avg_exit_slippage_bps, borrower_pnl]
+                 avg_open_impact_bps, avg_exit_slippage_bps, borrower_pnl,
+                 borrower_pnl_known_exits, borrower_pnl_unknown_exits]
       properties:
         positions: { type: integer }
         open: { type: integer }
@@ -1106,7 +1107,11 @@ components:
         settlement_rate_bps: { type: [integer, 'null'], description: 'SOL settlements (S1–S3) per 10,000 exits.' }
         avg_open_impact_bps: { type: [number, 'null'], description: "Mean price impact of the opens' sales vs the pre-trade spot (§8.3)." }
         avg_exit_slippage_bps: { type: [number, 'null'], description: "Mean slippage of the exits' buybacks vs the live quote (§8.3)." }
-        borrower_pnl: { $ref: '#/components/schemas/I128' }
+        borrower_pnl:
+          description: Null if any exited position has unknown external token acquisition cost; never a partial total.
+          oneOf: [{ $ref: '#/components/schemas/I128' }, { type: 'null' }]
+        borrower_pnl_known_exits: { type: integer }
+        borrower_pnl_unknown_exits: { type: integer }
     LenderLoss:
       type: object
       required: [settlements, token_value, lender_amount, lender_pnl, realised_lender_loss,
@@ -1245,11 +1250,12 @@ components:
           oneOf:
             - type: 'null'
             - type: object
-              required: [ts, signature, keeper, buyback_cost, rent_paid, penalty, expiry_fee,
+              required: [ts, signature, kind, keeper, buyback_cost, rent_paid, penalty, expiry_fee,
                          keeper_paid, borrower_payout, settle_condition, borrower_pnl, duration_s]
               properties:
                 ts: { type: integer }
                 signature: { $ref: '#/components/schemas/Signature' }
+                kind: { type: string, enum: [Close, Repay, Liquidate, Expire, SolSettle] }
                 keeper: { oneOf: [{ $ref: '#/components/schemas/Pubkey' }, { type: 'null' }] }
                 buyback_cost: { oneOf: [{ $ref: '#/components/schemas/U64' }, { type: 'null' }] }
                 rent_paid: { oneOf: [{ $ref: '#/components/schemas/U64' }, { type: 'null' }] }
@@ -1258,7 +1264,9 @@ components:
                 keeper_paid: { oneOf: [{ $ref: '#/components/schemas/U64' }, { type: 'null' }] }
                 borrower_payout: { $ref: '#/components/schemas/U64' }
                 settle_condition: { type: [string, 'null'], enum: [S1, S2, S3, null] }
-                borrower_pnl: { $ref: '#/components/schemas/I128' }
+                borrower_pnl:
+                  description: Null for Repay; external token acquisition cost is unknown.
+                  oneOf: [{ $ref: '#/components/schemas/I128' }, { type: 'null' }]
                 duration_s: { type: integer }
     PositionPage:
       allOf:

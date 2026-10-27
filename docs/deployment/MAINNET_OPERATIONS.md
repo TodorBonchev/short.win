@@ -526,3 +526,21 @@ These are operating requirements for the chosen early mainnet release, not a
 reintroduction of an external-audit/bounty prerequisite. Provisioning, purchases,
 fund transfers, signing and deployment require the actual operator's separate
 execution; this document performs none of them.
+
+### Implemented diagnostic request budget (October 27 checkpoint)
+
+The read-only `shortwin-price-probe --config <file> --once` now requires a
+`[request_budget]` configuration; see the refusing template in
+[`services/keeper/price-probe.example.toml`](../../services/keeper/price-probe.example.toml).
+Cooperating workers must use the same absolute state-file path, identical limits
+and service UID. Pre-create its dedicated parent directory with mode0700; the
+state file is0600. Never rename/delete/reset an active or corrupt quota file to
+bypass an exhausted/failed budget. Reservations precede HTTP, failed/cancelled
+requests are not refunded, and automatic HTTP retries are disabled.
+
+This establishes a cooperative local rolling reservation limit, not a guarantee
+about provider arrival time, other API-account consumers or monthly credits. The
+illustrative 10 total / 6 background / at least3 reserved exit RPS needs measured
+combined-load and actual account-plan validation. The probe returns API candidates
+with `executable_minimum_verified=false`; it neither simulates trades nor signs,
+submits or publishes prices. A running diagnostic is not a commissioned price daemon.

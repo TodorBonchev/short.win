@@ -8,6 +8,9 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
+/// Additional conservative checks for the isolated test executor; not production authorization.
+pub mod isolation;
+
 /// A Solana address, without a runtime or SDK dependency.
 pub type Address = [u8; 32];
 

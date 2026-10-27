@@ -363,6 +363,57 @@ mod tests {
         assert_eq!(pool_kind_name(POOL_KIND_FAST), "fast path");
     }
 
+    /// Borrower-delivered repayment is a distinct exit event, never a zero-cost Close.
+    #[test]
+    fn repayment_decodes_only_from_shortwin_self_cpi_and_never_as_close() {
+        use shortwin::events::{Close, Repay};
+        let repayment = Repay {
+            market: Pubkey::new_unique(),
+            slot: 42,
+            ts: 43,
+            position: Pubkey::new_unique(),
+            borrower: Pubkey::new_unique(),
+            q: 100,
+            rent: 5,
+            rent_protocol: 1,
+            borrower_payout: 195,
+        };
+        let mut data = anchor_lang::event::EVENT_IX_TAG_LE.to_vec();
+        data.extend_from_slice(Repay::DISCRIMINATOR);
+        repayment.serialize(&mut data).unwrap();
+        let out = TxOutcome {
+            inner: vec![vec![
+                InnerIx {
+                    program_id: Pubkey::new_unique(),
+                    data: data.clone(),
+                },
+                InnerIx {
+                    program_id: shortwin::ID,
+                    data,
+                },
+            ]],
+            ..TxOutcome::default()
+        };
+        let got = of::<Repay>(&out);
+        assert_eq!(got.len(), 1);
+        let got = &got[0];
+        assert_eq!(got.market, repayment.market);
+        assert_eq!(got.position, repayment.position);
+        assert_eq!(got.borrower, repayment.borrower);
+        assert_eq!(
+            (
+                got.slot,
+                got.ts,
+                got.q,
+                got.rent,
+                got.rent_protocol,
+                got.borrower_payout
+            ),
+            (42, 43, 100, 5, 1, 195)
+        );
+        assert!(of::<Close>(&out).is_empty());
+    }
+
     /// A CPI dependency can print any `Program data:` bytes. Only data emitted while short.win is
     /// the active runtime invocation is one of short.win's `emit!` events.
     #[test]

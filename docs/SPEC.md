@@ -7,6 +7,15 @@ swaps; concrete reporter/risk settings and implementation need qualification. Th
 and operator commands below remain baseline evidence, not deployment approval
 for the new design. Audit/bounty funding timing otherwise remains unchanged.
 
+**Unreleased implementation checkpoint:** `repay_short(max_rent)` returns the
+borrower's complete token debt in-kind, pays accrued rent within the signed bound
+and position collateral, and closes that debt without route/oracle reads. It emits
+`Repay`; externally acquired tokens have unknown acquisition cost/P&L. Immutable
+exact-q `PriceReport` initialization/publication and a diagnostic quote probe are
+implemented separately; reports do not yet admit markets or authorize financial
+actions. See the [current engineering record](audit/mainnet-preparation-2026-10-27.md).
+The bounded Jupiter executor remains a test-only probe, not a production adapter.
+
 *v0.3 • Solana • Permissionless P2P token lending for shorting memecoins*
 *Supersedes "ShortMeme" v0.1 and short.win draft v0.2. Domain: **short.win** • Brand: **ShortWin***
 

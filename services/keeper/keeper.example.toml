@@ -1,3 +1,4 @@
+# The separate read-only Jupiter diagnostic uses price-probe.example.toml; do not put its keys here.
 # shortwin-keeper configuration (ARCHITECTURE §7.1). Every key is optional: the values below are
 # the defaults (ECON §5.8 duties; owner item O17 sets the budget, the ceiling and the markets).
 #

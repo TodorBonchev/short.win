@@ -1717,6 +1717,11 @@ risk prices. Our reporting operators are the price authority.
 Preserve 1.0.3 evidence as its exact baseline; qualify the new program separately.
 The pre-redesign Token-2022-only long campaign is not started and stays on hold.
 Audit/bounty funding timing below otherwise remains the owner's chosen policy.
+The [October 27 engineering checkpoint](audit/mainnet-preparation-2026-10-27.md)
+records incremental repayment/report/client/replay checks and their limits. It does
+not close findings, authorize financial defaults or replace fresh final-runtime CI,
+fuzz and funded commissioning. The concrete infrastructure budget is approved;
+provider setup and the proposed overdue-default financial choice remain pending.
 
 **Current initial-mainnet policy (owner, 2026-10-27):** launch with existing
 per-market borrowing limits before an external audit and a funded bug bounty;

@@ -129,6 +129,21 @@ pub struct Close {
     pub token_surplus: u64,
 }
 
+/// Borrower supplies all debt tokens without an oracle or swap. External acquisition
+/// cost is not observed; readers must not interpret this as a zero-cost trading profit.
+#[event]
+pub struct Repay {
+    pub market: Pubkey,
+    pub slot: u64,
+    pub ts: i64,
+    pub position: Pubkey,
+    pub borrower: Pubkey,
+    pub q: u64,
+    pub rent: u64,
+    pub rent_protocol: u64,
+    pub borrower_payout: u64,
+}
+
 /// `liquidate`. `cr_spot_bps` is the robust spot leg's CR (`CR(V_eff, B̂(Q; reprice(max(L_live,
 /// L_ema'), P_rs)))` at the risk fee; FITS-2), `cr_ema_bps` the newest ring entry's (its cached
 /// `(x, y)`);

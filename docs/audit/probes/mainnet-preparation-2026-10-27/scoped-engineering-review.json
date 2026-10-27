@@ -1,0 +1,85 @@
+{
+  "recorded_utc": "2026-10-27T18:00:46.340237+00:00",
+  "kind": "independent AI engineering checks within declared scopes; no external firm or accreditation",
+  "release_approval": false,
+  "checks": [
+    {
+      "author": "/root",
+      "reviewers": [
+        "/root/inhouse_liquidation_review"
+      ],
+      "scope": "isolated route account/scratch/postcondition helpers; no production adapter authorization",
+      "result": "no scoped blocking finding"
+    },
+    {
+      "author": "/root",
+      "reviewers": [
+        "/root/inhouse_liquidation_review"
+      ],
+      "scope": "repay_short legacy-state accounting and exact pool net-q token repayment",
+      "result": "no scoped blocking finding"
+    },
+    {
+      "author": "/root/inhouse_liquidation_review",
+      "reviewers": [
+        "/root"
+      ],
+      "scope": "report core/codec and unadmitted on-chain persistence wrapper",
+      "result": "no scoped blocking finding; future financial consumers still need real account/PDA/domain/debt lifecycle integration"
+    },
+    {
+      "author": "/root/inhouse_liquidation_review",
+      "reviewers": [
+        "/root/price_service_sizing"
+      ],
+      "scope": "Repay indexer/API nullable-PnL compatibility",
+      "result": "no material issue within compatibility scope"
+    },
+    {
+      "author": "/root/price_service_sizing",
+      "reviewers": [
+        "/root"
+      ],
+      "scope": "borrower repayment reader, bound-preserving rebuild, transaction/simulation hold and disclosure UI",
+      "result": "no scoped blocking finding; actual program max-rent/full-q conditions remain authoritative"
+    },
+    {
+      "author": "/root/quote_native_policy",
+      "reviewers": [
+        "/root/inhouse_liquidation_review"
+      ],
+      "scope": "unwired quote_native arithmetic",
+      "result": "no blocking arithmetic defect against proposed contract; authentication and lifecycle remain integration obligations"
+    },
+    {
+      "author": "/root/inhouse_liquidation_review",
+      "reviewers": [
+        "/root/quote_native_policy"
+      ],
+      "scope": "unwired quote_rent arithmetic",
+      "result": "relative integral-delta and immutable kink-cohort defects corrected and narrowly rereviewed; no automatic legacy carry conversion"
+    },
+    {
+      "author": "/root/price_service_sizing",
+      "reviewers": [
+        "/root/quote_native_policy",
+        "/root"
+      ],
+      "scope": "shared local quota, bounded HTTP/probe transport and API-only classifications",
+      "result": "default HTTP retry defect corrected with retry::never; independent reviewer ran 10 budget and 21 HTTP groups; no remaining scoped blocker; executable minimum, monthly credits and provider-arrival timing unqualified"
+    }
+  ],
+  "stopped_scope": "The separate executor subtask was provider-stopped during final follow-up. Completed evidence preserved; unfinished review not retried or declared complete.",
+  "source_sha256": {
+    "crates/shortwin-jupiter-route/src/isolation.rs": "ba164075e7c088bb680d83c41c87cd9d461cdd560c62657ac87ad2f08b36aee1",
+    "crates/shortwin-math/src/quote_native.rs": "d2e076592edeccf2d72908599aa0b33d068d4a3225539c8c61d9bedd8e4a82cb",
+    "crates/shortwin-math/src/quote_rent.rs": "f6f6c51ecfc8a838b79d375716970f26fc527125422383f31d2622aeef712933",
+    "services/keeper/src/price_budget.rs": "a8e92a5cc9d12161f9a48f94c6db3994bbb9e5e972cb8ba158de878b223473bf",
+    "services/keeper/src/price_http.rs": "851160d4567d1a97f5e69dd3a285006b5266b15e3efc16ad31b75dcfec924ae9",
+    "services/keeper/src/price_search.rs": "1ccd49b017bfecb89dad6eee827551e43651d312dee6070878d4f7275c947230",
+    "services/keeper/src/bin/price_probe.rs": "774acdb31877f934c04783f9fde6b0206fa249cb54ef39abba2600b1c039fdbd",
+    "apps/web/src/features/short/positions/repay.ts": "f98845d5ad3591360be30b14281aecd442484400d48b6f68fd34ad673ba2fbbe",
+    "apps/web/src/features/short/positions/useRepay.ts": "d134f2be07a26fc494b702a70c1b76448ccd77cba09bcc9640d4a6b1c4a5f195",
+    "apps/web/src/features/short/positions/RepayPanel.tsx": "f39fce554e95e2f6ce343232d0fa3355d51372230bb3b043e431b941b58e561b"
+  }
+}

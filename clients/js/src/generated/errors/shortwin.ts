@@ -236,6 +236,8 @@ export const SHORTWIN_ERROR__POOL_DRAINED = 0x17dc; // 6108
 export const SHORTWIN_ERROR__CURVE_CASHBACK_COIN = 0x17dd; // 6109
 /** LegacyPoolCarry: This empty pool has historical SOL carry: deposits require a reviewed migration */
 export const SHORTWIN_ERROR__LEGACY_POOL_CARRY = 0x17de; // 6110
+/** RepaymentRentAboveMax: Accrued rent exceeds the borrower's repayment bound */
+export const SHORTWIN_ERROR__REPAYMENT_RENT_ABOVE_MAX = 0x17df; // 6111
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -322,6 +324,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE
   | typeof SHORTWIN_ERROR__REBASE_NEEDS_OWNER
   | typeof SHORTWIN_ERROR__REFERENCE_STALE
+  | typeof SHORTWIN_ERROR__REPAYMENT_RENT_ABOVE_MAX
   | typeof SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER
   | typeof SHORTWIN_ERROR__ROUTE_BROKEN
   | typeof SHORTWIN_ERROR__S3_TIMER_RUNNING
@@ -437,6 +440,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE]: `Pump venues take precedence for this mint`,
     [SHORTWIN_ERROR__REBASE_NEEDS_OWNER]: `Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner`,
     [SHORTWIN_ERROR__REFERENCE_STALE]: `No fresh completed observation bucket`,
+    [SHORTWIN_ERROR__REPAYMENT_RENT_ABOVE_MAX]: `Accrued rent exceeds the borrower's repayment bound`,
     [SHORTWIN_ERROR__RESERVED_SCAN_OUT_OF_ORDER]: `Reserved (6103): unused`,
     [SHORTWIN_ERROR__ROUTE_BROKEN]: `Route is flagged broken`,
     [SHORTWIN_ERROR__S3_TIMER_RUNNING]: `S3 timer is still running`,

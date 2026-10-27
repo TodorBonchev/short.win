@@ -1,5 +1,15 @@
 # short.win — Indexer and API (M8 contract)
 
+**Unreleased Repay compatibility (2026-10-27):** direct whole-debt token repayment
+uses the `Repay` event and `exit.kind = Repay` with `status = closed`. It books full
+token return and actual rent/protocol fees, but token acquisition cost, exit live
+price and borrower P&L are `NULL`. Whole-market borrower P&L is also unavailable
+if any exited position has unknown cost; known/unknown exit counts are exposed.
+Migration `0102_direct_repayment.sql` adds the exit-kind/view changes without
+rewriting historical migrations. API and website readers must preserve unavailable
+values rather than coalescing them into zero profit. Existing `Close` semantics
+are retained. See the [engineering record](../audit/mainnet-preparation-2026-10-27.md).
+
 *v1.2 • 2026-10-01 • the M8 contract, as built: three parallel tracks built against v1.0, then
 integrated (§13.5) — the exit criteria are met (ARCH §9 M8; evidence in §13.5); v1.2 folds in the
 M8 security review's fixes (M8-SEC-1 … -15; regressions §11.5a, open items §14); v1.3 (2026-10-03)

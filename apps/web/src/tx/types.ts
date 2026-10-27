@@ -20,6 +20,7 @@ export type TxKind =
     | 'sync_lender'
     | 'open_short'
     | 'close_short'
+    | 'repay_short'
     | 'add_margin'
     | 'sweep_trader';
 

@@ -43,6 +43,9 @@ UNITS = [
     ("shortwin-jupiter-route", "core", "Jupiter redesign header and fixed-account prototype; "
      "not yet linked into production",
      ["crates/shortwin-jupiter-route/Cargo.toml", "crates/shortwin-jupiter-route/src"]),
+    ("shortwin-price-report", "core", "in-house exact-q report authorization/history and canonical codec; "
+     "the unadmitted account wrapper is in program scope; financial integration remains open",
+     ["crates/shortwin-price-report/Cargo.toml", "crates/shortwin-price-report/src"]),
     ("jupiter-oracle-compat", "context", "standalone native oracle SDK compatibility experiment; "
      "not linked into production and not a live-attestation qualification",
      ["experiments/jupiter-oracle-compat", ".github/workflows/jupiter-oracle-compat.yml"]),
@@ -57,7 +60,9 @@ UNITS = [
       "services/keeper/src/budget.rs", "services/keeper/src/fees.rs",
       "services/keeper/src/graduation.rs", "services/keeper/src/ixs.rs",
       "services/keeper/src/venue.rs", "services/keeper/src/view.rs",
-      "services/keeper/src/pda.rs", "services/keeper/src/sweep.rs",
+      "services/keeper/src/pda.rs", "services/keeper/src/price_search.rs",
+      "services/keeper/src/price_http.rs", "services/keeper/src/price_budget.rs",
+      "services/keeper/src/sweep.rs",
       "services/keeper/src/monitor.rs", "services/keeper/src/pool_monitor.rs",
       "services/common/src/tx.rs", "services/common/src/chain.rs"]),
     ("keeper-rest", "context", "the keeper loop, configuration, metrics, alerts, the RPC backend, "
@@ -65,12 +70,15 @@ UNITS = [
      "context)",
      ["services/Cargo.toml", "services/Cargo.lock",
       "services/keeper/Cargo.toml", "services/keeper/keeper.example.toml",
+      "services/keeper/price-probe.example.toml",
       "services/keeper/src", "services/common/Cargo.toml", "services/common/src",
       ":(exclude)services/keeper/src/decide.rs", ":(exclude)services/keeper/src/coverage.rs",
       ":(exclude)services/keeper/src/budget.rs", ":(exclude)services/keeper/src/fees.rs",
       ":(exclude)services/keeper/src/graduation.rs", ":(exclude)services/keeper/src/ixs.rs",
       ":(exclude)services/keeper/src/venue.rs", ":(exclude)services/keeper/src/view.rs",
-      ":(exclude)services/keeper/src/pda.rs", ":(exclude)services/keeper/src/sweep.rs",
+      ":(exclude)services/keeper/src/pda.rs", ":(exclude)services/keeper/src/price_search.rs",
+      ":(exclude)services/keeper/src/price_http.rs", ":(exclude)services/keeper/src/price_budget.rs",
+      ":(exclude)services/keeper/src/sweep.rs",
       ":(exclude)services/keeper/src/monitor.rs", ":(exclude)services/keeper/src/pool_monitor.rs",
       ":(exclude)services/common/src/tx.rs", ":(exclude)services/common/src/chain.rs"]),
     ("governance", "context", "the governance tool `shortwin-gov` (services/ops) and its Squads v4 "
@@ -79,6 +87,11 @@ UNITS = [
      "audit scope of 2026-10-02 names the programs and the keeper core), read for context",
      ["crates/squads-v4-ix/Cargo.toml", "crates/squads-v4-ix/src",
       "services/ops/Cargo.toml", "services/ops/governance.example.toml", "services/ops/src"]),
+    ("jupiter-exec-probe", "out", "isolated TEST-ONLY SBF execution probe and frozen candidate "
+     "Jupiter input; no production adapter or financial qualification",
+     ["tests/jupiter_exec_probe",
+      "scripts/build-jupiter-exec-probe.sh", "scripts/materialize-jupiter-probe.py",
+      ".github/workflows/jupiter-exec-probe.yml"]),
     ("test-only", "out", "TEST-ONLY mock venue code: compiled only with feature `test-venue`, "
      "never in the release ELF (A49; CI checks that the release shortwin.so embeds neither the "
      "mock id nor the test-venue marker)",
@@ -94,6 +107,7 @@ EXCLUDED = [
     ("crates/shortwin-math/LICENSE-APACHE", "published crate license text; not built"),
     ("crates/shortwin-math/NOTICE", "published crate attribution; not built"),
     ("crates/shortwin-jupiter-route/README.md", "prototype documentation; read for context"),
+    ("crates/shortwin-price-report/README.md", "report/history/codec contract; read for context"),
     ("crates/shortwin-venue-state/README.md", "published crate documentation; read for context"),
     ("programs/shortwin/README.md", "published program crate documentation; read for context"),
     ("crates/shortwin-math/tests", "tests"),

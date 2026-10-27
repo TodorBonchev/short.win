@@ -11,6 +11,8 @@ members = [
     "crates/shortwin-venue-state",
     # Jupiter redesign core prototype: header checks only; not linked into production.
     "crates/shortwin-jupiter-route",
+    # In-house report/history codec; financial consumers remain a separate gate.
+    "crates/shortwin-price-report",
     # M10 WP-7: Squads v4 encoders for the governance tests (host-only; tests/litesvm links it).
     "crates/squads-v4-ix",
     "programs/shortwin",

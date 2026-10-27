@@ -104,6 +104,29 @@ describe('MarketPage', () => {
         queryClient.clear();
     });
 
+    it('keeps aggregate P&L unavailable when borrower token acquisition costs are unknown', async () => {
+        const base = detail();
+        indexerFor({
+            [`/v1/markets/${MINT_A}`]: {
+                ...base,
+                exits: {
+                    ...base.exits,
+                    borrower_pnl: null,
+                    borrower_pnl_known_exits: 5,
+                    borrower_pnl_unknown_exits: 1,
+                },
+            },
+        });
+        const { queryClient, view } = await renderAt(`/m/${MINT_A}`);
+        try {
+            expect(await screen.findByText('Unavailable (external token cost)')).toBeTruthy();
+            expect(screen.getByText('Positions with unknown P&L')).toBeTruthy();
+        } finally {
+            view?.unmount();
+            queryClient.clear();
+        }
+    });
+
     it('shows creator-wallet deposits (SPEC R1) with the self-dealing disclosure', async () => {
         indexerFor();
         const { queryClient } = await renderAt(`/m/${MINT_A}`);

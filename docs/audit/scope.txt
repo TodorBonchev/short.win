@@ -40,11 +40,14 @@ programs/shortwin/src/instructions/expire.rs
 programs/shortwin/src/instructions/flag_unsafe_mint.rs
 programs/shortwin/src/instructions/flag_venue_upgraded.rs
 programs/shortwin/src/instructions/initialize_config.rs
+programs/shortwin/src/instructions/initialize_price_report.rs
 programs/shortwin/src/instructions/liquidate.rs
 programs/shortwin/src/instructions/mod.rs
 programs/shortwin/src/instructions/open_short.rs
 programs/shortwin/src/instructions/propose_config.rs
 programs/shortwin/src/instructions/propose_pool.rs
+programs/shortwin/src/instructions/publish_price_report.rs
+programs/shortwin/src/instructions/repay_short.rs
 programs/shortwin/src/instructions/revalidate_venue.rs
 programs/shortwin/src/instructions/set_coverage_pause.rs
 programs/shortwin/src/instructions/set_pause.rs
@@ -68,6 +71,7 @@ programs/shortwin/src/state/mod.rs
 programs/shortwin/src/state/oracle.rs
 programs/shortwin/src/state/pod.rs
 programs/shortwin/src/state/position.rs
+programs/shortwin/src/state/price_report.rs
 programs/shortwin/src/state/vault.rs
 programs/shortwin/src/state/venue_extras.rs
 programs/shortwin/src/state/venue_guard.rs
@@ -101,7 +105,9 @@ crates/shortwin-math/src/quote/ray_v4.rs
 crates/shortwin-math/src/quote/reprice.rs
 crates/shortwin-math/src/quote/sol_leg.rs
 crates/shortwin-math/src/quote/straddle.rs
+crates/shortwin-math/src/quote_native.rs
 crates/shortwin-math/src/quote_oracle.rs
+crates/shortwin-math/src/quote_rent.rs
 crates/shortwin-math/src/rent.rs
 crates/shortwin-math/src/risk.rs
 crates/shortwin-math/src/settle.rs
@@ -110,7 +116,13 @@ crates/shortwin-math/src/waterfall.rs
 
 # [core] shortwin-jupiter-route: Jupiter redesign header and fixed-account prototype; not yet linked into production
 crates/shortwin-jupiter-route/Cargo.toml
+crates/shortwin-jupiter-route/src/isolation.rs
 crates/shortwin-jupiter-route/src/lib.rs
+
+# [core] shortwin-price-report: in-house exact-q report authorization/history and canonical codec; the unadmitted account wrapper is in program scope; financial integration remains open
+crates/shortwin-price-report/Cargo.toml
+crates/shortwin-price-report/src/codec.rs
+crates/shortwin-price-report/src/lib.rs
 
 # [context] jupiter-oracle-compat: standalone native oracle SDK compatibility experiment; not linked into production and not a live-attestation qualification
 .github/workflows/jupiter-oracle-compat.yml
@@ -156,6 +168,9 @@ services/keeper/src/ixs.rs
 services/keeper/src/monitor.rs
 services/keeper/src/pda.rs
 services/keeper/src/pool_monitor.rs
+services/keeper/src/price_budget.rs
+services/keeper/src/price_http.rs
+services/keeper/src/price_search.rs
 services/keeper/src/sweep.rs
 services/keeper/src/venue.rs
 services/keeper/src/view.rs
@@ -168,9 +183,11 @@ services/common/src/lib.rs
 services/common/src/rpc.rs
 services/keeper/Cargo.toml
 services/keeper/keeper.example.toml
+services/keeper/price-probe.example.toml
 services/keeper/src/alerts.rs
 services/keeper/src/alt.rs
 services/keeper/src/bin/build_alt.rs
+services/keeper/src/bin/price_probe.rs
 services/keeper/src/bin/v1_probe.rs
 services/keeper/src/config.rs
 services/keeper/src/events.rs
@@ -201,6 +218,22 @@ services/ops/src/send.rs
 services/ops/src/squads.rs
 services/ops/src/verify.rs
 
+# [out] jupiter-exec-probe: isolated TEST-ONLY SBF execution probe and frozen candidate Jupiter input; no production adapter or financial qualification
+.github/workflows/jupiter-exec-probe.yml
+scripts/build-jupiter-exec-probe.sh
+scripts/materialize-jupiter-probe.py
+tests/jupiter_exec_probe/.gitignore
+tests/jupiter_exec_probe/Cargo.lock
+tests/jupiter_exec_probe/Cargo.toml
+tests/jupiter_exec_probe/README.md
+tests/jupiter_exec_probe/fixtures/jupiter-2026-10-27/README.md
+tests/jupiter_exec_probe/fixtures/jupiter-2026-10-27/SHA256SUMS
+tests/jupiter_exec_probe/fixtures/jupiter-2026-10-27/getMultipleAccounts.json.gz
+tests/jupiter_exec_probe/fixtures/jupiter-2026-10-27/identity.json
+tests/jupiter_exec_probe/fixtures/jupiter-2026-10-27/jupiter-onchain-idl.json
+tests/jupiter_exec_probe/src/lib.rs
+tests/jupiter_exec_probe/src/wire.rs
+
 # [out] test-only: TEST-ONLY mock venue code: compiled only with feature `test-venue`, never in the release ELF (A49; CI checks that the release shortwin.so embeds neither the mock id nor the test-venue marker)
 crates/shortwin-venue-state/src/mock_cpamm.rs
 programs/shortwin/src/venues/mock.rs
@@ -216,6 +249,7 @@ tests/mock_cpamm/src/state.rs
 # crates/shortwin-math/LICENSE-APACHE: published crate license text; not built
 # crates/shortwin-math/NOTICE: published crate attribution; not built
 # crates/shortwin-jupiter-route/README.md: prototype documentation; read for context
+# crates/shortwin-price-report/README.md: report/history/codec contract; read for context
 # crates/shortwin-venue-state/README.md: published crate documentation; read for context
 # programs/shortwin/README.md: published program crate documentation; read for context
 # crates/shortwin-math/tests: tests

@@ -48,6 +48,7 @@ bytemuck = { version = "1.25", features = ["derive", "min_const_generics"] }
 solana-sha256-hasher = "3"
 shortwin-math = { version = "0.1.0", path = "../../crates/shortwin-math" }
 shortwin-venue-state = { version = "0.1.0", path = "../../crates/shortwin-venue-state" }
+shortwin-price-report = { version = "0.1.0", path = "../../crates/shortwin-price-report" }
 
 [package.metadata.docs.rs]
 features = ["no-entrypoint"]

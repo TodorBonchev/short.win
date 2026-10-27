@@ -1,5 +1,16 @@
 # short.win — Economic & Risk Model
 
+**Current development scope (owner, 2026-10-27):** first mainnet is postponed for
+[the broad Jupiter redesign](JUPITER_REDESIGN.md). Legacy formulas below remain
+baseline evidence, not qualification of the new quote-native risk/rent model.
+
+**Unreleased in-kind repayment:** `repay_short(max_rent)` requires actual net receipt
+of all `q` tokens and full accrued rent no greater than the signed maximum and `V`,
+then applies ordinary close accounting without a protocol swap. External token
+acquisition cost/P&L is unknown. If rent exceeds `V`, margin must be added first;
+untransferable tokens can still block repayment. This adds no mixed repayment or
+new cash-default eligibility. [Engineering record](../audit/mainnet-preparation-2026-10-27.md).
+
 **Launch policy update (owner, 2026-10-27):** initial mainnet precedes external
 audit and a funded bounty, with earned protocol fees accumulated toward later
 security funding. Existing per-market borrowing limits remain; the compiled

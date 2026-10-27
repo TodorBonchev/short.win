@@ -158,7 +158,9 @@ export interface ExitCounts {
     readonly settlement_rate_bps: number | null;
     readonly avg_open_impact_bps: number | null;
     readonly avg_exit_slippage_bps: number | null;
-    readonly borrower_pnl: I128;
+    readonly borrower_pnl: I128 | null;
+    readonly borrower_pnl_known_exits: number;
+    readonly borrower_pnl_unknown_exits: number;
 }
 
 export interface LenderLoss {
@@ -256,6 +258,7 @@ export interface MarketPools {
 }
 
 export interface PositionExit {
+    readonly kind: 'Close' | 'Repay' | 'Liquidate' | 'Expire' | 'SolSettle';
     readonly ts: number;
     readonly signature: Signature;
     readonly keeper: Pubkey | null;
@@ -266,7 +269,7 @@ export interface PositionExit {
     readonly keeper_paid: U64 | null;
     readonly borrower_payout: U64;
     readonly settle_condition: SettleCondition | null;
-    readonly borrower_pnl: I128;
+    readonly borrower_pnl: I128 | null;
     readonly duration_s: number;
 }
 
@@ -380,6 +383,7 @@ export type EventKind =
     | 'LenderSynced'
     | 'Open'
     | 'Close'
+    | 'Repay'
     | 'Liquidate'
     | 'Expire'
     | 'SolSettle'

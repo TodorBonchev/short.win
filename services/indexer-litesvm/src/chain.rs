@@ -157,6 +157,7 @@ pub enum Ev {
     LenderSynced(e::LenderSynced),
     Open(e::Open),
     Close(e::Close),
+    Repay(e::Repay),
     Liquidate(e::Liquidate),
     Expire(e::Expire),
     SolSettle(e::SolSettle),
@@ -223,6 +224,7 @@ impl Ev {
         LenderSynced,
         Open,
         Close,
+        Repay,
         Liquidate,
         Expire,
         SolSettle,
@@ -259,7 +261,7 @@ impl Ev {
         decode_one!(payload,
             MarketCreated => e::MarketCreated, Deposit => e::Deposit, Withdraw => e::Withdraw,
             ClaimSol => e::ClaimSol, DeficitCovered => e::DeficitCovered,
-            LenderSynced => e::LenderSynced, Open => e::Open, Close => e::Close,
+            LenderSynced => e::LenderSynced, Open => e::Open, Close => e::Close, Repay => e::Repay,
             Liquidate => e::Liquidate, Expire => e::Expire, SolSettle => e::SolSettle,
             SettleArmed => e::SettleArmed, SettleDisarmed => e::SettleDisarmed,
             EpochRolled => e::EpochRolled, ProtocolFeesSwept => e::ProtocolFeesSwept,
@@ -296,6 +298,7 @@ impl Ev {
             LenderSynced,
             Open,
             Close,
+            Repay,
             Liquidate,
             Expire,
             SolSettle,
@@ -346,6 +349,7 @@ impl Ev {
             LenderSynced,
             Open,
             Close,
+            Repay,
             Liquidate,
             Expire,
             SolSettle,
@@ -451,12 +455,11 @@ pub struct InstructionCatalog {
 impl InstructionCatalog {
     /// Reads the repository's IDL.
     pub fn load() -> anyhow::Result<Self> {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../clients/js/idl/shortwin.json"
-        );
+        // Bind the catalog to this harness build. A copied test binary must not
+        // silently read a different checkout's IDL (or require root's home access).
         let idl: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(path).context("the IDL")?)?;
+            serde_json::from_str(include_str!("../../../clients/js/idl/shortwin.json"))
+                .context("the build-pinned IDL")?;
         let mut by_disc = HashMap::new();
         for ix in idl["instructions"].as_array().context("instructions")? {
             let name = ix["name"].as_str().context("name")?.to_string();
@@ -909,6 +912,7 @@ pub struct PositionModel {
     pub exit_ts: Option<i64>,
     pub exit_signature: Option<String>,
     pub exit_keeper: Option<Pubkey>,
+    pub exit_kind: Option<&'static str>,
     pub buyback_cost: Option<u64>,
     pub b_live_exit: Option<u64>,
     pub rent_paid: Option<u64>,
@@ -923,10 +927,14 @@ pub struct PositionModel {
 }
 
 impl PositionModel {
-    /// `borrower_payout − (m + margin_added) − fee_open` once exited (§6.5).
+    /// Known-cost PNL after an exit; direct Repay leaves external acquisition cost unknown.
     pub fn borrower_pnl(&self) -> Option<i128> {
-        self.borrower_payout
-            .map(|p| formulas::borrower_pnl(p, self.m, self.margin_added, self.fee_open))
+        if self.exit_kind == Some("Repay") {
+            None
+        } else {
+            self.borrower_payout
+                .map(|p| formulas::borrower_pnl(p, self.m, self.margin_added, self.fee_open))
+        }
     }
 }
 
@@ -1166,7 +1174,7 @@ fn key_opt(k: Pubkey) -> Option<Pubkey> {
 }
 
 /// The events that change a market's accounting (a `market_state_log` row after each, §6.1).
-pub const ACCOUNTING_EVENTS: [&str; 16] = [
+pub const ACCOUNTING_EVENTS: [&str; 17] = [
     "MarketCreated",
     "Deposit",
     "Withdraw",
@@ -1175,6 +1183,7 @@ pub const ACCOUNTING_EVENTS: [&str; 16] = [
     "LenderSynced",
     "Open",
     "Close",
+    "Repay",
     "Liquidate",
     "Expire",
     "SolSettle",
@@ -1222,6 +1231,7 @@ fn event_data(ev: &Ev) -> serde_json::Value {
         Ev::LenderSynced(x) => lender!(x),
         Ev::Open(x) => position!(x),
         Ev::Close(x) => position!(x),
+        Ev::Repay(x) => position!(x),
         Ev::MarginAdded(x) => position!(x),
         Ev::SettleArmed(x) => position!(x),
         Ev::SettleDisarmed(x) => position!(x),
@@ -1242,6 +1252,7 @@ fn position_and_actor(ev: &Ev, fee_payer: Pubkey) -> (Option<Pubkey>, Option<Pub
         Ev::LenderSynced(x) => (None, Some(x.owner)),
         Ev::Open(x) => (Some(x.position), Some(x.borrower)),
         Ev::Close(x) => (Some(x.position), Some(x.borrower)),
+        Ev::Repay(x) => (Some(x.position), Some(x.borrower)),
         Ev::Liquidate(x) => (Some(x.position), Some(x.keeper)),
         Ev::Expire(x) => (Some(x.position), Some(x.keeper)),
         Ev::SolSettle(x) => (Some(x.position), Some(x.keeper)),
@@ -1417,6 +1428,12 @@ impl Model {
     fn exited(&mut self, t: &ChainTx, position: &Pubkey, status: &'static str, ts: i64) {
         if let Some(p) = self.positions.get_mut(position) {
             p.status = status;
+            p.exit_kind = Some(match status {
+                "closed" => "Close",
+                "liquidated" => "Liquidate",
+                "expired" => "Expire",
+                _ => "SolSettle",
+            });
             p.exit_slot = Some(t.slot);
             p.exit_ts = Some(ts);
             p.exit_signature = Some(t.signature.clone());
@@ -1601,6 +1618,7 @@ impl Model {
                         exit_ts: None,
                         exit_signature: None,
                         exit_keeper: None,
+                        exit_kind: None,
                         buyback_cost: None,
                         b_live_exit: None,
                         rent_paid: None,
@@ -1647,6 +1665,28 @@ impl Model {
                     pp.rent_paid = Some(x.rent);
                     pp.rent_protocol = Some(x.rent_protocol);
                     pp.token_surplus = Some(x.token_surplus);
+                }
+                if let Some(m) = self.markets.get_mut(&x.market) {
+                    m.lender_sol += i128::from(x.rent) - i128::from(x.rent_protocol);
+                    m.protocol_fees += i128::from(x.rent_protocol);
+                }
+                let f = FeeX::new(x.market, x.ts, x.rent.saturating_sub(x.rent_protocol))
+                    .position(x.position);
+                self.fee(t, r, ("rent_lender", "lenders"), f);
+                let f = FeeX::new(x.market, x.ts, x.rent_protocol).position(x.position);
+                self.fee(t, r, ("rent_protocol", "protocol"), f);
+            }
+            Ev::Repay(x) => {
+                if self.exit(&x.position, true).is_some() {
+                    self.exited(t, &x.position, "closed", x.ts);
+                    let pp = self.positions.get_mut(&x.position).expect("known");
+                    pp.exit_kind = Some("Repay");
+                    pp.buyback_cost = None;
+                    pp.b_live_exit = None;
+                    pp.borrower_payout = Some(x.borrower_payout);
+                    pp.rent_paid = Some(x.rent);
+                    pp.rent_protocol = Some(x.rent_protocol);
+                    pp.token_surplus = Some(0);
                 }
                 if let Some(m) = self.markets.get_mut(&x.market) {
                     m.lender_sol += i128::from(x.rent) - i128::from(x.rent_protocol);
@@ -2415,6 +2455,7 @@ fn event_slot(ev: &Ev) -> Option<u64> {
         LenderSynced,
         Open,
         Close,
+        Repay,
         Liquidate,
         Expire,
         SolSettle,

@@ -1,0 +1,36 @@
+[package]
+name = "shortwin-jupiter-exec-probe"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+publish = false
+license-file = "../../LICENSE"
+readme = "README.md"
+description = "TEST-ONLY isolated scratch CPI/rollback probe; never a production program"
+
+# Its own workspace/lock: excluded from ordinary production and Anchor builds.
+[workspace]
+resolver = "3"
+
+[lib]
+name = "shortwin_jupiter_exec_probe"
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+no-entrypoint = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = "=1.2.0"
+anchor-spl = { version = "=1.2.0", default-features = false, features = ["token"] }
+shortwin-jupiter-route = { path = "../../crates/shortwin-jupiter-route" }
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

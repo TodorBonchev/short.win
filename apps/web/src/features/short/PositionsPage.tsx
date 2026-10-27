@@ -79,7 +79,12 @@ export function positionTotals(rows: readonly PositionRowData[]) {
     let missingPnl = 0;
     let open = 0;
     for (const r of rows) {
-        const p = r.status === 'open' ? (r.metrics?.pnl ?? null) : r.api?.exit ? big(r.api.exit.borrower_pnl) : null;
+        const p =
+            r.status === 'open'
+                ? (r.metrics?.pnl ?? null)
+                : r.api?.exit?.borrower_pnl != null
+                  ? big(r.api.exit.borrower_pnl)
+                  : null;
         if (p === null) missingPnl += 1;
         else pnl += p;
         if (r.status !== 'open') continue;
@@ -104,7 +109,7 @@ function Totals({ rows, status }: { rows: readonly PositionRowData[]; status: St
                 </span>
             )}
             <span>
-                P&amp;L{t.missingPnl > 0 && t.missingPnl < t.count ? ' (priced so far)' : ''}{' '}
+                P&amp;L{t.missingPnl > 0 && t.missingPnl < t.count ? ' (known positions)' : ''}{' '}
                 {t.missingPnl === t.count ? <span className="muted">—</span> : <Pnl lamports={t.pnl} />}
             </span>
             {t.open > 0 && (
@@ -247,7 +252,11 @@ function columns(labels: Labels, withStatus: boolean): Column<PositionRowData>[]
             align: 'right',
             render: (r) => {
                 const pnl =
-                    r.status === 'open' ? (r.metrics?.pnl ?? null) : r.api?.exit ? big(r.api.exit.borrower_pnl) : null;
+                    r.status === 'open'
+                        ? (r.metrics?.pnl ?? null)
+                        : r.api?.exit?.borrower_pnl != null
+                          ? big(r.api.exit.borrower_pnl)
+                          : null;
                 return pnl === null ? (
                     <span className="muted" data-testid={cell('pnl')}>
                         —

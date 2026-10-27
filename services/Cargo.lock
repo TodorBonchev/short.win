@@ -4279,6 +4279,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 name = "shortwin"
 version = "1.0.3"
 dependencies = [
+ "shortwin-price-report",
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
@@ -4361,9 +4362,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "shortwin-jupiter-route"
+version = "0.1.0"
+
+[[package]]
 name = "shortwin-keeper"
 version = "0.1.0"
 dependencies = [
+ "sha2 0.10.9",
+ "shortwin-jupiter-route",
+ "serde_json",
+ "reqwest 0.12.28",
+ "base64 0.22.1",
  "anchor-lang",
  "anyhow",
  "bytemuck",
@@ -4518,6 +4528,10 @@ dependencies = [
  "tokio",
  "wincode",
 ]
+
+[[package]]
+name = "shortwin-price-report"
+version = "0.1.0"
 
 [[package]]
 name = "shortwin-venue-state"

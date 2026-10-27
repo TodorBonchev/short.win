@@ -80,3 +80,13 @@ proptest = "1.11.0"
 [[test]]
 name = "it"
 path = "tests/it/main.rs"
+
+# Explicit opt-in: the isolated SBF probe has its own build/artifact gate and never joins
+# ordinary production Anchor builds or the default program-test execution claim.
+[features]
+jupiter-exec-probe = []
+
+[[test]]
+name = "jupiter_exec_probe"
+path = "tests/jupiter_exec_probe.rs"
+required-features = ["jupiter-exec-probe"]

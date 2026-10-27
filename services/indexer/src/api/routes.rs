@@ -399,7 +399,10 @@ const Q_MARKET: &str = concat!(
          'expiry_rate_bps', x.expiry_rate_bps, 'settlement_rate_bps', x.settlement_rate_bps, \
          'avg_open_impact_bps', round(x.avg_open_impact_bps, 3)::float8, \
          'avg_exit_slippage_bps', round(x.avg_exit_slippage_bps, 3)::float8, \
-         'borrower_pnl', COALESCE(x.borrower_pnl, 0)::text) \
+         'borrower_pnl', CASE WHEN COALESCE(x.borrower_pnl_unknown_exits, 0) > 0 \
+             THEN NULL ELSE COALESCE(x.borrower_pnl, 0)::text END, \
+         'borrower_pnl_known_exits', COALESCE(x.borrower_pnl_known_exits, 0), \
+         'borrower_pnl_unknown_exits', COALESCE(x.borrower_pnl_unknown_exits, 0)) \
          FROM (SELECT 1) one LEFT JOIN v_market_exits x ON x.market = m.market), \
      'lender_loss', (SELECT jsonb_build_object('settlements', COALESCE(l.settlements, 0), \
          'token_value', COALESCE(l.token_value, 0)::text, \

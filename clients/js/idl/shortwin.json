@@ -2031,6 +2031,101 @@
       ]
     },
     {
+      "name": "initialize_price_report",
+      "docs": [
+        "Governance creates immutable exact-q report persistence; this admits no financial action."
+      ],
+      "discriminator": [
+        107,
+        190,
+        18,
+        196,
+        64,
+        24,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "price_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "args.quantity"
+              },
+              {
+                "kind": "arg",
+                "path": "args.model.epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializePriceReportArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "liquidate",
       "docs": [
         "A keeper liquidates a CR-liquidatable position within the fixed exit bound (ARCH §3.6)."
@@ -2731,6 +2826,293 @@
         {
           "name": "candidate_kind",
           "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "publish_price_report",
+      "docs": [
+        "An authorized runtime signer publishes finite/Unknown evidence without financial authority."
+      ],
+      "discriminator": [
+        83,
+        130,
+        3,
+        116,
+        85,
+        225,
+        131,
+        88
+      ],
+      "accounts": [
+        {
+          "name": "publisher",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "price_report",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  114,
+                  101,
+                  112,
+                  111,
+                  114,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "price_report.quantity",
+                "account": "PriceReport"
+              },
+              {
+                "kind": "account",
+                "path": "price_report.model_epoch",
+                "account": "PriceReport"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "PublishPriceReportArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "repay_short",
+      "docs": [
+        "Borrower returns all owed tokens in-kind, paying accrued rent within max_rent.",
+        "No swap route, oracle or price history is required."
+      ],
+      "discriminator": [
+        222,
+        215,
+        167,
+        6,
+        20,
+        137,
+        188,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": [
+            "position",
+            "exposure"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "borrower_token_account",
+          "writable": true
+        },
+        {
+          "name": "pool_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_rent",
+          "type": "u64"
         }
       ]
     },
@@ -3887,6 +4269,19 @@
       ]
     },
     {
+      "name": "PriceReport",
+      "discriminator": [
+        26,
+        139,
+        144,
+        41,
+        36,
+        16,
+        187,
+        8
+      ]
+    },
+    {
       "name": "ShortPosition",
       "discriminator": [
         110,
@@ -4237,6 +4632,19 @@
         100,
         130,
         85
+      ]
+    },
+    {
+      "name": "Repay",
+      "discriminator": [
+        163,
+        101,
+        155,
+        40,
+        203,
+        244,
+        185,
+        68
       ]
     },
     {
@@ -4964,6 +5372,11 @@
       "code": 6110,
       "name": "LegacyPoolCarry",
       "msg": "This empty pool has historical SOL carry: deposits require a reviewed migration"
+    },
+    {
+      "code": 6111,
+      "name": "RepaymentRentAboveMax",
+      "msg": "Accrued rent exceeds the borrower's repayment bound"
     }
   ],
   "types": [
@@ -6274,6 +6687,56 @@
               "array": [
                 "u64",
                 6
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializePriceReportArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "genesis_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "model",
+            "type": {
+              "defined": {
+                "name": "PriceReportModelArgs"
+              }
+            }
+          },
+          {
+            "name": "policy",
+            "type": {
+              "defined": {
+                "name": "PriceReportPolicyArgs"
+              }
+            }
+          },
+          {
+            "name": "publisher_count",
+            "type": "u8"
+          },
+          {
+            "name": "publishers",
+            "type": {
+              "array": [
+                "pubkey",
+                8
               ]
             }
           }
@@ -8450,6 +8913,189 @@
       }
     },
     {
+      "name": "PriceReport",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "model_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "state_bytes",
+            "type": {
+              "array": [
+                "u8",
+                1488
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceReportDomainArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "genesis_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "quote_decimals",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceReportModelArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "policy_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceReportPolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_age_slots",
+            "type": "u64"
+          },
+          {
+            "name": "max_age_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "max_window_slots",
+            "type": "u64"
+          },
+          {
+            "name": "max_window_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "max_update_gap_slots",
+            "type": "u64"
+          },
+          {
+            "name": "max_update_gap_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "epoch_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "minimum_completed_epochs",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceReportStatusArgs",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Unknown"
+          },
+          {
+            "name": "Finite",
+            "fields": [
+              {
+                "name": "lower",
+                "type": "u64"
+              },
+              {
+                "name": "central",
+                "type": "u64"
+              },
+              {
+                "name": "upper",
+                "type": "u64"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "ProtocolFeesSwept",
       "docs": [
         "`sweep_protocol_fees`."
@@ -8476,6 +9122,131 @@
           {
             "name": "recipient",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PublishPriceReportArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "domain",
+            "type": {
+              "defined": {
+                "name": "PriceReportDomainArgs"
+              }
+            }
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "model",
+            "type": {
+              "defined": {
+                "name": "PriceReportModelArgs"
+              }
+            }
+          },
+          {
+            "name": "configuration_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "publisher",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "start_slot",
+            "type": "u64"
+          },
+          {
+            "name": "start_ts",
+            "type": "i64"
+          },
+          {
+            "name": "end_slot",
+            "type": "u64"
+          },
+          {
+            "name": "end_ts",
+            "type": "i64"
+          },
+          {
+            "name": "observation_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PriceReportStatusArgs"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Repay",
+      "docs": [
+        "Borrower supplies all debt tokens without an oracle or swap. External acquisition",
+        "cost is not observed; readers must not interpret this as a zero-cost trading profit."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          },
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "q",
+            "type": "u64"
+          },
+          {
+            "name": "rent",
+            "type": "u64"
+          },
+          {
+            "name": "rent_protocol",
+            "type": "u64"
+          },
+          {
+            "name": "borrower_payout",
+            "type": "u64"
           }
         ]
       }

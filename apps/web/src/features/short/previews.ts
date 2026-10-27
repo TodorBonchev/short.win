@@ -107,14 +107,14 @@ export function newestRingXy(m: Market): readonly [bigint, bigint] {
 }
 
 /** The rent basis now: `Market.rent_basis` accrued to `now` at `P_ema` and the current utilisation. */
-export function rentBasisNow(math: MathModule, s: MarketSnapshot) {
+export function rentBasisNow(math: MathModule, s: Pick<MarketSnapshot, 'market' | 'now'>) {
     const [j0, j1, j2] = s.market.rentBasis.map(p128) as [bigint, bigint, bigint];
     const basis = new math.RentBasis(j0, j1, j2);
     const dt = s.now - s.market.lastAccrualTs;
     if (dt <= 0n) return basis;
     try {
         const util = math.utilizationBps(s.market.tokensFree, s.market.borrowedQ);
-        return basis.accrue(marketPrice(s).pEma, util, s.market.utilKinkBps, dt);
+        return basis.accrue(p128(s.market.emaPrice), util, s.market.utilKinkBps, dt);
     } finally {
         basis.free();
     }

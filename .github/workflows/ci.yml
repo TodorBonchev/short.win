@@ -101,7 +101,7 @@ jobs:
       - name: Rust toolchain from rust-toolchain.toml
         run: rustup toolchain install || rustup show
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: cargo test -p shortwin-math -p shortwin-math-wasm -p shortwin-jupiter-route -p squads-v4-ix --locked
+      - run: cargo test -p shortwin-math -p shortwin-math-wasm -p shortwin-price-report -p shortwin-jupiter-route -p squads-v4-ix --locked
 
   vectors:
     # Committed test vectors must be exactly what the normative sims generate today.
@@ -258,8 +258,12 @@ jobs:
       # its trailing args directly to cargo-build-sbf, hence the second `--` before Cargo's flags.
       - name: Build release artifacts and IDL from the lockfile
         run: |
+          set -o pipefail
+          mkdir -p target
+          python3 -m unittest discover -s scripts/tests -v
           anchor build --tools-version "$PLATFORM_TOOLS" --arch "$SBPF_ARCH" \
-            --ignore-keys --no-idl -- -- --locked
+            --ignore-keys --no-idl -- -- --locked 2>&1 | tee target/sbf-release-build.log
+          python3 scripts/check-sbf-stack.py target/sbf-release-build.log
           mkdir -p target/idl target/types
           anchor idl build -p shortwin -o target/idl/shortwin.json \
             -t target/types/shortwin.ts -- --locked
@@ -327,6 +331,7 @@ jobs:
             target/deploy/mock_cpamm.so
             target/test-venue/deploy/shortwin.so
             target/idl/shortwin.json
+            target/sbf-release-build.log
             target/types/shortwin.ts
           if-no-files-found: error
 

@@ -376,6 +376,10 @@ pub enum ShortwinError {
     /// a deposit nor the normal sweeps may assign that historical value to new shares.
     #[msg("This empty pool has historical SOL carry: deposits require a reviewed migration")]
     LegacyPoolCarry,
+
+    // Appended for route/oracle-independent in-kind repayment; previous codes stay stable.
+    #[msg("Accrued rent exceeds the borrower's repayment bound")]
+    RepaymentRentAboveMax,
 }
 
 impl From<MathError> for ShortwinError {
@@ -479,6 +483,7 @@ mod tests {
             (ShortwinError::PoolDrained, 6108),
             (ShortwinError::CurveCashbackCoin, 6109),
             (ShortwinError::LegacyPoolCarry, 6110),
+            (ShortwinError::RepaymentRentAboveMax, 6111),
             (ShortwinError::CurveStraddle, 6031),
         ];
         for (e, c) in pins {

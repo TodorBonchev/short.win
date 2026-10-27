@@ -1175,6 +1175,26 @@ Checkbox: “I understand I give up my unvested income.”
 
 Checkbox: “I understand my position can be liquidated or settled in SOL.”
 
+#### `borrower.tokenRepay` — Repay the full debt with your tokens
+
+> This transaction returns the full debt of {q} tokens ({qRaw} raw units) from your selected token account. It does not buy tokens or use a live swap quote.
+>
+> You authorize at most {maxRent} SOL ({maxRentLamports} lamports) of accrued rent from the position vault. The rest of the vault and refundable account rent return to you; you also pay the network fee.
+>
+> The cost of obtaining these tokens outside short.win is unknown. The returned SOL is not a profit figure, so economic P&L is unavailable for this repayment.
+
+Checkbox: “I understand that the full token debt will be repaid and external token acquisition costs are not included.”
+
+The borrower’s token-repayment review shows the exact raw debt, selected account,
+explicit rent limit and simulated source/pool deltas. Its data read uses the
+position, market, mint and chain clock without a venue or oracle quote. The rent
+limit starts empty, cannot exceed the position vault, and is preserved on retry;
+there is no automatic increase. Account token-program/owner/mint/balance checks,
+a wallet SOL check, the simulated network-fee budget and the normal simulation, acknowledgement and explicit
+wallet-signature pipeline remain required. CPI Guard accounts must be disabled
+by their owner outside this flow or another source account selected. This is a
+borrower repayment path; keeper liquidation is a separate integration.
+
 #### `borrower.residuals` — Known limits (accepted by the protocol)
 
 *Severity:* info · *Acknowledgement:* none · *Source:* ARCH §8.5, §10 O19 (OWNER-M7-11); ECON §8.2, §12.2, §12.5, §12.6
@@ -3411,6 +3431,16 @@ Adding an id is free; renaming or removing one changes this table in the same ch
 | `close-slippage-input` | `T.closeSlippageInput` | max slippage on the buyback |
 | `close-preview-<…>` | `T.closePreview` | `<field>` ∈ buyback, rent, payout, pnl |
 | `close-submit` | `T.closeSubmit` | opens the review (*2026-10-15, pump v3:* `close-straddle-notice` is removed with FE-3, §5.11) |
+| `repay-panel` | `T.repayPanel` | price-independent borrower token repayment form |
+| `repay-q` | `T.repayQ` | full raw principal; `data-value` raw units |
+| `repay-rent` | `T.repayRent` | stored-basis rent estimate; `data-value` lamports |
+| `repay-source` | `T.repaySource` | borrower token-account selector |
+| `repay-max-rent` | `T.repayMaxRentInput` | explicit SOL rent bound; initially empty |
+| `repay-use-estimate` | `T.repayUseEstimate` | user action copying the current rent estimate |
+| `repay-exact-limit` | `T.repayExactLimit` | exact SOL and lamport authorization bound |
+| `repay-pnl-disclosure` | `T.repayPnlDisclosure` | external token cost and unavailable economic P&L notice |
+| `repay-reason` | `T.repayReason` | why repayment review is disabled |
+| `repay-submit` | `T.repaySubmit` | builds the SDK repayment plan and opens simulation/review |
 | `short-submit-reason` | `T.shortSubmitReason` | *M10-RESP:* why `short-submit` is disabled, one line in the form's sticky foot (`role=status`; `data-reason` while there is one); while the acknowledgement blocks it, a button that focuses the box |
 | `positions-totals` | `T.positionsTotals` | *M10-RESP:* the dashboard's totals line (a KPI strip since design pass P6-2) — count, vault, P&L (sign and arrow), rent due |
 | `positions-empty-cta` | `T.positionsEmptyCta` | *M10-RESP:* "Open a short" (to `/markets`) when there are no open positions |

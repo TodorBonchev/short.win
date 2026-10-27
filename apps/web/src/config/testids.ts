@@ -282,6 +282,16 @@ export const T = {
     closeSlippageInput: 'close-slippage-input',
     closePreview: p<'buyback' | 'rent' | 'payout' | 'pnl'>('close-preview'),
     closeSubmit: 'close-submit',
+    repayPanel: 'repay-panel',
+    repayQ: 'repay-q',
+    repayRent: 'repay-rent',
+    repaySource: 'repay-source',
+    repayMaxRentInput: 'repay-max-rent',
+    repayUseEstimate: 'repay-use-estimate',
+    repayExactLimit: 'repay-exact-limit',
+    repayPnlDisclosure: 'repay-pnl-disclosure',
+    repayReason: 'repay-reason',
+    repaySubmit: 'repay-submit',
     // appended by TRADE (M10-RESP; FRONTEND.md §7.6, §11.4)
     /** Why the Short submit is disabled, one line (`data-reason` while there is one). */
     shortSubmitReason: 'short-submit-reason',

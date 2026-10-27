@@ -2574,6 +2574,7 @@ dependencies = [
  "anchor-spl",
  "bytemuck",
  "shortwin-math",
+ "shortwin-price-report",
  "shortwin-venue-state",
  "solana-security-txt",
  "solana-sha256-hasher",
@@ -2596,6 +2597,10 @@ dependencies = [
  "solana-signer",
  "solana-transaction-error",
 ]
+
+[[package]]
+name = "shortwin-jupiter-route"
+version = "0.1.0"
 
 [[package]]
 name = "shortwin-litesvm-tests"
@@ -2645,10 +2650,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shortwin-jupiter-route"
-version = "0.1.0"
-
-[[package]]
 name = "shortwin-math"
 version = "0.1.0"
 dependencies = [
@@ -2666,6 +2667,10 @@ dependencies = [
  "shortwin-venue-state",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "shortwin-price-report"
+version = "0.1.0"
 
 [[package]]
 name = "shortwin-venue-state"

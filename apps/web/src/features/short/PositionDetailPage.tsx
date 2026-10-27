@@ -39,6 +39,7 @@ import { useWallet } from '../../wallet/useWallet.ts';
 import { useChainNow, usePositionAccount, useShortSnapshot, useTokenLabel } from './hooks.ts';
 import { AddMarginForm } from './positions/AddMarginForm.tsx';
 import { CloseForm } from './positions/CloseForm.tsx';
+import { RepayPanel } from './positions/RepayPanel.tsx';
 import { HealthBanner, SettlementRisk } from './positions/SettlementRisk.tsx';
 import { positionMetrics, TIER_NAMES } from './previews.ts';
 import { CrValue } from './ui.tsx';
@@ -117,6 +118,7 @@ function ClosedSummary({ p, decimals, symbol }: { p: Position; decimals: number 
                         {e?.settle_condition ? ` ${e.settle_condition}` : ''}
                     </Badge>,
                 ],
+                ['Exit', e?.kind === 'Repay' ? 'Tokens repaid by borrower' : (e?.kind ?? '—')],
                 ['Q', decimals === null ? p.q : <Tokens key="q" raw={big(p.q)} decimals={decimals} symbol={symbol} />],
                 ['Buyback', e?.buyback_cost ? <Sol key="b" lamports={big(e.buyback_cost)} /> : '—'],
                 ['Rent paid', e?.rent_paid ? <Sol key="r" lamports={big(e.rent_paid)} frac={6} /> : '—'],
@@ -124,7 +126,16 @@ function ClosedSummary({ p, decimals, symbol }: { p: Position; decimals: number 
                 ['Expiry fee', e?.expiry_fee ? <Sol key="ef" lamports={big(e.expiry_fee)} /> : '—'],
                 ['Keeper paid', e?.keeper_paid ? <Sol key="k" lamports={big(e.keeper_paid)} /> : '—'],
                 ['You received', e ? <Sol key="pay" lamports={big(e.borrower_payout)} /> : '—'],
-                ['P&L', e ? <Pnl key="pnl" lamports={big(e.borrower_pnl)} /> : '—'],
+                [
+                    'P&L',
+                    e?.borrower_pnl != null ? (
+                        <Pnl key="pnl" lamports={big(e.borrower_pnl)} />
+                    ) : e?.kind === 'Repay' ? (
+                        'Unavailable (external token cost)'
+                    ) : (
+                        '—'
+                    ),
+                ],
                 ['Duration', e ? formatDuration(e.duration_s) : '—'],
             ]}
         />
@@ -512,6 +523,12 @@ export function PositionDetailPage({ position }: { position: Address }) {
                     <ErrorState error={snap.error} retry={() => void snap.refetch()} />
                 ) : (
                     <Skeleton width={240} />
+                )}
+                {/* Token repayment has its own account/rent read and stays available during a price outage. */}
+                {pos && (
+                    <Panel title="Return borrowed tokens">
+                        <RepayPanel position={position} symbol={symbol} />
+                    </Panel>
                 )}
             </div>
         </div>

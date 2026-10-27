@@ -1,0 +1,10 @@
+[package]
+name = "shortwin-price-report"
+version = "0.1.0"
+description = "Unwired in-house quantity-price report state and authorization-policy core"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+license-file = "../../LICENSE"
+
+[dependencies]

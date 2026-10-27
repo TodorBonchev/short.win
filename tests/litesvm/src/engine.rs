@@ -397,6 +397,34 @@ pub fn open_short_ix(
     ix::with_remaining(ix, &mm.trade_remaining(extras))
 }
 
+/// Whole-debt borrower token repayment with no remaining venue/reference accounts.
+pub fn repay_short_ix(
+    mm: &impl VenueMarket,
+    borrower: &Pubkey,
+    borrower_token_account: &Pubkey,
+    nonce: u64,
+    max_rent: u64,
+) -> Instruction {
+    let market = mm.market();
+    build(
+        shortwin::accounts::RepayShort {
+            borrower: *borrower,
+            config: pda::config(),
+            market,
+            position: pda::position(&market, borrower, nonce).0,
+            exposure: pda::exposure(&market, borrower).0,
+            mint: mm.mint(),
+            borrower_token_account: *borrower_token_account,
+            pool_vault: mm.keys().pool_vault,
+            market_vault: mm.keys().market_vault,
+            token_program: mm.keys().token_program,
+            event_authority: pda::event_authority(),
+            program: shortwin::ID,
+        },
+        shortwin::instruction::RepayShort { max_rent },
+    )
+}
+
 /// `close_short(max_buyback_cost, sel)` of `borrower`'s position `nonce`.
 pub fn close_short_ix(
     mm: &impl VenueMarket,

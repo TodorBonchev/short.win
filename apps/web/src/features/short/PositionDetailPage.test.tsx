@@ -50,6 +50,14 @@ function position(status: Position['status'] = 'open'): PositionDetail {
                 status === 'open'
                     ? null
                     : {
+                          kind:
+                              status === 'closed'
+                                  ? 'Close'
+                                  : status === 'liquidated'
+                                    ? 'Liquidate'
+                                    : status === 'expired'
+                                      ? 'Expire'
+                                      : 'SolSettle',
                           ts: 1_799_999_100,
                           signature: SIG_A,
                           keeper: null,
@@ -79,6 +87,28 @@ afterEach(() => {
 });
 
 describe('position exit history', () => {
+    it('shows borrower token repayment with unavailable economic P&L rather than zero profit', async () => {
+        const record = position('closed');
+        const original = record.position.exit;
+        if (!original) throw new Error('closed fixture');
+        const repaid: PositionDetail = {
+            ...record,
+            position: {
+                ...record.position,
+                exit: { ...original, kind: 'Repay', buyback_cost: null, borrower_pnl: null },
+            },
+        };
+        mockIndexer({ [`/v1/positions/${MINT_A}`]: repaid });
+        const { queryClient, view } = await renderAt(`/positions/${MINT_A}`);
+        try {
+            expect(await screen.findByText('Tokens repaid by borrower')).toBeTruthy();
+            expect(screen.getByText('Unavailable (external token cost)')).toBeTruthy();
+        } finally {
+            view?.unmount();
+            queryClient.clear();
+        }
+    });
+
     it('shows history updating after the account closes, then picks up the exit without a WebSocket', async () => {
         vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
         let exited = false;
