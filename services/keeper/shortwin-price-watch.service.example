@@ -1,0 +1,27 @@
+# One instance per reviewed exact-q snapshot; use actual built artifact hashes.
+# Configure Failure/Unknown/stale/snapshotwarmup/storage alerts externally before enabling debt.
+[Unit]
+Description=short.win trusted off-chain price history
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Same UID/path/limits as other consumers of the local shared Jupiter budget.
+User=shortwin-operator
+Group=shortwin-operator
+ExecStart=/opt/shortwin/bin/shortwin-price-watch --config /etc/shortwin-price/market-q.toml --watch
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/etc/shortwin-price
+ReadWritePaths=/var/lib/shortwin-price
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

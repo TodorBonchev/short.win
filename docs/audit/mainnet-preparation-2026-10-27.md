@@ -8,6 +8,23 @@ No purchase, tag, deployment, financial/governance transaction or website public
 is claimed. First mainnet remains postponed for broad Jupiter support; external
 whole-repository audit and bounty timing remains the owner's pre-audit launch choice.
 
+## Current selected history model
+
+The owner explicitly accepts trusted off-chain price history on the VPS and our
+service as authority. Use on-demand authenticated snapshots for actual actions;
+continuous two-second ON-CHAIN publication is superseded. Private history is not
+public timing proof, and the old publication-cost measurement is retained as
+historical evidence for the rejected model. Actual per-action fees, RPC/API
+usage and funded operation still need measurement.
+
+The new snapshot codec/account/receiver, durable collector/watcher, trusted
+bid/ask evaluator, distinct notional-rent persistence and quote-native repayment
+bookkeeping are being qualified as a new engineering batch. No production market
+adoption/opening, complete routed financial execution, cash default or funded
+operation is claimed from these foundations. The owner subsequently explicitly selected overdue collateral default after the
+locked 24-hour grace, including healthy borrower forfeiture. The distinct recovery
+path and immutable terms are being implemented and tested; this is not activation.
+
 ## Implemented and focused checks
 
 - Dependency-free exact-q report state, authorized publisher/domain/model/window/
@@ -196,7 +213,7 @@ and that the 25-SOL compiled opening-notional cap is per market while deposits a
 market count remain uncapped. None of this sequence constitutes a purchase, tag,
 deployment or financial transaction in this checkpoint.
 
-## Publication cost and packet-size finding
+## Historical publication cost and packet-size finding (superseded)
 
 SDK serialization and an independent wire parser measured the proposed two-feed
 v0 publication packets. Two Finite updates plus the normal compute-budget
@@ -242,3 +259,74 @@ No program, server, wallet/send pipeline or on-chain rent bound changed. The
 [red/green receipt](probes/repay-position-switch-2026-10-27/README.md) retains
 source, router evidence, exact commands and hashes. Final integration qualification
 remains open.
+
+## Prior checkpoint CI verification
+
+Ordinary CI [40566841702](https://github.com/TodorBonchev/short.win/actions/runs/40566841702)
+passed **24 jobs** at `30a2c17e5fde8c64073a93e149abb673b92584b0`, with `mutants`
+and `fuzz-nightly` intentionally skipped. The focused execution probe
+[40566841555](https://github.com/TodorBonchev/short.win/actions/runs/40566841555) passed.
+The actual CI merge snapshot has zero file differences from that head. Independent
+artifact verification matched the ZIP digests, every member hash, Anchor/verifier
+release ELF raw `392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9`,
+trimmed `95c151e4081835772382dd48d0732c140eadca8f32c568991fd99d85c7dab7a2`, and
+committed/fresh IDL `3fd8a6207f5bc25763c0f64c6d5e2bf8301c206aa6f952dc0e4c04da2099099c`.
+This verifies the PRIOR checkpoint; it does not qualify this new trusted-history
+runtime or substitute for full selected mutations and final 24-hour fuzz.
+
+
+## Trusted-history / overdue-default follow-up (2026-10-28 local)
+
+The implementation now has a distinct on-demand `PriceSnapshot` (1,624 bytes,
+1,533-byte core codec), immutable per-feed producer commitments and a shared
+financial policy. Prospective `QuotePolicy` initialization does not set the
+quote-native backend flag or enable borrowing. The read-only reference preflight
+checks actual owned accounts, canonical PDAs, quantities, policy/producer binding,
+minimum sequence and actual runtime freshness. Governance/emergency can pause
+trusted price actions, with governance-only clear. Legacy rent/observation entry
+points reject the distinct backend instead of interpreting its state as reserves.
+
+Typed quote-native repayment and the owner-selected overdue default are built.
+Positions (348 bytes) lock the checked deadline-plus-86,400s recovery time, keeper
+reward and vesting schedule. The overdue instruction uses actual Clock/unpaid debt,
+requires no price/mint/token/route accounts, pays `K_s` to the keeper and `V-K_s`
+to lenders, and emits `OverdueCollateralDefault`; it never claims token repayment,
+S3, insolvency or fair value. The caller signs a maximum epoch-record rent bound.
+Account-rent/untracked-donation refunds remain separate from borrower collateral.
+A review found mutable global vesting was still being read; the fix locks the
+position value and has retained red/green and actual-SBF controls for both exits.
+
+The watcher/publisher retains off-chain H8 history and trusted two-sided API
+estimates, with Unknown/gap resets, bounded requests/evidence, exact policy hashes,
+explicit publication only, durable fee/burst budgets and pending-signature
+reconciliation. No actual Jupiter API account, mainnet send, provisioned VPS or
+funded operation was used in these checks. The independent recovery CLI is read-
+only unless explicitly passed `--send`, constructs one known instruction and
+has fee/rent/program-identity checks. These controls do not remove operator-price
+trust or establish independent source-state freshness.
+
+The indexer/API/web preserve a distinct defaulted status, nominal q loss, lender
+collateral, actual keeper reward and account refund. Due rent is not reported as
+paid rent; no buyback cost, token return or trading PnL is invented. Shared-ledger
+idempotence/rebuild and legacy repayment/API compatibility have focused PostgreSQL
+checks. Final retained receipts distinguish earlier intermediate binaries from
+the final locked-vesting checkpoint.
+
+**Remaining release work is material:** no public quote-native adoption/opening
+path is exposed, no production general Jupiter financial executor is enabled,
+and shared-pool deposit/withdraw/sweep, typed margin/close/liquidation, actual
+snapshot debt hooks and per-cohort carry handling still need complete integration.
+The final fuzzer must generate those real paths and qualify frozen final inputs
+for at least 24h; catalog/standalone tests are not that evidence. Actual source/API
+capacity, configured public authorities, funded operator/alerts/backups and the
+concrete multisig deployment packet remain pending. This is an engineering
+checkpoint, not a mainnet-ready source tag or deployment approval.
+
+
+The [retained October28 checkpoint](probes/trusted-history-2026-10-28/README.md)
+contains exact current bytes, scope-specific counts, resolved review findings,
+independent AI review receipts and lossless logs. Current release raw hash is
+`43971efd45e22df7e2511e5439ff78281f4fa72c30b88bfc96e7f82740008ac1`;
+this development candidate is not a final release/fuzz freeze. Public mainnet
+role identities and the prospective sub-lamport cohort rule were requested from
+the owner while implementation continues; neither is inferred from placeholders.

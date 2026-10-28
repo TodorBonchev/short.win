@@ -192,6 +192,66 @@
       "args": []
     },
     {
+      "name": "check_quote_reference",
+      "docs": [
+        "Read-only actual-runtime validation of a trusted reference; grants no financial action."
+      ],
+      "discriminator": [
+        237,
+        219,
+        120,
+        174,
+        251,
+        9,
+        70,
+        133
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "quote_policy"
+        },
+        {
+          "name": "price_snapshot"
+        }
+      ],
+      "args": [
+        {
+          "name": "quantity",
+          "type": "u64"
+        },
+        {
+          "name": "minimum_sequence",
+          "type": "u64"
+        }
+      ],
+      "returns": {
+        "defined": {
+          "name": "QuoteReferenceView"
+        }
+      }
+    },
+    {
       "name": "claim_sol",
       "docs": [
         "A lender claims its realised SOL."
@@ -2126,6 +2186,194 @@
       ]
     },
     {
+      "name": "initialize_price_snapshot",
+      "docs": [
+        "Governance creates a distinct cache for trusted off-chain history; no admission."
+      ],
+      "discriminator": [
+        1,
+        69,
+        60,
+        231,
+        200,
+        31,
+        9,
+        223
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "price_snapshot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  115,
+                  110,
+                  97,
+                  112,
+                  115,
+                  104,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "args.quantity"
+              },
+              {
+                "kind": "arg",
+                "path": "args.model.epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializePriceSnapshotArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize_quote_policy",
+      "docs": [
+        "Governance locks a reviewed quote-native financial policy; this does not admit opens."
+      ],
+      "discriminator": [
+        210,
+        167,
+        89,
+        214,
+        64,
+        140,
+        123,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "quote_policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101,
+                  95,
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "arg",
+                "path": "args.model_epoch"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeQuotePolicyArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "liquidate",
       "docs": [
         "A keeper liquidates a CR-liquidatable position within the fixed exit bound (ARCH §3.6)."
@@ -2639,6 +2887,193 @@
       ]
     },
     {
+      "name": "overdue_quote_default",
+      "docs": [
+        "Clock-based quote-native collateral default after the locked 24-hour grace."
+      ],
+      "discriminator": [
+        222,
+        183,
+        120,
+        157,
+        6,
+        141,
+        217,
+        177
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "docs": [
+            "Permissionless executor and reward recipient; funds a roll record if needed."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "finance_market"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "relations": [
+            "finance_market",
+            "position",
+            "exposure"
+          ]
+        },
+        {
+          "name": "finance_market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101,
+                  95,
+                  102,
+                  105,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "borrower",
+          "writable": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101,
+                  95,
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "share_epoch_rec",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_epoch_record_rent",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "propose_config",
       "docs": [
         "Governance proposes a timelocked config change."
@@ -2918,6 +3353,337 @@
               "name": "PublishPriceReportArgs"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "publish_price_snapshot",
+      "docs": [
+        "Authorized on-demand cache update, without any periodic publication requirement."
+      ],
+      "discriminator": [
+        5,
+        33,
+        77,
+        182,
+        0,
+        135,
+        12,
+        240
+      ],
+      "accounts": [
+        {
+          "name": "publisher",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market"
+        },
+        {
+          "name": "price_snapshot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  105,
+                  99,
+                  101,
+                  95,
+                  115,
+                  110,
+                  97,
+                  112,
+                  115,
+                  104,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "price_snapshot.quantity",
+                "account": "PriceSnapshot"
+              },
+              {
+                "kind": "account",
+                "path": "price_snapshot.model_epoch",
+                "account": "PriceSnapshot"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "PublishPriceSnapshotArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "repay_quote_short",
+      "docs": [
+        "Full-token repayment for a distinct quote-native position; no report or swap."
+      ],
+      "discriminator": [
+        249,
+        51,
+        112,
+        50,
+        40,
+        214,
+        204,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          },
+          "relations": [
+            "finance_market"
+          ]
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          },
+          "relations": [
+            "finance_market",
+            "position",
+            "exposure"
+          ]
+        },
+        {
+          "name": "finance_market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101,
+                  95,
+                  102,
+                  105,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101,
+                  95,
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "borrower_token_account",
+          "writable": true
+        },
+        {
+          "name": "pool_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "market_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_rent",
+          "type": "u64"
         }
       ]
     },
@@ -3349,6 +4115,56 @@
             }
           }
         },
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_quote_price_pause",
+      "docs": [
+        "Emergency/governance may pause trusted price actions; only governance clears."
+      ],
+      "discriminator": [
+        149,
+        111,
+        0,
+        252,
+        149,
+        180,
+        101,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true
+        }
+      ],
+      "args": [
         {
           "name": "paused",
           "type": "bool"
@@ -4282,6 +5098,71 @@
       ]
     },
     {
+      "name": "PriceSnapshot",
+      "discriminator": [
+        152,
+        36,
+        67,
+        109,
+        153,
+        115,
+        119,
+        27
+      ]
+    },
+    {
+      "name": "QuoteFinanceExposure",
+      "discriminator": [
+        154,
+        254,
+        151,
+        241,
+        19,
+        111,
+        125,
+        27
+      ]
+    },
+    {
+      "name": "QuoteFinanceMarket",
+      "discriminator": [
+        45,
+        47,
+        202,
+        241,
+        250,
+        148,
+        31,
+        165
+      ]
+    },
+    {
+      "name": "QuoteFinancePosition",
+      "discriminator": [
+        116,
+        226,
+        168,
+        38,
+        244,
+        77,
+        168,
+        178
+      ]
+    },
+    {
+      "name": "QuotePolicy",
+      "discriminator": [
+        1,
+        43,
+        26,
+        79,
+        86,
+        39,
+        171,
+        67
+      ]
+    },
+    {
       "name": "ShortPosition",
       "discriminator": [
         110,
@@ -4554,6 +5435,19 @@
         241,
         132,
         61
+      ]
+    },
+    {
+      "name": "OverdueCollateralDefault",
+      "discriminator": [
+        2,
+        185,
+        242,
+        248,
+        210,
+        23,
+        116,
+        79
       ]
     },
     {
@@ -5377,9 +6271,76 @@
       "code": 6111,
       "name": "RepaymentRentAboveMax",
       "msg": "Accrued rent exceeds the borrower's repayment bound"
+    },
+    {
+      "code": 6112,
+      "name": "OverdueDefaultNotReady",
+      "msg": "The locked overdue-default time has not been reached"
+    },
+    {
+      "code": 6113,
+      "name": "EpochRecordRentAboveMax",
+      "msg": "Required epoch record rent exceeds the caller's signed bound"
+    },
+    {
+      "code": 6114,
+      "name": "QuotePriceActionsPaused",
+      "msg": "Trusted price actions are paused for this market"
     }
   ],
   "types": [
+    {
+      "name": "AttestedPriceBucketArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "first_slot",
+            "type": "u64"
+          },
+          {
+            "name": "first_ts",
+            "type": "i64"
+          },
+          {
+            "name": "last_slot",
+            "type": "u64"
+          },
+          {
+            "name": "last_ts",
+            "type": "i64"
+          },
+          {
+            "name": "lower_min",
+            "type": "u64"
+          },
+          {
+            "name": "central_last",
+            "type": "u64"
+          },
+          {
+            "name": "upper_max",
+            "type": "u64"
+          },
+          {
+            "name": "observations",
+            "type": "u64"
+          },
+          {
+            "name": "largest_gap_slots",
+            "type": "u64"
+          },
+          {
+            "name": "largest_gap_seconds",
+            "type": "u64"
+          }
+        ]
+      }
+    },
     {
       "name": "ClaimSol",
       "docs": [
@@ -6738,6 +7699,153 @@
                 "pubkey",
                 8
               ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializePriceSnapshotArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "genesis_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "producer_commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "model",
+            "type": {
+              "defined": {
+                "name": "PriceReportModelArgs"
+              }
+            }
+          },
+          {
+            "name": "policy",
+            "type": {
+              "defined": {
+                "name": "PriceReportPolicyArgs"
+              }
+            }
+          },
+          {
+            "name": "publisher_count",
+            "type": "u8"
+          },
+          {
+            "name": "publishers",
+            "type": {
+              "array": [
+                "pubkey",
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeQuotePolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "genesis_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "model_version",
+            "type": "u32"
+          },
+          {
+            "name": "model_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "expected_policy_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "history",
+            "type": {
+              "defined": {
+                "name": "QuoteHistoryPolicy"
+              }
+            }
+          },
+          {
+            "name": "lot_count",
+            "type": "u8"
+          },
+          {
+            "name": "lots",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "small_lot_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "capacity_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "producer_commitments",
+            "docs": [
+              "Canonical sorted union order; unused suffix must be all zero."
+            ],
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                10
+              ]
+            }
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "QuoteFinancialTerms"
+              }
             }
           }
         ]
@@ -8263,6 +9371,93 @@
       }
     },
     {
+      "name": "OverdueCollateralDefault",
+      "docs": [
+        "Fixed-term quote-native collateral foreclosure after the locked 24-hour grace.",
+        "This is token-principal loss/default, never a token repayment or fair-value S3."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          },
+          {
+            "name": "position",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "keeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "q_lost",
+            "type": "u64"
+          },
+          {
+            "name": "default_at",
+            "type": "i64"
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          },
+          {
+            "name": "keeper_payment",
+            "type": "u64"
+          },
+          {
+            "name": "lender_amount",
+            "type": "u64"
+          },
+          {
+            "name": "borrower_amount",
+            "type": "u64"
+          },
+          {
+            "name": "rent_due",
+            "type": "u64"
+          },
+          {
+            "name": "credited_retired",
+            "type": "u64"
+          },
+          {
+            "name": "vested",
+            "type": "u64"
+          },
+          {
+            "name": "vest_flushed",
+            "type": "u64"
+          },
+          {
+            "name": "share_epoch_after",
+            "type": "u32"
+          },
+          {
+            "name": "position_account_refund",
+            "docs": [
+              "Solana account-rent floor and untracked donations, outside economic collateral V."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Params",
       "docs": [
         "Global parameters in account form (ARCH §2.3.3; the values of `shortwin_math::params::Params`",
@@ -9096,6 +10291,55 @@
       }
     },
     {
+      "name": "PriceSnapshot",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "model_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "producer_commitment",
+            "docs": [
+              "Per-feed observation/search settings commitment, distinct from the global financial model."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "state_bytes",
+            "type": {
+              "array": [
+                "u8",
+                1533
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "ProtocolFeesSwept",
       "docs": [
         "`sweep_protocol_fees`."
@@ -9199,6 +10443,694 @@
                 "name": "PriceReportStatusArgs"
               }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PublishPriceSnapshotArgs",
+      "docs": [
+        "Domain, quantity, model and allowed publisher are bound by the immutable account.",
+        "Omitting redundant identities keeps the full H8 update within a normal transaction packet."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "start_slot",
+            "type": "u64"
+          },
+          {
+            "name": "start_ts",
+            "type": "i64"
+          },
+          {
+            "name": "end_slot",
+            "type": "u64"
+          },
+          {
+            "name": "end_ts",
+            "type": "i64"
+          },
+          {
+            "name": "observation_digest",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "PriceReportStatusArgs"
+              }
+            }
+          },
+          {
+            "name": "history_count",
+            "type": "u8"
+          },
+          {
+            "name": "history",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "AttestedPriceBucketArgs"
+                  }
+                },
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteFeedBinding",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "snapshot",
+            "type": "pubkey"
+          },
+          {
+            "name": "producer_commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteFinanceExposure",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "q_open",
+            "type": "u64"
+          },
+          {
+            "name": "notional_open",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteFinanceMarket",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "model_version",
+            "type": "u32"
+          },
+          {
+            "name": "model_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "policy_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rent_state",
+            "type": {
+              "array": [
+                "u8",
+                159
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteFinancePosition",
+      "docs": [
+        "Own escrow/identity. A legacy ShortPosition can never decode as this account or",
+        "share its PDA namespace; direct repayment cannot accidentally charge legacy rent."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "finance_market",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "q",
+            "type": "u64"
+          },
+          {
+            "name": "s",
+            "type": "u64"
+          },
+          {
+            "name": "m",
+            "type": "u64"
+          },
+          {
+            "name": "v",
+            "type": "u64"
+          },
+          {
+            "name": "n_open",
+            "type": "u64"
+          },
+          {
+            "name": "fee_open",
+            "type": "u64"
+          },
+          {
+            "name": "t_open",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "default_at",
+            "docs": [
+              "Fixed at open; margin additions never extend it."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "settle_keeper_fixed",
+            "type": "u64"
+          },
+          {
+            "name": "settle_keeper_bps",
+            "type": "u16"
+          },
+          {
+            "name": "settle_keeper_cap",
+            "type": "u64"
+          },
+          {
+            "name": "lump_vest_seconds",
+            "docs": [
+              "Reviewed opening policy, never replaced by a later global config value."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "model_version",
+            "type": "u32"
+          },
+          {
+            "name": "model_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "policy_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "rent_state",
+            "type": {
+              "array": [
+                "u8",
+                94
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteFinancialTerms",
+      "docs": [
+        "All fields are explicit governance inputs. No selected production values are supplied.",
+        "One QuotePilot profile, with conservative legacy-D CR floors, never automatic A/B tiering."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "position_quantity_max",
+            "type": "u64"
+          },
+          {
+            "name": "market_quantity_max",
+            "type": "u64"
+          },
+          {
+            "name": "min_notional",
+            "type": "u64"
+          },
+          {
+            "name": "position_notional_max",
+            "type": "u64"
+          },
+          {
+            "name": "market_notional_max",
+            "type": "u64"
+          },
+          {
+            "name": "utilization_cap_bps",
+            "type": "u16"
+          },
+          {
+            "name": "wallet_cap_bps",
+            "type": "u16"
+          },
+          {
+            "name": "position_premium_bps",
+            "type": "u16"
+          },
+          {
+            "name": "capacity_premium_bps",
+            "type": "u16"
+          },
+          {
+            "name": "cr_open_bps",
+            "type": "u32"
+          },
+          {
+            "name": "cr_liq_bps",
+            "type": "u32"
+          },
+          {
+            "name": "open_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "rent_protocol_bps",
+            "type": "u16"
+          },
+          {
+            "name": "util_kink_bps",
+            "type": "u16"
+          },
+          {
+            "name": "rate_base_bps",
+            "type": "u32"
+          },
+          {
+            "name": "rate_slope1_bps",
+            "type": "u32"
+          },
+          {
+            "name": "rate_slope2_bps",
+            "type": "u32"
+          },
+          {
+            "name": "min_rent_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "max_duration_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "penalty_bps",
+            "type": "u16"
+          },
+          {
+            "name": "penalty_lender_bps",
+            "type": "u16"
+          },
+          {
+            "name": "penalty_protocol_bps",
+            "type": "u16"
+          },
+          {
+            "name": "penalty_keeper_bps",
+            "type": "u16"
+          },
+          {
+            "name": "expiry_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "settle_keeper_fixed",
+            "type": "u64"
+          },
+          {
+            "name": "settle_keeper_bps",
+            "type": "u16"
+          },
+          {
+            "name": "settle_keeper_cap",
+            "type": "u64"
+          },
+          {
+            "name": "expiry_keeper_fixed",
+            "type": "u64"
+          },
+          {
+            "name": "expiry_keeper_bps",
+            "type": "u16"
+          },
+          {
+            "name": "expiry_keeper_cap",
+            "type": "u64"
+          },
+          {
+            "name": "liquidation_delta_bps",
+            "type": "u16"
+          },
+          {
+            "name": "expiry_delta_bps",
+            "type": "u16"
+          },
+          {
+            "name": "completed_liquidation_epochs",
+            "type": "u8"
+          },
+          {
+            "name": "cr_arm_delay_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "cr_arm_delay_slots",
+            "type": "u64"
+          },
+          {
+            "name": "coherence_max_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "coherence_max_slots",
+            "type": "u64"
+          },
+          {
+            "name": "lump_vest_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "default_grace_seconds",
+            "docs": [
+              "Fixed contractual maturity default: borrower zero, lenders V-K even if healthy."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteHistoryPolicy",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_age_slots",
+            "type": "u64"
+          },
+          {
+            "name": "max_age_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "max_window_slots",
+            "type": "u64"
+          },
+          {
+            "name": "max_window_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "max_update_gap_slots",
+            "type": "u64"
+          },
+          {
+            "name": "max_update_gap_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "epoch_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "minimum_completed_epochs",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuotePolicy",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "domain",
+            "type": {
+              "defined": {
+                "name": "QuotePolicyDomain"
+              }
+            }
+          },
+          {
+            "name": "model_version",
+            "type": "u32"
+          },
+          {
+            "name": "model_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "policy_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "history",
+            "type": {
+              "defined": {
+                "name": "QuoteHistoryPolicy"
+              }
+            }
+          },
+          {
+            "name": "lot_count",
+            "type": "u8"
+          },
+          {
+            "name": "lots",
+            "type": {
+              "array": [
+                "u64",
+                8
+              ]
+            }
+          },
+          {
+            "name": "small_lot_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "capacity_quantity",
+            "type": "u64"
+          },
+          {
+            "name": "feed_count",
+            "type": "u8"
+          },
+          {
+            "name": "feeds",
+            "type": {
+              "array": [
+                {
+                  "defined": {
+                    "name": "QuoteFeedBinding"
+                  }
+                },
+                10
+              ]
+            }
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "QuoteFinancialTerms"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuotePolicyDomain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "genesis_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "quote_decimals",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuoteReferenceView",
+      "docs": [
+        "Read-only authenticated reference preflight. This is neither open admission nor",
+        "liquidation eligibility, and no field promises executable buyback liquidity."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "source_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "opening_upper",
+            "type": "u64"
+          },
+          {
+            "name": "lower_base",
+            "type": "u64"
+          },
+          {
+            "name": "acquisition_reference",
+            "type": "u64"
           }
         ]
       }

@@ -95,3 +95,62 @@ new reference backend. Admit no new market until its normal exit and recovery
 policy are specified and tested. This engineering selection adds no numerical
 risk/settlement terms, deployment authorization or principal guarantee. See the
 [selected liquidation contract](../design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice).
+
+## Later owner selection: trusted off-chain history and on-demand updates
+
+After rejecting the continuous on-chain publication cost, the owner instructed:
+
+> I am ok my vps monitor price history off chain and our service to be trusted. Allign all documents and code with this and do the changes required so we are ready for launch
+
+This explicitly authorizes the service to retain and attest historical prices off
+chain. Use a distinct trusted-history snapshot model, ordinary allowed reporter
+transaction signatures, and fresh on-demand cache updates for actual actions.
+There is no periodic on-chain heartbeat requirement in this model. Preserve the
+older public-history implementation and cost measurements as development evidence;
+they are not the active publication design or a recurring SOL spending commitment.
+
+The program can check signer authorization, immutable domain/quantity/policy,
+sequence, timestamps, numerical bounds and its own elapsed-time rules. It cannot
+prove that privately attested samples existed at the claimed times or that the
+operator omitted no gaps. A compromised or mistaken reporter can manufacture
+history and cause false financial decisions. One VPS remains one trust and
+availability domain. The indexer archive aids diagnosis; it does not remove that
+trust or become a second independent oracle.
+
+Keep whole-position atomic Jupiter repayment, price-independent borrower repayment
+and bounded voluntary exits. Fresh matching snapshots may be reused within their
+reviewed lifetime. Keeper update/action batching needs packet/CU qualification;
+separate refresh and action transactions are not jointly atomic. Refreshing the
+cache after wallet approval must not modify already-signed action bytes, and
+stale evidence, changed state or violated borrower bounds must refuse execution.
+
+Sparse on-chain arming/rechecking may prove two separated checks, not continuous
+unhealthy pricing between them. Privately claimed history alone must not create
+an immediate collateral-confiscation path. At the time of the history selection, overdue collateral default and healthy-
+borrower forfeiture were a separate unanswered choice. The subsequent explicit
+selection below resolves that choice; history trust alone did not select it. Concrete keys,
+policy settings, final tests/CI/fuzz and funded operation still precede activation.
+
+
+## Later explicit owner choice: overdue collateral default
+
+The owner answered the separate recovery question:
+
+> Use remaining collateral to compensate lenders, less the capped keeper fee; borrower gets zero after grace, even if the latest price appears healthy.
+
+This explicitly selects the proposed deadline-plus-24-hour backstop. Lock
+`default_at = deadline + 86,400 seconds` and the bounded keeper settlement terms
+when new quote-native debt opens. At/after that time, an unpaid position can be
+closed through a distinctly named overdue collateral default: keeper receives the
+locked capped reward, lenders receive the remaining collateral, borrower receives
+zero, and the unresolved token-principal claim/loss is accounted exactly once.
+This may forfeit healthy borrower equity; it is a fixed-term debt consequence,
+not proof that the token is worthless, insolvent or untradeable. Price/history/API
+failures cannot advance the deadline. Full-token repayment may win the atomic
+race before default; the second terminal attempt must fail without another payout.
+
+This resolves the financial choice previously marked pending. Implement and test
+the exact path, immutable terms, lender-share/receivable/epoch accounting, distinct
+event/API/UI disclosure and independent funded recovery CLI before admission.
+It does not itself qualify implementation, supply actual keys/settings, deploy
+code or waive final CI/review/fuzz and funded commissioning.

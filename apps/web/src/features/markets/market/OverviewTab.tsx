@@ -36,6 +36,7 @@ const FEE_TEXT: Readonly<Record<FeeType, string>> = {
     expiry_fee: 'Expiry fees',
     expiry_keeper_reward: 'Expiry keeper rewards',
     settle_keeper_reward: 'Settlement keeper rewards',
+    overdue_keeper_reward: 'Overdue-default keeper reward',
     trader_sweep_lenders: 'Swept to lenders',
     trader_sweep_wipe: 'Swept to the wipe record',
     trader_sweep_protocol: 'Swept to the protocol',
@@ -176,6 +177,33 @@ function Exits({ d }: { d: MarketDetail }) {
                     ['Liquidated (CR)', String(e.liquidations_cr)],
                     ['Liquidated after expiry', String(e.liquidations_expired)],
                     ['Expired', String(e.expiries)],
+                    ...(e.overdue_collateral_defaults !== undefined
+                        ? ([
+                              ['Overdue collateral defaults', String(e.overdue_collateral_defaults)],
+                              [
+                                  'Nominal token principal lost',
+                                  e.overdue_principal_tokens_lost === undefined ? (
+                                      '—'
+                                  ) : d.decimals === null ? (
+                                      `${e.overdue_principal_tokens_lost} raw units`
+                                  ) : (
+                                      <Tokens
+                                          key="default-loss"
+                                          raw={big(e.overdue_principal_tokens_lost)}
+                                          decimals={d.decimals}
+                                      />
+                                  ),
+                              ],
+                              [
+                                  'Default collateral to lenders',
+                                  e.overdue_lender_collateral === undefined ? (
+                                      '—'
+                                  ) : (
+                                      <Sol key="default-sol" lamports={big(e.overdue_lender_collateral)} />
+                                  ),
+                              ],
+                          ] as const)
+                        : []),
                     [
                         'Settled in SOL (S1 / S2 / S3)',
                         `${e.settlements_s1} / ${e.settlements_s2} / ${e.settlements_s3}`,
@@ -187,7 +215,12 @@ function Exits({ d }: { d: MarketDetail }) {
                     bpsRow('Average open impact', e.avg_open_impact_bps),
                     bpsRow('Average exit slippage', e.avg_exit_slippage_bps),
                     e.borrower_pnl === null
-                        ? ['Borrowers’ P&L', 'Unavailable (external token cost)']
+                        ? [
+                              'Borrowers’ P&L',
+                              (e.overdue_collateral_defaults ?? 0) > 0
+                                  ? 'Unavailable (collateral default or external token cost)'
+                                  : 'Unavailable (external token cost)',
+                          ]
                         : pnl('Borrowers’ P&L', big(e.borrower_pnl)),
                     ['Positions with unknown P&L', String(e.borrower_pnl_unknown_exits)],
                 ]}

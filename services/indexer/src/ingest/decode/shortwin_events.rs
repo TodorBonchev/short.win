@@ -71,6 +71,7 @@ fn check_program_layout(kind: &str, body: &[u8]) -> anyhow::Result<usize> {
         Open,
         Close,
         Repay,
+        OverdueCollateralDefault,
         Liquidate,
         Expire,
         SolSettle,
@@ -209,7 +210,9 @@ pub fn actor_of(kind: &str, data: &Value, fee_payer: &Pubkey) -> Option<Pubkey> 
             key_field(data, "owner")
         }
         "Open" | "Close" | "Repay" => key_field(data, "borrower"),
-        "Liquidate" | "Expire" | "SolSettle" => key_field(data, "keeper"),
+        "Liquidate" | "Expire" | "SolSettle" | "OverdueCollateralDefault" => {
+            key_field(data, "keeper")
+        }
         "CoveragePauseSet" | "PauseSet" | "ConfigCancelled" => key_field(data, "by"),
         "PriceCranked" => Some(*fee_payer),
         _ => None,
@@ -446,6 +449,29 @@ pub(crate) mod tests {
                     rent: 3,
                     rent_protocol: 1,
                     borrower_payout: 135,
+                },
+            ),
+            enc(
+                "OverdueCollateralDefault",
+                e::OverdueCollateralDefault {
+                    market,
+                    slot: 10,
+                    ts: 20,
+                    position: k(8),
+                    borrower: k(9),
+                    keeper: k(10),
+                    q_lost: 100,
+                    default_at: 19,
+                    collateral: 200,
+                    keeper_payment: 1,
+                    lender_amount: 199,
+                    borrower_amount: 0,
+                    rent_due: 5,
+                    credited_retired: 3,
+                    vested: 0,
+                    vest_flushed: 0,
+                    share_epoch_after: 1,
+                    position_account_refund: 25,
                 },
             ),
             enc(

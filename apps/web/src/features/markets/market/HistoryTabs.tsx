@@ -282,6 +282,7 @@ const EXIT_TEXT: Readonly<Record<ExitEvent['kind'], string>> = {
     liquidation: 'Liquidation',
     expiry: 'Expiry',
     settlement: 'SOL settlement',
+    overdue_default: 'Overdue collateral default',
 };
 
 function solOrDash(v: string | null) {
@@ -298,7 +299,9 @@ function exitColumns(decimals: number, now: number): Column<ExitEvent>[] {
             render: (x) => (
                 <>
                     {EXIT_TEXT[x.kind]}
-                    {x.expired && x.kind !== 'expiry' && <span className="muted"> (expired)</span>}
+                    {x.expired && x.kind !== 'expiry' && x.kind !== 'overdue_default' && (
+                        <span className="muted"> (expired)</span>
+                    )}
                 </>
             ),
         },
@@ -346,7 +349,7 @@ export function LiquidationsTab({ mint, decimals }: { mint: Address; decimals: n
     return (
         <DataTable
             className="mk-tbl"
-            caption="Recent liquidations, expiries and SOL settlements"
+            caption="Recent liquidations, expiries, SOL settlements and collateral defaults"
             testId={T.marketLiquidations}
             columns={exitColumns(decimals, now)}
             rows={q.data?.data.data}
@@ -355,7 +358,7 @@ export function LiquidationsTab({ mint, decimals }: { mint: Address; decimals: n
             rowKey={(x) => `${x.signature}-${x.ix_index}`}
             rowTestId={(x) => T.marketLiquidationRow(x.signature)}
             rowAttrs={(x) => ({ 'data-kind': x.kind, 'data-condition': x.settle_condition ?? undefined })}
-            empty="No liquidations, expiries or SOL settlements on this market yet."
+            empty="No liquidations, expiries, SOL settlements or collateral defaults on this market yet."
         />
     );
 }

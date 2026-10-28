@@ -23,7 +23,9 @@ use std::cell::Cell;
 use anchor_lang::AccountDeserialize;
 use anchor_lang::prelude::Pubkey;
 use litesvm::LiteSVM;
-use shortwin::events::{Close, Expire, Liquidate, Open, PoolSwitched, Repay, SolSettle};
+use shortwin::events::{
+    Close, Expire, Liquidate, Open, OverdueCollateralDefault, PoolSwitched, Repay, SolSettle,
+};
 use shortwin::state::{
     GlobalConfig, MARKET_FLAG_ROUTE_BROKEN, Market, ShortPosition, VenueKind, WalletExposure,
 };
@@ -62,6 +64,9 @@ pub struct MarketPositions {
     pub market: Pubkey,
     pub state: Market,
     pub positions: Vec<(Pubkey, ShortPosition, u64)>,
+    /// Distinct quote-native escrow accounts, never interpreted as legacy rent.
+    pub quote_positions: Vec<(Pubkey, shortwin::state::QuoteFinancePosition, u64)>,
+    pub quote_finance: Option<shortwin::state::QuoteFinanceMarket>,
     /// The venue as short.win's adapter sees it (I13 re-quotes, I16 route predicates and
     /// records): the mock and the Raydium venues ([`VenueView`]); `None` for other venues.
     pub venue: Option<VenueView>,
@@ -89,6 +94,10 @@ pub fn snapshot(svm: &LiteSVM, markets: &[Pubkey]) -> PositionsSnapshot {
                     market: *k,
                     state: m,
                     positions: positions_of(svm, k),
+                    quote_positions: super::quote_finance::positions_of(svm, k),
+                    quote_finance: super::quote_finance::finance(svm, k)
+                        .ok()
+                        .map(|(_, finance)| finance),
                     venue: venue_view::view(svm, &m),
                     trader_wsol_lamports: read::lamports(svm, &m.trader_wsol),
                 })
@@ -110,6 +119,14 @@ pub fn check_market(svm: &LiteSVM, key: &Pubkey, m: &Market) -> Result<(), Viola
     ema_is_newest_entry(key, m)?;
     one_second_lag(svm, key, m)?;
     no_delegate_outside_legs(svm, key, m)?;
+    if m.has_flag(shortwin::state::MARKET_FLAG_QUOTE_NATIVE) {
+        return super::quote_finance::check_market(svm, key, m);
+    }
+    ensure(
+        super::quote_finance::positions_of(svm, key).is_empty(),
+        "I6",
+        || format!("legacy market {key} contains quote-native debt"),
+    )?;
     let positions = positions_of(svm, key);
     exposures_match(svm, key, &positions)?;
     if injected_borrower_side() && positions.is_empty() {
@@ -348,6 +365,7 @@ pub struct IxFacts<'a> {
     pub opens: &'a [Open],
     pub closes: &'a [Close],
     pub repays: &'a [Repay],
+    pub overdue_defaults: &'a [OverdueCollateralDefault],
     pub liquidations: &'a [Liquidate],
     pub expiries: &'a [Expire],
     pub settlements: &'a [SolSettle],
@@ -408,6 +426,7 @@ impl IxFacts<'_> {
     fn is_exit(&self) -> bool {
         !(self.closes.is_empty()
             && self.repays.is_empty()
+            && self.overdue_defaults.is_empty()
             && self.liquidations.is_empty()
             && self.expiries.is_empty()
             && self.settlements.is_empty())
@@ -429,6 +448,10 @@ pub fn check_ix(svm: &LiteSVM, pre: &PositionsSnapshot, ix: &IxFacts<'_>) -> Res
     }
     let config = read::zc::<GlobalConfig>(svm, &crate::pda::config());
     for mp in &pre.markets {
+        if mp.state.has_flag(shortwin::state::MARKET_FLAG_QUOTE_NATIVE) {
+            super::quote_finance::check_ix(svm, mp, ix)?;
+            continue;
+        }
         let market = mp.market;
         let post = read::zc::<Market>(svm, &market);
         for (pk, p, before) in &mp.positions {

@@ -301,3 +301,14 @@ AI3-L02/L08 remain duplicates of **KI-23**, and AI3-L15 remains a duplicate of
 **KI-75/AIR-20**, only within their written mechanism and bounds. AI3-F07 retains
 KI-70's unsigned-authority decision; AI3-F08 retains KI-69(a)'s hashless-bootstrap
 decision. These mappings do not acknowledge any larger or different exposure.
+
+
+## 9. Selected Jupiter trusted-history design (2026-10-27)
+
+These are new architecture dispositions, not external-firm findings or claims that
+the redesign has passed final qualification. See the [explicit owner decision](owner-jupiter-redesign-decision-2026-10-27.md).
+
+| ID | Statement / exposure | Bound and present limitation | Decision and rationale | Status |
+|---|---|---|---|---|
+| JUP-TRUST-01 | The in-house reporter attests Jupiter-derived indicative prices and private history | The program authenticates the reporter and checks identities, quantities, policy, sequence, timestamps and arithmetic. It cannot prove historical sample existence, fair/best price, API source-state freshness or absence of omitted gaps. A mistaken/compromised operator can cause false health/reference decisions; no new quantitative loss bound is established. One VPS or several keys under one operator is not independent quorum. | Owner explicitly accepts trusted VPS/off-chain history and service authority. Use distinct on-demand snapshot mode; actual full-q delivery/spend bounds remain mandatory and do not remove pricing trust. Preserve source evidence, rate/fee limits and monitoring. | architectural trust accepted by owner, 2026-10-27; concrete settings/keys and financial integration/qualification pending |
+| JUP-RECOVERY-01 | New quote-native markets need complete lender recovery during gaps/outages | Quote failures are Unknown and cannot prove insolvency/no route. The deadline-plus-24h default can forfeit healthy borrower collateral. The owner explicitly selected this consequence separately from history trust. | Lock deadline/grace/keeper terms, implement the distinct default and exact loss/share accounting, disclose healthy forfeiture before opening, and qualify it before admission. No public quote-native adoption/open initializer is supplied by this checkpoint. | financial consequence accepted by owner, 2026-10-27; implementation/qualification pending, not enabled |

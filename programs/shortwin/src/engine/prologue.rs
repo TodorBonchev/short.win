@@ -87,6 +87,7 @@ pub fn sync_market_params(config: &GlobalConfig, market: &mut Market, now: i64) 
 /// lamport a second of lender rent). On a list-only market (no price) and with no open position
 /// both are 0 and only the vest is released. Returns the lender credit.
 pub fn accrue(market: &mut Market, pool: &mut Pool, vault: &mut Vault, now: i64) -> Result<u64> {
+    super::quote_reference::require_legacy_finance_guard(market)?;
     if market.deposit_hold_until == 0 {
         // Legacy dust flushes did not invalidate source bits. Re-check every source once;
         // an empty vest alone does not prove that old cashback has already been collected.
@@ -161,6 +162,7 @@ pub fn run(
     clock_now: i64,
     slot: u64,
 ) -> Result<Prologue> {
+    super::quote_reference::require_legacy_finance_guard(market)?;
     let now = market_now(market, clock_now);
     if market.restart_ema_count == 0 {
         // Legacy accounts cannot identify an earlier restart. Invalidate existing arms once
@@ -253,6 +255,7 @@ fn refresh_locked_depth(market: &mut Market, obs: &mut Observation, st: &VenueSt
 /// A16's step 5 for the lender instructions (`deposit`, `withdraw`): rolls a completed
 /// bucket (integration, ring push, `CoverageGap`) without recording anything.
 pub fn roll_only(market_key: &Pubkey, market: &mut Market, now: i64, slot: u64) -> Result<()> {
+    super::quote_reference::require_legacy_finance_guard(market)?;
     if market.b_lo.get() == 0 {
         return Ok(());
     }

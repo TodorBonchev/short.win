@@ -4,6 +4,12 @@ This file tracks every finding from the external audit and records how each was 
 belongs to the audit package ([`docs/AUDIT.md`](../AUDIT.md) §12). The M10 exit criterion is
 "every finding fixed, or acknowledged with a rationale" (ARCH §9).
 
+The later [trusted-history owner decision](owner-jupiter-redesign-decision-2026-10-27.md)
+and [new risk dispositions](known-issues.md#9-selected-jupiter-trusted-history-design-2026-10-27)
+apply to the Jupiter redesign. They do not close prior findings, turn private
+history into public timing proof, or qualify changed runtime bytes. Fresh
+regression/CI/review/fuzz and funded commissioning remain required.
+
 **Rules:**
 - **One row per finding**, keyed by the firm's id. Keep the firm's severity, and add our own
   only if we disagree; give the reason in the finding's section below.

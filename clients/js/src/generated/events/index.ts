@@ -23,6 +23,7 @@ export * from "./marginAdded.ts";
 export * from "./marketCreated.ts";
 export * from "./mintSafetyTripped.ts";
 export * from "./open.ts";
+export * from "./overdueCollateralDefault.ts";
 export * from "./pauseSet.ts";
 export * from "./poolProposed.ts";
 export * from "./poolSwitchCancelled.ts";

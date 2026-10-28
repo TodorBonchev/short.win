@@ -108,6 +108,7 @@ function Facts({ rows }: { rows: readonly (readonly [string, ReactNode, boolean?
 
 function ClosedSummary({ p, decimals, symbol }: { p: Position; decimals: number | null; symbol: string }) {
     const e = p.exit;
+    const overdue = e?.kind === 'OverdueCollateralDefault' ? e.overdue_default : null;
     return (
         <Kv
             rows={[
@@ -118,8 +119,29 @@ function ClosedSummary({ p, decimals, symbol }: { p: Position; decimals: number 
                         {e?.settle_condition ? ` ${e.settle_condition}` : ''}
                     </Badge>,
                 ],
-                ['Exit', e?.kind === 'Repay' ? 'Tokens repaid by borrower' : (e?.kind ?? '—')],
-                ['Q', decimals === null ? p.q : <Tokens key="q" raw={big(p.q)} decimals={decimals} symbol={symbol} />],
+                [
+                    'Exit',
+                    e?.kind === 'Repay'
+                        ? 'Tokens repaid by borrower'
+                        : e?.kind === 'OverdueCollateralDefault'
+                          ? 'Overdue collateral default'
+                          : (e?.kind ?? '—'),
+                ],
+                [
+                    e?.kind === 'OverdueCollateralDefault' ? 'Token principal lost' : 'Q',
+                    decimals === null ? p.q : <Tokens key="q" raw={big(p.q)} decimals={decimals} symbol={symbol} />,
+                ],
+                ...(overdue
+                    ? ([
+                          ['Collateral forfeited', <Sol key="forfeited" lamports={big(overdue.collateral)} />],
+                          ['To lenders', <Sol key="lenders" lamports={big(overdue.lender_amount)} />],
+                          [
+                              'Position account refund',
+                              <Sol key="refund" lamports={big(overdue.position_account_refund)} />,
+                          ],
+                          ['Rent due at default', <Sol key="due" lamports={big(overdue.rent_due)} frac={6} />],
+                      ] as [string, ReactNode][])
+                    : []),
                 ['Buyback', e?.buyback_cost ? <Sol key="b" lamports={big(e.buyback_cost)} /> : '—'],
                 ['Rent paid', e?.rent_paid ? <Sol key="r" lamports={big(e.rent_paid)} frac={6} /> : '—'],
                 ['Penalty', e?.penalty ? <Sol key="pe" lamports={big(e.penalty)} /> : '—'],
@@ -130,6 +152,8 @@ function ClosedSummary({ p, decimals, symbol }: { p: Position; decimals: number 
                     'P&L',
                     e?.borrower_pnl != null ? (
                         <Pnl key="pnl" lamports={big(e.borrower_pnl)} />
+                    ) : e?.kind === 'OverdueCollateralDefault' ? (
+                        'Unavailable (collateral default; no token buyback)'
                     ) : e?.kind === 'Repay' ? (
                         'Unavailable (external token cost)'
                     ) : (

@@ -26,12 +26,16 @@ the [recorded decision](docs/audit/owner-jupiter-redesign-decision-2026-10-27.md
 [design proposal](docs/design/JUPITER_REDESIGN.md). The owner selected
 in-house Jupiter-derived risk observations with ordinary Solana reporter
 transaction authorization. Keep the initial price worker in the keeper codebase,
-separately supervised on the proposed VPS. Concrete reporter/risk settings still
+separately supervised on the proposed VPS. The owner explicitly accepts trusted
+off-chain price history and on-demand authenticated snapshots; continuous on-chain
+publication is superseded. Concrete reporter/risk settings still
 need review before deployment; unsigned caller/API JSON remains forbidden as
 permissionless financial authority. New tokens stay disabled until qualified.
 
 - [ ] Implement and validate the [in-house price producer](docs/design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md),
-      exact-quantity references, authorized on-chain updates, history and failure rules.
+      exact-quantity references, on-demand authenticated snapshots, trusted off-chain
+      history and failure rules. The new mode must remain distinct from the older
+      public on-chain history prototype.
       The [producer contract](docs/design/jupiter/QUOTE_PRODUCER_CONTRACT.md) preserves
       the distinction between candidate upper cost and forced-action lower evidence.
   The report/history core, immutable authenticated account boundary and bounded
@@ -40,19 +44,25 @@ permissionless financial authority. New tokens stay disabled until qualified.
   still-open quote-native financial integration and final qualification.
 - [ ] Measure the combined price-worker/keeper/indexer/database workload and API/RPC
       budget on the [initial host](docs/deployment/MAINNET_OPERATIONS.md#in-house-price-worker-on-the-initial-host).
-- [ ] Qualify an affordable publication cadence, batching design and funded SOL
-      budget. The [measured two-feed/two-second candidate](docs/audit/probes/price-publication-cost-2026-10-27/README.md)
-      costs 12.96 SOL per continuous 30 days separately, or 6.48 SOL with qualified
-      batching, in base fees alone. The approved hosting/API baseline excludes
-      these fees. Packet-size fit with a synthetic ALT is not landing qualification.
+- [ ] Qualify on-demand snapshot freshness, action/cache sequencing, packet/CU fit
+      and funded per-action fee/retry budgets. Keep idle history off chain. The
+      [continuous-publication measurement](docs/audit/probes/price-publication-cost-2026-10-27/README.md)
+      is historical evidence for the rejected model, not a monthly operating duty.
 - [ ] Implement the [selected whole-position atomic liquidation](docs/design/jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice):
       bounded isolated buyback, actual full-debt token credit, rollback and budgeted
       fresh-route retries. No hosted liquidation orders or partial/mixed repayment.
 - [ ] Specify and qualify separate gap/no-route settlement and outage recovery for
       new markets; failed quotes/swaps alone cannot authorize default. Keep markets
-      disabled until these rules and lender loss accounting are tested. The owner's
-      choice on the proposed overdue-default backstop in the [financial contract](docs/design/jupiter/QUOTE_NATIVE_FINANCIAL_CONTRACT.md)
-      is pending; infrastructure budget approval does not select that financial policy.
+      disabled until these rules and lender loss accounting are tested. The owner explicitly selected the
+      deadline-plus-24h collateral default, including zero borrower payout even
+      when healthy; implement/qualify the exact [financial contract](docs/design/jupiter/QUOTE_NATIVE_FINANCIAL_CONTRACT.md)
+      and prominent disclosure before admission.
+- [ ] Complete quote-native financial integration: snapshot-to-risk consumers and
+      actual per-q debt hooks; isolated open/close/liquidation; typed margin addition;
+      shared-pool deposit/withdraw/sweep accrual and backend dispatch. No public
+      quote-native adoption/open initializer is exposed by the foundations.
+      New deposits into an empty-share quote pool must quarantine/reconcile the
+      separate notional-rent carry; the legacy guard does not read this sidecar.
 - [ ] Integrate compatible keeper, client and indexer behavior.
 - [ ] Independently review and qualify final code/fixtures, then run fresh fuzz.
 - [ ] Select the new release version and complete funded mainnet commissioning.

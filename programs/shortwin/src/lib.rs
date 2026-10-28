@@ -218,6 +218,60 @@ pub mod shortwin {
         instructions::publish_price_report::handler(ctx, args)
     }
 
+    /// Governance creates a distinct cache for trusted off-chain history; no admission.
+    pub fn initialize_price_snapshot(
+        ctx: Context<InitializePriceSnapshot>,
+        args: InitializePriceSnapshotArgs,
+    ) -> Result<()> {
+        instructions::initialize_price_snapshot::handler(ctx, args)
+    }
+
+    /// Authorized on-demand cache update, without any periodic publication requirement.
+    pub fn publish_price_snapshot(
+        ctx: Context<PublishPriceSnapshot>,
+        args: PublishPriceSnapshotArgs,
+    ) -> Result<()> {
+        instructions::publish_price_snapshot::handler(ctx, args)
+    }
+
+    /// Full-token repayment for a distinct quote-native position; no report or swap.
+    pub fn repay_quote_short<'info>(
+        ctx: Context<'info, RepayQuoteShort<'info>>,
+        max_rent: u64,
+    ) -> Result<()> {
+        instructions::repay_quote_short::handler(ctx, max_rent)
+    }
+
+    /// Clock-based quote-native collateral default after the locked 24-hour grace.
+    pub fn overdue_quote_default<'info>(
+        ctx: Context<'info, OverdueQuoteDefault<'info>>,
+        max_epoch_record_rent: u64,
+    ) -> Result<()> {
+        instructions::overdue_quote_default::handler(ctx, max_epoch_record_rent)
+    }
+
+    /// Governance locks a reviewed quote-native financial policy; this does not admit opens.
+    pub fn initialize_quote_policy(
+        ctx: Context<InitializeQuotePolicy>,
+        args: InitializeQuotePolicyArgs,
+    ) -> Result<()> {
+        instructions::initialize_quote_policy::handler(ctx, args)
+    }
+
+    /// Read-only actual-runtime validation of a trusted reference; grants no financial action.
+    pub fn check_quote_reference(
+        ctx: Context<CheckQuoteReference>,
+        quantity: u64,
+        minimum_sequence: u64,
+    ) -> Result<QuoteReferenceView> {
+        instructions::initialize_quote_policy::check_handler(ctx, quantity, minimum_sequence)
+    }
+
+    /// Emergency/governance may pause trusted price actions; only governance clears.
+    pub fn set_quote_price_pause(ctx: Context<SetQuotePricePause>, paused: bool) -> Result<()> {
+        instructions::initialize_quote_policy::set_price_pause_handler(ctx, paused)
+    }
+
     /// Anyone refreshes the cached SOL/USD price.
     pub fn crank_sol_usd(ctx: Context<CrankSolUsd>) -> Result<()> {
         instructions::crank_sol_usd::handler(ctx)

@@ -36,6 +36,7 @@ const STATUS_OPTIONS: readonly { value: StatusFilter; label: string }[] = [
     { value: 'liquidated', label: 'Liquidated' },
     { value: 'expired', label: 'Expired' },
     { value: 'settled', label: 'Settled in SOL' },
+    { value: 'defaulted', label: 'Collateral default' },
     { value: 'all', label: 'All' },
 ];
 
@@ -45,6 +46,7 @@ const STATUS_TONE: Record<string, Tone> = {
     liquidated: 'danger',
     expired: 'warn',
     settled: 'danger',
+    defaulted: 'danger',
 };
 
 /** The live channels of the open rows (≤ 40, FRONTEND.md §6.4). */

@@ -86,7 +86,15 @@ macro_rules! position_json {
              'borrower_payout', COALESCE(p.borrower_payout, 0)::text, \
              'settle_condition', sw_api_condition(p.settle_condition), \
              'borrower_pnl', p.borrower_pnl::text, \
-             'duration_s', COALESCE(p.duration_s, p.exit_ts - p.opened_ts, 0)) END)"
+             'duration_s', COALESCE(p.duration_s, p.exit_ts - p.opened_ts, 0), \
+             'overdue_default', (SELECT jsonb_build_object('q_lost', od.q_lost::text, \
+                 'default_at', od.default_at, 'collateral', od.collateral::text, \
+                 'lender_amount', od.lender_amount::text, 'keeper_payment', od.keeper_payment::text, \
+                 'borrower_amount', od.borrower_amount::text, 'rent_due', od.rent_due::text, \
+                 'credited_retired', od.credited_retired::text, 'vested', od.vested::text, \
+                 'vest_flushed', od.vest_flushed::text, 'share_epoch_after', od.share_epoch_after::bigint, \
+                 'position_account_refund', od.position_account_refund::text) \
+                 FROM overdue_defaults od WHERE od.position=p.position)) END)"
     };
 }
 
@@ -144,18 +152,18 @@ macro_rules! exit_json {
             "jsonb_build_object(",
             chain_ref_args!("e", "ev_ts"),
             ", 'kind', CASE e.kind WHEN 'Liquidate' THEN 'liquidation' \
-                 WHEN 'Expire' THEN 'expiry' ELSE 'settlement' END, \
+                 WHEN 'Expire' THEN 'expiry' WHEN 'OverdueCollateralDefault' THEN 'overdue_default' ELSE 'settlement' END, \
              'market', e.market::text, 'mint', m.mint::text, 'position', e.position::text, \
              'keeper', COALESCE(e.actor::text, e.data->>'keeper', p.exit_keeper::text), \
              'q', p.q::text, \
-             'buyback_cost', CASE WHEN e.kind = 'SolSettle' THEN NULL ELSE \
+             'buyback_cost', CASE WHEN e.kind IN ('SolSettle','OverdueCollateralDefault') THEN NULL ELSE \
                  COALESCE(p.buyback_cost::text, e.data->>'buyback_cost') END, \
-             'lender_amount', s.lender_amount::text, \
+             'lender_amount', CASE WHEN e.kind='OverdueCollateralDefault' THEN e.data->>'lender_amount' ELSE s.lender_amount::text END, \
              'keeper_paid', COALESCE(p.keeper_paid, 0)::text, \
              'borrower_payout', COALESCE(p.borrower_payout, 0)::text, \
              'settle_condition', sw_api_condition(p.settle_condition), \
              'expired', CASE e.kind WHEN 'Liquidate' THEN COALESCE(p.liquidated_expired, FALSE) \
-                 WHEN 'Expire' THEN TRUE ELSE COALESCE(s.expired, FALSE) END)"
+                 WHEN 'Expire' THEN TRUE WHEN 'OverdueCollateralDefault' THEN TRUE ELSE COALESCE(s.expired, FALSE) END)"
         )
     };
 }

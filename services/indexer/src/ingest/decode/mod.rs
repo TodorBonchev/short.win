@@ -650,12 +650,12 @@ fn derive(
     let top = raw.instructions.get(k)?;
     let emitter_raw = node_ix(top, emitter)?;
     match (kind, invocation) {
-        ("EpochRolled", "sol_settle") => {
+        ("EpochRolled", "sol_settle" | "overdue_quote_default") => {
             // §6.4: lamports pre-funded at the record's address, swept into the vault by
             // `arming::create_pda_account` (a System transfer, inner to this invocation, from
             // `share_epoch_rec` to `market_vault`).
-            let rec = sw::account_of("sol_settle", "share_epoch_rec", &emitter_raw.accounts)?;
-            let vault = sw::account_of("sol_settle", "market_vault", &emitter_raw.accounts)?;
+            let rec = sw::account_of(invocation, "share_epoch_rec", &emitter_raw.accounts)?;
+            let vault = sw::account_of(invocation, "market_vault", &emitter_raw.accounts)?;
             let h = emitter_raw.stack_height;
             let start = emitter.map_or(0, |j| j + 1);
             let mut donation: u64 = 0;

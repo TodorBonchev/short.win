@@ -33,8 +33,8 @@ use litesvm::LiteSVM;
 use litesvm::types::TransactionMetadata;
 use shortwin::events::{
     ClaimSol, Close, DeficitCovered, Deposit, Expire, LenderSynced, Liquidate, MarketCreated, Open,
-    PoolProposed, PoolSwitchCancelled, PoolSwitched, Repay, SettleArmed, SettleDisarmed, SolSettle,
-    VenueStateChanged, Withdraw,
+    OverdueCollateralDefault, PoolProposed, PoolSwitchCancelled, PoolSwitched, Repay, SettleArmed,
+    SettleDisarmed, SolSettle, VenueStateChanged, Withdraw,
 };
 use shortwin::state::{LenderPosition, Market, MarketVault, ShortPosition, VenueGuard, VenueKind};
 use shortwin_math::pool::{R_MAX, VIRTUAL_ASSETS, VIRTUAL_SHARES};
@@ -46,6 +46,7 @@ pub mod lender;
 pub mod open_terms;
 pub mod pool_select;
 pub mod positions;
+pub mod quote_finance;
 pub mod venue_view;
 
 /// A failed invariant.
@@ -452,6 +453,7 @@ pub struct IxEvents {
     pub opens: Vec<Open>,
     pub closes: Vec<Close>,
     pub repays: Vec<Repay>,
+    pub overdue_defaults: Vec<OverdueCollateralDefault>,
     pub liquidations: Vec<Liquidate>,
     pub expiries: Vec<Expire>,
     pub settlements: Vec<SolSettle>,
@@ -494,6 +496,7 @@ impl IxEvents {
             opens: events::of_ix(meta, ix),
             closes: events::of_ix(meta, ix),
             repays: events::of_ix(meta, ix),
+            overdue_defaults: events::of_ix(meta, ix),
             liquidations: events::of_ix(meta, ix),
             expiries: events::of_ix(meta, ix),
             settlements: events::of_ix(meta, ix),
@@ -567,6 +570,7 @@ impl IxEvents {
             opens: &self.opens,
             closes: &self.closes,
             repays: &self.repays,
+            overdue_defaults: &self.overdue_defaults,
             liquidations: &self.liquidations,
             expiries: &self.expiries,
             settlements: &self.settlements,

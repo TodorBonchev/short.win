@@ -257,7 +257,9 @@ describe('MarketPage', () => {
         });
         const { queryClient, view } = await renderAt(`/m/${MINT_A}?tab=liquidations`);
         try {
-            await screen.findByText('No liquidations, expiries or SOL settlements on this market yet.');
+            await screen.findByText(
+                'No liquidations, expiries, SOL settlements or collateral defaults on this market yet.',
+            );
             expect(api.callsTo(path)).toHaveLength(1);
             // The harness's socket never opens. The mounted tab must recover through REST.
             exited = true;

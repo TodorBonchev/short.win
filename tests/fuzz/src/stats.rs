@@ -220,7 +220,7 @@ impl Stats {
 }
 
 /// The number of short.win instructions (`programs/shortwin/src/lib.rs`; [`ix_name`]'s table).
-pub const IX_COUNT: usize = 33;
+pub const IX_COUNT: usize = 40;
 
 /// A short.win instruction's name from its Anchor discriminator.
 pub fn ix_name(data: &[u8]) -> &'static str {
@@ -235,6 +235,13 @@ pub fn ix_name(data: &[u8]) -> &'static str {
         InitializeConfig => "initialize_config",
         InitializePriceReport => "initialize_price_report",
         PublishPriceReport => "publish_price_report",
+        InitializePriceSnapshot => "initialize_price_snapshot",
+        InitializeQuotePolicy => "initialize_quote_policy",
+        CheckQuoteReference => "check_quote_reference",
+        SetQuotePricePause => "set_quote_price_pause",
+        PublishPriceSnapshot => "publish_price_snapshot",
+        RepayQuoteShort => "repay_quote_short",
+        OverdueQuoteDefault => "overdue_quote_default",
         ProposeConfig => "propose_config",
         ApplyConfig => "apply_config",
         CancelConfig => "cancel_config",
@@ -282,6 +289,7 @@ pub fn event_name(d: &[u8]) -> &'static str {
         Open,
         Close,
         Repay,
+        OverdueCollateralDefault,
         Liquidate,
         Expire,
         SolSettle,
@@ -503,6 +511,15 @@ mod tests {
                 "initialize_price_report",
             ),
             (i::PublishPriceReport::DISCRIMINATOR, "publish_price_report"),
+            (
+                i::InitializePriceSnapshot::DISCRIMINATOR,
+                "initialize_price_snapshot",
+            ),
+            (
+                i::PublishPriceSnapshot::DISCRIMINATOR,
+                "publish_price_snapshot",
+            ),
+            (i::RepayQuoteShort::DISCRIMINATOR, "repay_quote_short"),
             (i::RepayShort::DISCRIMINATOR, "repay_short"),
         ] {
             assert_eq!(ix_name(discriminator), name);

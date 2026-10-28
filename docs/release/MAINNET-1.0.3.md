@@ -5,7 +5,10 @@ for broad Jupiter redesign.** See the [new decision](../audit/owner-jupiter-rede
 and [design proposal](../design/JUPITER_REDESIGN.md). The plan below preserves the
 1.0.3 baseline and operating requirements; it is not authorization to tag/deploy
 that candidate while the redesign is unresolved. Audit/bounty timing remains
-post-launch as previously selected.
+post-launch as previously selected. The active redesign now uses explicitly trusted
+off-chain VPS history and on-demand authenticated snapshots. It requires its own
+version/settings review, runtime integration, CI/fuzz and funded commissioning;
+the 1.0.3 public-history/binary evidence is not borrowed for the new runtime.
 
 Current owner decision: **launch mainnet with existing per-market borrowing caps
 before an external security audit and before a funded bug bounty**. Use protocol

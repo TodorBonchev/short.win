@@ -3,13 +3,15 @@
 **Development scope update (2026-10-27): first mainnet is postponed for broad
 Jupiter support.** See the [recorded decision](docs/audit/owner-jupiter-redesign-decision-2026-10-27.md)
 and [design proposal](docs/design/JUPITER_REDESIGN.md). In-house price reporting
-and our own keeper with Jupiter swaps are selected; concrete reporter/risk settings
+and our own keeper with Jupiter swaps are selected. The owner accepts trusted
+VPS price history off chain with on-demand authenticated snapshots; continuous
+on-chain price publication is superseded. Concrete reporter/risk settings
 are under review. No Jupiter
 integration or new release is deployed.
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20ShortWin-5865F2?logo=discord&logoColor=white)](https://discord.gg/sTcSSXDZqK)
 
-A Solana protocol for permissionless peer-to-peer token lending, built to short memecoins,
+The implemented legacy baseline is a Solana protocol for permissionless peer-to-peer token lending, built to short memecoins,
 including pump.fun launches still on the bonding curve. Lenders deposit tokens into a
 per-token pool and earn rent. A borrower posts SOL margin; the program borrows the tokens
 and sells them in the same transaction, and buys them back on close, liquidation or

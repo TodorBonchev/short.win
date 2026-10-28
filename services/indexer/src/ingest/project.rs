@@ -902,7 +902,7 @@ async fn load_position(
 fn vest_after(vest_bal: Option<u64>, kind: &str, d: &Value, record_donation: u64) -> Option<u64> {
     match kind {
         "PriceCranked" => Some(u64_field(d, "vest_bal")),
-        "SolSettle" if u64_field(d, "vest_flushed") > 0 => Some(0),
+        "SolSettle" | "OverdueCollateralDefault" if u64_field(d, "vest_flushed") > 0 => Some(0),
         "Deposit" | "Withdraw" | "ClaimSol" | "DeficitCovered" | "LenderSynced"
             if u128_field(d, "s_after") == 0 =>
         {
@@ -914,7 +914,8 @@ fn vest_after(vest_bal: Option<u64>, kind: &str, d: &Value, record_donation: u64
     }
 }
 
-/// The `ShareEpoch` record donation a rolling `sol_settle` swept into `lender_sol` (§6.4;
+/// The `ShareEpoch` record donation a rolling `sol_settle` or `overdue_quote_default` swept
+/// into `lender_sol` (§6.4;
 /// `events.derived` of its `EpochRolled`), 0 elsewhere.
 fn record_donation(ev: &EventIn) -> u64 {
     ev.derived
@@ -1119,6 +1120,7 @@ async fn apply_to_market(
             )
             .await?;
         }
+        "OverdueCollateralDefault" => apply_overdue_default(conn, m, market, ev).await?,
         "Close" | "Repay" | "Liquidate" | "Expire" | "SolSettle" => {
             apply_exit(conn, m, market, ev).await?;
         }
@@ -1647,6 +1649,83 @@ async fn apply_exit(
             .context("settlements")?;
         }
     }
+    Ok(())
+}
+
+/// Fixed-term collateral foreclosure. Nominal q is extinguished, not returned;
+/// unpaid rent receivable retirement is not a rent-payment/protocol-fee event.
+async fn apply_overdue_default(
+    conn: &mut PgConnection,
+    m: &mut MarketRow,
+    market: &Pubkey,
+    ev: &EventIn,
+) -> anyhow::Result<()> {
+    let d = &ev.data;
+    let position = key_field(d, "position").context("overdue default position")?;
+    let Some(pos) = load_position(conn, &position).await? else {
+        tracing::warn!(position=%position,"overdue default of a position never opened in the index");
+        return Ok(());
+    };
+    if !pos.status_open {
+        return Ok(());
+    }
+    let q_lost = u64_field(d, "q_lost");
+    let collateral = u64_field(d, "collateral");
+    let keeper_payment = u64_field(d, "keeper_payment");
+    let lender_amount = u64_field(d, "lender_amount");
+    anyhow::ensure!(
+        q_lost == pos.q && collateral == pos.v,
+        "overdue default debt/collateral differs from indexed position"
+    );
+    anyhow::ensure!(
+        pos.deadline.checked_add(86_400) == Some(i64_field(d, "default_at")),
+        "overdue default locked grace differs"
+    );
+    anyhow::ensure!(
+        keeper_payment.checked_add(lender_amount) == Some(collateral)
+            && u64_field(d, "borrower_amount") == 0,
+        "overdue default collateral distribution differs"
+    );
+    anyhow::ensure!(
+        ev.ev_ts >= i64_field(d, "default_at"),
+        "overdue default before locked grace"
+    );
+    let borrower = key_field(d, "borrower").context("overdue default borrower")?;
+    let keeper = key_field(d, "keeper").context("overdue default keeper")?;
+    sqlx::query("UPDATE positions SET status='defaulted',exit_kind='OverdueCollateralDefault',exit_slot=$2,exit_ts=$3, \
+        exit_signature=$4,exit_keeper=$5,buyback_cost=NULL,b_live_exit=NULL,rent_paid=NULL,rent_protocol=NULL, \
+        penalty=NULL,expiry_fee=NULL,keeper_paid=$6::numeric,borrower_payout=0,token_surplus=NULL, \
+        liquidated_expired=NULL,settle_condition=NULL,borrower_pnl=NULL,duration_s=$7,armed=FALSE WHERE position=$1")
+        .bind(position.to_string()).bind(ev.key.slot).bind(ev.ev_ts).bind(&ev.signature).bind(keeper.to_string())
+        .bind(keeper_payment.to_string()).bind(ev.ev_ts-pos.opened_ts).execute(&mut *conn).await?;
+    sqlx::query("INSERT INTO overdue_defaults(position,market,borrower,keeper,q_lost,default_at,collateral,keeper_payment, \
+        lender_amount,borrower_amount,rent_due,credited_retired,vested,vest_flushed,share_epoch_after,position_account_refund, \
+        signature,ix_index,ev_source,ev_seq,slot,tx_index,ts) VALUES($1,$2,$3,$4,$5::numeric,$6,$7::numeric,$8::numeric, \
+        $9::numeric,0,$10::numeric,$11::numeric,$12::numeric,$13::numeric,$14,$15::numeric,$16,$17,$18,$19,$20,$21,$22) \
+        ON CONFLICT(position) DO NOTHING")
+        .bind(position.to_string()).bind(market.to_string()).bind(borrower.to_string()).bind(keeper.to_string())
+        .bind(q_lost.to_string()).bind(i64_field(d,"default_at")).bind(collateral.to_string()).bind(keeper_payment.to_string())
+        .bind(lender_amount.to_string()).bind(u64_field(d,"rent_due").to_string()).bind(u64_field(d,"credited_retired").to_string())
+        .bind(u64_field(d,"vested").to_string()).bind(u64_field(d,"vest_flushed").to_string()).bind(i64_of(u32_field(d,"share_epoch_after")))
+        .bind(u64_field(d,"position_account_refund").to_string()).bind(&ev.signature).bind(ev.key.ix_index).bind(ev.key.ev_source)
+        .bind(ev.key.ev_seq).bind(ev.key.slot).bind(ev.key.tx_index).bind(ev.ev_ts).execute(&mut *conn).await?;
+    remove_position(m, &pos);
+    // No tokens_free increment and no invented fair-value/S3 row or lender PNL.
+    m.lender_sol = m
+        .lender_sol
+        .checked_add(lender_amount)
+        .context("overdue lender SOL overflow")?;
+    fee_row(
+        conn,
+        ev,
+        "overdue_keeper_reward",
+        Some(keeper),
+        market,
+        Some(position),
+        keeper_payment,
+        false,
+    )
+    .await?;
     Ok(())
 }
 

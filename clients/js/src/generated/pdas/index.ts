@@ -8,10 +8,12 @@
 
 export * from "./config.ts";
 export * from "./exposure.ts";
+export * from "./financeMarket.ts";
 export * from "./lender.ts";
 export * from "./market.ts";
 export * from "./marketVault.ts";
 export * from "./oracleCache.ts";
+export * from "./overdueQuoteDefaultExposure.ts";
 export * from "./poolVault.ts";
 export * from "./position.ts";
 export * from "./trader.ts";

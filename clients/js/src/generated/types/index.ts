@@ -6,6 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./attestedPriceBucketArgs.ts";
 export * from "./configChange.ts";
 export * from "./emaConfig.ts";
 export * from "./emaParamsArgs.ts";
@@ -24,6 +25,11 @@ export * from "./priceReportDomainArgs.ts";
 export * from "./priceReportModelArgs.ts";
 export * from "./priceReportPolicyArgs.ts";
 export * from "./priceReportStatusArgs.ts";
+export * from "./quoteFeedBinding.ts";
+export * from "./quoteFinancialTerms.ts";
+export * from "./quoteHistoryPolicy.ts";
+export * from "./quotePolicyDomain.ts";
+export * from "./quoteReferenceView.ts";
 export * from "./ringEntry.ts";
 export * from "./seedPart.ts";
 export * from "./seedPartArg.ts";

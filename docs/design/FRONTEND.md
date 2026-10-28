@@ -1,5 +1,14 @@
 # short.win — Web frontend (M9 contract)
 
+> Current redesign decision (owner, 2026-10-27): new Jupiter markets use trusted
+> off-chain VPS price history and on-demand authenticated snapshots, not continuous
+> on-chain publication. Private samples are operator assertions. See the
+> [active financial contract](jupiter/QUOTE_NATIVE_FINANCIAL_CONTRACT.md) and
+> [owner decision](../audit/owner-jupiter-redesign-decision-2026-10-27.md).
+> Legacy reference behavior below remains baseline evidence until the distinct
+> backend is fully integrated and qualified; this is not a mainnet-ready claim.
+
+
 *v1.4 • 2026-10-09 • **as built** (M9 integrated, then the M9 security and UX review fixed — §13
 "Review fixes"; v1.3 folds in M10 — §13 "M10 changes"; v1.4 makes the app responsive — phones,
 tablets and desktops, the owner's request of 2026-10-09, §7.6–§7.7 and §13 "M10-RESP changes"; v1.5 adds the

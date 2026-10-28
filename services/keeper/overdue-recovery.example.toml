@@ -1,0 +1,16 @@
+# Read-only plan/simulation by default. No continuous scheduler or price reporter key.
+# Verify this compiled program hash against final reproducible release artifacts.
+rpc_url_file = "/etc/shortwin-recovery/mainnet-rpc-url"
+keeper_keypair_file = "/etc/shortwin-recovery/keeper.json"
+expected_program_elf_sha256_hex = "REPLACE_WITH_FINAL_REVIEWED_TRIMMED_ELF_HASH"
+maximum_epoch_record_rent_lamports = 5000000
+maximum_transaction_fee_lamports = 20000
+minimum_keeper_balance_after_lamports = 10000000
+compute_unit_limit = 200000
+micro_lamports_per_cu = 10000
+operation_timeout_seconds = 30
+# Already-existing private0700 directory; exclusive0600 receipts are never overwritten.
+receipt_directory = "/var/lib/shortwin-recovery/receipts"
+# Owner selected fixed deadline+24h default even while healthy; operator must review it.
+# This is a template, not funded commissioning or approval of these example fee values.
+acknowledge_healthy_collateral_forfeiture = true

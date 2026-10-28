@@ -235,10 +235,20 @@ fn ordered_window(window: Window) -> Result<(u64, u64)> {
     Ok((start, end))
 }
 
+/// History trust is explicit and cannot be mixed inside one admission decision.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HistoryMode {
+    /// Earlier adapter: observations and publication must share the runtime epoch.
+    RuntimeEpoch,
+    /// Operator attests private completed history; freshness is checked at use time.
+    TrustedOffchain,
+}
+
 /// Immutable summary checked at one actual runtime clock. Every financial helper
 /// rechecks that exact clock, preventing reuse of cached eligibility at a later clock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Summary {
+    history_mode: HistoryMode,
     key: ReferenceKey,
     epoch: u64,
     checked_at: Clock,
@@ -252,6 +262,9 @@ pub struct Summary {
 }
 
 impl Summary {
+    pub const fn history_mode(self) -> HistoryMode {
+        self.history_mode
+    }
     pub const fn key(self) -> ReferenceKey {
         self.key
     }
@@ -290,6 +303,46 @@ pub fn summarize(
     policy: EvidencePolicy,
     now: Clock,
 ) -> Result<Summary> {
+    summarize_with_mode(
+        expected,
+        live,
+        history_newest_first,
+        policy,
+        now,
+        HistoryMode::RuntimeEpoch,
+    )
+}
+
+/// Distinct on-demand mode: history is attested by the configured trusted operator.
+/// It ends before the live SOURCE epoch, which may precede the runtime epoch while
+/// the observation remains fresh. No claim of public historical timing follows.
+/// The caller must authenticate the new trusted snapshot account/codec, not adapt
+/// arbitrary user history or reinterpret the earlier public-history account.
+pub fn summarize_trusted_history(
+    expected: ReferenceKey,
+    live: LiveReference,
+    history_newest_first: &[CompletedReference],
+    policy: EvidencePolicy,
+    now: Clock,
+) -> Result<Summary> {
+    summarize_with_mode(
+        expected,
+        live,
+        history_newest_first,
+        policy,
+        now,
+        HistoryMode::TrustedOffchain,
+    )
+}
+
+fn summarize_with_mode(
+    expected: ReferenceKey,
+    live: LiveReference,
+    history_newest_first: &[CompletedReference],
+    policy: EvidencePolicy,
+    now: Clock,
+    history_mode: HistoryMode,
+) -> Result<Summary> {
     policy.validate()?;
     if live.key != expected {
         return Err(Error::KeyMismatch);
@@ -297,7 +350,10 @@ pub fn summarize(
     if history_newest_first.len() != policy.history_length {
         return Err(Error::HistoryLength);
     }
-    let current_epoch = epoch_at(now, policy)?;
+    let current_epoch = match history_mode {
+        HistoryMode::RuntimeEpoch => epoch_at(now, policy)?,
+        HistoryMode::TrustedOffchain => epoch_at(live.source.end, policy)?,
+    };
     let (start, end) = ordered_window(live.source)?;
     let now_time = timestamp(now)?;
     if live.source.end.slot > now.slot || end > now_time {
@@ -374,6 +430,7 @@ pub fn summarize(
         / 2;
     let median = *used.get(median_index).ok_or(Error::HistoryLength)?;
     Ok(Summary {
+        history_mode,
         key: expected,
         epoch: current_epoch,
         checked_at: now,
@@ -403,6 +460,7 @@ fn coherent(summaries: &[Summary], limits: CoherenceLimits, now: Clock) -> Resul
     for summary in summaries {
         summary.check(summary.key.quantity, now)?;
         if !summary.key.same_model(first.key)
+            || summary.history_mode != first.history_mode
             || summary.policy != first.policy
             || summary.epoch != first.epoch
         {
@@ -901,6 +959,57 @@ mod tests {
             booked_notional: 0,
             actual_sale: q * 10,
         }
+    }
+
+    #[test]
+    fn trusted_history_can_cross_landing_epoch_but_never_freshness() {
+        let (live, buckets) = raw(1, 10, 12, &[(9, 13), (8, 14)]);
+        let mut p = policy(2);
+        p.max_age_seconds = 10;
+        p.max_age_slots = 100;
+        let now = Clock {
+            slot: 1_100,
+            unix_timestamp: 110,
+        };
+        assert_eq!(
+            summarize(key(1), live, &buckets, p, now),
+            Err(Error::HistoryEpoch)
+        );
+        let accepted = summarize_trusted_history(key(1), live, &buckets, p, now).unwrap();
+        assert_eq!(accepted.epoch(), 10);
+        assert_eq!(accepted.history_mode(), HistoryMode::TrustedOffchain);
+        assert_eq!(accepted.opening_upper(), 14);
+        let stale = Clock {
+            slot: 1_111,
+            unix_timestamp: 112,
+        };
+        assert_eq!(
+            summarize_trusted_history(key(1), live, &buckets, p, stale),
+            Err(Error::StaleObservation)
+        );
+        let mut future = live;
+        future.source.end.unix_timestamp = 111;
+        assert_eq!(
+            summarize_trusted_history(key(1), future, &buckets, p, now),
+            Err(Error::FutureObservation)
+        );
+    }
+
+    #[test]
+    fn admission_cannot_mix_public_and_trusted_history_or_reanchor_old_buckets() {
+        let (live, buckets) = raw(1, 10, 12, &[(9, 13), (8, 14)]);
+        let public = summarize(key(1), live, &buckets, policy(2), NOW).unwrap();
+        let trusted = summarize_trusted_history(key(1), live, &buckets, policy(2), NOW).unwrap();
+        assert_eq!(
+            coherent(&[public, trusted], LIMITS, NOW),
+            Err(Error::IncoherentReferences)
+        );
+        let mut incorrect = buckets.clone();
+        incorrect[0].epoch += 1;
+        assert_eq!(
+            summarize_trusted_history(key(1), live, &incorrect, policy(2), NOW),
+            Err(Error::HistoryEpoch)
+        );
     }
 
     #[test]

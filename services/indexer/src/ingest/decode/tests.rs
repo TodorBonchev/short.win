@@ -3,7 +3,7 @@
 //! lines, the CPMM discriminator from another program, "Log truncated", failed transactions,
 //! the derived projection inputs, and v1 key resolution.
 
-use anchor_lang::Discriminator;
+use anchor_lang::{Discriminator, InstructionData, ToAccountMetas};
 use serde_json::Value;
 use solana_pubkey::Pubkey;
 use solana_signature::Signature;
@@ -455,5 +455,77 @@ fn the_committed_sessions_decode_with_the_current_layouts() {
     assert!(
         files >= 15 && events > 1_000,
         "{files} sessions, {events} events"
+    );
+}
+
+#[test]
+fn overdue_default_roll_derives_only_record_to_vault_prefunding() {
+    let program = shortwin::ID;
+    let record = k(30);
+    let vault = k(31);
+    let keeper = k(40);
+    let market = k(1);
+    let accounts = shortwin::accounts::OverdueQuoteDefault {
+        keeper,
+        config: k(41),
+        market,
+        finance_market: k(42),
+        position: k(43),
+        borrower: k(44),
+        exposure: k(45),
+        market_vault: vault,
+        share_epoch_rec: record,
+        system_program: SYSTEM_PROGRAM,
+        event_authority: k(200),
+        program,
+    }
+    .to_account_metas(None)
+    .into_iter()
+    .map(|meta| meta.pubkey)
+    .collect();
+    let transfer = |from: Pubkey, to: Pubkey, amount: u64| {
+        let mut data = 2u32.to_le_bytes().to_vec();
+        data.extend(amount.to_le_bytes());
+        ix(SYSTEM_PROGRAM, 2, data, vec![from, to])
+    };
+    let rolled = shortwin::events::EpochRolled {
+        market,
+        slot: 100,
+        ts: 1_790_000_000,
+        epoch: 0,
+        acc_end: 0,
+        num: 1,
+        den: 1000,
+        vest_flushed: 100,
+    };
+    let mut payload = shortwin::events::EpochRolled::DISCRIMINATOR.to_vec();
+    payload.extend(super::borsh_bytes(&rolled));
+    let transaction = raw(
+        vec![RawTopIx {
+            ix: ix(
+                program,
+                1,
+                shortwin::instruction::OverdueQuoteDefault {
+                    max_epoch_record_rent: 1000,
+                }
+                .data(),
+                accounts,
+            ),
+            inner: vec![
+                transfer(record, vault, 777),
+                transfer(keeper, record, 1000), // keeper's full new rent is not old-lender income
+                transfer(keeper, vault, 555),   // an unrelated source is not record prefunding
+                event_ix(program, 2, &payload),
+            ],
+        }],
+        vec![],
+    );
+    let decoded = decode_plain(&transaction);
+    assert_eq!(decoded.invocations[0].name, "overdue_quote_default");
+    assert_eq!(decoded.events.len(), 1);
+    assert_eq!(decoded.events[0].kind, "EpochRolled");
+    assert_eq!(
+        decoded.events[0].derived.as_ref().unwrap()["record_donation"],
+        "777"
     );
 }

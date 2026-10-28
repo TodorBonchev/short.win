@@ -1,5 +1,14 @@
 # short.win — Indexer and API (M8 contract)
 
+> Current redesign decision (owner, 2026-10-27): new Jupiter markets use trusted
+> off-chain VPS price history and on-demand authenticated snapshots, not continuous
+> on-chain publication. Private samples are operator assertions. See the
+> [active financial contract](jupiter/QUOTE_NATIVE_FINANCIAL_CONTRACT.md) and
+> [owner decision](../audit/owner-jupiter-redesign-decision-2026-10-27.md).
+> Legacy reference behavior below remains baseline evidence until the distinct
+> backend is fully integrated and qualified; this is not a mainnet-ready claim.
+
+
 **Unreleased Repay compatibility (2026-10-27):** direct whole-debt token repayment
 uses the `Repay` event and `exit.kind = Repay` with `status = closed`. It books full
 token return and actual rent/protocol fees, but token acquisition cost, exit live

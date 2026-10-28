@@ -1,0 +1,427 @@
+{
+  "retained_utc": "2026-10-27T21:59:09.134406+00:00",
+  "lossless_archives": [
+    {
+      "archive": "service-initial.zip",
+      "source_directory": "/root/short.win-jupiter-redesign/target/trusted-offchain-service-2026-10-27",
+      "sha256": "46a363796c2927935890b551d903a1ee249c73738ab388eb8c087e78c2e080a0",
+      "bytes": 7660,
+      "members": [
+        {
+          "path": "1-fmt.log.gz",
+          "bytes": 20,
+          "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+        },
+        {
+          "path": "2-test.log.gz",
+          "bytes": 5437,
+          "sha256": "8f72e600c386a7fb1ce3787e661b3bcfdb97240833c9aec5c67c721ae39cbb49"
+        },
+        {
+          "path": "3-clippy.log.gz",
+          "bytes": 163,
+          "sha256": "968c405536a66044b9a0d6ad8d9a621a486bd99b2061a562fb5427a14e5a45b2"
+        },
+        {
+          "path": "4-diff.log.gz",
+          "bytes": 20,
+          "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+        },
+        {
+          "path": "receipt.json",
+          "bytes": 3914,
+          "sha256": "a98ba9f9e8617482285790a4a8fd49e7664760eeee92018907859170b0b6efdd"
+        }
+      ],
+      "scope": "Initial trusted snapshot/service/rent/repayment checkpoint; excludes subsequently added policy/default changes unless explicitly identified within its receipt."
+    },
+    {
+      "archive": "snapshot-and-independent-review-initial.zip",
+      "source_directory": "/root/short.win-jupiter-redesign/target/trusted-snapshot-core-evidence-2026-10-27",
+      "sha256": "8a8e61400af6ecf2639f8deed4666d5e3459509d61d1642c476c60c101689a0e",
+      "bytes": 13996,
+      "members": [
+        {
+          "path": "SERVICE_RECHECK_SHA256SUMS",
+          "bytes": 97,
+          "sha256": "d84d25e7dfd3f0166fe6275fc6a7896551ad2b42e5ef86b976a6736ba5a705d3"
+        },
+        {
+          "path": "SHA256SUMS",
+          "bytes": 1444,
+          "sha256": "dfbecf8a24888912cdc7c8d131e15cc5176208034fbbe0a1b86681359bb2d8ae"
+        },
+        {
+          "path": "actual-sbf-engine-final.log",
+          "bytes": 5796,
+          "sha256": "29f147abcc48832aa599224cd4a52c0834a133bd311cd426d9e2d6e63fad93cb"
+        },
+        {
+          "path": "actual-sbf-engine-receipt-final.json",
+          "bytes": 509,
+          "sha256": "7811e631d5a9ba7c9a9533193fbbcfcd8f075c8e67a82b894c564446ae59cd21"
+        },
+        {
+          "path": "actual-sbf-receipt-final.json",
+          "bytes": 560,
+          "sha256": "0dd2d2221a50ca86e577564edd06b59430a305822abc189f4c517a24ea87f2a6"
+        },
+        {
+          "path": "actual-sbf-snapshot-final.log",
+          "bytes": 1224,
+          "sha256": "50e4380b6df492c962107136a5358bacc08b0b87626a98a9ddd8c2125688af03"
+        },
+        {
+          "path": "core-clippy.log",
+          "bytes": 60,
+          "sha256": "3fe980a0f9709b0a2d093ea2a65202e1e589d4893ac71be4272c165923b9e527"
+        },
+        {
+          "path": "independent-scope-review.json",
+          "bytes": 5413,
+          "sha256": "1d27fa4a594d7a7d9e37d0211cc53966935a2ae8ab88cc6de3461eb37375eb95"
+        },
+        {
+          "path": "initial-point-actual-sbf-receipt.json",
+          "bytes": 414,
+          "sha256": "8e8248b10b054b9a34918d85a87302538e182fa6712becffaf9b7dce35d5a5d1"
+        },
+        {
+          "path": "initial-point-actual-sbf-snapshot.log",
+          "bytes": 1081,
+          "sha256": "bfe09f65a1fa93bbf2ef65ea44a46275065e080f5cfdf9b1e96922a0e0166394"
+        },
+        {
+          "path": "native-report-and-snapshot.log",
+          "bytes": 3396,
+          "sha256": "c0c15aad3d94e78ef4acac2799e296d059f3d1af2888591ffb8bc44c2e1dc6df"
+        },
+        {
+          "path": "native-snapshot-abi.log",
+          "bytes": 513,
+          "sha256": "091d75eb440d7b26061ee0ff18da8df643ae285f7c7b8bc15c07824574c4a4ac"
+        },
+        {
+          "path": "price-watch-independent.log",
+          "bytes": 747,
+          "sha256": "2278133689a8b919bf5ddc4f6ce901ca508982cde2f6383e7df97f9a3cbd771a"
+        },
+        {
+          "path": "publication-budget-independent.log",
+          "bytes": 1060,
+          "sha256": "c2c73c2b7281bd5a404fa6f154c977ca50829d7441fa968153162cf1a0c51617"
+        },
+        {
+          "path": "service-review-tests-receipt.json",
+          "bytes": 1021,
+          "sha256": "e8f6d467d17eb3091743557d102256abebe887e0a47f59eae0b91a13e6405aa2"
+        },
+        {
+          "path": "service-seal-verification.json",
+          "bytes": 1808,
+          "sha256": "243916aef6522d53643320f61d8dd6e2a353a649c799cb7551afd4f2d4eafe07"
+        },
+        {
+          "path": "snapshot-clippy.log",
+          "bytes": 60,
+          "sha256": "968694eb2dcf057f0b793892b3309e93c43d784f6c9588d49e7b6eeeaad76702"
+        },
+        {
+          "path": "snapshot-publisher-independent.log",
+          "bytes": 549,
+          "sha256": "0b9f0b5cdef767685026cfed6b5c3b138cfce2b94887f0e897ecd1145867eb35"
+        }
+      ],
+      "scope": "Initial trusted snapshot/service/rent/repayment checkpoint; excludes subsequently added policy/default changes unless explicitly identified within its receipt."
+    },
+    {
+      "archive": "quote-finance-initial.zip",
+      "source_directory": "/root/short.win-jupiter-redesign/target/quote-finance-verification-2026-10-27",
+      "sha256": "290b0c05100d8ed4f3acc7bb00aed3567dbd4bb43b6b6dd032ed8fd8ea512434",
+      "bytes": 7491,
+      "members": [
+        {
+          "path": "clippy-final.json",
+          "bytes": 291,
+          "sha256": "5b1cf56a7eabc0555fe15d7aefbcfed2eb6ee4ad96a0a3e57dd43a01765f8667"
+        },
+        {
+          "path": "clippy-final.log",
+          "bytes": 236,
+          "sha256": "684fa8471a797e374af2a9c2e54c28c2fd42d2048a8158aad53a66cc596a23c8"
+        },
+        {
+          "path": "clippy.json",
+          "bytes": 401,
+          "sha256": "8e3360a81dd3981080bd0d6193971a7a6ea0d80c03138d5ca9363a5a97c8841b"
+        },
+        {
+          "path": "clippy.log",
+          "bytes": 860,
+          "sha256": "c5b0451f6afcccccb9f5c173f7ea3aaa021727169922bbf854aa5407252915e1"
+        },
+        {
+          "path": "final-qualified-receipt.json",
+          "bytes": 1629,
+          "sha256": "b9de36322aa36015d308b4049dc95fe024dc55b96c74958b8640fd6f8a82e348"
+        },
+        {
+          "path": "fmt.json",
+          "bytes": 224,
+          "sha256": "95d73733116cdf79e38d939d680a4151dbf3ce3c6daabd36b62c2f17736f8aa3"
+        },
+        {
+          "path": "fmt.log",
+          "bytes": 1,
+          "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+        },
+        {
+          "path": "native-final.json",
+          "bytes": 255,
+          "sha256": "334d761ed1f7974270ebc6d60d358788837004d8933608bdb5e497312daef603"
+        },
+        {
+          "path": "native-final.log",
+          "bytes": 1100,
+          "sha256": "46693c84626e7ae34f1f139d3986e0836723184167c42da669b64808c099af3e"
+        },
+        {
+          "path": "owned-source-receipt.json",
+          "bytes": 1980,
+          "sha256": "d62a267af018e072c6f031f842de66c3334a3b23ac3a4d57978f66cb7c0c73a3"
+        },
+        {
+          "path": "protocol-rent-red.log",
+          "bytes": 1048,
+          "sha256": "3d9ea2f35b46f7704bdf58b46aadf59535325bababa72890ded9618b60ceeb1e"
+        },
+        {
+          "path": "sbf-final.json",
+          "bytes": 631,
+          "sha256": "e69834228492ceb62ae8410092c1d30a1438412236b152191720243628fbc6a3"
+        },
+        {
+          "path": "sbf-final.log",
+          "bytes": 1004,
+          "sha256": "ab15ed642352372944f6d47504f11a965855a92c13746c60432b057655080180"
+        },
+        {
+          "path": "sbf-preliminary.json",
+          "bytes": 371,
+          "sha256": "d7f6fe9edd389e5f6147a7ef912db670a9a0a304c572018082d648c19d3cdb64"
+        },
+        {
+          "path": "sbf-preliminary.log",
+          "bytes": 1032,
+          "sha256": "f7296c3b6f5cf05e886b4c4f4bd6ab9fb35e45f66df998cb238b6849cd5aa9bb"
+        }
+      ],
+      "scope": "Initial trusted snapshot/service/rent/repayment checkpoint; excludes subsequently added policy/default changes unless explicitly identified within its receipt."
+    },
+    {
+      "archive": "initial-build-and-checks.zip",
+      "source_directory": "/root/short.win-jupiter-redesign/target/trusted-history-2026-10-27",
+      "sha256": "a624011f68756538b97501b33bedeec069a3f6e3db127d596def0417d9798902",
+      "bytes": 1093261,
+      "members": [
+        {
+          "path": "candidate-build-receipt.json",
+          "bytes": 1868,
+          "sha256": "544b77123e88c69cc63ecb0e5abfd3c33c75f9224d8fc6050360dce8bd433141"
+        },
+        {
+          "path": "candidate-client-check.log",
+          "bytes": 2534,
+          "sha256": "cbc1d6771fcc5ed1b852ee27db57cf318d6d8ddc67391cc173522dc7e2a02890"
+        },
+        {
+          "path": "candidate-client-generate.log",
+          "bytes": 894,
+          "sha256": "eb62d6963abe35bb86cc6b2408282b9ca9fe5798c51c907d13281bb72fcf5664"
+        },
+        {
+          "path": "candidate-client-sync.log",
+          "bytes": 151,
+          "sha256": "35f18abd1db7ebad9e21bed284c50a06c835f1c1ea3796e4a60f2a22299e104d"
+        },
+        {
+          "path": "candidate-release-idl.log",
+          "bytes": 362,
+          "sha256": "17e1f5739d6d7bbec84f8be0dafffe45a16fb7d5e49c5db432120bf0ee824172"
+        },
+        {
+          "path": "candidate-release-sbf.log",
+          "bytes": 145,
+          "sha256": "cc7dfc84ccfaeb9c732a09ea35eeb8c49bc5edc6de1822d4acd03a9c0bd17e2a"
+        },
+        {
+          "path": "candidate-test-venue-sbf.log",
+          "bytes": 403,
+          "sha256": "1dc638c727f69aeae75ad3325f658388def18ba512fe33a40c1feb10fee2f4b8"
+        },
+        {
+          "path": "client-check.log",
+          "bytes": 2451,
+          "sha256": "ce305a9e4fffa355bfa7db0b4502a4b204dbe2155be8e3dfb6bf779cff3fbb4d"
+        },
+        {
+          "path": "client-generate.log",
+          "bytes": 894,
+          "sha256": "eb62d6963abe35bb86cc6b2408282b9ca9fe5798c51c907d13281bb72fcf5664"
+        },
+        {
+          "path": "client-idl-sync.log",
+          "bytes": 151,
+          "sha256": "35f18abd1db7ebad9e21bed284c50a06c835f1c1ea3796e4a60f2a22299e104d"
+        },
+        {
+          "path": "diff-check-receipt.json",
+          "bytes": 262,
+          "sha256": "d3e3e6799ae46e6bf9a407309cddecc35c85da6a871fba103c3b63e93bc07c47"
+        },
+        {
+          "path": "diff-check.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "fixtures-live-receipt.json",
+          "bytes": 298,
+          "sha256": "5766d25d91d7934a70a83484fac5ba979b6c8a4fe7069b1275403976e2dbf3cb"
+        },
+        {
+          "path": "fixtures-live.log",
+          "bytes": 2343,
+          "sha256": "2b93f5ef72834b7fa0c6aedb793727dd871b0df3a7dc538c2d27bba17a69855f"
+        },
+        {
+          "path": "fixtures-receipt.json",
+          "bytes": 284,
+          "sha256": "c04bcf22167ac9f3184e0cc0a462360fa7650c99082e8e5dc2005ae4a4d03ee6"
+        },
+        {
+          "path": "fixtures.log",
+          "bytes": 121,
+          "sha256": "a0c0b3caea551b532a1e8e3c818cbfa1c0b105801533b29120d1fcfe7a415f0a"
+        },
+        {
+          "path": "fuzz-catalog-before.log",
+          "bytes": 1750,
+          "sha256": "138a6152e56543821d5268222cdc05b5fe0d4ab976c507ba35cc3261d8e50aeb"
+        },
+        {
+          "path": "fuzz-unit-after.log",
+          "bytes": 1206,
+          "sha256": "a43e6347f01cd1e06a3f40b1e27e01fdd579194536311fd8ef44b095540c11d5"
+        },
+        {
+          "path": "indexer-unit-final.log",
+          "bytes": 6449,
+          "sha256": "ee5adbf2f059968bf5d46a6cd20a98ac3c604bb408bd12abef1656c572dd7e94"
+        },
+        {
+          "path": "indexer-unit.log",
+          "bytes": 247,
+          "sha256": "3e980f398e7886d7c46b329f69712c847bb7c7efa3eac5a3632488c9e0a17ca2"
+        },
+        {
+          "path": "math-all.log",
+          "bytes": 13065,
+          "sha256": "d59a65d3edfc7eacbe920f538f17707571255abd465ddc895152caba59c0c9cc"
+        },
+        {
+          "path": "math-clippy.log",
+          "bytes": 60,
+          "sha256": "9ae36bb22d8f0f810a77044760863f70b81405396a32cce477ec08eecd4e6d59"
+        },
+        {
+          "path": "old-artifacts/release.so",
+          "bytes": 1917048,
+          "sha256": "e0e0490901adc361a5319c1932f3444dd9e9763562bf7d6d87286cf8c2aa5bff"
+        },
+        {
+          "path": "old-artifacts/shortwin.json",
+          "bytes": 253345,
+          "sha256": "5fa141d1da4b084b2b65ceb2012a582c7414996c14c37cf9223c7c71804089cd"
+        },
+        {
+          "path": "old-artifacts/test-venue.so",
+          "bytes": 1948080,
+          "sha256": "8ca3da7ac7dc8f1256ef92f25da26fdf189dbc0640e3db2f8b335346a17fa63a"
+        },
+        {
+          "path": "release-build-fixed-2.log",
+          "bytes": 670,
+          "sha256": "ed88ce61026b02f0137ab8c6c43b02ad8a5aa603a1953fc2f76d01a23c9b6149"
+        },
+        {
+          "path": "release-build-fixed.log",
+          "bytes": 1459,
+          "sha256": "3447331d4818a5681b8fc596bceefba4eb34fe28d0ad824b392b840df16443b9"
+        },
+        {
+          "path": "release-build.log",
+          "bytes": 1875,
+          "sha256": "82bf33c158fce2a828de4a15832ab046f9127cbbc704fd31a20de1fb380a6b14"
+        },
+        {
+          "path": "release-idl.log",
+          "bytes": 256,
+          "sha256": "dc11e67a1e6fbb78f2dac97f77d4d85d16019970e4efd655a18a23cc080a0936"
+        },
+        {
+          "path": "release-sbf-final.log",
+          "bytes": 251,
+          "sha256": "615e20a41476d9637765eb1791fca7a287c3b770934db062789d5d64b38eece9"
+        },
+        {
+          "path": "release-sbf.log",
+          "bytes": 145,
+          "sha256": "f0ca42aeeff093fb0adbca411d449f0e5b710d7608468ae452c5f8e718ac116f"
+        },
+        {
+          "path": "runtime-inputs-after.json",
+          "bytes": 13761,
+          "sha256": "41b5d8afa5095ea63ab55cc06e6d156022f54ca0720352818ea21fc9630c8b8d"
+        },
+        {
+          "path": "runtime-inputs-before.json",
+          "bytes": 13761,
+          "sha256": "41b5d8afa5095ea63ab55cc06e6d156022f54ca0720352818ea21fc9630c8b8d"
+        },
+        {
+          "path": "scope-current-receipt.json",
+          "bytes": 282,
+          "sha256": "0b50f1f8d3b70bdbf9881d31f0cf327f60456f804f1554015d3cb6d777d40108"
+        },
+        {
+          "path": "scope-current.log",
+          "bytes": 77,
+          "sha256": "eddeb5c812f6d5c07a6aaf83648868a2f8d2aee6b52b6fc16fafd13d4d24f1dd"
+        },
+        {
+          "path": "test-venue-sbf-final.log",
+          "bytes": 509,
+          "sha256": "d9c5a1ed1d776092a0b879f0ce38ed00f972e0164becebacb93c94f710d53d55"
+        },
+        {
+          "path": "test-venue-sbf.log",
+          "bytes": 599,
+          "sha256": "85b14a8ac463f87135b53e96ed6e78459456872b2412b016c0602407175fe429"
+        },
+        {
+          "path": "web-typecheck-executed.log",
+          "bytes": 32,
+          "sha256": "38ac890c60e7f38d59ddfb410325cdfb5fca83c9411765c5481754e01c021630"
+        },
+        {
+          "path": "web-typecheck.log",
+          "bytes": 70,
+          "sha256": "8d4c5ced634d4c3211ce6e8cd6660a4ed10ec19ab9d5b1840b50f85f8bba91cf"
+        }
+      ],
+      "scope": "Initial trusted snapshot/service/rent/repayment checkpoint; excludes subsequently added policy/default changes unless explicitly identified within its receipt."
+    }
+  ],
+  "original_inner_seals_preserved": true
+}

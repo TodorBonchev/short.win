@@ -1,0 +1,64 @@
+# Trusted operator API estimates with PRIVATE off-chain H8 history.
+# TEMPLATE ONLY: replace identities and review/hash every setting before initialization.
+# --check independently verifies actual genesis, snapshot PDA/owner, linked market/config
+# and the full policy commitment. This template intentionally refuses placeholders.
+# --watch never signs/publishes. --snapshot exports unsigned args. Only explicit
+# --publish uses the scoped reporter key below; never send arbitrary transactions.
+rpc_url_file = "/etc/shortwin-price/mainnet-rpc-url"
+api_key_file = "/etc/shortwin-price/jupiter-api-key"
+snapshot_account = "REPLACE_WITH_INITIALIZED_SNAPSHOT_PDA"
+publisher = "REPLACE_WITH_REVIEWED_REPORTER_PUBLIC_KEY"
+taker = "REPLACE_WITH_REVIEWED_JUPITER_TAKER_PUBLIC_KEY"
+account_policy_digest_hex = "REPLACE_WITH_REVIEWED_64_LOWERCASE_HEX_DIGEST"
+
+# These directories must already exist, owner=the service UID, mode0700.
+# Files are0600. All API consumers share request_budget.state_file, limits and UID.
+state_file = "/var/lib/shortwin-price/history/market-q.state"
+evidence_directory = "/var/lib/shortwin-price/evidence/market-q"
+# Explicit storage quota; collection stops for operator archival on exhaustion.
+# No audit evidence is deleted automatically. Include this in delivered alerts.
+evidence_max_bytes = 10737418240
+
+# EXAMPLES ONLY, not approved mainnet risk/cadence settings. Exact-q quantity and
+# history policy are read from the actual initialized on-chain snapshot account.
+# Total requests/sample =1independentbid+length(ask_input_lamports).
+# Configure only covered quantities within shared provider quotas and measure cadence.
+poll_interval_ms = 1000
+ask_input_lamports = ["1000000", "1100000"]
+maximum_ask_input_lamports = "1100000"
+slippage_bps = 50
+request_timeout_ms = 750
+observation_window_ms = 2000
+maximum_response_bytes = 1048576
+minimum_request_spacing_ms = 100
+bid_haircut_bps = 100
+ask_buffer_bps = 200
+maximum_spread_bps = 1000
+maximum_observation_slots = 8
+maximum_observation_seconds = 2
+# Explicit accepted trust: API market-state age is not independently authenticated.
+api_market_state_age_is_trusted = true
+
+[request_budget]
+state_file = "/var/lib/shortwin-price/request-budget/requests.state"
+total_per_second = 10
+background_per_second = 6
+reserved_exit_per_second = 3
+
+# OPTIONAL explicit on-demand publication only. THESE ARE EXAMPLE BUDGETS, not owner
+# approval of real payer funding or reviewed settings. Initialize budget once with
+# --initialize-budget before --publish. Corrupt/missing state never auto-resets.
+# All feeds using this reporter share the same file, limits and service UID.
+# A lost confirmation blocks new signatures; --reconcile checks exact signature
+# or absence after finalized height exceeds validity. No reservation is refunded.
+[publication]
+reporter_keypair_file = "/etc/shortwin-price/reporter.json"
+budget_state_file = "/var/lib/shortwin-price/publication-budget/fees.state"
+daily_max_lamports = 10000000
+burst_window_seconds = 60
+burst_attempts = 10
+compute_unit_limit = 50000
+micro_lamports_per_cu = 10000
+maximum_fee_lamports = 10000
+minimum_payer_balance_after_lamports = 10000000
+operation_timeout_seconds = 15

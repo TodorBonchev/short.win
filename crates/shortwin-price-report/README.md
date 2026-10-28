@@ -2,6 +2,30 @@
 
 This dependency-free `no_std` crate is a **financially unwired prerequisite**, not a production oracle or mainnet approval. It implements structural report acceptance, authorization policy, bounded history and a canonical state codec. It performs no HTTP requests, Solana account-boundary authentication, signature verification, transaction execution, financial health calculation or settlement. No production risk settings, keys or deployment are selected here.
 
+## Selected trusted-history mode (version 2)
+
+The owner explicitly accepted off-chain VPS history and on-demand authenticated
+snapshots. `trusted_snapshot::SnapshotState` uses a distinct `SWPSNAP2` codec
+(1,533 bytes), account namespace/version and `SnapshotReport`; it never decodes as
+version-1 public history. The on-chain wrapper is `PriceSnapshot` (1,624 bytes, including the immutable per-feed producer commitment).
+An allowed runtime Signer supplies live marks and up to eight chronological
+completed private-history buckets. No previous on-chain updates or periodic
+publication are required. This is deliberately **operator-attested history**:
+structural checks cannot prove past sample truth, collection time or omitted gaps.
+
+The source epoch anchors the completed history; a still-fresh snapshot can land
+or be read in a later runtime epoch. `evidence_at(now, minimum_sequence)` requires
+latest sequence at least the caller's bound, actual runtime freshness in both
+slots/seconds, finite marks and configured warm history. Replays, future/stale
+windows, wrong bindings, noncanonical storage and Unknown are refused or invalidate
+finite use. `Unknown` clears history. Publisher/model policy remains immutable in
+the wrapper; safe rotation and actual outstanding-debt hooks remain integration
+requirements. A zero counter in an unwired wrapper proves no real debt absence.
+
+Sections below describe the retained version-1 public-history prototype. Its
+same-runtime-epoch publication and on-chain cadence requirements are not the active
+version-2 transport. Neither mode itself enables financial admission or defaults.
+
 ## Scope and trust boundary
 
 Each `ReportState` binds one exact positive debt quantity `q` to the chain genesis, program, configuration account, market, base/quote mints, token-program identities, decimals, model/version/policy commitment and configuration epoch. The quantity and domain never change through reconfiguration. Use separately derived, independently validated state for each required quantity; this does not impose a fixed lot size or certify aggregate market liquidity, concurrent liquidation capacity or exposure limits.

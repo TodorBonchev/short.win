@@ -1,6 +1,12 @@
 # Fixed-quantity quote producer contract — implementation draft
 
-The owner selected signed Jupiter-derived risk feeds. This contract narrows the
+The owner selected in-house Jupiter-derived prices and later explicitly accepted
+trusted off-chain price history with on-demand authenticated snapshots. An initial
+trusted bid/ask policy may use strictly validated, separately collected Jupiter
+sell/buy estimates, with configured buffers and spread/time limits. These are
+operator-accepted reference estimates; neither edge proves a globally optimal
+price or guaranteed executable output. Concrete numerical policy and its hash
+still require review before activation. This contract narrows the
 next producer implementation; it is not a live feed, a selected lower-reference
 policy, production settings or an authenticated observation.
 
@@ -50,7 +56,7 @@ It is not proof of the globally cheapest route, future liquidity or a fair-price
 lower edge. Failed smaller-input requests, a preceding input-ladder point or a
 linear price inversion do not establish that lower edge.
 
-Do not construct CostEvidence::Finite from upper-only observations. The lower
+Do not construct financial Finite evidence from upper-only observations. The lower
 and central financial references require their own explicitly reviewed economic
 policy and matching authenticated identity/quantity/epoch. Forced liquidation,
 S1 and S2 remain unavailable when their required lower evidence is missing.
@@ -85,3 +91,35 @@ Cover nonmonotone candidate responses; expected/minimum output disagreement;
 incomplete ladders; raw-unit overflow; mint/quantity/policy substitution; stale
 source with fresh signature; resource/fee/account mismatch; and missing-lower
 refusal. No producer implementation or successful live attestation is claimed here.
+
+## Accepted trusted-history mode
+
+Collect two independent directions for each exact raw debt lot: a q-token sell
+estimate and a bounded WSOL-input buy candidate covering q. The service may
+accept their configured buffered bid/ask band as a trusted financial estimate;
+authentication establishes the operator, not fair value or future execution.
+Keep this explicitly separate from simulated executable evidence. An unknown
+rounding rule must never be presented as a proven output minimum.
+
+The fixed official API endpoint, validated mint/amount/taker/route semantics,
+local request/RPC clock windows, search policy and raw-response digest are bound
+by the configured policy. A local RPC clock proves local context, not that Jupiter
+used that slot. Preserve that trust limitation in output and deployment review.
+Timeouts, crossed/spread-invalid bands, stale/mismatched context and incomplete
+coverage produce Unknown; they do not prove no route or authorize cash default.
+
+Store completed history durably off chain; publish only on demand. Distinct mode,
+version, immutable account/domain/q/model/configuration, monotone publication
+sequence and runtime freshness checks must prevent replay/misrouting. A snapshot
+may contain operator-attested completed history without any prior on-chain price
+updates. Do not claim that its digest proves historical collection or omitted no
+gaps. Public-history prototype measurements remain historical evidence.
+
+
+The immutable snapshot wrapper also carries a per-feed `producer_commitment`,
+initialized by governance. The watcher recomputes that commitment from exact q,
+identity, shared financial model hash, source/history/search inputs, taker, buffers
+and all request/resource settings. It must equal the actual governed account value.
+The shared financial policy hash remains common across position/small/capacity
+quantities; per-feed hashes cannot defeat financial coherence checks. Final market
+admission must bind the reviewed feed account/commitment registry explicitly.

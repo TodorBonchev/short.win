@@ -1,0 +1,7 @@
+[1m[92m   Compiling[0m shortwin-venue-state v0.1.0 (/home/runner/work/short.win/short.win/crates/shortwin-venue-state)
+[1m[92m   Compiling[0m shortwin-price-report v0.1.0 (/home/runner/work/short.win/short.win/crates/shortwin-price-report)
+[1m[92m   Compiling[0m shortwin-math v0.1.0 (/home/runner/work/short.win/short.win/crates/shortwin-math)
+[1m[92m   Compiling[0m shortwin v1.0.3 (/home/runner/work/short.win/short.win/programs/shortwin)
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 24.98s
+[1m[92m   Compiling[0m mock-cpamm v0.1.0 (/home/runner/work/short.win/short.win/tests/mock_cpamm)
+[1m[92m    Finished[0m `release` profile [optimized] target(s) in 2.64s

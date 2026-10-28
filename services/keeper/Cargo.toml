@@ -15,6 +15,7 @@ test-venue = ["shortwin/test-venue"]
 [dependencies]
 shortwin.workspace = true
 shortwin-math.workspace = true
+shortwin-price-report = { path = "../../crates/shortwin-price-report" }
 # The venue-state readers the program uses (AMM v4 `AmmInfo`, CPMM `PoolState` / `AmmConfig`,
 # ProgramData headers): the admin monitor reads exactly the bytes the adapters read.
 shortwin-venue-state.workspace = true
@@ -40,6 +41,10 @@ solana-keypair.workspace = true
 solana-message.workspace = true
 solana-pubkey.workspace = true
 solana-signer.workspace = true
+solana-signature.workspace = true
+solana-commitment-config.workspace = true
+solana-compute-budget-interface.workspace = true
+solana-transaction = { workspace = true, features = ["wincode"] }
 
 [dev-dependencies]
 # The discriminator checks of the unit tests (the version the program uses).
@@ -66,3 +71,13 @@ path = "src/bin/v1_probe.rs"
 [[bin]]
 name = "shortwin-price-probe"
 path = "src/bin/price_probe.rs"
+
+# Off-chain trusted bid/ask history; --snapshot exports unsigned action-time arguments.
+[[bin]]
+name = "shortwin-price-watch"
+path = "src/bin/price_watch.rs"
+
+# Distinct fixed-term quote-native recovery; plan is read-only, --send is explicit.
+[[bin]]
+name = "shortwin-overdue-recovery"
+path = "src/bin/overdue_recovery.rs"

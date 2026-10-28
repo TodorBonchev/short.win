@@ -380,6 +380,16 @@ pub enum ShortwinError {
     // Appended for route/oracle-independent in-kind repayment; previous codes stay stable.
     #[msg("Accrued rent exceeds the borrower's repayment bound")]
     RepaymentRentAboveMax,
+
+    /// Locked quote-native maturity plus the agreed recovery grace has not elapsed.
+    #[msg("The locked overdue-default time has not been reached")]
+    OverdueDefaultNotReady,
+
+    #[msg("Required epoch record rent exceeds the caller's signed bound")]
+    EpochRecordRentAboveMax,
+
+    #[msg("Trusted price actions are paused for this market")]
+    QuotePriceActionsPaused,
 }
 
 impl From<MathError> for ShortwinError {
@@ -484,6 +494,9 @@ mod tests {
             (ShortwinError::CurveCashbackCoin, 6109),
             (ShortwinError::LegacyPoolCarry, 6110),
             (ShortwinError::RepaymentRentAboveMax, 6111),
+            (ShortwinError::OverdueDefaultNotReady, 6112),
+            (ShortwinError::EpochRecordRentAboveMax, 6113),
+            (ShortwinError::QuotePriceActionsPaused, 6114),
             (ShortwinError::CurveStraddle, 6031),
         ];
         for (e, c) in pins {

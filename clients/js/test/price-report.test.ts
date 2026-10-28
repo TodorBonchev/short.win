@@ -76,3 +76,80 @@ test('report account is exactly 1547 bytes; token repayment retains its explicit
     }
     assert.equal(client.SHORTWIN_ERROR__REPAYMENT_RENT_ABOVE_MAX, 6111);
 });
+
+
+test('trusted snapshot uses distinct account bytes and compact H8 wire format', async () => {
+    const history = Array.from({ length: 8 }, (_, i) => ({
+        epoch: BigInt(i + 20), firstSlot: BigInt(i * 5 + 100), firstTs: BigInt(i + 200),
+        lastSlot: BigInt(i * 5 + 102), lastTs: BigInt(i + 201), lowerMin: BigInt(i + 10),
+        centralLast: BigInt(i + 11), upperMax: BigInt(i + 12), observations: 2n,
+        largestGapSlots: 2n, largestGapSeconds: 1n,
+    }));
+    const prefix = Buffer.concat([
+        disc('global:publish_price_snapshot'), Buffer.from([2, 0]), u64(4n),
+        u64(5n), i64(-6n), u64(7n), i64(-8n), bytes(9),
+    ]);
+    const buckets = history.map((b) => Buffer.concat([
+        u64(b.epoch), u64(b.firstSlot), i64(b.firstTs), u64(b.lastSlot), i64(b.lastTs),
+        u64(b.lowerMin), u64(b.centralLast), u64(b.upperMax), u64(b.observations),
+        u64(b.largestGapSlots), u64(b.largestGapSeconds),
+    ]));
+    for (const status of [client.priceReportStatusArgs('Unknown'), client.priceReportStatusArgs('Finite', {
+        lower: 10n, central: 11n, upper: 12n,
+    })]) {
+        const input = { version: 2, sequence: 4n,
+            startSlot: 5n, startTs: -6n, endSlot: 7n, endTs: -8n, observationDigest: bytes(9),
+            status, historyCount: 8, history };
+        const statusBytes = status.__kind === 'Unknown' ? Buffer.from([0])
+            : Buffer.concat([Buffer.from([1]), u64(10n), u64(11n), u64(12n)]);
+        const expected = Buffer.concat([prefix, statusBytes, Buffer.from([8]), ...buckets]);
+        const ix = await client.getPublishPriceSnapshotInstructionAsync({
+            ...input, publisher, config: key, market: key, priceSnapshot: key,
+        });
+        assert.deepEqual(Buffer.from(ix.data), expected);
+        assert.equal(ix.data.length, status.__kind === 'Unknown' ? 788 : 812);
+        assert.deepEqual(ix.accounts.map((a) => a.role), [
+            AccountRole.READONLY_SIGNER, AccountRole.READONLY, AccountRole.READONLY, AccountRole.WRITABLE,
+        ]);
+    }
+    const stateBytes = Uint8Array.from({ length: 1533 }, (_, i) => i % 251);
+    const encoded = client.getPriceSnapshotEncoder().encode({
+        version: 2, bump: 253, market: key, quantity: 123n, modelEpoch: 456n, producerCommitment: bytes(42), stateBytes,
+    });
+    assert.equal(client.getPriceSnapshotSize(), 1624);
+    assert.deepEqual(Buffer.from(encoded), Buffer.concat([
+        disc('account:PriceSnapshot'), Buffer.from([2, 0, 253]), Buffer.from(getAddressEncoder().encode(key)),
+        u64(123n), u64(456n), bytes(42), stateBytes,
+    ]));
+    assert.notDeepEqual(Buffer.from(encoded).subarray(0, 8), disc('account:PriceReport'));
+    assert.deepEqual(Buffer.from(client.getRepayQuoteShortInstructionDataEncoder().encode({ maxRent: 123n })),
+        Buffer.concat([disc('global:repay_quote_short'), u64(123n)]));
+});
+
+
+test('overdue record-rent cap and read-only trusted-reference preflight have exact signed bytes', async () => {
+    for (const maxEpochRecordRent of [0n, 1n, (1n << 64n) - 1n]) {
+        assert.deepEqual(Buffer.from(client.getOverdueQuoteDefaultInstructionDataEncoder().encode({ maxEpochRecordRent })),
+            Buffer.concat([disc('global:overdue_quote_default'), u64(maxEpochRecordRent)]));
+    }
+    const ix = await client.getCheckQuoteReferenceInstructionAsync({
+        config: key, market: key, quotePolicy: key, priceSnapshot: key,
+        quantity: (1n << 64n) - 1n, minimumSequence: 123n,
+    });
+    assert.deepEqual(Buffer.from(ix.data), Buffer.concat([
+        disc('global:check_quote_reference'), u64((1n << 64n) - 1n), u64(123n),
+    ]));
+    assert.deepEqual(ix.accounts.map((a) => a.role), Array(4).fill(AccountRole.READONLY));
+    for (const paused of [false, true]) {
+        const pause = await client.getSetQuotePricePauseInstructionAsync({ authority: publisher, config: key, market: key, paused });
+        assert.deepEqual(Buffer.from(pause.data), Buffer.concat([
+            disc('global:set_quote_price_pause'), Buffer.from([Number(paused)]),
+        ]));
+        assert.deepEqual(pause.accounts.map((a) => a.role), [
+            AccountRole.READONLY_SIGNER, AccountRole.READONLY, AccountRole.WRITABLE,
+        ]);
+    }
+    assert.equal(client.SHORTWIN_ERROR__OVERDUE_DEFAULT_NOT_READY, 6112);
+    assert.equal(client.SHORTWIN_ERROR__EPOCH_RECORD_RENT_ABOVE_MAX, 6113);
+    assert.equal(client.SHORTWIN_ERROR__QUOTE_PRICE_ACTIONS_PAUSED, 6114);
+});

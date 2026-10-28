@@ -214,6 +214,10 @@ pub const MARKET_FLAG_WIPE_TRADER_SWEPT: u16 = 1 << 7;
 /// Bit 8: `claim_venue_rewards` ran since the last full wipe (R4A-7).
 pub const MARKET_FLAG_WIPE_REWARDS_CLAIMED: u16 = 1 << 8;
 
+// Flag bit 9 is the distinct quote-native backend (quote_finance::MARKET_FLAG_QUOTE_NATIVE).
+// Flag bit 10 pauses trusted-price actions (quote_policy::MARKET_FLAG_QUOTE_PRICE_PAUSED).
+// Neither changes this account layout; prospective policy initialization sets neither.
+
 /// Indices into `Market.pool_cache` while the venue is `PumpSwap` (ARCH §2.3.4). Since M6 a
 /// **pump-curve** market also holds them (derived once at listing, `venues::pump_amm::precompute`),
 /// so its `→ PumpSwap` transition derives nothing; nothing reads them before that transition. (A

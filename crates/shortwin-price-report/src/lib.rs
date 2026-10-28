@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod codec;
+pub mod trusted_snapshot;
 
 pub type Address = [u8; 32];
 pub const REPORT_VERSION: u16 = 1;
@@ -433,6 +434,10 @@ impl ReportState {
     }
     pub const fn last_sequence(&self) -> u64 {
         self.last_sequence
+    }
+    /// Last accepted collection/runtime clock; not the publisher's source observation clock.
+    pub const fn last_runtime_clock(&self) -> RuntimeClock {
+        self.last_runtime_clock
     }
     pub const fn latest_metadata(&self) -> Option<ReportMetadata> {
         self.latest

@@ -17,6 +17,8 @@
 //! backend adoption requires zero or separately reconciled old carry and reviewed handling
 //! of fractional ownership across share/epoch changes. Never silently drop or transplant it.
 //! It supplies arithmetic only; it selects no default/maturity policy and is not program-wired.
+pub mod persistence;
+
 use crate::error::MathError;
 use crate::num::{BPS, Rounding, U256, WAD, mul_div, to_u64};
 
@@ -100,6 +102,48 @@ pub struct NotionalPosition {
     minimum_rent: u64,
 }
 impl NotionalPosition {
+    /// Restore versioned quote-native position fields only. The authenticated account
+    /// boundary must bind the actual position/market/model and its immutable opening
+    /// terms. In particular, a structurally valid minimum is not proof that it was
+    /// derived from the qualified opening notional/utilization at opening time.
+    pub fn from_parts(
+        opening_notional: OpeningNotional,
+        open_basis: Basis,
+        rates: LockedRates,
+        kink_bps: u32,
+        protocol_bps: u32,
+        minimum_rent: u64,
+    ) -> Result<Self, MathError> {
+        lender_share(protocol_bps)?;
+        split_util(0, kink_bps)?;
+        // Validate the stored basis independently of how it was constructed.
+        Basis::from_indices(open_basis.indices())?;
+        Ok(Self {
+            opening_notional,
+            open_basis,
+            rates,
+            kink_bps,
+            protocol_bps,
+            minimum_rent,
+        })
+    }
+    /// A checkpoint must not precede this position's opening basis or imply more
+    /// utilized time than elapsed time. Membership and the locked kink remain caller
+    /// obligations; a numerically valid checkpoint is not authenticated storage.
+    pub fn validate_at_basis(&self, basis: &Basis) -> Result<(), MathError> {
+        let mut delta = [0; 3];
+        for ((value, current), open) in delta
+            .iter_mut()
+            .zip(basis.indices())
+            .zip(self.open_basis.indices())
+        {
+            *value = current.checked_sub(open).ok_or(MathError::Underflow)?;
+        }
+        if delta[1].checked_add(delta[2]).ok_or(MathError::Overflow)? > delta[0] {
+            return Err(MathError::InvalidInput);
+        }
+        Ok(())
+    }
     /// Lock after the common pool accrued through the actual opening time. Caller must
     /// obtain booked N_open from qualified opening accounting, never from raw token q.
     pub fn lock(
@@ -151,6 +195,52 @@ pub struct NotionalAggregate {
     kink_bps: Option<u32>,
 }
 impl NotionalAggregate {
+    /// Restore a versioned quote-native aggregate. These structural bounds reject
+    /// impossible totals and ghost weights in an empty pool, but do not establish
+    /// real position membership or the sum of authenticated position contributions.
+    pub fn from_parts(
+        folded_lender_weights: [u128; 3],
+        positions: u64,
+        opening_notional_total: u128,
+        kink_bps: Option<u32>,
+    ) -> Result<Self, MathError> {
+        if positions == 0 {
+            if folded_lender_weights != [0; 3] || opening_notional_total != 0 || kink_bps.is_some()
+            {
+                return Err(MathError::InvalidInput);
+            }
+            return Ok(Self::empty());
+        }
+        let kink = kink_bps.ok_or(MathError::InvalidInput)?;
+        split_util(0, kink)?;
+        let count = u128::from(positions);
+        let max_total = count
+            .checked_mul(u128::from(u64::MAX))
+            .ok_or(MathError::Overflow)?;
+        if opening_notional_total < count || opening_notional_total > max_total {
+            return Err(MathError::InvalidInput);
+        }
+        // Each coefficient is u32 and each lender share is at most BPS. If this
+        // mathematical bound exceeds u128, every representable weight is in range;
+        // saturating only this comparison bound is exact, not financial arithmetic.
+        let max_weight = opening_notional_total.saturating_mul(
+            u128::from(u32::MAX)
+                .checked_mul(u128::from(BPS))
+                .ok_or(MathError::Overflow)?,
+        );
+        if folded_lender_weights.iter().any(|weight| {
+            *weight > max_weight
+                || (positions == 1 && !weight.is_multiple_of(opening_notional_total))
+        }) {
+            return Err(MathError::InvalidInput);
+        }
+        Ok(Self {
+            folded_lender_weights,
+            positions,
+            opening_notional_total,
+            kink_bps: Some(kink),
+        })
+    }
     pub const fn empty() -> Self {
         Self {
             folded_lender_weights: [0; 3],
@@ -207,14 +297,17 @@ impl NotionalAggregate {
         for (value, item) in weights.iter_mut().zip(contribution) {
             *value = value.checked_sub(item).ok_or(MathError::Underflow)?;
         }
-        self.folded_lender_weights = weights;
-        self.positions = count;
-        self.opening_notional_total = total;
-        self.kink_bps = if count == 0 {
-            None
-        } else {
-            Some(position.kink_bps)
-        };
+        let restored = Self::from_parts(
+            weights,
+            count,
+            total,
+            if count == 0 {
+                None
+            } else {
+                Some(position.kink_bps)
+            },
+        )?;
+        *self = restored;
         Ok(())
     }
 }

@@ -109,6 +109,59 @@ describe('position exit history', () => {
         }
     });
 
+    it('shows overdue default as principal loss and collateral distribution, never repayment or S3', async () => {
+        const record = position('closed');
+        const exit = record.position.exit;
+        if (!exit) throw new Error('closed fixture');
+        const defaulted: PositionDetail = {
+            ...record,
+            position: {
+                ...record.position,
+                status: 'defaulted',
+                exit: {
+                    ...exit,
+                    kind: 'OverdueCollateralDefault',
+                    buyback_cost: null,
+                    rent_paid: null,
+                    borrower_pnl: null,
+                    borrower_payout: '0',
+                    keeper_paid: '5',
+                    settle_condition: null,
+                    overdue_default: {
+                        q_lost: '100',
+                        default_at: 1800086400,
+                        collateral: '200',
+                        lender_amount: '195',
+                        keeper_payment: '5',
+                        borrower_amount: '0',
+                        rent_due: '7',
+                        credited_retired: '6',
+                        vested: '1',
+                        vest_flushed: '0',
+                        share_epoch_after: 0,
+                        position_account_refund: '3000000',
+                    },
+                },
+            },
+        };
+        mockIndexer({ [`/v1/positions/${MINT_A}`]: defaulted });
+        const { queryClient, view } = await renderAt(`/positions/${MINT_A}`);
+        try {
+            expect(await screen.findByText('Overdue collateral default')).toBeTruthy();
+            expect(screen.getByText('Token principal lost')).toBeTruthy();
+            expect(screen.getByText('Collateral forfeited')).toBeTruthy();
+            expect(screen.getByText('To lenders')).toBeTruthy();
+            expect(screen.getByText('Position account refund')).toBeTruthy();
+            expect(screen.getByText('Rent due at default')).toBeTruthy();
+            expect(screen.getByText('Unavailable (collateral default; no token buyback)')).toBeTruthy();
+            expect(screen.queryByText('Tokens repaid by borrower')).toBeNull();
+            expect(screen.queryByText('S3')).toBeNull();
+        } finally {
+            view?.unmount();
+            queryClient.clear();
+        }
+    });
+
     it('shows history updating after the account closes, then picks up the exit without a WebSocket', async () => {
         vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
         let exited = false;

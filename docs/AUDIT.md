@@ -1713,7 +1713,11 @@ These are where we would look first. They are not limits on the scope.
 [new decision](audit/owner-jupiter-redesign-decision-2026-10-27.md). The owner
 selected in-house Jupiter-derived price reporting, with concrete reporter/risk
 settings reviewed before deployment; raw caller/API responses are not authoritative
-risk prices. Our reporting operators are the price authority.
+risk prices. Our reporting operators are the price authority. The owner later
+explicitly accepted trusted off-chain history on the VPS with on-demand signed
+snapshots. Continuous on-chain publication is superseded; private history is an
+operator assertion, not public timing proof. Qualify this distinct model and its
+financial consumers separately from the earlier public-history prototype.
 Preserve 1.0.3 evidence as its exact baseline; qualify the new program separately.
 The pre-redesign Token-2022-only long campaign is not started and stays on hold.
 Audit/bounty funding timing below otherwise remains the owner's chosen policy.
@@ -1721,7 +1725,9 @@ The [October 27 engineering checkpoint](audit/mainnet-preparation-2026-10-27.md)
 records incremental repayment/report/client/replay checks and their limits. It does
 not close findings, authorize financial defaults or replace fresh final-runtime CI,
 fuzz and funded commissioning. The concrete infrastructure budget is approved;
-provider setup and the proposed overdue-default financial choice remain pending.
+provider setup remains pending. The owner subsequently explicitly selected the
+deadline-plus-24h collateral default, including healthy borrower forfeiture; its
+implementation, distinct loss accounting and qualification remain required.
 
 **Current initial-mainnet policy (owner, 2026-10-27):** launch with existing
 per-market borrowing limits before an external audit and a funded bug bounty;

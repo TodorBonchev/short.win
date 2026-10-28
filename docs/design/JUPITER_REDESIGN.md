@@ -3,7 +3,10 @@
 **Status: design and isolated prototypes; production integration is unimplemented.**
 The owner [postponed first mainnet](../audit/owner-jupiter-redesign-decision-2026-10-27.md)
 for this redesign. The owner selected in-house Jupiter-derived price reporting and our own keeper
-with atomic Jupiter swaps. Concrete reporter/risk settings remain subject to review
+with atomic Jupiter swaps. The owner now explicitly accepts trusted off-chain
+history on the VPS with on-demand authenticated snapshots, superseding continuous
+on-chain publication. Historical samples are operator assertions, not public timing
+proof. Concrete reporter/risk settings remain subject to review
 before deployment. Under the owner's later delegation, use the
 [whole-position atomic liquidation contract](jupiter/INHOUSE_PRICING_AND_LIQUIDATION.md#first-release-liquidation-choice)
 for the first release: full debt-token credit or rollback, with separate qualified

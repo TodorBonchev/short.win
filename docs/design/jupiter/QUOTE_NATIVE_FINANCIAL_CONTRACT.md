@@ -1,6 +1,11 @@
 # Quote-native financial contract V1 — proposal for concrete review
 
-Status: **proposed financial contract, not enabled or release-qualified**. This
+Status: **proposed financial contract, not enabled or release-qualified**.
+The owner has selected trusted off-chain history with on-demand authenticated
+snapshots and explicitly selected overdue collateral default after the locked
+24-hour grace, including healthy borrower forfeiture. Those architecture/economic
+choices are active; exact keys/settings and implementation remain subject to
+concrete review and qualification. This
 specifies the smallest complete first-release model I recommend implementing and
 independently reviewing after the owner's in-house/atomic-liquidation decision.
 It selects no actual reporter keys or production settings. Market admission stays
@@ -27,10 +32,10 @@ recovery right.
 For this first model, implement normal token buyback, a conservative finite-price
 S1 gap settlement, and a separately named **overdue collateral default**. Do not
 implement quote-only S2/S3 cash settlement or pretend an API error proves no route.
-The overdue backstop is a material proposed economic change requiring concrete
-owner review: it can forfeit healthy collateral, as illustrated below. If that
-consequence is not accepted, quote-only market admission must wait for a different
-specified and qualified recovery contract.
+The overdue backstop can forfeit healthy collateral, as illustrated below. The
+owner explicitly selected that consequence after the separate recovery question.
+Implement the selected exact payout/default/loss accounting and disclosures before
+quote-only market admission; this acceptance is not implementation qualification.
 
 This limits initial operating coverage, not the number of markets users may create.
 Broad Jupiter routing does not make every mint automatically safe or supported.
@@ -44,6 +49,14 @@ settings. Raw token quantities and integer SOL lamports are distinct types.
 Reports bind those identities, exact q, policy/configuration epochs, sequence,
 source observation window and evidence commitments. Runtime Signer/Clock and
 program-owned/PDA-checked accounts authorize updates; JSON fields do not.
+
+Use two explicit commitments. The shared financial model/policy hash must be
+identical for position, small-lot and capacity evidence. Each governed exact-q
+`PriceSnapshot` separately locks its producer commitment, covering its actual
+source/history/search/buffer/taker settings and the shared financial hash. Admission
+must pin the reviewed feed account/producer commitment for each quantity. Do not
+make per-q producer hashes masquerade as one coherent financial model or create
+a recursive global-hash/producer-hash definition. The owner packet lists both.
 
 A position locks its backend and policy hash, q, booked N_open, fee/rent/rate/CR/
 penalty/keeper terms, deadline and default grace. Existing positions never acquire
@@ -74,18 +87,28 @@ is preferable to inventing a lower edge by haircutting one ask; it still introdu
 operator, source-selection, simulation/RPC and market-manipulation trust. Multiple
 keys/processes on one VPS do not remove that trust.
 
-The current API-only search/HTTP probe cannot emit a financial Finite report merely
-by ordering three numbers. A separate reviewed reference-policy evaluator must
-establish the above meaning and qualified observation context. Until that exists,
-Unknown is the financial outcome. No numerical haircut creates the missing proof.
+The earlier API-only search/HTTP probe cannot become a financial report merely
+by ordering three numbers. The trusted two-sided evaluator must collect separate
+q-token sell and WSOL-input buy candidates, apply the explicit buffered bid/ask
+policy, validate identities and local request/context windows, and retain source
+bytes/digests. Under the selected operator trust these may be accepted indicative
+references without claiming simulated executable output, a universal lower bound,
+or independently authenticated Jupiter source-slot freshness. Concrete source
+policy/hash and limits must be reviewed before admission. A numerical haircut on
+one ask never substitutes for the independent bid observation.
 
 ### History and different uses of the edges
 
-Keep per-q completed epoch statistics. Current-epoch reports may provide live
-marks but never advance historical persistence. Require H consecutive, timely,
-completed finite epochs before use. Unknown, excessive publication/source gaps,
-policy/backend transitions and invalid context reset the relevant warmup/arms;
-repeated cranks and retroactive reports cannot manufacture completed epochs.
+Keep per-q completed epoch statistics OFF CHAIN on the trusted VPS. An on-demand
+snapshot contains fresh live marks and H consecutive completed finite source
+epochs, excluding the live source epoch. Unknown, excessive SOURCE sampling gaps,
+policy/backend transitions and invalid context reset local warmup. Idle on-chain
+publication gaps do not reset valid private history and require no transaction.
+The program validates structure, allowed Signer, domain, quantities, policy,
+sequence, windows and freshness; it cannot prove the operator collected samples
+at their claimed times or omitted no gaps. A compromised operator can manufacture
+historical epochs. Use the distinct versioned trusted-history account/codec; do
+not reinterpret the earlier public-history prototype as equivalent evidence.
 
 Use different references for different purposes:
 
@@ -214,15 +237,17 @@ an operator-payer budget, not an invented token buyback cost or hidden vault deb
 
 S1 is a separate finite-evidence gap path: normal liquidation/expiry eligibility
 must hold, and the live and completed cheap reference edges must exceed
-`V-K_s` (plus only any expressly permitted nonrefundable execution rent). Arm and
-recheck over n_settle distinct completed epochs and an explicit elapsed-time/gap
-policy. The position stores its last checked model/epoch and consecutive count;
-the eight-entry report ring is not itself a forty-epoch proof. Advance only from
-new verified completed epochs, reset on an unverified gap or margin addition, and
-never count repeated calls. Any batched catch-up must verify every counted epoch
-still present; otherwise restart rather than extrapolate missing predicates. A position margin addition or invalid/unknown evidence refutes/resets its
-arm. At execution recheck everything; pay the locked K_s and all `V-K_s` to the
-lenders, with borrower payout zero and the actual token-principal loss explicit.
+`V-K_s` (plus only any expressly permitted nonrefundable execution rent). This cash path remains unenabled while its trusted-history persistence and
+borrower-loss policy are reviewed. Private historical epochs alone cannot authorize
+immediate confiscation. Any sparse arm must be bound to the actual position,
+locked model/terms and real runtime arm time, followed by a distinct fresh check
+after an explicit locked delay. It proves separated checks, not continuous bad
+health between them. Repeated calls cannot shorten the delay. Margin changes
+require current-collateral reevaluation: a healthy position clears the candidate;
+a one-lamport addition must not automatically restart the delay forever. Unknown
+or invalid evidence cannot execute settlement. Before enabling S1, specify and
+test this state machine and actual token-principal loss/share-epoch accounting;
+the earlier forty-public-epoch proposal is not silently inherited.
 Use the existing settlement share-epoch/receivable mechanics only after proving
 the new notional-rent inputs and loss accounting. Do not synthesize reserves or a
 constant settlement box.
@@ -232,16 +257,19 @@ budget, fresh signature on stale data or unfilled route creates either condition
 This removes a fair-value cash-settlement surface; it does **not** itself provide
 lender recovery during an indefinite outage.
 
-## Explicit overdue collateral default, separate from liquidation
+## Selected overdue collateral default, separate from liquidation
 
-Recommended backstop for concrete owner review:
+The owner explicitly selected this backstop; implementation/settings still need
+qualification before activation:
 
 - Lock the ordinary maturity deadline at open and a proposed **24-hour grace**
   (`86,400` seconds), then `default_at = deadline + grace` by checked arithmetic.
-  The proposed QuotePilot maximum duration is 72 hours, so the earliest such
-  backstop is 96 hours after opening. If a later reviewed profile/ABI permits a
+  The proposed initial QuotePilot fixed duration is 72 hours, so that reviewed
+  configuration defaults at 96 hours after opening. The policy stores an explicit
+  duration bounded at 72 hours; a shorter governed duration has an earlier
+  deadline-plus-24h default and must be disclosed in the final settings. If a later reviewed profile/ABI permits a
   shorter maturity, it must retain its disclosed deadline plus the locked grace;
-  this proposal adds no hidden borrower-selected-duration ABI.
+  this contract adds no hidden borrower-selected-duration ABI.
 - Before default_at, borrower repayment, permitted buyback, margin addition and
   ordinary qualified liquidation/expiry/S1 remain possible. Alerts must give the
   borrower a usable last opportunity. Margin addition can fund rent or enable a
@@ -255,11 +283,14 @@ Recommended backstop for concrete owner review:
   Resolve the whole q claim once using explicit default/loss accounting. Do not
   label it a token repayment, S3 or fair-value settlement. An event/API/UI must
   identify `OverdueCollateralDefault` separately.
-- Full q repayment can still win the race before foreclosure lands. The first
+- Account-rent floor and untracked donations are refunded separately from the
+  economic collateral V, with distinct event fields; they are not borrower
+  collateral payout. Full q repayment can still win the race before foreclosure lands. The first
   successful atomic terminal instruction closes the debt; the other fails without
   a second payout. A stale/false no-route report cannot move default_at earlier.
 - Governance cannot retroactively shorten grace or change the payout of open debt.
-  Report/payer outages do not remove this clock-based right, although funded callers
+  Report/payer outages and a scoped trusted-price pause do not remove this
+  clock-based right, although funded callers
   and chain availability remain operational prerequisites. Publish the SDK/CLI
   recovery path so an independent funded caller can act through another RPC when
   the single operator host is down; a clock-based right is not an automatic job.
@@ -279,9 +310,9 @@ Neither the borrowing cap nor the backstop guarantees principal value or liquidi
 This backstop is simpler and more deterministic than a new no-route fair-value
 oracle or asynchronous auction. It is also harsher to an overdue healthy borrower
 than the current fair-value S2/S3 path. Do not hide that tradeoff or enable it based
-only on the earlier generic request to simplify. The final concrete owner review
-must explicitly accept this consequence, or choose and qualify another recovery
-model before new quote-native markets open.
+only on the earlier generic request to simplify. The owner explicitly accepted this consequence. The final concrete deployment
+review must still verify the immutable deadline/grace/reward terms, exact code,
+disclosure, tests and funded independent recovery path before markets open.
 
 ## Backend transition and retained obligations
 
@@ -299,6 +330,36 @@ legacy and N_open-weighted quote rent or by reinterpreting reserved bytes. Econo
 policy/grid changes must retain reports for outstanding quantities; zero-debt
 adoption does not erase lender claims or excuse sweep/vesting/epoch obligations.
 
+## End-of-cohort fractional rent (pending prospective rule)
+
+The new notional-rent numerator is separate from common pool `carry/carry_r`.
+A valid illustrative trace with 0.1-SOL opening notional, utilization 1,000 bps,
+base/slope1 10,000/37,500 bps, kink 8,000 bps, protocol share 1,500 bps and one
+second accrual has exact lender income `116875/31536` lamports: continuous credit
+3, fractional carry `22267/31536`, and per-position credited ceiling 4. A 3,600s
+minimum in that test pays 15,697 rent / 13,343 lender lamports. These are model
+inputs, not selected live settings. Repayment and last-share withdrawal do not
+consume the distinct quote fraction. An identical fresh cohort would incorrectly
+receive credit 4 instead of its own floor 3 if the old fraction were transplanted.
+Receivable zero and completed common-pool sweeps do not prove this fraction gone.
+
+The current safe boundary is quarantine: no fresh deposit with zero shares and
+nonzero quote carry; no reset/reconciliation is exposed. This protects ownership
+but can leave that market unavailable after the final lender exits. Resolve the
+prospective contract before borrowing is enabled; no affected mainnet state exists.
+
+Recommended new rule for explicit owner selection: define the unallocated quote
+fraction as the final current lender's residual under the new deposit contract.
+When all debt is closed, that lender may explicitly sign a waiver on the final
+share withdrawal (or for the recorded closed cohort). The exact numerator must be
+strictly below its denominator: less than one lamport, hence less than
+0.000000001 SOL. Archive the exact fraction and signer in an event, never turn it
+into a whole-lamport payout or allocate it to newcomers. Preserve all real SOL,
+common-pool carry, paid/allocated claims, vest and ShareEpoch obligations. Without
+that explicit waiver, retain quarantine. No blanket historical-pro-rata guarantee
+or arbitrary one-lamport compensation is introduced. This rule is not yet selected
+or enabled; it needs model/SBF conservation and ownership tests plus disclosure.
+
 ## Concrete pilot candidates and request budget
 
 These are **review/qualification candidates**, not authorized live settings:
@@ -313,7 +374,7 @@ These are **review/qualification candidates**, not authorized live settings:
 | Lots / raw capacity | One supported position lot q_lot per initially covered market; capacity report at Q_market_max=4*q_lot; wallet raw limit then equals one lot. Calibrate raw q_lot from admission evidence; do not hardcode a token decimal/display amount |
 | Premium gates | Proposed all-in position 300 bps and market 1,000 bps, numerically inherited from D impact caps but explicitly **new semantics** |
 | History | H=8 completed finite epochs, 2-second epochs as a load-test target; n_liq=3 and n_settle=40 retain existing counts but imply about 6/80 seconds, not old 3/40-second timing |
-| Freshness / cadence | Qualification targets: age <=4 s and 16 slots; source window <=2 s and 8 slots; update gap <=3 s and 12 slots. These are independent caps, not proof of a fixed slot duration. Missed targets disable use; do not silently widen them |
+| Freshness / off-chain sampling | Qualification targets: age <=4 s and 16 slots; source window <=2 s and 8 slots; source sample gap <=3 s and 12 slots; no periodic on-chain update requirement. These are independent caps, not proof of a fixed slot duration. Missed targets disable use; do not silently widen them |
 | Execution delta / reward | Existing delta_liq=200 bps, delta_exp=100 bps and locked keeper terms; prototype Jupiter venue-side native rent=0, with measured temporary-rent bounds |
 | Overdue grace | Proposed 86,400 s; borrowed from an existing duration constant for review, **not** inherited old settlement semantics |
 
@@ -325,13 +386,15 @@ limit all periodic work to at most 6 RPS under one shared limiter, and leave
 headroom. Quote responses, simulations, retries and source-context collection
 must actually meet latency/cadence and monthly-credit budgets. The average formula
 is not proof that a serial worker, 10-RPS key or monthly allowance can meet it.
-The current report core requires source-window start, source-window end and the
-publication's runtime clock to belong to the same epoch. Thus the proposed 2-second
-epoch requires the whole relevant observation and transaction landing to finish
-inside its epoch; a 4-second age cap does not permit late publication. Align cycles
-and measure worst-case quote/simulation/landing latency. If that target cannot be
-met reliably, keep admission off and review a different cadence/risk profile or
-capacity plan; an average RPS calculation cannot waive this constraint.
+The earlier public-history prototype required publication inside the source
+epoch. That model is superseded for new markets. The trusted snapshot requires
+the source window to occupy one source epoch; it may land or be read in the next
+epoch while still satisfying the independent actual-runtime age/slot bounds.
+Completed history ends before that source epoch. This removes idle chain writes;
+it does not relax freshness or establish a fixed slot duration. Measure sampling,
+request latency, action-time cache landing and financial-action landing before
+activation. If the target is not met, refuse use and qualify changed settings;
+never silently widen freshness.
 
 Four sustained Build requests/second is about 10.368 million requests per 30 days;
 a 25M-credit allowance covers that only if the average cost is at most about 2.41
@@ -363,10 +426,11 @@ full-collateral-default examples, funded operators, measured request/latency lim
 byte identities, review/CI/fuzz evidence and actual deployment/configuration packet.
 Do not call the model ready or enable markets while any of these is only a draft.
 
-## Operational cost addendum (same proposed financial policy)
+## Historical continuous-publication cost (superseded)
 
-The two-second/two-feed profile above remains a candidate, with no production
-cadence or spending approval. The [measured publication-cost record](../../audit/probes/price-publication-cost-2026-10-27/README.md)
+The earlier continuous two-second/two-feed ON-CHAIN publication model was
+rejected by the owner. The figures below remain historical measurement only;
+the active model samples off chain and publishes on demand. The [measured publication-cost record](../../audit/probes/price-publication-cost-2026-10-27/README.md)
 shows continuous 30-day base signature fees of 12.96 SOL with separate updates,
 or 6.48 SOL with qualified batching. A two-Finite-report v0 packet is 1,226 bytes
 without compute-budget instructions, 1,278 bytes with the normal limit/price pair,
@@ -374,7 +438,6 @@ and 1,188 bytes with a synthetic four-address ALT. No real ALT or timely landing
 qualified. These exclude priority fees, retries, rent and other transactions.
 
 The owner-approved 245.20 USD hosting/API baseline excludes SOL fees. Actual
-publication duty cycle, cost/funding, payload/batching design and observation/
-landing feasibility require review before final settings selection; reducing
-cadence or changing history/trust semantics is not silently authorized by this
-measurement. This addendum changes no numerical financial rule in the proposal.
+per-action cost/funding, payload/batching and observation/action landing feasibility
+require review before final settings selection. The later explicit owner decision
+authorizes trusted off-chain history; the old measurement itself did not. This addendum changes no numerical financial rule in the proposal.

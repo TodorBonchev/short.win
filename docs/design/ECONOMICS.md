@@ -1,5 +1,14 @@
 # short.win — Economic & Risk Model
 
+> Current redesign decision (owner, 2026-10-27): new Jupiter markets use trusted
+> off-chain VPS price history and on-demand authenticated snapshots, not continuous
+> on-chain publication. Private samples are operator assertions. See the
+> [active financial contract](jupiter/QUOTE_NATIVE_FINANCIAL_CONTRACT.md) and
+> [owner decision](../audit/owner-jupiter-redesign-decision-2026-10-27.md).
+> Legacy reference behavior below remains baseline evidence until the distinct
+> backend is fully integrated and qualified; this is not a mainnet-ready claim.
+
+
 **Current development scope (owner, 2026-10-27):** first mainnet is postponed for
 [the broad Jupiter redesign](JUPITER_REDESIGN.md). Legacy formulas below remain
 baseline evidence, not qualification of the new quote-native risk/rent model.

@@ -238,6 +238,12 @@ export const SHORTWIN_ERROR__CURVE_CASHBACK_COIN = 0x17dd; // 6109
 export const SHORTWIN_ERROR__LEGACY_POOL_CARRY = 0x17de; // 6110
 /** RepaymentRentAboveMax: Accrued rent exceeds the borrower's repayment bound */
 export const SHORTWIN_ERROR__REPAYMENT_RENT_ABOVE_MAX = 0x17df; // 6111
+/** OverdueDefaultNotReady: The locked overdue-default time has not been reached */
+export const SHORTWIN_ERROR__OVERDUE_DEFAULT_NOT_READY = 0x17e0; // 6112
+/** EpochRecordRentAboveMax: Required epoch record rent exceeds the caller's signed bound */
+export const SHORTWIN_ERROR__EPOCH_RECORD_RENT_ABOVE_MAX = 0x17e1; // 6113
+/** QuotePriceActionsPaused: Trusted price actions are paused for this market */
+export const SHORTWIN_ERROR__QUOTE_PRICE_ACTIONS_PAUSED = 0x17e2; // 6114
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -270,6 +276,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL
   | typeof SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH
   | typeof SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY
+  | typeof SHORTWIN_ERROR__EPOCH_RECORD_RENT_ABOVE_MAX
   | typeof SHORTWIN_ERROR__EXIT_BOUND_NOT_MET
   | typeof SHORTWIN_ERROR__GRADUATION_HALTED
   | typeof SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY
@@ -308,6 +315,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__ORACLE_STALE
   | typeof SHORTWIN_ERROR__ORACLE_STEP
   | typeof SHORTWIN_ERROR__ORACLE_VERIFICATION
+  | typeof SHORTWIN_ERROR__OVERDUE_DEFAULT_NOT_READY
   | typeof SHORTWIN_ERROR__PENDING_CHANGE_EXPIRED
   | typeof SHORTWIN_ERROR__POOL_DRAINED
   | typeof SHORTWIN_ERROR__POOL_INELIGIBLE
@@ -322,6 +330,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__PRICE_DEVIATES_FROM_EMA
   | typeof SHORTWIN_ERROR__PROCEEDS_BELOW_MIN
   | typeof SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE
+  | typeof SHORTWIN_ERROR__QUOTE_PRICE_ACTIONS_PAUSED
   | typeof SHORTWIN_ERROR__REBASE_NEEDS_OWNER
   | typeof SHORTWIN_ERROR__REFERENCE_STALE
   | typeof SHORTWIN_ERROR__REPAYMENT_RENT_ABOVE_MAX
@@ -386,6 +395,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL]: `Only governance may cancel an authorities or timelock change`,
     [SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH]: `A ShareEpoch record does not match the market or epoch`,
     [SHORTWIN_ERROR__EPOCH_RECORD_READ_ONLY]: `A ShareEpoch record the lender converts through must be passed writable`,
+    [SHORTWIN_ERROR__EPOCH_RECORD_RENT_ABOVE_MAX]: `Required epoch record rent exceeds the caller's signed bound`,
     [SHORTWIN_ERROR__EXIT_BOUND_NOT_MET]: `Live buyback cost exceeds the exit bound`,
     [SHORTWIN_ERROR__GRADUATION_HALTED]: `PumpSwap pool creation is disabled (GlobalConfig.disable_flags bit 0), so this curve cannot graduate: new curve positions are refused until it is re-enabled; open positions are unaffected`,
     [SHORTWIN_ERROR__INSUFFICIENT_FREE_INVENTORY]: `Insufficient free (unborrowed) inventory`,
@@ -424,6 +434,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__ORACLE_STALE]: `Oracle price is stale or not newer than the cache`,
     [SHORTWIN_ERROR__ORACLE_STEP]: `Oracle price step too large`,
     [SHORTWIN_ERROR__ORACLE_VERIFICATION]: `Oracle update is not fully verified`,
+    [SHORTWIN_ERROR__OVERDUE_DEFAULT_NOT_READY]: `The locked overdue-default time has not been reached`,
     [SHORTWIN_ERROR__PENDING_CHANGE_EXPIRED]: `The pending config change expired; propose it again`,
     [SHORTWIN_ERROR__POOL_DRAINED]: `The pool is drained (at most 1/1,000 of its tokens unborrowed): deposits wait until repayments or settlements free more`,
     [SHORTWIN_ERROR__POOL_INELIGIBLE]: `Pool is not eligible`,
@@ -438,6 +449,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__PRICE_DEVIATES_FROM_EMA]: `Spot price deviates from the EMA`,
     [SHORTWIN_ERROR__PROCEEDS_BELOW_MIN]: `Sale proceeds below the minimum`,
     [SHORTWIN_ERROR__PUMP_VENUE_PRECEDENCE]: `Pump venues take precedence for this mint`,
+    [SHORTWIN_ERROR__QUOTE_PRICE_ACTIONS_PAUSED]: `Trusted price actions are paused for this market`,
     [SHORTWIN_ERROR__REBASE_NEEDS_OWNER]: `Only the position's owner may convert it through a rebase record: sync_lender must be signed by the owner`,
     [SHORTWIN_ERROR__REFERENCE_STALE]: `No fresh completed observation bucket`,
     [SHORTWIN_ERROR__REPAYMENT_RENT_ABOVE_MAX]: `Accrued rent exceeds the borrower's repayment bound`,

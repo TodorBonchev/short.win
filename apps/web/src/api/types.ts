@@ -26,7 +26,7 @@ export type VenueName =
     | 'mock'
     | 'unknown';
 export type TierName = 'A' | 'B' | 'C' | 'D';
-export type PositionStatus = 'open' | 'closed' | 'liquidated' | 'expired' | 'settled';
+export type PositionStatus = 'open' | 'closed' | 'liquidated' | 'expired' | 'settled' | 'defaulted';
 export type SettleCondition = 'S1' | 'S2' | 'S3';
 export type MarketSort = 'tvl' | 'oi' | 'util' | 'created' | 'open_positions';
 export type SortOrder = 'asc' | 'desc';
@@ -125,6 +125,7 @@ export type FeeType =
     | 'expiry_fee'
     | 'expiry_keeper_reward'
     | 'settle_keeper_reward'
+    | 'overdue_keeper_reward'
     | 'trader_sweep_lenders'
     | 'trader_sweep_wipe'
     | 'trader_sweep_protocol'
@@ -161,6 +162,9 @@ export interface ExitCounts {
     readonly borrower_pnl: I128 | null;
     readonly borrower_pnl_known_exits: number;
     readonly borrower_pnl_unknown_exits: number;
+    readonly overdue_collateral_defaults?: number;
+    readonly overdue_principal_tokens_lost?: BigNum;
+    readonly overdue_lender_collateral?: BigNum;
 }
 
 export interface LenderLoss {
@@ -257,8 +261,24 @@ export interface MarketPools {
     readonly events: readonly IndexerEvent[];
 }
 
+/** Fixed-clock nominal principal write-off; no fair-price/S3 valuation is implied. */
+export interface OverdueDefault {
+    readonly q_lost: U64;
+    readonly default_at: number;
+    readonly collateral: U64;
+    readonly lender_amount: U64;
+    readonly keeper_payment: U64;
+    readonly borrower_amount: U64;
+    readonly rent_due: U64;
+    readonly credited_retired: U64;
+    readonly vested: U64;
+    readonly vest_flushed: U64;
+    readonly share_epoch_after: number;
+    readonly position_account_refund: U64;
+}
+
 export interface PositionExit {
-    readonly kind: 'Close' | 'Repay' | 'Liquidate' | 'Expire' | 'SolSettle';
+    readonly kind: 'Close' | 'Repay' | 'Liquidate' | 'Expire' | 'SolSettle' | 'OverdueCollateralDefault';
     readonly ts: number;
     readonly signature: Signature;
     readonly keeper: Pubkey | null;
@@ -271,6 +291,8 @@ export interface PositionExit {
     readonly settle_condition: SettleCondition | null;
     readonly borrower_pnl: I128 | null;
     readonly duration_s: number;
+    /** Optional for reader compatibility with older indexer versions; null on other exits. */
+    readonly overdue_default?: OverdueDefault | null;
 }
 
 export interface Position {
@@ -331,7 +353,7 @@ export interface PositionDetail {
 }
 
 export interface ExitEvent extends ChainRef {
-    readonly kind: 'liquidation' | 'expiry' | 'settlement';
+    readonly kind: 'liquidation' | 'expiry' | 'settlement' | 'overdue_default';
     readonly market: Pubkey;
     readonly mint: Pubkey;
     readonly position: Pubkey;
@@ -384,6 +406,7 @@ export type EventKind =
     | 'Open'
     | 'Close'
     | 'Repay'
+    | 'OverdueCollateralDefault'
     | 'Liquidate'
     | 'Expire'
     | 'SolSettle'
@@ -559,6 +582,7 @@ export interface KeeperActivity {
     readonly liquidations: number;
     readonly expiries: number;
     readonly settlements: number;
+    readonly overdue_defaults?: number;
     readonly rewards_lamports: BigNum;
     readonly markets: number;
     readonly failures: number;

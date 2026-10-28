@@ -135,12 +135,13 @@ pub const VENUE_NAMES: [&str; 8] = [
 /// `TierName`.
 pub const TIER_NAMES: [&str; 4] = ["A", "B", "C", "D"];
 /// `PositionStatusFilter`.
-const POSITION_FILTERS: [&str; 6] = [
+const POSITION_FILTERS: [&str; 7] = [
     "open",
     "closed",
     "liquidated",
     "expired",
     "settled",
+    "defaulted",
     "exited",
 ];
 /// The lender events of `/v1/lenders/{owner}/events` and the `lender:` channel.
@@ -166,7 +167,12 @@ pub const ADMIN_KINDS: [&str; 11] = [
     "MintSafetyTripped",
 ];
 /// The exits of `/v1/liquidations` and the `liquidations` channel.
-pub const EXIT_KINDS: [&str; 3] = ["Liquidate", "Expire", "SolSettle"];
+pub const EXIT_KINDS: [&str; 4] = [
+    "Liquidate",
+    "Expire",
+    "SolSettle",
+    "OverdueCollateralDefault",
+];
 /// The `coverage` channel.
 pub const COVERAGE_KINDS: [&str; 2] = ["CoverageGap", "CoveragePauseSet"];
 /// At most this many buckets per series response (§10.2).
@@ -402,7 +408,10 @@ const Q_MARKET: &str = concat!(
          'borrower_pnl', CASE WHEN COALESCE(x.borrower_pnl_unknown_exits, 0) > 0 \
              THEN NULL ELSE COALESCE(x.borrower_pnl, 0)::text END, \
          'borrower_pnl_known_exits', COALESCE(x.borrower_pnl_known_exits, 0), \
-         'borrower_pnl_unknown_exits', COALESCE(x.borrower_pnl_unknown_exits, 0)) \
+         'borrower_pnl_unknown_exits', COALESCE(x.borrower_pnl_unknown_exits, 0), \
+         'overdue_collateral_defaults', COALESCE(x.overdue_collateral_defaults,0), \
+         'overdue_principal_tokens_lost', COALESCE(x.overdue_principal_tokens_lost,0)::text, \
+         'overdue_lender_collateral', COALESCE(x.overdue_lender_collateral,0)::text) \
          FROM (SELECT 1) one LEFT JOIN v_market_exits x ON x.market = m.market), \
      'lender_loss', (SELECT jsonb_build_object('settlements', COALESCE(l.settlements, 0), \
          'token_value', COALESCE(l.token_value, 0)::text, \
@@ -811,7 +820,7 @@ const Q_EXITS: &str = concat!(
      JOIN markets m ON m.market = e.market \
      LEFT JOIN settlements s ON s.position = e.position AND e.kind = 'SolSettle' \
      CROSS JOIN ingest_state st \
-     WHERE e.kind IN ('Liquidate', 'Expire', 'SolSettle') \
+     WHERE e.kind IN ('Liquidate', 'Expire', 'SolSettle', 'OverdueCollateralDefault') \
        AND ($1::text IS NULL OR e.market = $1) \
        AND ($2::bigint IS NULL OR (e.slot, e.tx_index, e.ix_index, e.ev_source, e.ev_seq) \
             < ($2, $3::int, $4::smallint, $5::smallint, $6::int)) \
@@ -891,11 +900,11 @@ async fn list_settlements(State(st): State<AppState>, q: Params) -> ApiResult {
 /// Keepers by rewards; `failures` from the counters (`keeper_failure_counts`, one keeper's rows
 /// per keeper listed — never every fee payer's failed transactions, M8-SEC-3).
 const Q_KEEPERS: &str = "SELECT jsonb_build_object('keeper', k.keeper, \
-    'liquidations', k.liquidations, 'expiries', k.expiries, 'settlements', k.settlements, \
+    'liquidations', k.liquidations, 'expiries', k.expiries, 'settlements', k.settlements, 'overdue_defaults', k.overdue_defaults, \
     'rewards_lamports', k.rewards::text, 'markets', k.markets, \
     'failures', COALESCE(f.failures, 0)), k.rewards::text, k.keeper \
     FROM (SELECT keeper::text AS keeper, sum(liquidations)::bigint AS liquidations, \
-          sum(expiries)::bigint AS expiries, sum(settlements)::bigint AS settlements, \
+          sum(expiries)::bigint AS expiries, sum(settlements)::bigint AS settlements, sum(overdue_defaults)::bigint AS overdue_defaults, \
           COALESCE(sum(rewards_lamports), 0) AS rewards, count(DISTINCT market) AS markets \
           FROM v_keeper_activity WHERE keeper IS NOT NULL GROUP BY keeper) k \
     LEFT JOIN LATERAL (SELECT sum(c.failures)::bigint AS failures FROM keeper_failure_counts c \

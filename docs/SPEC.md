@@ -1,5 +1,14 @@
 # short.win — Product & Implementation Specification
 
+> Current redesign decision (owner, 2026-10-27): new Jupiter markets use trusted
+> off-chain VPS price history and on-demand authenticated snapshots, not continuous
+> on-chain publication. This is operator-price/history trust, not independently
+> verified historical sampling. The [active contract](design/jupiter/QUOTE_NATIVE_FINANCIAL_CONTRACT.md)
+> and [owner record](audit/owner-jupiter-redesign-decision-2026-10-27.md) govern that
+> work. Legacy reference behavior below remains baseline evidence until the distinct
+> backend is fully integrated and qualified; no mainnet-ready claim follows.
+
+
 **Current development scope (owner, 2026-10-27): first mainnet is postponed
 for the [broad Jupiter redesign](design/JUPITER_REDESIGN.md).**
 The owner selected in-house price reporting and our own keeper with Jupiter

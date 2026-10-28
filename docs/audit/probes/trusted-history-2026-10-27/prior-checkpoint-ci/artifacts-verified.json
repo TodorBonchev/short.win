@@ -1,0 +1,67 @@
+[
+  {
+    "id": 12763811414,
+    "name": "verifiable-build",
+    "archive_size_bytes": 469270,
+    "archive_sha256": "37caeb8fa31d538d35dca48e899875a5d2aae9d93680e6fa0ef9f488bb8bbe21",
+    "api_digest": "sha256:37caeb8fa31d538d35dca48e899875a5d2aae9d93680e6fa0ef9f488bb8bbe21",
+    "api_digest_matches": true,
+    "members": [
+      {
+        "path": "shortwin.build.log",
+        "size_bytes": 6437,
+        "sha256": "dea3c2774188212c8c4275f39b4cbbf78cbab22a71d836dcaaeed2706c8249d4"
+      },
+      {
+        "path": "shortwin.so",
+        "size_bytes": 1759472,
+        "sha256": "392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9"
+      },
+      {
+        "path": "verifiable-hashes.txt",
+        "size_bytes": 604,
+        "sha256": "84086515673d960caac1d9402d21875a2707e4339fe0a4a491cfae1c0c82d97d"
+      }
+    ]
+  },
+  {
+    "id": 12763497218,
+    "name": "shortwin-program",
+    "archive_size_bytes": 1072655,
+    "archive_sha256": "2e53d6591a11fbbaf7988f2269e373265c3833b2145311ddedb6633e8d02d0d0",
+    "api_digest": "sha256:2e53d6591a11fbbaf7988f2269e373265c3833b2145311ddedb6633e8d02d0d0",
+    "api_digest_matches": true,
+    "members": [
+      {
+        "path": "deploy/shortwin.so",
+        "size_bytes": 1759472,
+        "sha256": "392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9"
+      },
+      {
+        "path": "test-venue/deploy/shortwin.so",
+        "size_bytes": 1790504,
+        "sha256": "c4445c878f7f714a128c4cc6db4fb568c01d1ab92c6b7f6b63e3c14106f6da5e"
+      },
+      {
+        "path": "deploy/mock_cpamm.so",
+        "size_bytes": 281240,
+        "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9"
+      },
+      {
+        "path": "idl/shortwin.json",
+        "size_bytes": 235057,
+        "sha256": "3fd8a6207f5bc25763c0f64c6d5e2bf8301c206aa6f952dc0e4c04da2099099c"
+      },
+      {
+        "path": "sbf-release-build.log",
+        "size_bytes": 706,
+        "sha256": "9e949d95a2425d6038aad284d432f53b712a3a04b04c8c873857e6857098f8aa"
+      },
+      {
+        "path": "types/shortwin.ts",
+        "size_bytes": 234452,
+        "sha256": "78065edd70a93bfcf1d91619b00bcbdb88fc5ff79aa091c751e21814171a171b"
+      }
+    ]
+  }
+]

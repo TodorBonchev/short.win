@@ -907,6 +907,12 @@ pub fn vest_flushes_are_reported(
         .iter()
         .filter(|e| e.market == market)
         .map(|e| e.vest_flushed)
+        .chain(
+            ev.overdue_defaults
+                .iter()
+                .filter(|e| e.market == market)
+                .map(|e| e.vest_flushed),
+        )
         .max()
         .unwrap_or(0);
     let last_shares = ev

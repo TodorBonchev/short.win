@@ -48,7 +48,7 @@ macro_rules! spec {
 
 /// Every short.win event (`programs/shortwin/src/events.rs`, the IDL's event catalog), in the
 /// order of INDEXER.md §5.3.
-pub const SHORTWIN_EVENTS: [EventSpec; 37] = {
+pub const SHORTWIN_EVENTS: [EventSpec; 38] = {
     use shortwin::events as e;
     [
         spec!(e::MarketCreated, "MarketCreated", Cpi),
@@ -60,6 +60,7 @@ pub const SHORTWIN_EVENTS: [EventSpec; 37] = {
         spec!(e::Open, "Open", Cpi),
         spec!(e::Close, "Close", Cpi),
         spec!(e::Repay, "Repay", Cpi),
+        spec!(e::OverdueCollateralDefault, "OverdueCollateralDefault", Cpi),
         spec!(e::Liquidate, "Liquidate", Cpi),
         spec!(e::Expire, "Expire", Cpi),
         spec!(e::SolSettle, "SolSettle", Cpi),
@@ -130,10 +131,17 @@ pub fn tier_name(tier: u8) -> &'static str {
 }
 
 /// `positions.status`.
-pub const POSITION_STATUSES: [&str; 5] = ["open", "closed", "liquidated", "expired", "settled"];
+pub const POSITION_STATUSES: [&str; 6] = [
+    "open",
+    "closed",
+    "liquidated",
+    "expired",
+    "settled",
+    "defaulted",
+];
 
 /// `fees.fee_type` and its recipient (INDEXER.md §8.2).
-pub const FEE_TYPES: [(&str, &str); 18] = [
+pub const FEE_TYPES: [(&str, &str); 19] = [
     ("creation_fee", "protocol"),
     ("open_fee", "protocol"),
     ("venue_rent", "venue"),
@@ -146,6 +154,7 @@ pub const FEE_TYPES: [(&str, &str); 18] = [
     ("expiry_fee", "lenders"),
     ("expiry_keeper_reward", "keeper"),
     ("settle_keeper_reward", "keeper"),
+    ("overdue_keeper_reward", "keeper"),
     ("trader_sweep_lenders", "lenders"),
     ("trader_sweep_wipe", "lenders"),
     ("trader_sweep_protocol", "protocol"),

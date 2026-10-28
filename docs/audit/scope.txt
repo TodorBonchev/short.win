@@ -18,6 +18,8 @@ programs/shortwin/src/engine/mod.rs
 programs/shortwin/src/engine/observe.rs
 programs/shortwin/src/engine/pool_select.rs
 programs/shortwin/src/engine/prologue.rs
+programs/shortwin/src/engine/quote_finance.rs
+programs/shortwin/src/engine/quote_reference.rs
 programs/shortwin/src/engine/route.rs
 programs/shortwin/src/engine/tier.rs
 programs/shortwin/src/engine/trader.rs
@@ -41,12 +43,17 @@ programs/shortwin/src/instructions/flag_unsafe_mint.rs
 programs/shortwin/src/instructions/flag_venue_upgraded.rs
 programs/shortwin/src/instructions/initialize_config.rs
 programs/shortwin/src/instructions/initialize_price_report.rs
+programs/shortwin/src/instructions/initialize_price_snapshot.rs
+programs/shortwin/src/instructions/initialize_quote_policy.rs
 programs/shortwin/src/instructions/liquidate.rs
 programs/shortwin/src/instructions/mod.rs
 programs/shortwin/src/instructions/open_short.rs
+programs/shortwin/src/instructions/overdue_quote_default.rs
 programs/shortwin/src/instructions/propose_config.rs
 programs/shortwin/src/instructions/propose_pool.rs
 programs/shortwin/src/instructions/publish_price_report.rs
+programs/shortwin/src/instructions/publish_price_snapshot.rs
+programs/shortwin/src/instructions/repay_quote_short.rs
 programs/shortwin/src/instructions/repay_short.rs
 programs/shortwin/src/instructions/revalidate_venue.rs
 programs/shortwin/src/instructions/set_coverage_pause.rs
@@ -72,6 +79,9 @@ programs/shortwin/src/state/oracle.rs
 programs/shortwin/src/state/pod.rs
 programs/shortwin/src/state/position.rs
 programs/shortwin/src/state/price_report.rs
+programs/shortwin/src/state/price_snapshot.rs
+programs/shortwin/src/state/quote_finance.rs
+programs/shortwin/src/state/quote_policy.rs
 programs/shortwin/src/state/vault.rs
 programs/shortwin/src/state/venue_extras.rs
 programs/shortwin/src/state/venue_guard.rs
@@ -108,6 +118,7 @@ crates/shortwin-math/src/quote/straddle.rs
 crates/shortwin-math/src/quote_native.rs
 crates/shortwin-math/src/quote_oracle.rs
 crates/shortwin-math/src/quote_rent.rs
+crates/shortwin-math/src/quote_rent/persistence.rs
 crates/shortwin-math/src/rent.rs
 crates/shortwin-math/src/risk.rs
 crates/shortwin-math/src/settle.rs
@@ -119,10 +130,12 @@ crates/shortwin-jupiter-route/Cargo.toml
 crates/shortwin-jupiter-route/src/isolation.rs
 crates/shortwin-jupiter-route/src/lib.rs
 
-# [core] shortwin-price-report: in-house exact-q report authorization/history and canonical codec; the unadmitted account wrapper is in program scope; financial integration remains open
+# [core] shortwin-price-report: in-house exact-q report/trusted off-chain snapshot authorization and canonical codecs; the unadmitted account wrapper is in program scope; financial integration remains open
 crates/shortwin-price-report/Cargo.toml
 crates/shortwin-price-report/src/codec.rs
 crates/shortwin-price-report/src/lib.rs
+crates/shortwin-price-report/src/trusted_snapshot.rs
+crates/shortwin-price-report/src/trusted_snapshot/codec.rs
 
 # [context] jupiter-oracle-compat: standalone native oracle SDK compatibility experiment; not linked into production and not a live-attestation qualification
 .github/workflows/jupiter-oracle-compat.yml
@@ -159,6 +172,8 @@ rust-toolchain.toml
 # [keeper] keeper-core: exit and crank decisions, coverage and budget, the instructions and account lists the keeper sends (in scope: the owner's decision of 2026-10-02)
 services/common/src/chain.rs
 services/common/src/tx.rs
+services/keeper/src/bin/overdue_recovery.rs
+services/keeper/src/bin/price_watch.rs
 services/keeper/src/budget.rs
 services/keeper/src/coverage.rs
 services/keeper/src/decide.rs
@@ -166,12 +181,16 @@ services/keeper/src/fees.rs
 services/keeper/src/graduation.rs
 services/keeper/src/ixs.rs
 services/keeper/src/monitor.rs
+services/keeper/src/offchain_price_history.rs
 services/keeper/src/pda.rs
 services/keeper/src/pool_monitor.rs
 services/keeper/src/price_budget.rs
 services/keeper/src/price_http.rs
 services/keeper/src/price_search.rs
+services/keeper/src/publication_budget.rs
+services/keeper/src/snapshot_publisher.rs
 services/keeper/src/sweep.rs
+services/keeper/src/trusted_jupiter_reference.rs
 services/keeper/src/venue.rs
 services/keeper/src/view.rs
 
@@ -183,7 +202,10 @@ services/common/src/lib.rs
 services/common/src/rpc.rs
 services/keeper/Cargo.toml
 services/keeper/keeper.example.toml
+services/keeper/overdue-recovery.example.toml
 services/keeper/price-probe.example.toml
+services/keeper/price-watch.example.toml
+services/keeper/shortwin-price-watch.service.example
 services/keeper/src/alerts.rs
 services/keeper/src/alt.rs
 services/keeper/src/bin/build_alt.rs

@@ -1,0 +1,8 @@
+{
+  "utc": "2026-10-28T08:03:31.071637+00:00",
+  "path": "services/indexer/migrations/0103_overdue_collateral_default.sql",
+  "change": "Remove one trailing blank line for git diff --check; SQL tokens and statements unchanged. Earlier source seals retain their original exact bytes.",
+  "before_sha256": "298e38fa9f4b8f95b9ec5f80c018e912cb529f1f86ff3fcea048fd00b58ef6e6",
+  "after_sha256": "9fba3c87bc62a280d3000b3af8d362361eb50d34ad028316a4f08c2db74678ea",
+  "validation": "Whitespace-only; no runtime/program/fuzzer/fixture input changed."
+}

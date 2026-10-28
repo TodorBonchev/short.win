@@ -1,0 +1,16 @@
+Verified 2026-10-27T20:46:25.122080+00:00
+
+CI 40566841702 completed success for PR head 30a2c17e5fde8c64073a93e149abb673b92584b0: 24 successful jobs; fuzz-nightly and mutants skipped. Focused probe 40566841555 hostile-sbf completed success for the same head.
+
+Both downloaded archives matched GitHub API digests. Every non-directory archive member was hashed in artifacts-verified.json.
+
+Anchor release and verifier ELF are byte-for-byte equal (1759472 bytes).
+Raw SHA256: 392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9
+Trimmed executable SHA256: 95c151e4081835772382dd48d0732c140eadca8f32c568991fd99d85c7dab7a2
+The independently calculated hashes match verifiable-hashes.txt and the previously recorded b7 build.
+Fresh Anchor IDL equals the worktree and PR-head git blob clients/js/idl/shortwin.json.
+IDL SHA256: 3fd8a6207f5bc25763c0f64c6d5e2bf8301c206aa6f952dc0e4c04da2099099c
+
+Actual verifier build commit: a4a4c2e73f241ff906052286c2485c8ddaae49fe (PR merge snapshot, not the PR head object). The retained GitHub comparison has 0 changed files, 1 extra commits.
+
+Ordinary pull-request CI and focused hostile-SBF probe. The mutants and fuzz-nightly jobs were skipped; this record does not establish full mutation qualification, a new 24-hour fuzz run, or final mainnet readiness.

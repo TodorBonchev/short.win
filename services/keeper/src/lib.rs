@@ -121,12 +121,16 @@ pub mod ixs;
 pub mod keeper;
 pub mod metrics;
 pub mod monitor;
+pub mod offchain_price_history;
 pub mod pda;
 pub mod pool_monitor;
 pub mod price_budget;
 pub mod price_http;
 pub mod price_search;
+pub mod publication_budget;
+pub mod snapshot_publisher;
 pub mod sweep;
+pub mod trusted_jupiter_reference;
 pub mod venue;
 pub mod view;
 

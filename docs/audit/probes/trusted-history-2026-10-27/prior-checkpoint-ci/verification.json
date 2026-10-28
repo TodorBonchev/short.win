@@ -1,0 +1,301 @@
+{
+  "verified_at_utc": "2026-10-27T20:46:25.122080+00:00",
+  "repository": "TodorBonchev/short.win",
+  "ci": {
+    "id": 40566841702,
+    "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702",
+    "status": "completed",
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "30a2c17e5fde8c64073a93e149abb673b92584b0",
+    "created_at": "2026-10-27T19:11:28Z",
+    "completed_updated_at": "2026-10-27T20:15:01Z",
+    "job_counts": {
+      "success": 24,
+      "skipped": 2
+    },
+    "jobs": [
+      {
+        "name": "clippy",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:42Z",
+        "completed_at": "2026-10-27T19:13:38Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900250"
+      },
+      {
+        "name": "cu-math",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:42Z",
+        "completed_at": "2026-10-27T19:14:09Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900618"
+      },
+      {
+        "name": "wasm",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:41Z",
+        "completed_at": "2026-10-27T19:13:14Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900664"
+      },
+      {
+        "name": "vectors",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:41Z",
+        "completed_at": "2026-10-27T19:20:03Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900824"
+      },
+      {
+        "name": "fmt",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:41Z",
+        "completed_at": "2026-10-27T19:13:04Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900826"
+      },
+      {
+        "name": "deny",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:41Z",
+        "completed_at": "2026-10-27T19:13:21Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900915"
+      },
+      {
+        "name": "web",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:41Z",
+        "completed_at": "2026-10-27T19:14:39Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900942"
+      },
+      {
+        "name": "test",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:42Z",
+        "completed_at": "2026-10-27T19:14:33Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410900950"
+      },
+      {
+        "name": "anchor-build",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:12:43Z",
+        "completed_at": "2026-10-27T19:14:45Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122410901136"
+      },
+      {
+        "name": "program-tests",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:48Z",
+        "completed_at": "2026-10-27T20:15:00Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412038740"
+      },
+      {
+        "name": "verifiable-build",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:48Z",
+        "completed_at": "2026-10-27T19:18:07Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412038803"
+      },
+      {
+        "name": "t-pot",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:48Z",
+        "completed_at": "2026-10-27T19:19:46Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039087"
+      },
+      {
+        "name": "m2-cu",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:16:12Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039251"
+      },
+      {
+        "name": "indexer",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:30:35Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039278"
+      },
+      {
+        "name": "web-e2e",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:41:22Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039325"
+      },
+      {
+        "name": "services",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:32:34Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039419"
+      },
+      {
+        "name": "m6-cu",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:21:31Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039423"
+      },
+      {
+        "name": "t-size",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:16:27Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039474"
+      },
+      {
+        "name": "m5-cu",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:21:59Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039593"
+      },
+      {
+        "name": "fuzz-smoke",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:18:41Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039616"
+      },
+      {
+        "name": "m1-cu",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:48Z",
+        "completed_at": "2026-10-27T19:16:18Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039623"
+      },
+      {
+        "name": "m3-cu",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:20:39Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039808"
+      },
+      {
+        "name": "m7-keeper-bench",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:49Z",
+        "completed_at": "2026-10-27T19:22:00Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412039812"
+      },
+      {
+        "name": "codama",
+        "conclusion": "success",
+        "started_at": "2026-10-27T19:14:48Z",
+        "completed_at": "2026-10-27T19:15:22Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412040059"
+      },
+      {
+        "name": "fuzz-nightly",
+        "conclusion": "skipped",
+        "started_at": "2026-10-27T19:14:46Z",
+        "completed_at": "2026-10-27T19:14:46Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412042899"
+      },
+      {
+        "name": "mutants",
+        "conclusion": "skipped",
+        "started_at": "2026-10-27T19:14:46Z",
+        "completed_at": "2026-10-27T19:14:46Z",
+        "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841702/job/122412042911"
+      }
+    ]
+  },
+  "probe": {
+    "id": 40566841555,
+    "url": "https://github.com/TodorBonchev/short.win/actions/runs/40566841555",
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "30a2c17e5fde8c64073a93e149abb673b92584b0",
+    "job": "hostile-sbf",
+    "started_at": "2026-10-27T19:11:31Z",
+    "completed_at": "2026-10-27T19:13:42Z"
+  },
+  "artifacts": [
+    {
+      "id": 12763811414,
+      "name": "verifiable-build",
+      "archive_size_bytes": 469270,
+      "archive_sha256": "37caeb8fa31d538d35dca48e899875a5d2aae9d93680e6fa0ef9f488bb8bbe21",
+      "api_digest": "sha256:37caeb8fa31d538d35dca48e899875a5d2aae9d93680e6fa0ef9f488bb8bbe21",
+      "api_digest_matches": true,
+      "members": [
+        {
+          "path": "shortwin.build.log",
+          "size_bytes": 6437,
+          "sha256": "dea3c2774188212c8c4275f39b4cbbf78cbab22a71d836dcaaeed2706c8249d4"
+        },
+        {
+          "path": "shortwin.so",
+          "size_bytes": 1759472,
+          "sha256": "392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9"
+        },
+        {
+          "path": "verifiable-hashes.txt",
+          "size_bytes": 604,
+          "sha256": "84086515673d960caac1d9402d21875a2707e4339fe0a4a491cfae1c0c82d97d"
+        }
+      ]
+    },
+    {
+      "id": 12763497218,
+      "name": "shortwin-program",
+      "archive_size_bytes": 1072655,
+      "archive_sha256": "2e53d6591a11fbbaf7988f2269e373265c3833b2145311ddedb6633e8d02d0d0",
+      "api_digest": "sha256:2e53d6591a11fbbaf7988f2269e373265c3833b2145311ddedb6633e8d02d0d0",
+      "api_digest_matches": true,
+      "members": [
+        {
+          "path": "deploy/shortwin.so",
+          "size_bytes": 1759472,
+          "sha256": "392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9"
+        },
+        {
+          "path": "test-venue/deploy/shortwin.so",
+          "size_bytes": 1790504,
+          "sha256": "c4445c878f7f714a128c4cc6db4fb568c01d1ab92c6b7f6b63e3c14106f6da5e"
+        },
+        {
+          "path": "deploy/mock_cpamm.so",
+          "size_bytes": 281240,
+          "sha256": "4cf1700761782aece1a4e3463ce0b2b9f2afaed2ecf3d0a6362f115faf9c7ab9"
+        },
+        {
+          "path": "idl/shortwin.json",
+          "size_bytes": 235057,
+          "sha256": "3fd8a6207f5bc25763c0f64c6d5e2bf8301c206aa6f952dc0e4c04da2099099c"
+        },
+        {
+          "path": "sbf-release-build.log",
+          "size_bytes": 706,
+          "sha256": "9e949d95a2425d6038aad284d432f53b712a3a04b04c8c873857e6857098f8aa"
+        },
+        {
+          "path": "types/shortwin.ts",
+          "size_bytes": 234452,
+          "sha256": "78065edd70a93bfcf1d91619b00bcbdb88fc5ff79aa091c751e21814171a171b"
+        }
+      ]
+    }
+  ],
+  "byte_comparison": {
+    "anchor_size_bytes": 1759472,
+    "verifier_size_bytes": 1759472,
+    "anchor_verifier_byte_equal": true,
+    "raw_elf_sha256": "392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9",
+    "trimmed_elf_sha256": "95c151e4081835772382dd48d0732c140eadca8f32c568991fd99d85c7dab7a2",
+    "trimmed_elf_size_bytes": 1759457,
+    "idl_byte_equal_to_worktree": true,
+    "idl_sha256": "3fd8a6207f5bc25763c0f64c6d5e2bf8301c206aa6f952dc0e4c04da2099099c",
+    "worktree_idl_sha256": "3fd8a6207f5bc25763c0f64c6d5e2bf8301c206aa6f952dc0e4c04da2099099c",
+    "worktree_head": "30a2c17e5fde8c64073a93e149abb673b92584b0",
+    "idl_byte_equal_to_ci_head_git_blob": true,
+    "verifier_hash_record_matches_calculated_bytes": true
+  },
+  "ci_snapshot": {
+    "actual_build_commit": "a4a4c2e73f241ff906052286c2485c8ddaae49fe",
+    "pr_head": "30a2c17e5fde8c64073a93e149abb673b92584b0",
+    "compare_status": "ahead",
+    "compare_files": [],
+    "compare_total_commits": 1
+  },
+  "scope": "Ordinary pull-request CI and focused hostile-SBF probe. The mutants and fuzz-nightly jobs were skipped; this record does not establish full mutation qualification, a new 24-hour fuzz run, or final mainnet readiness."
+}

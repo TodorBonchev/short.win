@@ -3,7 +3,9 @@
 **Current development scope (owner, 2026-10-27): first mainnet is postponed
 for the [broad Jupiter redesign](../design/JUPITER_REDESIGN.md).**
 The owner selected an in-house price producer and our own keeper with
-Jupiter swaps; exact reporter/risk settings and implementation need qualification. The existing 1.0.3 specification, measurements
+Jupiter swaps, with trusted off-chain history and on-demand authenticated snapshots;
+continuous on-chain publication is superseded. Exact reporter/risk settings and
+implementation need qualification. The existing 1.0.3 specification, measurements
 and operator commands below remain baseline evidence, not deployment approval
 for the new design. Audit/bounty funding timing otherwise remains unchanged.
 
@@ -80,7 +82,8 @@ starting estimate, not a market-count or throughput guarantee. The regular 50 Gi
 boot disk alone is not the full storage recommendation.
 
 The planned worker calls remote Jupiter APIs, performs bounded parsing/math and
-submits authenticated reports; swap simulations run on the remote RPC. It shares
+retains trusted price history locally and updates the authenticated on-chain cache
+only on demand for actual actions; swap simulations run on the remote RPC. It shares
 the keeper's Rust clients/types and build tooling, but runs as a separately
 supervised process with its own scoped reporting key. Quote timeouts/restarts must
 not stall the execution keeper. This process/CLI is not implemented yet. Reuse the
@@ -117,7 +120,9 @@ benchmark of 10 supported markets.
 Jupiter currently lists 1 request/s on Free and 10 requests/s on Developer. Measure
 actual endpoint credit consumption and monthly usage as well as peak RPS before
 selecting an API plan; a VPS with free RAM does not increase that allowance.
-Budget report-update RPC/sends and transaction fees explicitly. The existing
+Budget action-triggered cache-update RPC/sends and transaction fees explicitly.
+Idle off-chain sampling sends no on-chain update. Cap solicited refreshes/retries
+so arbitrary HTTP requests cannot drain the reporter payer. The existing
 1.0.3 execution-keeper budget does not automatically cover the planned price worker.
 [Current Jupiter plans](https://developers.jup.ag/pricing).
 
@@ -137,10 +142,60 @@ limits must meet the reviewed report-freshness and exit requirements. No success
 host load test or provisioned/funded operation is claimed here.
 
 One host is one availability and administrative failure domain. Keep monitoring
-capable of detecting host loss off-host; use separate report/execution OS accounts
-and permissions without calling them independent oracle operators. The host now
+capable of detecting host loss off-host. The current shared quota-file primitive
+requires cooperating quote consumers to use the same restricted service UID and
+budget path/limits; separate systemd units/keys are not independent OS identities.
+Do not deploy separate UIDs against that primitive or claim independent oracle
+operators. A separate-UID topology needs a qualified shared budget broker or a
+conservative partition of the provider quota before activation. The host now
 contains a financial price-reporting authority, so it is not accurately described
 as having only a harmless fee payer. Governance/deployment keys remain off-host.
+
+## Trusted-history and independent recovery commands
+
+The keeper workspace now provides `shortwin-price-watch` with strict fixed-source
+bid/ask estimates, private durable history/evidence and distinct global-financial /
+per-feed producer commitments. The [configuration template](../../services/keeper/price-watch.example.toml)
+refuses placeholders; the [supervision template](../../services/keeper/shortwin-price-watch.service.example)
+runs collection only. These are source implementations, not commissioned services.
+
+The modes have separate effects:
+
+- `--check` verifies actual chain/receiver/domain/producer configuration.
+- `--once` / `--watch` collect and persist off-chain history; they submit no chain update.
+- `--snapshot` exports unsigned current snapshot arguments.
+- `--initialize-budget` explicitly creates the private local publication journal.
+- `--publish` builds only the fixed snapshot-update instruction, simulates the exact
+  bounded message, checks funding/freshness and durably reserves the configured
+  maximum fee/burst allowance before one send. It is never called by `--watch`.
+- `--reconcile` handles the recorded pending signature. Unknown actual fees remain
+  unknown; reservations are not refunded, and pending liability survives midnight.
+
+Do not expose an arbitrary-transaction signing endpoint. The reporter is also its
+publication fee payer and has no governance/vault-withdrawal authority. Configure
+private files/UIDs, exact per-q settings, response/evidence quotas, fee reserves,
+source/RPC limits and delivered alerts before activation. Retained source bodies
+cover the independent bid and selected ask; they do not replay every search
+candidate or prove Jupiter's source-state age/executable minimum.
+
+`shortwin-overdue-recovery --config <file> --position <pubkey> --keeper <pubkey>`
+is read-only by default and does not load a signing key. Its [template](../../services/keeper/overdue-recovery.example.toml)
+requires actual mainnet identity and a reviewed program hash. It verifies the
+locked deadline plus 24h, typed positions/shared accounting, keeper/reward/refund
+breakdown, record-rent and network-fee bounds, then simulates one fixed default
+instruction. Only explicit `--send` signs/submits with a separate funded keeper
+key. The signed `max_epoch_record_rent` is enforced by the program. Preserve public
+receipts and inspect uncertain confirmation before another manual attempt. This
+path needs neither the price process nor reporter key and may be run through a
+qualified fallback RPC. No command here has been used to send a mainnet transaction.
+
+The owner selected zero borrower economic collateral after the locked grace even
+when healthy: keeper receives the capped locked reward, lenders receive `V-K_s`,
+and the full unreturned q claim is explicitly resolved as token-principal loss.
+Account-rent/untracked-donation refunds are separate. Governance/emergency may
+pause trusted price actions; only governance clears that pause. Repayment and the
+clock-based default remain available. Final setup must verify independent recovery,
+actual alerts, balances and artifact/config identities; code tests do not prove it.
 
 ## RPC service and network identity
 

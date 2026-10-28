@@ -621,3 +621,28 @@ pub struct VenueExtrasSet {
     /// displaced `current` had stood for `EXTRAS_STABLE_S` or Governance wrote.
     pub stable_version: u32,
 }
+
+/// Fixed-term quote-native collateral foreclosure after the locked 24-hour grace.
+/// This is token-principal loss/default, never a token repayment or fair-value S3.
+#[event]
+pub struct OverdueCollateralDefault {
+    pub market: Pubkey,
+    pub slot: u64,
+    pub ts: i64,
+    pub position: Pubkey,
+    pub borrower: Pubkey,
+    pub keeper: Pubkey,
+    pub q_lost: u64,
+    pub default_at: i64,
+    pub collateral: u64,
+    pub keeper_payment: u64,
+    pub lender_amount: u64,
+    pub borrower_amount: u64,
+    pub rent_due: u64,
+    pub credited_retired: u64,
+    pub vested: u64,
+    pub vest_flushed: u64,
+    pub share_epoch_after: u32,
+    /// Solana account-rent floor and untracked donations, outside economic collateral V.
+    pub position_account_refund: u64,
+}

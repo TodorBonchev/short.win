@@ -831,7 +831,7 @@ components:
       name: status
       in: query
       description: '`exited` = every status but `open`.'
-      schema: { type: string, enum: [open, closed, liquidated, expired, settled, exited] }
+      schema: { type: string, enum: [open, closed, liquidated, expired, settled, defaulted, exited] }
     EventKinds:
       name: kind
       in: query
@@ -916,11 +916,11 @@ components:
       enum: [A, B, C, D]
     PositionStatus:
       type: string
-      enum: [open, closed, liquidated, expired, settled]
+      enum: [open, closed, liquidated, expired, settled, defaulted]
     EventKind:
       type: string
       enum: [MarketCreated, Deposit, Withdraw, ClaimSol, DeficitCovered, LenderSynced, Open,
-             Close, Repay, Liquidate, Expire, SolSettle, SettleArmed, SettleDisarmed, EpochRolled,
+             Close, Repay, OverdueCollateralDefault, Liquidate, Expire, SolSettle, SettleArmed, SettleDisarmed, EpochRolled,
              ProtocolFeesSwept, MarginAdded, PriceCranked, VenueStateChanged, RouteChainChanged,
              PoolProposed, PoolSwitched, PoolSwitchCancelled, TraderSwept, VenueRewardsClaimed,
              MintSafetyTripped, VenueUpgradeFlagged, VenueRevalidated, CoverageGap,
@@ -930,7 +930,7 @@ components:
       type: string
       enum: [creation_fee, open_fee, venue_rent, rent_lender, rent_protocol, liq_penalty_lender,
              liq_penalty_protocol, liq_penalty_keeper, liq_keeper_topup, expiry_fee,
-             expiry_keeper_reward, settle_keeper_reward, trader_sweep_lenders, trader_sweep_wipe,
+             expiry_keeper_reward, settle_keeper_reward, overdue_keeper_reward, trader_sweep_lenders, trader_sweep_wipe,
              trader_sweep_protocol, venue_rewards_lenders, venue_rewards_wipe,
              venue_rewards_protocol]
 
@@ -1112,6 +1112,9 @@ components:
           oneOf: [{ $ref: '#/components/schemas/I128' }, { type: 'null' }]
         borrower_pnl_known_exits: { type: integer }
         borrower_pnl_unknown_exits: { type: integer }
+        overdue_collateral_defaults: { type: integer }
+        overdue_principal_tokens_lost: { $ref: '#/components/schemas/BigNum' }
+        overdue_lender_collateral: { $ref: '#/components/schemas/BigNum' }
     LenderLoss:
       type: object
       required: [settlements, token_value, lender_amount, lender_pnl, realised_lender_loss,
@@ -1251,11 +1254,11 @@ components:
             - type: 'null'
             - type: object
               required: [ts, signature, kind, keeper, buyback_cost, rent_paid, penalty, expiry_fee,
-                         keeper_paid, borrower_payout, settle_condition, borrower_pnl, duration_s]
+                         keeper_paid, borrower_payout, settle_condition, borrower_pnl, duration_s, overdue_default]
               properties:
                 ts: { type: integer }
                 signature: { $ref: '#/components/schemas/Signature' }
-                kind: { type: string, enum: [Close, Repay, Liquidate, Expire, SolSettle] }
+                kind: { type: string, enum: [Close, Repay, Liquidate, Expire, SolSettle, OverdueCollateralDefault] }
                 keeper: { oneOf: [{ $ref: '#/components/schemas/Pubkey' }, { type: 'null' }] }
                 buyback_cost: { oneOf: [{ $ref: '#/components/schemas/U64' }, { type: 'null' }] }
                 rent_paid: { oneOf: [{ $ref: '#/components/schemas/U64' }, { type: 'null' }] }
@@ -1265,9 +1268,29 @@ components:
                 borrower_payout: { $ref: '#/components/schemas/U64' }
                 settle_condition: { type: [string, 'null'], enum: [S1, S2, S3, null] }
                 borrower_pnl:
-                  description: Null for Repay; external token acquisition cost is unknown.
+                  description: Null for Repay (external token cost unknown) and overdue collateral default (separate principal write-off; no buyback PNL claimed).
                   oneOf: [{ $ref: '#/components/schemas/I128' }, { type: 'null' }]
                 duration_s: { type: integer }
+                overdue_default:
+                  oneOf: [{ $ref: '#/components/schemas/OverdueDefault' }, { type: 'null' }]
+    OverdueDefault:
+      description: Fixed deadline plus locked 24h grace, not fair-value settlement or token repayment. q_lost is nominal token principal extinguished; position_account_refund excludes tracked collateral.
+      type: object
+      required: [q_lost, default_at, collateral, lender_amount, keeper_payment, borrower_amount,
+                 rent_due, credited_retired, vested, vest_flushed, share_epoch_after, position_account_refund]
+      properties:
+        q_lost: { $ref: '#/components/schemas/U64' }
+        default_at: { type: integer }
+        collateral: { $ref: '#/components/schemas/U64' }
+        lender_amount: { $ref: '#/components/schemas/U64' }
+        keeper_payment: { $ref: '#/components/schemas/U64' }
+        borrower_amount: { $ref: '#/components/schemas/U64' }
+        rent_due: { $ref: '#/components/schemas/U64' }
+        credited_retired: { $ref: '#/components/schemas/U64' }
+        vested: { $ref: '#/components/schemas/U64' }
+        vest_flushed: { $ref: '#/components/schemas/U64' }
+        share_epoch_after: { type: integer }
+        position_account_refund: { $ref: '#/components/schemas/U64' }
     PositionPage:
       allOf:
         - { $ref: '#/components/schemas/PageMeta' }
@@ -1293,7 +1316,7 @@ components:
         - type: object
           required: [kind, market, mint, position, keeper, q, buyback_cost, lender_amount, keeper_paid, borrower_payout, settle_condition, expired]
           properties:
-            kind: { type: string, enum: [liquidation, expiry, settlement] }
+            kind: { type: string, enum: [liquidation, expiry, settlement, overdue_default] }
             market: { $ref: '#/components/schemas/Pubkey' }
             mint: { $ref: '#/components/schemas/Pubkey' }
             position: { $ref: '#/components/schemas/Pubkey' }
@@ -1558,6 +1581,7 @@ components:
         liquidations: { type: integer }
         expiries: { type: integer }
         settlements: { type: integer }
+        overdue_defaults: { type: integer }
         rewards_lamports: { $ref: '#/components/schemas/BigNum' }
         markets: { type: integer }
         failures: { type: integer, description: 'Failed exit, crank, pool and coverage attempts paid by this key (one per transaction and instruction; the counters of v_keeper_failures, kept within the invocation retention).' }

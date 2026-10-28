@@ -1,5 +1,13 @@
 # services
 
+> Active Jupiter redesign: the owner accepts trusted off-chain history on the VPS
+> and on-demand authenticated snapshots. Keep polling/history local; idle sampling
+> does not publish chain transactions. Use dedicated scoped reporter credentials,
+> exact-q/model/policy matching, bounded request and action-fee budgets, and explicit
+> Unknown handling. The [operations contract](../docs/deployment/MAINNET_OPERATIONS.md)
+> records commissioning requirements; no provisioned/funded price service is claimed.
+
+
 **Current mainnet preparation (owner, 2026-10-27):** launch with existing
 per-market borrowing caps before an external audit and a funded bug bounty;
 deposits and market count remain uncapped. Use earned protocol fees to accumulate

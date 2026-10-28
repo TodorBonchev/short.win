@@ -1,0 +1,5 @@
+commit a4a4c2e73f241ff906052286c2485c8ddaae49fe (pull-request merge commit, on no branch: PR head 30a2c17e5fde8c64073a93e149abb673b92584b0 merged into its base)
+solana-verify 0.5.2; image solanafoundation/solana-verifiable-build@sha256:2e0b78f44ee76612e9260c7c988570c5e14de6fbd93e0ab07115ec7054473b4f
+args: --arch v3 --cargo-build-sbf-args="--tools-version v1.57"
+# program  sha256(file)  executable-hash(trailing zeros trimmed; on-chain comparison)  bytes
+shortwin 392b6ac13811e599bb2b3c80ef175382ff7abb27bdcb4c2801b73e6eea82abc9 95c151e4081835772382dd48d0732c140eadca8f32c568991fd99d85c7dab7a2 1759472

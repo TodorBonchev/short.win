@@ -55,7 +55,9 @@ continuous keeper/report availability or recovery of all lender token principal.
 
 Operate the quantity-specific price producer ourselves. It collects Jupiter quote
 candidates and validated simulation evidence, applies the reviewed reference policy
-and submits an authorized price-update instruction. Standard Solana transaction
+and retains completed history off chain. It submits an authorized on-demand
+snapshot only when a financial action needs a fresh matching cache. There is no
+continuous on-chain price heartbeat. Standard Solana transaction
 signatures plus an on-chain reporter allowlist can authenticate these updates;
 a third-party oracle SDK or a custom detached-signature parser is not inherently
 required. Authentication binds our reporting authority, not the truth or fairness
@@ -66,9 +68,11 @@ candidate atomic buybacks, while the program verifies eligibility, accepted pric
 history, locked terms, maximum debit and actual net debt-token repayment. The
 reporter key has no vault withdrawal authority. Separate report and execution roles.
 The indexer reconstructs state, retains source observations/fills and alerts on
-inconsistencies. It cannot replace program-enforced authoritative history with a
-caller-supplied database history. Multiple keys on one VPS or under one operator
-are not independent quorum.
+inconsistencies. Under the owner's later explicit selection, historical values
+are trusted operator assertions from that database. The new snapshot mode must
+not be confused with public on-chain historical publication. Arbitrary callers
+cannot replace them with their own history. Multiple keys on one VPS or under one
+operator are not independent quorum.
 
 Ordinary HTTP/API JSON can guide search and execution. The on-chain program cannot
 fetch that HTTP endpoint or distinguish arbitrary submitted JSON from a genuine
@@ -131,7 +135,8 @@ before deployment, and new markets remain disabled until qualification.
 
 Reuse keeper clients/types and build tooling, with pricing as a separately
 supervised worker from the same Rust codebase. This is planned work; no new CLI
-or service binary is claimed to exist. Keep a distinct scoped report key and
+or fully qualified signing service is claimed to exist. The read-only probe and
+durable-history/watch implementation are development checkpoints. Keep a distinct scoped report key and
 separate execution payer permissions. One host remains one administrative and
 availability failure domain, regardless of process/key count.
 
@@ -141,3 +146,34 @@ routing and remote RPC simulations. Bounded request queues, shared caching and
 exit-priority budgets avoid adding a message broker, separate microservice cluster
 or full validator merely to collect and publish prices. Host capacity and oracle
 financial/reference correctness are separate qualification questions.
+
+## Selected history transport and action sequencing
+
+The owner's explicit trusted-VPS-history decision supersedes continuous on-chain
+publication. The program authenticates an immutable exact-q snapshot account and
+allowed runtime reporter Signer, validates fresh live marks and structurally valid
+completed history, and enforces financial arithmetic. It cannot establish private
+sample truth, collection time or absence of omitted gaps. A database checksum is
+integrity evidence, not independent price verification.
+
+New cache mode/version/seeds and codec prevent interpreting this history as the
+older public-history witness. The source epoch anchors completed history; actual
+runtime time/slot cap observation age even if landing crosses an epoch boundary.
+Latest/minimum-sequence reads permit a fresher cache to satisfy an already signed,
+bounded action. The exact account/model/policy/quantity and monetary limits remain
+locked. Updating and acting in separate transactions are not jointly atomic;
+stale evidence or breached bounds must refuse the financial action.
+
+Keeper batching is optional after packet/CU qualification. Borrower wallet approval
+can outlast freshness: refresh the cache after approval, then submit unchanged
+signed bytes if still valid. Rebuild/re-sign when blockhash, state or bounds require
+it. No arbitrary-transaction co-signing endpoint is selected. Full-token repayment
+and borrower-consented bounded exits remain price independent.
+
+Private historical persistence cannot prove continuous bad health. Any sparse
+forced-action arm must enforce a real on-chain elapsed delay and fresh recheck;
+it proves separated checks only. Unknown is not insolvency, and private history
+alone cannot authorize immediate cash confiscation. The owner subsequently explicitly selected deadline-plus-24h collateral default
+with zero borrower payout even when healthy. That distinct clock-based path needs
+its immutable terms, complete loss accounting and independent recovery tests; the
+history decision alone did not select it.

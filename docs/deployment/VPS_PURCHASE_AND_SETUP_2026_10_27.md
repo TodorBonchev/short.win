@@ -49,15 +49,18 @@ actual call mix, including reads, simulations, retries and confirmations.
 
 The total excludes domain/website costs, any paid independent alert/fallback RPC
 service, backup/egress overages and SOL transaction/deployment/rent budgets.
-The current proposed two-feed, two-second publication schedule was separately
+The earlier two-feed, two-second on-chain publication schedule was rejected by
+the owner and is superseded by trusted off-chain history/on-demand snapshots.
+The following cost is retained only as historical rejected-design evidence. It was
 measured in the [publication-cost record](../audit/probes/price-publication-cost-2026-10-27/README.md):
 continuous 30-day base signature fees alone would be **12.96 SOL** with separate
 updates, or **6.48 SOL** with a qualified two-report batch. The no-ALT batch with
 normal compute-budget instructions is 1,278 bytes and exceeds the 1,232-byte v0
 limit. A synthetic ALT reduces it to 1,188 bytes, proving only structural fit.
 No actual ALT, batching/landing cadence, priority-fee budget or additional SOL
-spending is approved by the hosting/API budget. Review these costs, the publication
-duty cycle and payer funding before selecting production timing. Determine
+spending is approved by the hosting/API budget. The active model needs measured
+per-action refresh/retry funding and RPC/API budgets, not this continuous monthly
+SOL allowance. Determine
 those from final artifacts, measured operation and the owner's actual accounts;
 do not substitute a guessed SOL balance or spot fiat conversion for funding evidence.
 

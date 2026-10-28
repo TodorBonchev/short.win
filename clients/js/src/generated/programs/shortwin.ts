@@ -40,6 +40,11 @@ import {
   getMarketVaultCodec,
   getOracleCacheCodec,
   getPriceReportCodec,
+  getPriceSnapshotCodec,
+  getQuoteFinanceExposureCodec,
+  getQuoteFinanceMarketCodec,
+  getQuoteFinancePositionCodec,
+  getQuotePolicyCodec,
   getShortPositionCodec,
   getVenueExtrasCodec,
   getVenueGuardCodec,
@@ -56,6 +61,16 @@ import {
   type OracleCacheArgs,
   type PriceReport,
   type PriceReportArgs,
+  type PriceSnapshot,
+  type PriceSnapshotArgs,
+  type QuoteFinanceExposure,
+  type QuoteFinanceExposureArgs,
+  type QuoteFinanceMarket,
+  type QuoteFinanceMarketArgs,
+  type QuoteFinancePosition,
+  type QuoteFinancePositionArgs,
+  type QuotePolicy,
+  type QuotePolicyArgs,
   type ShortPosition,
   type ShortPositionArgs,
   type VenueExtras,
@@ -69,6 +84,7 @@ import {
   getAddMarginInstruction,
   getApplyConfigInstructionAsync,
   getCancelConfigInstructionAsync,
+  getCheckQuoteReferenceInstructionAsync,
   getClaimSolInstructionAsync,
   getCloseShortInstructionAsync,
   getCoverDeficitInstructionAsync,
@@ -83,15 +99,21 @@ import {
   getFlagVenueUpgradedInstructionAsync,
   getInitializeConfigInstructionAsync,
   getInitializePriceReportInstructionAsync,
+  getInitializePriceSnapshotInstructionAsync,
+  getInitializeQuotePolicyInstructionAsync,
   getLiquidateInstructionAsync,
   getOpenShortInstructionAsync,
+  getOverdueQuoteDefaultInstructionAsync,
   getProposeConfigInstructionAsync,
   getProposePoolInstructionAsync,
   getPublishPriceReportInstructionAsync,
+  getPublishPriceSnapshotInstructionAsync,
+  getRepayQuoteShortInstructionAsync,
   getRepayShortInstructionAsync,
   getRevalidateVenueInstructionAsync,
   getSetCoveragePauseInstructionAsync,
   getSetPauseInstructionAsync,
+  getSetQuotePricePauseInstructionAsync,
   getSetRouteBrokenInstructionAsync,
   getSetVenueExtrasInstructionAsync,
   getSolSettleInstructionAsync,
@@ -102,6 +124,7 @@ import {
   parseAddMarginInstruction,
   parseApplyConfigInstruction,
   parseCancelConfigInstruction,
+  parseCheckQuoteReferenceInstruction,
   parseClaimSolInstruction,
   parseCloseShortInstruction,
   parseCoverDeficitInstruction,
@@ -116,15 +139,21 @@ import {
   parseFlagVenueUpgradedInstruction,
   parseInitializeConfigInstruction,
   parseInitializePriceReportInstruction,
+  parseInitializePriceSnapshotInstruction,
+  parseInitializeQuotePolicyInstruction,
   parseLiquidateInstruction,
   parseOpenShortInstruction,
+  parseOverdueQuoteDefaultInstruction,
   parseProposeConfigInstruction,
   parseProposePoolInstruction,
   parsePublishPriceReportInstruction,
+  parsePublishPriceSnapshotInstruction,
+  parseRepayQuoteShortInstruction,
   parseRepayShortInstruction,
   parseRevalidateVenueInstruction,
   parseSetCoveragePauseInstruction,
   parseSetPauseInstruction,
+  parseSetQuotePricePauseInstruction,
   parseSetRouteBrokenInstruction,
   parseSetVenueExtrasInstruction,
   parseSolSettleInstruction,
@@ -135,6 +164,7 @@ import {
   type AddMarginInput,
   type ApplyConfigAsyncInput,
   type CancelConfigAsyncInput,
+  type CheckQuoteReferenceAsyncInput,
   type ClaimSolAsyncInput,
   type CloseShortAsyncInput,
   type CoverDeficitAsyncInput,
@@ -149,11 +179,15 @@ import {
   type FlagVenueUpgradedAsyncInput,
   type InitializeConfigAsyncInput,
   type InitializePriceReportAsyncInput,
+  type InitializePriceSnapshotAsyncInput,
+  type InitializeQuotePolicyAsyncInput,
   type LiquidateAsyncInput,
   type OpenShortAsyncInput,
+  type OverdueQuoteDefaultAsyncInput,
   type ParsedAddMarginInstruction,
   type ParsedApplyConfigInstruction,
   type ParsedCancelConfigInstruction,
+  type ParsedCheckQuoteReferenceInstruction,
   type ParsedClaimSolInstruction,
   type ParsedCloseShortInstruction,
   type ParsedCoverDeficitInstruction,
@@ -168,15 +202,21 @@ import {
   type ParsedFlagVenueUpgradedInstruction,
   type ParsedInitializeConfigInstruction,
   type ParsedInitializePriceReportInstruction,
+  type ParsedInitializePriceSnapshotInstruction,
+  type ParsedInitializeQuotePolicyInstruction,
   type ParsedLiquidateInstruction,
   type ParsedOpenShortInstruction,
+  type ParsedOverdueQuoteDefaultInstruction,
   type ParsedProposeConfigInstruction,
   type ParsedProposePoolInstruction,
   type ParsedPublishPriceReportInstruction,
+  type ParsedPublishPriceSnapshotInstruction,
+  type ParsedRepayQuoteShortInstruction,
   type ParsedRepayShortInstruction,
   type ParsedRevalidateVenueInstruction,
   type ParsedSetCoveragePauseInstruction,
   type ParsedSetPauseInstruction,
+  type ParsedSetQuotePricePauseInstruction,
   type ParsedSetRouteBrokenInstruction,
   type ParsedSetVenueExtrasInstruction,
   type ParsedSolSettleInstruction,
@@ -187,10 +227,13 @@ import {
   type ProposeConfigAsyncInput,
   type ProposePoolAsyncInput,
   type PublishPriceReportAsyncInput,
+  type PublishPriceSnapshotAsyncInput,
+  type RepayQuoteShortAsyncInput,
   type RepayShortAsyncInput,
   type RevalidateVenueAsyncInput,
   type SetCoveragePauseAsyncInput,
   type SetPauseAsyncInput,
+  type SetQuotePricePauseAsyncInput,
   type SetRouteBrokenAsyncInput,
   type SetVenueExtrasAsyncInput,
   type SolSettleAsyncInput,
@@ -202,10 +245,12 @@ import {
 import {
   findConfigPda,
   findExposurePda,
+  findFinanceMarketPda,
   findLenderPda,
   findMarketPda,
   findMarketVaultPda,
   findOracleCachePda,
+  findOverdueQuoteDefaultExposurePda,
   findPoolVaultPda,
   findPositionPda,
   findTraderPda,
@@ -226,20 +271,30 @@ export const ShortwinAccount = {
   3: "MarketVault",
   4: "OracleCache",
   5: "PriceReport",
-  6: "ShortPosition",
-  7: "VenueExtras",
-  8: "VenueGuard",
-  9: "WalletExposure",
+  6: "PriceSnapshot",
+  7: "QuoteFinanceExposure",
+  8: "QuoteFinanceMarket",
+  9: "QuoteFinancePosition",
+  10: "QuotePolicy",
+  11: "ShortPosition",
+  12: "VenueExtras",
+  13: "VenueGuard",
+  14: "WalletExposure",
   GlobalConfig: 0,
   LenderPosition: 1,
   Market: 2,
   MarketVault: 3,
   OracleCache: 4,
   PriceReport: 5,
-  ShortPosition: 6,
-  VenueExtras: 7,
-  VenueGuard: 8,
-  WalletExposure: 9,
+  PriceSnapshot: 6,
+  QuoteFinanceExposure: 7,
+  QuoteFinanceMarket: 8,
+  QuoteFinancePosition: 9,
+  QuotePolicy: 10,
+  ShortPosition: 11,
+  VenueExtras: 12,
+  VenueGuard: 13,
+  WalletExposure: 14,
 } as const;
 
 export type ShortwinAccount = (typeof ShortwinAccount)[Exclude<
@@ -321,6 +376,61 @@ export function identifyShortwinAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([152, 36, 67, 109, 153, 115, 119, 27]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinAccount.PriceSnapshot;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([154, 254, 151, 241, 19, 111, 125, 27]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinAccount.QuoteFinanceExposure;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([45, 47, 202, 241, 250, 148, 31, 165]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinAccount.QuoteFinanceMarket;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([116, 226, 168, 38, 244, 77, 168, 178]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinAccount.QuoteFinancePosition;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 43, 26, 79, 86, 39, 171, 67]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinAccount.QuotePolicy;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([110, 216, 100, 57, 75, 53, 168, 59]),
       ),
       0,
@@ -385,26 +495,27 @@ export const ShortwinEvent = {
   14: "MarketCreated",
   15: "MintSafetyTripped",
   16: "Open",
-  17: "PauseSet",
-  18: "PoolProposed",
-  19: "PoolSwitchCancelled",
-  20: "PoolSwitched",
-  21: "PriceCranked",
-  22: "ProtocolFeesSwept",
-  23: "Repay",
-  24: "RouteBrokenSet",
-  25: "RouteChainChanged",
-  26: "SettleArmed",
-  27: "SettleDisarmed",
-  28: "SolSettle",
-  29: "TraderSwept",
-  30: "VenueDisabled",
-  31: "VenueExtrasSet",
-  32: "VenueRevalidated",
-  33: "VenueRewardsClaimed",
-  34: "VenueStateChanged",
-  35: "VenueUpgradeFlagged",
-  36: "Withdraw",
+  17: "OverdueCollateralDefault",
+  18: "PauseSet",
+  19: "PoolProposed",
+  20: "PoolSwitchCancelled",
+  21: "PoolSwitched",
+  22: "PriceCranked",
+  23: "ProtocolFeesSwept",
+  24: "Repay",
+  25: "RouteBrokenSet",
+  26: "RouteChainChanged",
+  27: "SettleArmed",
+  28: "SettleDisarmed",
+  29: "SolSettle",
+  30: "TraderSwept",
+  31: "VenueDisabled",
+  32: "VenueExtrasSet",
+  33: "VenueRevalidated",
+  34: "VenueRewardsClaimed",
+  35: "VenueStateChanged",
+  36: "VenueUpgradeFlagged",
+  37: "Withdraw",
   ClaimSol: 0,
   Close: 1,
   ConfigApplied: 2,
@@ -422,26 +533,27 @@ export const ShortwinEvent = {
   MarketCreated: 14,
   MintSafetyTripped: 15,
   Open: 16,
-  PauseSet: 17,
-  PoolProposed: 18,
-  PoolSwitchCancelled: 19,
-  PoolSwitched: 20,
-  PriceCranked: 21,
-  ProtocolFeesSwept: 22,
-  Repay: 23,
-  RouteBrokenSet: 24,
-  RouteChainChanged: 25,
-  SettleArmed: 26,
-  SettleDisarmed: 27,
-  SolSettle: 28,
-  TraderSwept: 29,
-  VenueDisabled: 30,
-  VenueExtrasSet: 31,
-  VenueRevalidated: 32,
-  VenueRewardsClaimed: 33,
-  VenueStateChanged: 34,
-  VenueUpgradeFlagged: 35,
-  Withdraw: 36,
+  OverdueCollateralDefault: 17,
+  PauseSet: 18,
+  PoolProposed: 19,
+  PoolSwitchCancelled: 20,
+  PoolSwitched: 21,
+  PriceCranked: 22,
+  ProtocolFeesSwept: 23,
+  Repay: 24,
+  RouteBrokenSet: 25,
+  RouteChainChanged: 26,
+  SettleArmed: 27,
+  SettleDisarmed: 28,
+  SolSettle: 29,
+  TraderSwept: 30,
+  VenueDisabled: 31,
+  VenueExtrasSet: 32,
+  VenueRevalidated: 33,
+  VenueRewardsClaimed: 34,
+  VenueStateChanged: 35,
+  VenueUpgradeFlagged: 36,
+  Withdraw: 37,
 } as const;
 
 export type ShortwinEvent = (typeof ShortwinEvent)[Exclude<
@@ -639,6 +751,17 @@ export function identifyShortwinEvent(
     )
   ) {
     return ShortwinEvent.Open;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([2, 185, 242, 248, 210, 23, 116, 79]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinEvent.OverdueCollateralDefault;
   }
   if (
     containsBytes(
@@ -869,69 +992,83 @@ export const ShortwinInstruction = {
   0: "AddMargin",
   1: "ApplyConfig",
   2: "CancelConfig",
-  3: "ClaimSol",
-  4: "CloseShort",
-  5: "CoverDeficit",
-  6: "CrankPrice",
-  7: "CrankSolUsd",
-  8: "CreateMarket",
-  9: "Deposit",
-  10: "DisableVenue",
-  11: "ExecutePoolSwitch",
-  12: "Expire",
-  13: "FlagUnsafeMint",
-  14: "FlagVenueUpgraded",
-  15: "InitializeConfig",
-  16: "InitializePriceReport",
-  17: "Liquidate",
-  18: "OpenShort",
-  19: "ProposeConfig",
-  20: "ProposePool",
-  21: "PublishPriceReport",
-  22: "RepayShort",
-  23: "RevalidateVenue",
-  24: "SetCoveragePause",
-  25: "SetPause",
-  26: "SetRouteBroken",
-  27: "SetVenueExtras",
-  28: "SolSettle",
-  29: "SweepProtocolFees",
-  30: "SweepTrader",
-  31: "SyncLender",
-  32: "Withdraw",
+  3: "CheckQuoteReference",
+  4: "ClaimSol",
+  5: "CloseShort",
+  6: "CoverDeficit",
+  7: "CrankPrice",
+  8: "CrankSolUsd",
+  9: "CreateMarket",
+  10: "Deposit",
+  11: "DisableVenue",
+  12: "ExecutePoolSwitch",
+  13: "Expire",
+  14: "FlagUnsafeMint",
+  15: "FlagVenueUpgraded",
+  16: "InitializeConfig",
+  17: "InitializePriceReport",
+  18: "InitializePriceSnapshot",
+  19: "InitializeQuotePolicy",
+  20: "Liquidate",
+  21: "OpenShort",
+  22: "OverdueQuoteDefault",
+  23: "ProposeConfig",
+  24: "ProposePool",
+  25: "PublishPriceReport",
+  26: "PublishPriceSnapshot",
+  27: "RepayQuoteShort",
+  28: "RepayShort",
+  29: "RevalidateVenue",
+  30: "SetCoveragePause",
+  31: "SetPause",
+  32: "SetQuotePricePause",
+  33: "SetRouteBroken",
+  34: "SetVenueExtras",
+  35: "SolSettle",
+  36: "SweepProtocolFees",
+  37: "SweepTrader",
+  38: "SyncLender",
+  39: "Withdraw",
   AddMargin: 0,
   ApplyConfig: 1,
   CancelConfig: 2,
-  ClaimSol: 3,
-  CloseShort: 4,
-  CoverDeficit: 5,
-  CrankPrice: 6,
-  CrankSolUsd: 7,
-  CreateMarket: 8,
-  Deposit: 9,
-  DisableVenue: 10,
-  ExecutePoolSwitch: 11,
-  Expire: 12,
-  FlagUnsafeMint: 13,
-  FlagVenueUpgraded: 14,
-  InitializeConfig: 15,
-  InitializePriceReport: 16,
-  Liquidate: 17,
-  OpenShort: 18,
-  ProposeConfig: 19,
-  ProposePool: 20,
-  PublishPriceReport: 21,
-  RepayShort: 22,
-  RevalidateVenue: 23,
-  SetCoveragePause: 24,
-  SetPause: 25,
-  SetRouteBroken: 26,
-  SetVenueExtras: 27,
-  SolSettle: 28,
-  SweepProtocolFees: 29,
-  SweepTrader: 30,
-  SyncLender: 31,
-  Withdraw: 32,
+  CheckQuoteReference: 3,
+  ClaimSol: 4,
+  CloseShort: 5,
+  CoverDeficit: 6,
+  CrankPrice: 7,
+  CrankSolUsd: 8,
+  CreateMarket: 9,
+  Deposit: 10,
+  DisableVenue: 11,
+  ExecutePoolSwitch: 12,
+  Expire: 13,
+  FlagUnsafeMint: 14,
+  FlagVenueUpgraded: 15,
+  InitializeConfig: 16,
+  InitializePriceReport: 17,
+  InitializePriceSnapshot: 18,
+  InitializeQuotePolicy: 19,
+  Liquidate: 20,
+  OpenShort: 21,
+  OverdueQuoteDefault: 22,
+  ProposeConfig: 23,
+  ProposePool: 24,
+  PublishPriceReport: 25,
+  PublishPriceSnapshot: 26,
+  RepayQuoteShort: 27,
+  RepayShort: 28,
+  RevalidateVenue: 29,
+  SetCoveragePause: 30,
+  SetPause: 31,
+  SetQuotePricePause: 32,
+  SetRouteBroken: 33,
+  SetVenueExtras: 34,
+  SolSettle: 35,
+  SweepProtocolFees: 36,
+  SweepTrader: 37,
+  SyncLender: 38,
+  Withdraw: 39,
 } as const;
 
 export type ShortwinInstruction = (typeof ShortwinInstruction)[Exclude<
@@ -975,6 +1112,17 @@ export function identifyShortwinInstruction(
     )
   ) {
     return ShortwinInstruction.CancelConfig;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([237, 219, 120, 174, 251, 9, 70, 133]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.CheckQuoteReference;
   }
   if (
     containsBytes(
@@ -1134,6 +1282,28 @@ export function identifyShortwinInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([1, 69, 60, 231, 200, 31, 9, 223]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.InitializePriceSnapshot;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([210, 167, 89, 214, 64, 140, 123, 29]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.InitializeQuotePolicy;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([223, 179, 226, 125, 48, 46, 39, 74]),
       ),
       0,
@@ -1151,6 +1321,17 @@ export function identifyShortwinInstruction(
     )
   ) {
     return ShortwinInstruction.OpenShort;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([222, 183, 120, 157, 6, 141, 217, 177]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.OverdueQuoteDefault;
   }
   if (
     containsBytes(
@@ -1184,6 +1365,28 @@ export function identifyShortwinInstruction(
     )
   ) {
     return ShortwinInstruction.PublishPriceReport;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([5, 33, 77, 182, 0, 135, 12, 240]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.PublishPriceSnapshot;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([249, 51, 112, 50, 40, 214, 204, 255]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.RepayQuoteShort;
   }
   if (
     containsBytes(
@@ -1228,6 +1431,17 @@ export function identifyShortwinInstruction(
     )
   ) {
     return ShortwinInstruction.SetPause;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([149, 111, 0, 252, 149, 180, 101, 203]),
+      ),
+      0,
+    )
+  ) {
+    return ShortwinInstruction.SetQuotePricePause;
   }
   if (
     containsBytes(
@@ -1325,6 +1539,9 @@ export type ParsedShortwinInstruction<
       instructionType: typeof ShortwinInstruction.CancelConfig;
     } & ParsedCancelConfigInstruction<TProgram>)
   | ({
+      instructionType: typeof ShortwinInstruction.CheckQuoteReference;
+    } & ParsedCheckQuoteReferenceInstruction<TProgram>)
+  | ({
       instructionType: typeof ShortwinInstruction.ClaimSol;
     } & ParsedClaimSolInstruction<TProgram>)
   | ({
@@ -1367,11 +1584,20 @@ export type ParsedShortwinInstruction<
       instructionType: typeof ShortwinInstruction.InitializePriceReport;
     } & ParsedInitializePriceReportInstruction<TProgram>)
   | ({
+      instructionType: typeof ShortwinInstruction.InitializePriceSnapshot;
+    } & ParsedInitializePriceSnapshotInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.InitializeQuotePolicy;
+    } & ParsedInitializeQuotePolicyInstruction<TProgram>)
+  | ({
       instructionType: typeof ShortwinInstruction.Liquidate;
     } & ParsedLiquidateInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.OpenShort;
     } & ParsedOpenShortInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.OverdueQuoteDefault;
+    } & ParsedOverdueQuoteDefaultInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.ProposeConfig;
     } & ParsedProposeConfigInstruction<TProgram>)
@@ -1381,6 +1607,12 @@ export type ParsedShortwinInstruction<
   | ({
       instructionType: typeof ShortwinInstruction.PublishPriceReport;
     } & ParsedPublishPriceReportInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.PublishPriceSnapshot;
+    } & ParsedPublishPriceSnapshotInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.RepayQuoteShort;
+    } & ParsedRepayQuoteShortInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.RepayShort;
     } & ParsedRepayShortInstruction<TProgram>)
@@ -1393,6 +1625,9 @@ export type ParsedShortwinInstruction<
   | ({
       instructionType: typeof ShortwinInstruction.SetPause;
     } & ParsedSetPauseInstruction<TProgram>)
+  | ({
+      instructionType: typeof ShortwinInstruction.SetQuotePricePause;
+    } & ParsedSetQuotePricePauseInstruction<TProgram>)
   | ({
       instructionType: typeof ShortwinInstruction.SetRouteBroken;
     } & ParsedSetRouteBrokenInstruction<TProgram>)
@@ -1439,6 +1674,13 @@ export function parseShortwinInstruction<TProgram extends string>(
       return {
         instructionType: ShortwinInstruction.CancelConfig,
         ...parseCancelConfigInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.CheckQuoteReference: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.CheckQuoteReference,
+        ...parseCheckQuoteReferenceInstruction(instruction),
       };
     }
     case ShortwinInstruction.ClaimSol: {
@@ -1539,6 +1781,20 @@ export function parseShortwinInstruction<TProgram extends string>(
         ...parseInitializePriceReportInstruction(instruction),
       };
     }
+    case ShortwinInstruction.InitializePriceSnapshot: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.InitializePriceSnapshot,
+        ...parseInitializePriceSnapshotInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.InitializeQuotePolicy: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.InitializeQuotePolicy,
+        ...parseInitializeQuotePolicyInstruction(instruction),
+      };
+    }
     case ShortwinInstruction.Liquidate: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -1551,6 +1807,13 @@ export function parseShortwinInstruction<TProgram extends string>(
       return {
         instructionType: ShortwinInstruction.OpenShort,
         ...parseOpenShortInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.OverdueQuoteDefault: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.OverdueQuoteDefault,
+        ...parseOverdueQuoteDefaultInstruction(instruction),
       };
     }
     case ShortwinInstruction.ProposeConfig: {
@@ -1572,6 +1835,20 @@ export function parseShortwinInstruction<TProgram extends string>(
       return {
         instructionType: ShortwinInstruction.PublishPriceReport,
         ...parsePublishPriceReportInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.PublishPriceSnapshot: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.PublishPriceSnapshot,
+        ...parsePublishPriceSnapshotInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.RepayQuoteShort: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.RepayQuoteShort,
+        ...parseRepayQuoteShortInstruction(instruction),
       };
     }
     case ShortwinInstruction.RepayShort: {
@@ -1600,6 +1877,13 @@ export function parseShortwinInstruction<TProgram extends string>(
       return {
         instructionType: ShortwinInstruction.SetPause,
         ...parseSetPauseInstruction(instruction),
+      };
+    }
+    case ShortwinInstruction.SetQuotePricePause: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: ShortwinInstruction.SetQuotePricePause,
+        ...parseSetQuotePricePauseInstruction(instruction),
       };
     }
     case ShortwinInstruction.SetRouteBroken: {
@@ -1681,6 +1965,16 @@ export type ShortwinPluginAccounts = {
     SelfFetchFunctions<OracleCacheArgs, OracleCache>;
   priceReport: ReturnType<typeof getPriceReportCodec> &
     SelfFetchFunctions<PriceReportArgs, PriceReport>;
+  priceSnapshot: ReturnType<typeof getPriceSnapshotCodec> &
+    SelfFetchFunctions<PriceSnapshotArgs, PriceSnapshot>;
+  quoteFinanceExposure: ReturnType<typeof getQuoteFinanceExposureCodec> &
+    SelfFetchFunctions<QuoteFinanceExposureArgs, QuoteFinanceExposure>;
+  quoteFinanceMarket: ReturnType<typeof getQuoteFinanceMarketCodec> &
+    SelfFetchFunctions<QuoteFinanceMarketArgs, QuoteFinanceMarket>;
+  quoteFinancePosition: ReturnType<typeof getQuoteFinancePositionCodec> &
+    SelfFetchFunctions<QuoteFinancePositionArgs, QuoteFinancePosition>;
+  quotePolicy: ReturnType<typeof getQuotePolicyCodec> &
+    SelfFetchFunctions<QuotePolicyArgs, QuotePolicy>;
   shortPosition: ReturnType<typeof getShortPositionCodec> &
     SelfFetchFunctions<ShortPositionArgs, ShortPosition>;
   venueExtras: ReturnType<typeof getVenueExtrasCodec> &
@@ -1702,6 +1996,10 @@ export type ShortwinPluginInstructions = {
   cancelConfig: (
     input: CancelConfigAsyncInput,
   ) => ReturnType<typeof getCancelConfigInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  checkQuoteReference: (
+    input: CheckQuoteReferenceAsyncInput,
+  ) => ReturnType<typeof getCheckQuoteReferenceInstructionAsync> &
     SelfPlanAndSendFunctions;
   claimSol: (
     input: ClaimSolAsyncInput,
@@ -1757,6 +2055,14 @@ export type ShortwinPluginInstructions = {
     input: InitializePriceReportAsyncInput,
   ) => ReturnType<typeof getInitializePriceReportInstructionAsync> &
     SelfPlanAndSendFunctions;
+  initializePriceSnapshot: (
+    input: InitializePriceSnapshotAsyncInput,
+  ) => ReturnType<typeof getInitializePriceSnapshotInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  initializeQuotePolicy: (
+    input: InitializeQuotePolicyAsyncInput,
+  ) => ReturnType<typeof getInitializeQuotePolicyInstructionAsync> &
+    SelfPlanAndSendFunctions;
   liquidate: (
     input: LiquidateAsyncInput,
   ) => ReturnType<typeof getLiquidateInstructionAsync> &
@@ -1764,6 +2070,10 @@ export type ShortwinPluginInstructions = {
   openShort: (
     input: OpenShortAsyncInput,
   ) => ReturnType<typeof getOpenShortInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  overdueQuoteDefault: (
+    input: OverdueQuoteDefaultAsyncInput,
+  ) => ReturnType<typeof getOverdueQuoteDefaultInstructionAsync> &
     SelfPlanAndSendFunctions;
   proposeConfig: (
     input: ProposeConfigAsyncInput,
@@ -1776,6 +2086,14 @@ export type ShortwinPluginInstructions = {
   publishPriceReport: (
     input: PublishPriceReportAsyncInput,
   ) => ReturnType<typeof getPublishPriceReportInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  publishPriceSnapshot: (
+    input: PublishPriceSnapshotAsyncInput,
+  ) => ReturnType<typeof getPublishPriceSnapshotInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  repayQuoteShort: (
+    input: RepayQuoteShortAsyncInput,
+  ) => ReturnType<typeof getRepayQuoteShortInstructionAsync> &
     SelfPlanAndSendFunctions;
   repayShort: (
     input: RepayShortAsyncInput,
@@ -1792,6 +2110,10 @@ export type ShortwinPluginInstructions = {
   setPause: (
     input: SetPauseAsyncInput,
   ) => ReturnType<typeof getSetPauseInstructionAsync> &
+    SelfPlanAndSendFunctions;
+  setQuotePricePause: (
+    input: SetQuotePricePauseAsyncInput,
+  ) => ReturnType<typeof getSetQuotePricePauseInstructionAsync> &
     SelfPlanAndSendFunctions;
   setRouteBroken: (
     input: SetRouteBrokenAsyncInput,
@@ -1838,6 +2160,8 @@ export type ShortwinPluginPdas = {
   venueExtrasRaydiumV4: typeof findVenueExtrasRaydiumV4Pda;
   venueExtrasRaydiumCpmm: typeof findVenueExtrasRaydiumCpmmPda;
   position: typeof findPositionPda;
+  financeMarket: typeof findFinanceMarketPda;
+  overdueQuoteDefaultExposure: typeof findOverdueQuoteDefaultExposurePda;
 };
 
 export type ShortwinPluginRequirements = ClientWithRpc<
@@ -1862,6 +2186,20 @@ export function shortwinProgram() {
           marketVault: addSelfFetchFunctions(client, getMarketVaultCodec()),
           oracleCache: addSelfFetchFunctions(client, getOracleCacheCodec()),
           priceReport: addSelfFetchFunctions(client, getPriceReportCodec()),
+          priceSnapshot: addSelfFetchFunctions(client, getPriceSnapshotCodec()),
+          quoteFinanceExposure: addSelfFetchFunctions(
+            client,
+            getQuoteFinanceExposureCodec(),
+          ),
+          quoteFinanceMarket: addSelfFetchFunctions(
+            client,
+            getQuoteFinanceMarketCodec(),
+          ),
+          quoteFinancePosition: addSelfFetchFunctions(
+            client,
+            getQuoteFinancePositionCodec(),
+          ),
+          quotePolicy: addSelfFetchFunctions(client, getQuotePolicyCodec()),
           shortPosition: addSelfFetchFunctions(client, getShortPositionCodec()),
           venueExtras: addSelfFetchFunctions(client, getVenueExtrasCodec()),
           venueGuard: addSelfFetchFunctions(client, getVenueGuardCodec()),
@@ -1882,6 +2220,11 @@ export function shortwinProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getCancelConfigInstructionAsync(input),
+            ),
+          checkQuoteReference: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getCheckQuoteReferenceInstructionAsync(input),
             ),
           claimSol: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1953,6 +2296,16 @@ export function shortwinProgram() {
               client,
               getInitializePriceReportInstructionAsync(input),
             ),
+          initializePriceSnapshot: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInitializePriceSnapshotInstructionAsync(input),
+            ),
+          initializeQuotePolicy: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getInitializeQuotePolicyInstructionAsync(input),
+            ),
           liquidate: (input) =>
             addSelfPlanAndSendFunctions(
               client,
@@ -1962,6 +2315,11 @@ export function shortwinProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getOpenShortInstructionAsync(input),
+            ),
+          overdueQuoteDefault: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getOverdueQuoteDefaultInstructionAsync(input),
             ),
           proposeConfig: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1977,6 +2335,16 @@ export function shortwinProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getPublishPriceReportInstructionAsync(input),
+            ),
+          publishPriceSnapshot: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getPublishPriceSnapshotInstructionAsync(input),
+            ),
+          repayQuoteShort: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getRepayQuoteShortInstructionAsync(input),
             ),
           repayShort: (input) =>
             addSelfPlanAndSendFunctions(
@@ -1997,6 +2365,11 @@ export function shortwinProgram() {
             addSelfPlanAndSendFunctions(
               client,
               getSetPauseInstructionAsync(input),
+            ),
+          setQuotePricePause: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getSetQuotePricePauseInstructionAsync(input),
             ),
           setRouteBroken: (input) =>
             addSelfPlanAndSendFunctions(
@@ -2049,6 +2422,8 @@ export function shortwinProgram() {
           venueExtrasRaydiumV4: findVenueExtrasRaydiumV4Pda,
           venueExtrasRaydiumCpmm: findVenueExtrasRaydiumCpmmPda,
           position: findPositionPda,
+          financeMarket: findFinanceMarketPda,
+          overdueQuoteDefaultExposure: findOverdueQuoteDefaultExposurePda,
         },
         identifyAccount: identifyShortwinAccount,
         identifyInstruction: identifyShortwinInstruction,

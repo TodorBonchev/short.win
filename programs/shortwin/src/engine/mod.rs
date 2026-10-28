@@ -25,6 +25,8 @@ pub mod lender;
 pub mod observe;
 pub mod pool_select;
 pub mod prologue;
+pub mod quote_finance;
+pub mod quote_reference;
 pub mod route;
 pub mod tier;
 pub mod trader;
