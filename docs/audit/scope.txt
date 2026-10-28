@@ -217,6 +217,7 @@ services/keeper/src/keeper.rs
 services/keeper/src/lib.rs
 services/keeper/src/main.rs
 services/keeper/src/metrics.rs
+services/keeper/src/onboarding.rs
 
 # [context] governance: the governance tool `shortwin-gov` (services/ops) and its Squads v4 encoders (crates/squads-v4-ix): host-only, never on-chain; it stages and verifies, members review and sign in the Squads app (owner decision of 2026-10-03); out of scope (the owner's audit scope of 2026-10-02 names the programs and the keeper core), read for context
 crates/squads-v4-ix/Cargo.toml

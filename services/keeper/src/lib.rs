@@ -121,6 +121,7 @@ pub mod ixs;
 pub mod keeper;
 pub mod metrics;
 pub mod monitor;
+pub mod onboarding;
 pub mod offchain_price_history;
 pub mod pda;
 pub mod pool_monitor;
