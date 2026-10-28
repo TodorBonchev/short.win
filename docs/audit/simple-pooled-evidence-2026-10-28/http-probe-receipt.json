@@ -1,0 +1,21 @@
+{
+  "at_utc": "2026-10-28T16:34:28.592577+00:00",
+  "scope": "read-only keyless HTTP schema probe only; USDC base freeze authority is outside protocol eligibility; no chain transaction/ELF qualification",
+  "public_request": {
+    "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "outputMint": "So11111111111111111111111111111111111111112",
+    "amount": "1000000",
+    "taker": "AjK5kxYGJ5zKnmBwUY8jkNuwbhE5Ea6zTLyBNb9oqvsp",
+    "destinationTokenAccount": "89sHQvoCT4TvTxryvQ7CgNvUcriXDG73dXELX89NLh3P",
+    "wrapAndUnwrapSol": "false",
+    "maxAccounts": "48",
+    "slippageBps": "50"
+  },
+  "http_status": 200,
+  "sha256": "a92cc76be50dab5dfb3bd4aaa4465c43d69cc33b7f47623b64e75b8ed7ee9497",
+  "mode": "ExactIn",
+  "input": "1000000",
+  "output": "9896764",
+  "accounts": 55,
+  "prefix": "u2T6zDHErxRAQg8A"
+}

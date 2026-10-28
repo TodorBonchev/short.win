@@ -56,11 +56,22 @@ jobs:
           workspaces: simple
           key: simple-pooled-v1
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - name: Cache pinned SBF tools and Anchor CLI
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/v1.57
+            ~/.cargo/bin/anchor
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-${{ env.AGAVE_RELEASE_SHA256 }}-anchor-${{ env.ANCHOR_REV }}-v1.57-${{ runner.os }}
       - name: Install pinned Agave
+        if: steps.tools.outputs.cache-hit != 'true'
         run: bash .github/workflows/scripts/install-agave.sh
       - name: Select Agave
         run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
       - name: Install pinned Anchor CLI
+        if: steps.tools.outputs.cache-hit != 'true'
         run: cargo install --force --git https://github.com/otter-sec/anchor --rev "$ANCHOR_REV" anchor-cli --locked
       - name: Materialize hash-pinned historical Jupiter witness
         run: python3 scripts/materialize-jupiter-probe.py

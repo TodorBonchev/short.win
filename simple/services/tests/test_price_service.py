@@ -256,6 +256,26 @@ class PriceServiceTests(unittest.TestCase):
         self.assertEqual(quote.amount, 100)
         self.assertFalse(captured[0].has_header("X-api-key"))
 
+    def test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model(self):
+        provider = Provider()
+        client(settings(), provider).quote(MINT, service.WSOL, 100)
+        self.assertEqual(provider.calls[0]["maxAccounts"], "32")
+
+        def oversized(params):
+            raw = Provider()(params)
+            raw["swapInstruction"]["accounts"] *= 49
+            return raw
+
+        with self.assertRaises(service.Unavailable):
+            client(settings(), oversized).quote(MINT, service.WSOL, 100)
+        original = settings().model_hash
+        with patch.object(service, "REQUEST_ROUTE_ACCOUNT_BUDGET", 31):
+            self.assertNotEqual(settings().model_hash, original)
+        with patch.object(service, "MAX_ROUTE_ACCOUNTS", 47):
+            self.assertNotEqual(settings().model_hash, original)
+        with patch.object(service, "MAX_ROUTE_DATA_BYTES", 767):
+            self.assertNotEqual(settings().model_hash, original)
+
 
 if __name__ == "__main__":
     unittest.main()

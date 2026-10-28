@@ -24,6 +24,9 @@ import urllib.request
 WSOL = "So11111111111111111111111111111111111111112"
 BUILD_URL = "https://api.jup.ag/swap/v2/build"
 JUPITER_PROGRAM = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+REQUEST_ROUTE_ACCOUNT_BUDGET = 32
+MAX_ROUTE_ACCOUNTS = 48
+MAX_ROUTE_DATA_BYTES = 768
 MODEL_VERSION = "shortwin-simple-exact-q-v1"
 U64_MAX = (1 << 64) - 1
 
@@ -80,7 +83,12 @@ class Settings:
     @property
     def model_hash(self) -> str:
         # Match immutable Policy.price_policy_hash before enabling opens.
-        return digest({"model": MODEL_VERSION, "settings": asdict(self)})
+        return digest({"model": MODEL_VERSION, "settings": asdict(self),
+                       "route_profile": {"request_account_budget": REQUEST_ROUTE_ACCOUNT_BUDGET,
+                                         "maximum_total_accounts": MAX_ROUTE_ACCOUNTS,
+                                         "maximum_instruction_data_bytes": MAX_ROUTE_DATA_BYTES,
+                                         "program": JUPITER_PROGRAM, "swap_mode": "ExactIn",
+                                         "transaction_version": 0}})
 
 
 def verify_policy(settings: Settings, policy: dict) -> None:
@@ -184,7 +192,7 @@ class Jupiter:
         params = {"inputMint": input_mint, "outputMint": output_mint,
                   "amount": str(amount), "taker": self.taker,
                   "slippageBps": str(self.settings.slippage_bps),
-                  "wrapAndUnwrapSol": "false", "maxAccounts": "48", "transactionVersion": "0"}
+                  "wrapAndUnwrapSol": "false", "maxAccounts": str(REQUEST_ROUTE_ACCOUNT_BUDGET), "transactionVersion": "0"}
         # /swap/v2/build is ExactIn. Do not send an ignored ExactOut flag.
         if self.rate_gate:
             self.rate_gate()
@@ -211,9 +219,9 @@ class Jupiter:
                 raise ValueError("missing executable route witness")
             swap = raw["swapInstruction"]
             if (not isinstance(swap, dict) or swap.get("programId") != JUPITER_PROGRAM
-                    or not isinstance(swap.get("accounts"), list) or not 1 <= len(swap["accounts"]) <= 48
-                    or not isinstance(swap.get("data"), str) or len(swap["data"]) > 1024
-                    or not 8 <= len(base64.b64decode(swap["data"], validate=True)) <= 768):
+                    or not isinstance(swap.get("accounts"), list) or not 1 <= len(swap["accounts"]) <= MAX_ROUTE_ACCOUNTS
+                    or not isinstance(swap.get("data"), str) or len(swap["data"]) > (MAX_ROUTE_DATA_BYTES+2)//3*4
+                    or not 8 <= len(base64.b64decode(swap["data"], validate=True)) <= MAX_ROUTE_DATA_BYTES):
                 raise ValueError("route lies outside the current program/client envelope")
         except (KeyError, TypeError, ValueError) as error:
             raise Unavailable(f"Jupiter quote rejected: {error}") from None

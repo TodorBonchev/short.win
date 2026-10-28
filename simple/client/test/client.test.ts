@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {address,AccountRole,getBase64Decoder,getTransactionEncoder,createTransactionMessage,setTransactionMessageFeePayerSigner,setTransactionMessageLifetimeUsingBlockhash,compileTransaction,createNoopSigner,type Blockhash} from '@solana/kit';
-import {getPoolGenerationDecoder,getOpenPositionInstructionDataDecoder,getOpenPositionInstructionDataEncoder,getClosePositionInstructionDataDecoder,SHORTWIN_SIMPLE_PROGRAM_ADDRESS,associatedToken,executionAddresses,loanAddress,poolAddress,marketAddress,WSOL,TOKEN,JUPITER,planBundle,appendRoute,assertSameMessage,type BuildResponse} from '../src/index.ts';
+import {getPoolGenerationDecoder,getOpenPositionInstructionDataDecoder,getOpenPositionInstructionDataEncoder,getClosePositionInstructionDataDecoder,SHORTWIN_SIMPLE_PROGRAM_ADDRESS,associatedToken,executionAddresses,loanAddress,poolAddress,marketAddress,WSOL,TOKEN,JUPITER,planBundle,appendRoute,assertSameMessage,requestBuild,type BuildResponse} from '../src/index.ts';
 const wire=JSON.parse(readFileSync(new URL('./fixtures/rust-wire.json',import.meta.url),'utf8')) as Record<string,string>;
 test('generated client decodes exact Rust account and instruction bytes without precision loss',()=>{
  assert.equal(wire.program,SHORTWIN_SIMPLE_PROGRAM_ADDRESS);
@@ -43,4 +43,12 @@ test('wallet signatures may change but reviewed message bytes may not',()=>{
  const tx=compileTransaction(m),bytes=Uint8Array.from(getTransactionEncoder().encode(tx));
  const signed=bytes.slice();signed.fill(1,1,65);assert.doesNotThrow(()=>assertSameMessage(bytes,signed));
  const changed=signed.slice();changed[changed.length-1]^=1;assert.throws(()=>assertSameMessage(bytes,changed));
+});
+
+test('Jupiter request leaves envelope room and still refuses over-budget responses',async()=>{
+ const {build,binding}=await caseRoute();let routeBudget='';
+ const send=(async(input:RequestInfo|URL)=>{routeBudget=new URL(String(input)).searchParams.get('maxAccounts')??'';return new Response(JSON.stringify(build),{status:200});}) as typeof fetch;
+ await requestBuild('https://api.jup.ag',binding,50,undefined,send);assert.equal(routeBudget,'32');
+ const oversized=structuredClone(build);oversized.swapInstruction.accounts=Array.from({length:55},()=>build.swapInstruction.accounts[0]!);
+ await assert.rejects(planBundle(oversized,binding),/Unsupported Jupiter route/);
 });

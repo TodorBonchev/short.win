@@ -1,0 +1,62 @@
+$ pnpm -r check
+$ tsc --noEmit && node --test test/*.test.ts
+✔ generated client decodes exact Rust account and instruction bytes without precision loss (2.699584ms)
+✔ route uses loan-local scratch, with no outer PDA signature or API setup instructions (12.425903ms)
+✔ route rejects wrong mode, quantity, threshold, and unexpected signer (10.211766ms)
+✔ buy minimum output must cover whole token debt (6.155206ms)
+✔ wallet signatures may change but reviewed message bytes may not (36.229488ms)
+✔ Jupiter request leaves envelope room and still refuses over-budget responses (11.649094ms)
+✔ default boundary wins without price, pause, history or route; expiry requires fresh feed (0.731662ms)
+✔ CR actions bind both bad bids, strict sequence, source delays and reporter epoch (0.210569ms)
+✔ service model drift and fee/funding caps fail before signing (0.418611ms)
+✔ confirmed publication continues to a priced action; dry-run never assumes publication (0.256575ms)
+✔ finalized event pagination is resumable and idempotent; failed tx is never projected (9.707576ms)
+✔ empty authoritative loan snapshot still clears priority and processes queued warm work (73.253179ms)
+✔ post-tick confirmed clock accepts newer sources than initial finalized snapshot and rejects actual future (0.541544ms)
+✔ an inactive warmed quantity publishes before the first loan without reading a keyfile (71.486185ms)
+✔ bounded rotation advances beyond a persistently failing first identity (5.411157ms)
+✔ prewarm validates current policy and enqueues inactive exact-u64 identity only (11.595705ms)
+✔ Unknown or stale reference never becomes Finite and cannot authorize a sale route (12.210139ms)
+✔ route binds new loan nonce/scratch and returns fresh raw build plus verified table contents (25.378843ms)
+✔ CORS/body/IP limits and unsupported RPC overrides reject before provider calls (6.207847ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 454.739476
+$ tsc --noEmit && node --test test/*.test.ts
+✔ amount entry is exact beyond Number precision and refuses truncation (0.813807ms)
+✔ preview follows floor principal and actually paid income without time accrual (0.245532ms)
+✔ editing or cancelling while route preparation is pending revokes later review (0.849523ms)
+✔ wallet account or feature changes while signing prevent broadcast and clean old subscriptions (0.665014ms)
+✔ wallets without change events are rechecked after their async reply, including chain support (0.343072ms)
+✔ cancel during the final blockheight check prevents even the broadcast RPC call (11.374049ms)
+✔ managed service preserves exact quantities and uses fixed endpoints (20.707506ms)
+✔ managed service rejects insecure hosted URLs and reports capacity refusals (0.68008ms)
+✔ managed buy input can shrink but cannot exceed or reinterpret the signed user budget (0.430711ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 236.37688
+$ pnpm -r build
+$ tsc --noEmit
+$ tsc --noEmit && vite build
+vite v8.3.1 building client environment for production...
+transforming...
+✓ 116 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.40 kB │ gzip:  0.28 kB
+dist/assets/index-BWPJxP0o.css    3.59 kB │ gzip:  1.33 kB
+dist/assets/index-Bovl8KdK.js   152.94 kB │ gzip: 39.75 kB
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0m../node_modules/.pnpm/@solana+kit@8.3.0_typescript@5.9.3/node_modules/@solana/kit/dist/index.browser.mjs is dynamically imported by ../client/src/transactions.ts but also statically imported by ../client/src/chain.ts, ../client/src/generated/accounts/config.ts, ../client/src/generated/accounts/exposure.ts, ../client/src/generated/accounts/lenderReceipt.ts, ../client/src/generated/accounts/loan.ts, ..., dynamic import will not move module into another chunk.
+
+✓ built in 142ms

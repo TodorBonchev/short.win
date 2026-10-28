@@ -18,6 +18,11 @@ threshold covers the full token debt. It never requests ExactOut or interprets
 expected output as guaranteed output. It retains the successful sale and buy
 response bodies and their canonical JSON SHA256 hashes. A tested buy budget is
 an upper bound from that response; no globally cheapest route is claimed.
+The request uses a Jupiter routing-account budget of 32. This differs from the
+48-total-account protocol/client envelope: Jupiter's `maxAccounts` parameter is
+not a guarantee of total returned account count. Responses above 48 total metas
+or 768 instruction-data bytes remain Unknown. The request budget, total caps,
+program identity, swap mode and transaction version are part of the model hash.
 
 Completed history is sampled off-chain evidence trusted to this operator. For H
 completed epochs immediately preceding the source epoch, the service requires

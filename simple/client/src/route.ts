@@ -33,11 +33,11 @@ export function appendRoute(instruction:Instruction,bundle:RouteBundle):Instruct
 /** V2 is ExactIn only. Whole-q buyback selection is a bounded off-chain search;
  * the returned minimum output must cover q, then the on-chain net credit checks it.
  */
-export async function requestBuild(baseUrl:string,b:RouteBinding,slippageBps=50,apiKey?:string):Promise<BuildResponse>{
+export async function requestBuild(baseUrl:string,b:RouteBinding,slippageBps=50,apiKey?:string,send:typeof fetch=fetch):Promise<BuildResponse>{
  if(!Number.isInteger(slippageBps)||slippageBps<0||slippageBps>1000)throw new Error('Invalid slippage');
  const url=new URL('/swap/v2/build',baseUrl);
- url.search=new URLSearchParams({inputMint:b.side==='sell'?b.mint:WSOL,outputMint:b.side==='sell'?WSOL:b.mint,amount:b.inputAmount.toString(),taker:b.executionAuthority,destinationTokenAccount:b.side==='sell'?b.executionWsol:b.executionBase,wrapAndUnwrapSol:'false',maxAccounts:'48',slippageBps:String(slippageBps)}).toString();
- const response=await fetch(url,{headers:apiKey?{'x-api-key':apiKey}:{},signal:AbortSignal.timeout(10000)});
+ url.search=new URLSearchParams({inputMint:b.side==='sell'?b.mint:WSOL,outputMint:b.side==='sell'?WSOL:b.mint,amount:b.inputAmount.toString(),taker:b.executionAuthority,destinationTokenAccount:b.side==='sell'?b.executionWsol:b.executionBase,wrapAndUnwrapSol:'false',maxAccounts:'32',slippageBps:String(slippageBps)}).toString();
+ const response=await send(url,{headers:apiKey?{'x-api-key':apiKey}:{},signal:AbortSignal.timeout(10000)});
  if(!response.ok)throw new Error('Jupiter quote unavailable: '+response.status);
  const build=await response.json() as BuildResponse;await planBundle(build,b);return build;
 }

@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-10-28T16:26:36.121709+00:00",
-  "scope": "runtime sources/dependency lockfiles and IDL; candidate commit recorded in follow-up CI record",
+  "timestamp": "2026-10-28T16:39:45.186595+00:00",
+  "scope": "selected implementation file digests, build lockfiles and IDL; full frozen on-chain/test closure is in program-fuzz-metadata.json and Git identifies the complete workspace",
   "elf_sha256": "49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a",
   "sha256": {
     "simple/programs/shortwin-simple/src/errors.rs": "d714d22b8af5c93cf84bb76b855c53d7f7fef03e87e5a70902acbfc71b506d11",
@@ -26,6 +26,18 @@
     "simple/pnpm-lock.yaml": "c0222c8ecd956a00e4ee1676606e1af781b6ff260fca2cf049361e1cad4ea57a",
     "rust-toolchain.toml": "1e977a72694dfd8a4b1b5d2253f22ce5dad4e09bf522c902236476b1801dd803",
     "mise.toml": "0ec9d3a68a1eb0a1aed491290c7d84830798405115e94557d5a61058477f831b",
-    "simple/tests/runtime/Cargo.toml": "941e8d32d7e3877e79c8a5cd9549e65af5de563a459135dd138ad40da143e6a3"
+    "simple/tests/runtime/Cargo.toml": "941e8d32d7e3877e79c8a5cd9549e65af5de563a459135dd138ad40da143e6a3",
+    "simple/services/src/shortwin_price_service.py": "823d0bacd7e58e839e5a409d287048d06543ab01b0b4914886d7ae80cf715421",
+    "simple/client/src/route.ts": "a47fdf244961ffd6a1815ec805a75a8acddcdd063d8d9bdf7c151765355b2b70",
+    "simple/client/src/operator.ts": "3da944c868b0a327aeb07962dc5f0c7931a5e4d70cdd7f63f90dc826897cb03b",
+    "simple/client/src/server.ts": "4c6fc7ac8ce96c145654084cfd65f90cd91e77f950c9024baea7fb49618347c7",
+    "simple/web/src/main.ts": "dfff0e1597aa0a9c1f209ba87999c74c5b309ab1e98b76dff9364dffa3f7fe09",
+    "simple/web/src/intent.ts": "a277dae98694271637b5d216908f908202618196e4b948bb06c788327df36271",
+    "simple/web/src/managed.ts": "ad2d8be5475ed425d7965dc3633e927d2018c3a28d195e760f9a17484409c6f8",
+    "simple/web/src/wallet.ts": "d0be553e73440c217a123927d92ae2a3b1c248b2b30e1292fe8e68fa4c2f1497",
+    "simple/services/settings.example.json": "c9fa251bfa34a130a6d0e1ad3e5c1877c32e07d7e6806eb19b7937eec671c371",
+    "simple/client/src/transactions.ts": "da5f1b3e55ed4b8a6cc5db45677d8ae7019b32747bbf967e5f8900b17dfbd1cb",
+    "simple/client/src/pdas.ts": "3abac084da32b4f0a9aaf664c48293a552b79cee930853342e9b1c53b4af31d0",
+    "simple/client/src/chain.ts": "ad031a1f485bc30806ed52f698105b8d35668ec1023cdbff6054894f806ebb1b"
   }
 }
