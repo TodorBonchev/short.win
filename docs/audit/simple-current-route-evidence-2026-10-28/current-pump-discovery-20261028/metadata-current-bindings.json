@@ -1,0 +1,28 @@
+[
+  {
+    "mint": "C9Xfs2MYMMQU54uxXC27ybqjDLJz9GqiUqJ7H3YMpump",
+    "curve": "2oa3HmihFvvgisnytX8o7BdEUfTha97ekNbJqeAySnyB",
+    "loan": "5wSGeMFmwdJieDRzzD2c18gwQ6SzNs6wUszDQpaVTq5q",
+    "executionAuthority": "Fcf5Vn19srBMeEeq1nKZi5a7kr5drC3w8mpBU6jFTWhF",
+    "executionBase": "A2AdVniRgdJBEQNKqBSxxfbFtEQbY1o38xgNVNG52vvi",
+    "executionWsol": "UGb4sREHozHzZ3PeX4u4aJdT36eYR5gf8xaorfJktDJ",
+    "wsolMint": "So11111111111111111111111111111111111111112",
+    "wsolTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "jupiter": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "jupiterProgramData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+    "systemProgram": "11111111111111111111111111111111"
+  },
+  {
+    "mint": "CWVUnSU2hVY1KfFTU3zAGGNx6cGUcKc2JuKPjUAJZNF6",
+    "curve": "3TWh9WVNB8QeMWFdErjscFkt6Hom7DYDA3sJg2KxxQb5",
+    "loan": "CgbrUKF8RSLaMhmf9TGWhiaBQeak9C5ivZC3tcPzhQMb",
+    "executionAuthority": "6SY3Le87jVgMV6jf7BrSk6uffNQgvjkjL9vMUJXd1ukx",
+    "executionBase": "GQUJU7RzvBmy8N7FJ86Tk8qvBqH7P5Eip9LENicKkCwh",
+    "executionWsol": "23TZVBf6UNqR2YfVCamvnWnJgHSqUFmGdM5fxrqifRoZ",
+    "wsolMint": "So11111111111111111111111111111111111111112",
+    "wsolTokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "jupiter": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "jupiterProgramData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+    "systemProgram": "11111111111111111111111111111111"
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "finished_at": "2026-10-28T20:14:03.232258+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Wed, 28 Oct 2026 20:14:02 GMT"
+  },
+  "length": 1988036,
+  "method": "getMultipleAccounts",
+  "provider": "Solana public mainnet RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+        "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "47e5f44c969c0296b26318a2dbd1260754062e68885e030b33166ad24f93deb3",
+  "started_at": "2026-10-28T20:14:02.831884+00:00",
+  "status": 200
+}

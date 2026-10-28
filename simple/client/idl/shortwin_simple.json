@@ -4205,7 +4205,7 @@
           {
             "name": "temporary_funding",
             "docs": [
-              "Signed maximum for the separately refunded scratch-account rent advance."
+              "Signed maximum for scratch rent plus native setup advance; unused setup is refunded."
             ],
             "type": "u64"
           },
@@ -4697,6 +4697,13 @@
         "fields": [
           {
             "name": "input_amount",
+            "type": "u64"
+          },
+          {
+            "name": "setup_lamports",
+            "docs": [
+              "Actor-signed native route allowance, separate from WSOL trade economics."
+            ],
             "type": "u64"
           },
           {

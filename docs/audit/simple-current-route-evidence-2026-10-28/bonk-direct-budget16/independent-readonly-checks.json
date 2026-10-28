@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-28T20:02:01.344640+00:00",
+  "lookup_table_checks": [
+    {
+      "response": "buy-0.json",
+      "key": "95k7D3PCFdiVzjwLA8sYhBR1hpeiFvp1ZFEqCrMf7LA",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "sell.json",
+      "key": "5exgoTBDmaCRsZh2nWNbr6UvQVofk9PjK2H3SKo6WoBR",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    }
+  ],
+  "all_lookup_tables_match": true,
+  "net_bid_lamports": 9198883,
+  "whole_q_buy_lamports": 9430011,
+  "spread_bps_ceil": 252,
+  "within_500bps_spread": true
+}

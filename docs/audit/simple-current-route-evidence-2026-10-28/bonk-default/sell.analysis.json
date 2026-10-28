@@ -1,0 +1,85 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      100,
+      41,
+      195,
+      45,
+      77,
+      252,
+      138,
+      2,
+      120,
+      121,
+      34,
+      201,
+      241,
+      220,
+      211,
+      185,
+      193,
+      231,
+      7,
+      81,
+      72,
+      133,
+      52,
+      15,
+      29,
+      189,
+      65,
+      93,
+      21,
+      90,
+      244,
+      44
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 46645373,
+      "secs_since_epoch": 1793217361
+    },
+    "lastValidBlockHeight": 440626940
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 3077233,
+  "history_qualified": false,
+  "labels": [
+    "Whirlpool"
+  ],
+  "minimum_output": 3061847,
+  "request_amount": 10000000000,
+  "response_file": "sell.json",
+  "response_sha256": "1e1dce5ba3ce6ba5954614150a316099ed51010aa4e5e8efc03dde50c4bffc24",
+  "route_data_bytes": 40,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9",
+        "inAmount": "10000000000",
+        "inputMint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        "label": "Whirlpool",
+        "outAmount": "3077233",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  ],
+  "side": "sell",
+  "total_metas": 22
+}

@@ -56,6 +56,47 @@ pub fn check_surface(
     forbidden: &[Address],
     maximum_accounts: usize,
 ) -> Result<(), IsolationError> {
+    check_surface_inner(
+        proposed,
+        runtime,
+        expected,
+        current_program,
+        forbidden,
+        maximum_accounts,
+        false,
+    )
+}
+
+/// Explicit integration mode for a derived, System-owned, empty loan-local PDA.
+/// The caller must normalize writable-authority prefunding and verify exact SOL,
+/// owner and empty-data invariants after CPI. The strict default remains above.
+pub fn check_surface_allowing_writable_authority(
+    proposed: &[AccountMeta],
+    runtime: &[RuntimeAccount],
+    expected: &ExpectedAccounts,
+    current_program: Address,
+    forbidden: &[Address],
+    maximum_accounts: usize,
+) -> Result<(), IsolationError> {
+    check_surface_inner(
+        proposed,
+        runtime,
+        expected,
+        current_program,
+        forbidden,
+        maximum_accounts,
+        true,
+    )
+}
+fn check_surface_inner(
+    proposed: &[AccountMeta],
+    runtime: &[RuntimeAccount],
+    expected: &ExpectedAccounts,
+    current_program: Address,
+    forbidden: &[Address],
+    maximum_accounts: usize,
+    writable_authority_allowed: bool,
+) -> Result<(), IsolationError> {
     if current_program == [0; 32] || expected.shared.is_some() {
         return Err(IsolationError::InvalidBindings);
     }
@@ -104,7 +145,7 @@ pub fn check_surface(
             return Err(IsolationError::UnexpectedSigner);
         }
         if meta.key == expected.transfer_authority {
-            if meta.is_writable || actual.is_writable {
+            if !writable_authority_allowed && (meta.is_writable || actual.is_writable) {
                 return Err(IsolationError::WritableAuthority);
             }
             if actual.owner != [0; 32] || actual.executable {
@@ -390,6 +431,49 @@ mod tests {
         assert_eq!(
             check_surface(&m, &r, &expected(), [9; 32], &[], 64),
             Err(IsolationError::WritableIdentity)
+        );
+    }
+    #[test]
+    fn explicit_writable_authority_mode_keeps_other_isolation_guards_and_strict_default() {
+        let (mut m, mut r) = surface();
+        m[0].is_writable = true;
+        r[0].is_writable = true;
+        assert_eq!(
+            check_surface(&m, &r, &expected(), [9; 32], &[], 64),
+            Err(IsolationError::WritableAuthority)
+        );
+        assert_eq!(
+            check_surface_allowing_writable_authority(&m, &r, &expected(), [9; 32], &[], 64),
+            Ok(())
+        );
+        r[0].owner = [7; 32];
+        assert_eq!(
+            check_surface_allowing_writable_authority(&m, &r, &expected(), [9; 32], &[], 64),
+            Err(IsolationError::InvalidBindings)
+        );
+        r[0].owner = [0; 32];
+        r[0].executable = true;
+        assert_eq!(
+            check_surface_allowing_writable_authority(&m, &r, &expected(), [9; 32], &[], 64),
+            Err(IsolationError::InvalidBindings)
+        );
+        r[0].executable = false;
+        assert_eq!(
+            check_surface_allowing_writable_authority(&m, &r, &expected(), [9; 32], &[[1; 32]], 64),
+            Err(IsolationError::ForbiddenAccount)
+        );
+        r[2].is_signer = true;
+        assert_eq!(
+            check_surface_allowing_writable_authority(&m, &r, &expected(), [9; 32], &[], 64),
+            Err(IsolationError::UnexpectedSigner)
+        );
+        r[2].is_signer = false;
+        m.push(m[0]);
+        r.push(r[0]);
+        r[3].is_writable = false;
+        assert_eq!(
+            check_surface_allowing_writable_authority(&m, &r, &expected(), [9; 32], &[], 64),
+            Err(IsolationError::RuntimeMismatch)
         );
     }
     #[test]

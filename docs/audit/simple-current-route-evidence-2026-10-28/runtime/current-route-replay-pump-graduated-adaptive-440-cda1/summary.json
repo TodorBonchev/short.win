@@ -1,0 +1,57 @@
+{
+  "binding": {
+    "execution_authority": "XJ6G3jwwL5y66M2vFyVsGAP2yHZmB2UzgsTpZv3zNn7",
+    "execution_base": "4qe4ir8fAM9k8Zn66aoGFnkE1j5xHVBKPfNRrH2QTcZN",
+    "execution_wsol": "2cWEmfBX83rCq92owgf6FrW3ADNCA5jjPjhGjT6fmPNS",
+    "loan": "9H6tRhUsxt2kDhqCKcrRGU88oj7UaPfBAZttekcXaMD",
+    "mint": "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+    "q": 3500000000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "error": "rollback did not reach successful real Jupiter CPI and signed-bound refusal: post_swap_fee_bound_rollback: InstructionError(1, Custom(6039)); see exact runtime log",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "9b31f91dec71c3a56f0abe1bce7ec2c40f375d31666abe13c4f1fcfb907eed1c",
+  "name": "pump-graduated-adaptive-440",
+  "native_runner_sha256": "849afecd659f1c5cb5c55db3bc667e9ec24008fd7b0cecbb0626a7c45a67eb19",
+  "own_program_sha256": "cda19a0097b97477bff50254fbb90d516cf2caa8d4d1a950afecffc1c9ee0840",
+  "packet_fit_failures": {},
+  "schema": 1,
+  "status": "failed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 130674096,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 1000,
+    "live_ask_upper": 130674096,
+    "live_bid_lower": 124540925,
+    "spread_bps_ceiling": 493
+  },
+  "transactions": {
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 65760,
+      "error": "InstructionError(1, Custom(6039))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "bf0685886ff76a0faa8ecfd4d36c4909ac3487a93692466fe4a112ed68d11932",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1166
+    }
+  }
+}

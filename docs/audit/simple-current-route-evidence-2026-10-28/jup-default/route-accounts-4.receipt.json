@@ -1,0 +1,61 @@
+{
+  "finished_at": "2026-10-28T19:57:00.711531+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Wed, 28 Oct 2026 19:57:00 GMT"
+  },
+  "length": 189354,
+  "method": "getMultipleAccounts",
+  "provider": "Solana public mainnet RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "Fty99ShpXx9q6qHcCPAhRrQRksPLxstxehimqSg4MXHt",
+        "FzvRbXDdrsYVMa9KohXyQytWNAZAo4PsF8yujDH7KCfG",
+        "G2dgfLg35xk3ZNL9cSHKpMoDi5XPTbTGpLGRGxVWQXq4",
+        "G2u2b5bdJqUt16EsedFWfxXEd1smZGMR9KZw4xeZk4VX",
+        "G39Mthg4bixLGYRzHqjfRdpyAWSJGH5CiUC4grTMpwyd",
+        "GFcj7sRkYqoNCiEkXWxapY7D28UCmAqBjiqGNQGydha4",
+        "GMCJvYGf5Ex2ARiMquaBDqU6iKM8uiEQkB8jCnoNfHpC",
+        "GdbG1eUc9NJLPspQDN7qqPxatBLSm9YUmbw33kvcv1dw",
+        "H1qQ6Hent1C5wa4Hc3GK2V1sgg4grvDBbmKd5H8dsTmo",
+        "H6uYeiRAhArsFAr3R592NLYrzR7UnDz6DoYqRkubJf3m",
+        "HLixVmXdBqzP1sXT9au4BHcvUjDgx5ev16cEJdd9tUSM",
+        "HVJuVW2dRbZ2fynWEY2JK6Ak2YTfVpji73sHZMCqiXSb",
+        "HgFLBWQugxt6qbPaWiwXjrqauXdQmcpMV6H6t8ttD8s1",
+        "HrLmpzp8Nu5wkn9SGZYSS9Ms6deTvMgGc6BETp4161ZX",
+        "HxGjvBoVFNX2gXzsJBA5Ttd61WH8RV8YXyA7yaVF8rnE",
+        "J1to1yufRnoWn81KYg1XkTWzmKjnYSnmE2VY8DGUJ9Qv",
+        "J3w1NoRqdBbLf2JeU7DRdzjWEXRiN4R7yo6WpdMMeCCC",
+        "J4gvj34WtjvBJ7VYReCeySnjjQA9E9zaM13Vf8jRx2pR",
+        "J7znuMyVHurxwjL19Rbtq2CSbjPEhqWvwEcgdWajEtnc",
+        "JSvtokJbtGsYhneKomFBjnJh4djEQLdHV2kAeS43bBZ",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+        "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+        "SCoRcH8c2dpjvcJD6FiPbCSQyQgu3PcUAWj2Xxx3mqn",
+        "So11111111111111111111111111111111111111112",
+        "Sysvar1nstructions1111111111111111111111111",
+        "TessVdML9pBGgG9yGks7o4HewRaXVAMuoVj4x83GLQH",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "ZERor4xhbUycZ6gb9ntrhqscUcZmAbQDjEAtCf4hbZY",
+        "goonuddtQRrWqqn5nFyczVKaie28f3kDkHWkHtURSLE",
+        "m3BrPbv2TFmZZTPpyB9NgsCXqGNujpXvzvGqj8ksars",
+        "ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch",
+        "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "97c8d726dd7ac3ecba4b6f2c5c6c118cfdd7266dc8289a6abac8272b276e5ade",
+  "started_at": "2026-10-28T19:57:00.411185+00:00",
+  "status": 200
+}

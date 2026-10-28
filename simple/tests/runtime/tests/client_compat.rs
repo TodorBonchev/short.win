@@ -37,6 +37,7 @@ fn rust_client_wire_contract() {
             minimum_reference_sequence: 41,
             route: RouteArgs {
                 input_amount: 17,
+                setup_lamports: 3_123_456,
                 data: vec![1, 2, 3, 4, 5, 6, 7, 8],
             },
         },
@@ -48,6 +49,7 @@ fn rust_client_wire_contract() {
             temporary_funding: 103,
             route: RouteArgs {
                 input_amount: 97,
+                setup_lamports: 4_567_890,
                 data: vec![8, 7, 6, 5, 4, 3, 2, 1],
             },
         },

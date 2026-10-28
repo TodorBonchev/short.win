@@ -1,0 +1,418 @@
+{
+  "binding": {
+    "execution_authority": "DJVwQ5rGdEn9FoU1mRZPukiviMRkAMMNcN9SPvsZSPhT",
+    "execution_base": "5eEpU4UxvKn48YmiVuuQgeF89j4VBcfQYoG1z7oXeGpG",
+    "execution_wsol": "4bo3Np5gjPWBDqqg7wZEYEX3wR5RZ6Mm48QvATcEx1Tr"
+  },
+  "buy": {
+    "blockhash_metadata": {
+      "blockhash": [
+        40,
+        135,
+        2,
+        210,
+        142,
+        208,
+        19,
+        69,
+        88,
+        168,
+        146,
+        177,
+        77,
+        113,
+        195,
+        251,
+        69,
+        140,
+        158,
+        168,
+        127,
+        104,
+        96,
+        121,
+        112,
+        176,
+        11,
+        192,
+        82,
+        104,
+        229,
+        129
+      ],
+      "fetchedAt": {
+        "nanos_since_epoch": 538176127,
+        "secs_since_epoch": 1793217839
+      },
+      "lastValidBlockHeight": 440629162
+    },
+    "checks": {
+      "exact_domain": true,
+      "header_input": true,
+      "header_no_fees": true,
+      "header_quote": true,
+      "header_slippage50": true,
+      "jupiter_program": true,
+      "no_extra_signers": true,
+      "ordinary_route_v2": true,
+      "output_bounds": true,
+      "route_data_le768": true,
+      "slippage50": true,
+      "steps_le8": true,
+      "total_metas_le48": true
+    },
+    "cpi_execution_qualified": false,
+    "envelope_pass": true,
+    "expected_output": 40758842,
+    "history_qualified": false,
+    "labels": [
+      "Whirlpool"
+    ],
+    "minimum_output": 40555048,
+    "request_amount": 114505431,
+    "response_file": "buy-0.json",
+    "response_sha256": "a89c3e2d8472b358e96cf6edddac3859dcea65e1d3ab493e42c62526e8fa3c84",
+    "route_data_bytes": 40,
+    "route_plan": [
+      {
+        "bps": 10000,
+        "percent": 100,
+        "swapInfo": {
+          "ammKey": "C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz",
+          "inAmount": "114505431",
+          "inputMint": "So11111111111111111111111111111111111111112",
+          "label": "Whirlpool",
+          "outAmount": "40758842",
+          "outputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+        }
+      }
+    ],
+    "side": "buy",
+    "total_metas": 22
+  },
+  "buy_markup_bps": 200,
+  "buy_search": "first successful bounded ExactIn marked-up sale-output budget, doubling; not cheapest ask proof",
+  "captured_at": "2026-10-28T20:04:06.756293+00:00",
+  "cpi_execution_qualified": false,
+  "dexes": "Whirlpool",
+  "history_qualified": false,
+  "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+  "net_bid_lamports": 111698925,
+  "quantity": 40000000,
+  "request_max_accounts": 16,
+  "requests": [
+    {
+      "file": "dependency-accounts-1.json",
+      "finished_at": "2026-10-28T20:03:53.247316+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:03:52 GMT"
+      },
+      "length": 3857800,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+            "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+            "So11111111111111111111111111111111111111112",
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "4a59751806385603c25b72730edf86a02014c2d240b353aae2055e44ab40efb2",
+      "started_at": "2026-10-28T20:03:52.826799+00:00",
+      "status": 200
+    },
+    {
+      "file": "programdata-accounts-2.json",
+      "finished_at": "2026-10-28T20:03:55.425981+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:03:54 GMT"
+      },
+      "length": 1988036,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "3927e31b068639fb0de99033337761a96663527f264426e1561c1b4f9bd2c517",
+      "started_at": "2026-10-28T20:03:55.027000+00:00",
+      "status": 200
+    },
+    {
+      "file": "sell.json",
+      "finished_at": "2026-10-28T20:03:57.290516+00:00",
+      "headers": {
+        "Content-Type": "application/json",
+        "date": "Wed, 28 Oct 2026 20:03:57 GMT",
+        "x-ratelimit-current": "4",
+        "x-ratelimit-remaining": "1",
+        "x-ratelimit-reset": "1793217839"
+      },
+      "length": 15653,
+      "method": "GET",
+      "parameters": {
+        "amount": "40000000",
+        "destinationTokenAccount": "4bo3Np5gjPWBDqqg7wZEYEX3wR5RZ6Mm48QvATcEx1Tr",
+        "dexes": "Whirlpool",
+        "inputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "maxAccounts": "16",
+        "outputMint": "So11111111111111111111111111111111111111112",
+        "slippageBps": "50",
+        "taker": "DJVwQ5rGdEn9FoU1mRZPukiviMRkAMMNcN9SPvsZSPhT",
+        "transactionVersion": "0",
+        "wrapAndUnwrapSol": "false"
+      },
+      "provider": "Jupiter API",
+      "sha256": "89eb9b813f69dd4ad90e8f4dd50b867371d2c531bd975c546afaa556406bdbbe",
+      "started_at": "2026-10-28T20:03:57.227248+00:00",
+      "status": 200
+    },
+    {
+      "file": "buy-0.json",
+      "finished_at": "2026-10-28T20:03:59.527782+00:00",
+      "headers": {
+        "Content-Type": "application/json",
+        "date": "Wed, 28 Oct 2026 20:03:59 GMT",
+        "x-ratelimit-current": "4",
+        "x-ratelimit-remaining": "1",
+        "x-ratelimit-reset": "1793217841"
+      },
+      "length": 16316,
+      "method": "GET",
+      "parameters": {
+        "amount": "114505431",
+        "destinationTokenAccount": "5eEpU4UxvKn48YmiVuuQgeF89j4VBcfQYoG1z7oXeGpG",
+        "dexes": "Whirlpool",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "maxAccounts": "16",
+        "outputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "slippageBps": "50",
+        "taker": "DJVwQ5rGdEn9FoU1mRZPukiviMRkAMMNcN9SPvsZSPhT",
+        "transactionVersion": "0",
+        "wrapAndUnwrapSol": "false"
+      },
+      "provider": "Jupiter API",
+      "sha256": "a89c3e2d8472b358e96cf6edddac3859dcea65e1d3ab493e42c62526e8fa3c84",
+      "started_at": "2026-10-28T20:03:59.428690+00:00",
+      "status": 200
+    },
+    {
+      "file": "route-accounts-3.json",
+      "finished_at": "2026-10-28T20:04:02.698470+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:04:02 GMT"
+      },
+      "length": 3938298,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "3rQ2MqfAMrAeLRZ34ij55EXRXSoPEUhkZT3Rbvp6vFT1",
+            "48nZ6A9pnAsEtUqBUgG8DwGqDNu5GhZKofdVMSYGvPtd",
+            "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+            "4MZ6TtpQLBRUnfkL42ibxtgNcrUmdt8zBGGWL2sWYiyq",
+            "4bo3Np5gjPWBDqqg7wZEYEX3wR5RZ6Mm48QvATcEx1Tr",
+            "5FUiaik7o28J37kGV5yzCQjTefXp31UjqtkdWBziBxLZ",
+            "5eEpU4UxvKn48YmiVuuQgeF89j4VBcfQYoG1z7oXeGpG",
+            "8MFbZEaXp8Ky8ufhZRgphgMgKVwsjhDhZtNqmEPcxvQK",
+            "9cqQfiKayCkMeHa5cUPpVw2i3Xvqjy5cp5kXAGwcAutk",
+            "BMNUGJFFSSoEXZm2DtAswHaTFEFNyGV1LGi2y5ZsoVT7",
+            "C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz",
+            "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+            "DJVwQ5rGdEn9FoU1mRZPukiviMRkAMMNcN9SPvsZSPhT",
+            "DnBTfre88FAEEaDf7EmLW2JpeJU9JG4fpTU1tnb3Y1BB",
+            "GdbG1eUc9NJLPspQDN7qqPxatBLSm9YUmbw33kvcv1dw",
+            "HVJuVW2dRbZ2fynWEY2JK6Ak2YTfVpji73sHZMCqiXSb",
+            "J7znuMyVHurxwjL19Rbtq2CSbjPEhqWvwEcgdWajEtnc",
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+            "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+            "So11111111111111111111111111111111111111112",
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+            "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "4d3067e1e3fda1644f53ecb922fbe76febe8f79c9975d4cb4d1f2465b25a009c",
+      "started_at": "2026-10-28T20:04:01.628929+00:00",
+      "status": 200
+    },
+    {
+      "file": "programdata-accounts-4.json",
+      "finished_at": "2026-10-28T20:04:05.093154+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:04:04 GMT"
+      },
+      "length": 13981281,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "CtXfPzz36dH5Ws4UYKZvrQ1Xqzn42ecDW6y8NKuiN8nD"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "062f98adb6a9baa03cc3471c62f380403cf31824205dcbff2d0994bb269700ea",
+      "started_at": "2026-10-28T20:04:03.829299+00:00",
+      "status": 200
+    },
+    {
+      "file": "snapshot-blocktime.json",
+      "finished_at": "2026-10-28T20:04:06.566574+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:04:05 GMT"
+      },
+      "length": 45,
+      "method": "getBlockTime",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getBlockTime",
+        "params": [
+          462604622
+        ]
+      },
+      "sha256": "cc5e9e984afed32cab86f720f065f299924bbb1d7a77c4338620a95eadf140c6",
+      "started_at": "2026-10-28T20:04:06.030448+00:00",
+      "status": 200
+    }
+  ],
+  "scope": "read-only candidate; no financial CPI or history qualification",
+  "sell": {
+    "blockhash_metadata": {
+      "blockhash": [
+        22,
+        163,
+        250,
+        0,
+        195,
+        80,
+        104,
+        204,
+        141,
+        150,
+        187,
+        175,
+        254,
+        107,
+        98,
+        55,
+        192,
+        247,
+        240,
+        84,
+        43,
+        219,
+        10,
+        141,
+        9,
+        169,
+        113,
+        140,
+        4,
+        222,
+        115,
+        240
+      ],
+      "fetchedAt": {
+        "nanos_since_epoch": 332275713,
+        "secs_since_epoch": 1793217837
+      },
+      "lastValidBlockHeight": 440629151
+    },
+    "checks": {
+      "exact_domain": true,
+      "header_input": true,
+      "header_no_fees": true,
+      "header_quote": true,
+      "header_slippage50": true,
+      "jupiter_program": true,
+      "no_extra_signers": true,
+      "ordinary_route_v2": true,
+      "output_bounds": true,
+      "route_data_le768": true,
+      "slippage50": true,
+      "steps_le8": true,
+      "total_metas_le48": true
+    },
+    "cpi_execution_qualified": false,
+    "envelope_pass": true,
+    "expected_output": 112260226,
+    "history_qualified": false,
+    "labels": [
+      "Whirlpool"
+    ],
+    "minimum_output": 111698925,
+    "request_amount": 40000000,
+    "response_file": "sell.json",
+    "response_sha256": "89eb9b813f69dd4ad90e8f4dd50b867371d2c531bd975c546afaa556406bdbbe",
+    "route_data_bytes": 40,
+    "route_plan": [
+      {
+        "bps": 10000,
+        "percent": 100,
+        "swapInfo": {
+          "ammKey": "C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz",
+          "inAmount": "40000000",
+          "inputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+          "label": "Whirlpool",
+          "outAmount": "112260226",
+          "outputMint": "So11111111111111111111111111111111111111112"
+        }
+      }
+    ],
+    "side": "sell",
+    "total_metas": 22
+  },
+  "snapshot_block_time": 1793217844,
+  "snapshot_slot": 462604622,
+  "spread_bps_ceil": 252,
+  "whole_q_buy_lamports": 114505431,
+  "whole_q_quote_available": true,
+  "within_500bps_spread": true
+}

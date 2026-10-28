@@ -1,0 +1,101 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      18,
+      247,
+      143,
+      107,
+      38,
+      130,
+      33,
+      101,
+      34,
+      16,
+      167,
+      202,
+      20,
+      45,
+      173,
+      133,
+      10,
+      254,
+      58,
+      221,
+      33,
+      78,
+      185,
+      254,
+      16,
+      104,
+      182,
+      179,
+      8,
+      131,
+      202,
+      204
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 107736489,
+      "secs_since_epoch": 1793218472
+    },
+    "lastValidBlockHeight": 440632108
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 178341540,
+  "history_qualified": false,
+  "labels": [
+    "Raydium",
+    "Mercurial"
+  ],
+  "minimum_output": 177449833,
+  "request_amount": 10000000,
+  "request_max_accounts": 16,
+  "response_file": "sell-accounts16.json",
+  "response_sha256": "63b8b55949fbd0837b6a67b66783acfaeeff00543a00e7a4fda278057d6dc62f",
+  "route_data_bytes": 45,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "6gpZ9JkLoYvpA5cwdyPZFsDw6tkbPyyXM5FqRqHxMCny",
+        "inAmount": "10000000",
+        "inputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "label": "Raydium",
+        "outAmount": "126335312",
+        "outputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "MAR1zHjHaQcniE2gXsDptkyKUnNfMEsLBVcfP7vLyv7",
+        "inAmount": "126335312",
+        "inputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "label": "Mercurial",
+        "outAmount": "178341540",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  ],
+  "side": "sell",
+  "total_metas": 30
+}

@@ -12,6 +12,7 @@ import {
   indexEvents,
   successfulEvents,
   selectAction,
+  publicationNeeded,
   keeperCap,
   validateServicePolicy,
   fundingRequirement,
@@ -409,6 +410,7 @@ test("an inactive warmed quantity publishes before the first loan without readin
       mint: PROGRAM,
       quantity: "10",
       active_loan: false,
+      publication_requested_at: Number(now),
     };
     const snapshot = {
       slot: 200n,
@@ -515,4 +517,47 @@ test("bounded rotation advances beyond a persistently failing first identity", (
     roundRobin(["a", "c"], "b", (v) => v),
     ["a", "c"],
   );
+});
+
+test("healthy private history stays off chain; requests, adverse prices and maturity publish on demand", () => {
+  const good = ref;
+  const bad = {...ref, liveBidLower:200n, historyBidLowerMax:200n};
+  assert.equal(publicationNeeded(good,[loan],policy,config,clock,0n,0n),false);
+  assert.equal(publicationNeeded(bad,[loan],policy,config,clock,0n,0n),true);
+  assert.equal(publicationNeeded(good,[{...loan,crArmSequence:4n}],policy,config,clock,0n,0n),true);
+  assert.equal(publicationNeeded(good,[{...loan,deadline:100n}],policy,config,clock,0n,0n),true);
+  assert.equal(publicationNeeded(good,[],policy,config,clock,100n,0n),true);
+  assert.equal(publicationNeeded(good,[],policy,config,clock,100n,100n),false);
+  assert.equal(publicationNeeded(good,[],policy,config,{slot:1000n,timestamp:1000n},100n,0n),false);
+  assert.equal(publicationNeeded({...good,finite:false},[loan],policy,config,clock,100n,0n),false);
+  assert.equal(publicationNeeded(good,[{...loan,defaultAt:100n}],policy,config,clock,0n,0n),false);
+});
+
+test("reference allocation reservations survive unknown outcomes, restarts and duplicate submissions", async () => {
+  const dir=await mkdtemp(join(tmpdir(),"shortwin-allocations-"));
+  const file=join(dir,"operator.sqlite");
+  try {
+    let store=new OperatorStore(file);
+    store.reserveReference(PROGRAM,1);
+    store.close();
+    store=new OperatorStore(file);
+    store.reserveReference(PROGRAM,1);
+    assert.throws(()=>store.reserveReference(TOKEN,1),/allowance exhausted/);
+    assert.equal(store.get("reference-allocation:"+TOKEN),undefined);
+    store.close();
+  } finally {await rm(dir,{recursive:true,force:true});}
+});
+
+test("UTC-day publication fee reservations survive failures and never consume default action budget", () => {
+ const store=new OperatorStore(":memory:");
+ try {
+  store.reservePublicationFees(12,5n,10n);store.reservePublicationFees(12,5n,10n);
+  assert.throws(()=>store.reservePublicationFees(12,1n,10n),/fee allowance/);
+  assert.equal(store.publicationFees(12),10n);
+  store.reservePublicationFees(13,1n,10n);assert.equal(store.publicationFees(13),1n);
+  assert.throws(()=>store.reservePublicationFees(13,-1n,10n),/fee allowance/);
+  store.checkReferenceAllowance(PROGRAM,1,new Set());
+  assert.throws(()=>store.checkReferenceAllowance(TOKEN,1,new Set([PROGRAM])),/allowance/);
+  assert.equal(store.get("reference-allocation:"+PROGRAM),undefined);
+ } finally {store.close();}
 });

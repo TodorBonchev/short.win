@@ -1723,7 +1723,12 @@ implementation. Mainnet-before-external-audit/bounty funding timing remains the
 owner's policy, subject to fresh technical qualification of the new scope.
 The [pooled implementation/build checkpoint](audit/simple-pooled-reproducibility-2026-10-28.md)
 records the fresh green CI, matching build bytes and short-smoke limits;
-long-run and real operating qualification remain open.
+long-run and real operating qualification remain open. The later
+[production/current-route record](audit/simple-production-readiness-2026-10-28.md)
+tracks the free-key proposal, metadata-only Token-2022 support, actual Pump/
+high-volume route tests and separately bounded actor-funded native DEX setup.
+Those changed inputs need fresh CI/fuzz and operating receipts; no legacy finding
+closure or external-audit claim follows from the preparation work.
 
 
 **Later owner scope decision, 2026-10-27:** first mainnet is postponed for the

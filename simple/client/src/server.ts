@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {address,getBase58Encoder,getBase64Encoder,type Address,type Decoder,type AddressesByLookupTableAddress} from '@solana/kit';
 import * as g from './generated/index.ts';
 import {PROGRAM,TOKEN,TOKEN_2022,WSOL,configAddress,policyAddress,marketAddress,poolAddress,referenceAddress,loanAddress,executionAddresses} from './pdas.ts';
+import {validateMint} from './chain.ts';
 import {planBundle,type BuildResponse} from './route.ts';
 import {readLookupTables} from './transactions.ts';
 import {pythonCommand,rpcTransport,validateServicePolicy,stringify,type RpcCall,type ServiceSettings} from './operator.ts';
@@ -52,8 +53,8 @@ export function liveDependencies(options:BridgeOptions,settings:ServiceSettings)
    const pool=await read(poolKey,g.getPoolGenerationDecoder(),g.getPoolGenerationSize(),g.ShortwinSimpleAccount.PoolGeneration);
    if(!policy||!pool||policy.config!==configKey||pool.market!==marketKey||pool.mint!==mint||pool.tokenProgram!==market.tokenProgram||pool.retired)throw new Refusal(503,'Canonical policy/pool binding mismatch');
    const result=await rpc('getAccountInfo',[mint,{encoding:'base64',commitment:'confirmed'}]);const m=result?.value;
-   if(!m||m.executable||![TOKEN,TOKEN_2022].includes(m.owner)||m.owner!==market.tokenProgram||m.data?.[1]!=='base64'||mint===WSOL)throw new Refusal(422,'Mint is outside supported plain SPL/Token-2022 scope');
-   const data=getBase64Encoder().encode(m.data[0]);if(data.length!==82||data[45]!==1||data.slice(46,50).some(x=>x!==0)||data[44]!==market.decimals)throw new Refusal(422,'Mint is outside supported plain SPL/Token-2022 scope');
+   if(!m||m.executable||![TOKEN,TOKEN_2022].includes(m.owner)||m.owner!==market.tokenProgram||m.data?.[1]!=='base64'||mint===WSOL)throw new Refusal(422,'Mint is outside supported SPL/metadata-only Token-2022 scope');
+   const data=getBase64Encoder().encode(m.data[0]);try{const eligible=validateMint(mint,m.owner,m.executable,Uint8Array.from(data));if(eligible.decimals!==market.decimals)throw new Error('Mint decimals changed');}catch{throw new Refusal(422,'Mint is outside supported SPL/metadata-only Token-2022 scope');}
    const slot=BigInt(await rpc('getSlot',[{commitment:'confirmed'}]));const timestamp=BigInt(await rpc('getBlockTime',[Number(slot)]));
    const now=BigInt(Math.floor(Date.now()/1000));if(slot<=0n||timestamp<=0n||timestamp>now+5n||now-timestamp>60n)throw new Refusal(503,'RPC clock unavailable or stale');
    return {config,policy,market,pool,configKey,policyKey,marketKey,poolKey,mint,tokenProgram:market.tokenProgram,clock:{slot,timestamp}};
@@ -100,9 +101,10 @@ export function createBridge(options:BridgeOptions,deps:BridgeDependencies):(req
     return response(202,{status:'Warming',mint,quantity:q.toString(),market:state.marketKey,policy:state.policyKey},headers);
    }
    if(url.pathname==='/v1/route'){
-    fields(body,['mint','tokenProgram','side','quantity','inputAmount','minimumOutput','executionAuthority','executionBase','executionWsol','loan','borrower','nonce']);
+    fields(body,['mint','tokenProgram','side','quantity','inputAmount','minimumOutput','executionAuthority','executionBase','executionWsol','loan','borrower','nonce','setupLamports']);
     const mint=key(body.mint),tokenProgram=key(body.tokenProgram),loanKey=key(body.loan),q=integer(body.quantity,'quantity'),input=integer(body.inputAmount,'inputAmount'),minimum=integer(body.minimumOutput,'minimumOutput');
-    if(body.side!=='sell'&&body.side!=='buy')throw new Refusal(400,'side must be sell or buy');
+    const setup=body.setupLamports===undefined?0n:integer(body.setupLamports,'setupLamports',false);if(setup>5_000_000n)throw new Refusal(400,'Native route setup allowance exceeds cap');
+     if(body.side!=='sell'&&body.side!=='buy')throw new Refusal(400,'side must be sell or buy');
     const state=await deps.readState(mint);if(tokenProgram!==state.tokenProgram)throw new Refusal(422,'Token program mismatch');const exec=await executionAddresses(loanKey);
     if(key(body.executionAuthority)!==exec.executionAuthority||key(body.executionBase)!==exec.executionBase||key(body.executionWsol)!==exec.executionWsol)throw new Refusal(422,'Loan scratch identity mismatch');
     let policyKey=state.policyKey;
@@ -116,7 +118,7 @@ export function createBridge(options:BridgeOptions,deps:BridgeDependencies):(req
     const job={market:state.marketKey,policy:policyKey,mint,quantity:q.toString(),active_loan:body.side==='buy'};
     const command=body.side==='sell'?['build-sell','-','--taker',exec.executionAuthority,'--minimum-output',minimum.toString()]:['build-buy','-','--taker',exec.executionAuthority,'--maximum-input',input.toString()];
     const built=JSON.parse(await deps.service(command,job));if(built.status!=='Ready')throw new Refusal(503,'Fresh route unavailable');const actual=integer(built.input_amount,'route input');if(actual>input||(body.side==='sell'&&actual!==q))throw new Refusal(503,'Provider route exceeds requested input');
-    const bundle=await planBundle(built.build as BuildResponse,{mint,tokenProgram,side:body.side,quantity:q,inputAmount:actual,minimumOutput:minimum,...exec});
+    const bundle=await planBundle(built.build as BuildResponse,{mint,tokenProgram,side:body.side,quantity:q,inputAmount:actual,minimumOutput:minimum,setupLamports:setup,...exec});
     const tables=await deps.tables(bundle.lookupTableKeys);return response(200,{status:'Ready',build:built.build,bundle,lookupTables:tables,loan:loanKey,evidenceHash:built.evidence_hash},headers);
    }
    throw new Refusal(404,'Endpoint not found');

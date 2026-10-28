@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "scope": "Pinned non-atomic mainnet snapshots replayed through the actual newly built program; no live transactions or history provenance claim.",
+  "expected_pass": [
+    {
+      "name": "bonk-production-adaptive",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/bonk-production-adaptive",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "jup-production-adaptive",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/jup-production-adaptive",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "ray-production-exclude-scorch16",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/ray-production-exclude-scorch16",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "pump-curve-adaptive",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/pump-curve-adaptive",
+      "requires_actual_snapshot_packets": true,
+      "requires_opening_setup_spend": true,
+      "requires_zero_close_setup": true,
+      "requires_setup_budget_rejections": true
+    },
+    {
+      "name": "pump-graduated-adaptive-440",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/pump-graduated-adaptive-440",
+      "requires_actual_snapshot_packets": true,
+      "requires_opening_setup_spend": true,
+      "requires_zero_close_setup": true,
+      "requires_setup_budget_rejections": true
+    },
+    {
+      "name": "pump-fresh-native-adaptive",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/pump-fresh-native-adaptive",
+      "requires_actual_snapshot_packets": true,
+      "requires_opening_setup_spend": true,
+      "requires_zero_close_setup": true,
+      "requires_setup_budget_rejections": true
+    }
+  ],
+  "expected_fail": [
+    {
+      "name": "jup-direct-budget16",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/jup-direct-budget16",
+      "error_substring": "Custom(5460)",
+      "transaction": "post_swap_fee_bound_rollback",
+      "transaction_log_substring": "custom program error: 0x1554",
+      "reason": "Actual Scorch downstream CPI refusal; quote envelope alone is insufficient."
+    },
+    {
+      "name": "ray-direct-budget16",
+      "capture": "docs/audit/simple-current-route-evidence-2026-10-28/ray-direct-budget16",
+      "error_substring": "Custom(5460)",
+      "transaction": "post_swap_fee_bound_rollback",
+      "transaction_log_substring": "custom program error: 0x1554",
+      "reason": "Actual Scorch downstream CPI refusal; quote envelope alone is insufficient."
+    }
+  ],
+  "pending": [],
+  "own_program": {
+    "sha256_source": "current_ci_verified_build",
+    "explicit_materializer_argument_required": true
+  }
+}

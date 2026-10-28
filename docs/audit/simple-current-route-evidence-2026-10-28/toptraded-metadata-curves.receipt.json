@@ -1,0 +1,34 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "DwRrzF8Eyf78g1qiRYYoLW2L8KCyviQRpMVbWYDbrMx",
+        "76osxGGBbPLYCQLqdKAzmDZeY3ZJn8jnqgYDtnWLxCRi",
+        "4VcpZUbs6agfbYCAMYKZbg2GgJ5hBoCKipRFxhYuTKV2",
+        "9QBupVdbZ1mAznhS8MNN347mWRBcZV9QmUZuTY9oFToR",
+        "BRuPAH7Yc4y1P5p3jeTwPoxueDHX93hyLomYPRzxj1Fh",
+        "7H91U3EiQBt6x2eiRmEb9B3fGjNY1LtJ2HycZe1BGziX",
+        "9JGQ767qGY9ya2PpuXgDMiQL8YNYH3Jms2fyhrBPXsg5",
+        "13rmTqfMM3MxpXB5Yb99gnpSaK4S9ysTT47u8Qdm6vLU",
+        "2g53qza428sQmoTfg5YVuxADQDJT7b29RR2qQ64RHLq1",
+        "5oT3dihJfDTwhVebDXpeeYGjKKmQvNDELykw9xVMANAX",
+        "A1Nvh5SApuQvj2iG36XAt3LyXnpJAHV5Hui2LUSxryhW",
+        "47aN6wwJCn6Za8ZrsEkHXrRTqiF2RzVmyFdsHb2d6WDw",
+        "6LBXeav2yYfhCKg3Fd48bEvuigv2NxwL3HGXB11Rej42",
+        "FQemyZ9ktwdUEJCQMEFVoQtbCs6w4P6QShtbLyu8s1KP",
+        "A9QSPEt3Fw6dTBaJmfvwDxKreGUXdH2mpXQA3nQcEMDd"
+      ],
+      {
+        "encoding": "base64",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "started_at": "2026-10-28T20:17:26.060262+00:00",
+  "finished_at": "2026-10-28T20:17:26.212226+00:00",
+  "sha256": "f3fe0dffd26e2abae2681fbd4a1a9af161cd73c5eab19a826f3855f73ff41a72",
+  "bytes": 5780
+}

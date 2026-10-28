@@ -1,0 +1,111 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      65,
+      73,
+      25,
+      213,
+      141,
+      20,
+      23,
+      124,
+      253,
+      40,
+      100,
+      214,
+      66,
+      90,
+      251,
+      69,
+      52,
+      126,
+      136,
+      78,
+      238,
+      99,
+      233,
+      217,
+      230,
+      15,
+      82,
+      35,
+      149,
+      201,
+      24,
+      130
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 710544707,
+      "secs_since_epoch": 1793217440
+    },
+    "lastValidBlockHeight": 440627310
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 55839157,
+  "history_qualified": false,
+  "labels": [
+    "Raydium CLMM",
+    "Raydium",
+    "Raydium"
+  ],
+  "minimum_output": 55559962,
+  "request_amount": 1000000000,
+  "response_file": "buy-4.json",
+  "response_sha256": "60ed98afb5c5c336123ef00b94b93634e714c7df67afa9ef22e66fb6fe80c574",
+  "route_data_bytes": 50,
+  "route_plan": [
+    {
+      "bps": 2642,
+      "percent": 26.42,
+      "swapInfo": {
+        "ammKey": "8EzbUfvcRT1Q6RL462ekGkgqbxsPmwC5FMLQZhSPMjJ3",
+        "inAmount": "264182258",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Raydium CLMM",
+        "outAmount": "187065124",
+        "outputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "6gpZ9JkLoYvpA5cwdyPZFsDw6tkbPyyXM5FqRqHxMCny",
+        "inAmount": "187065124",
+        "inputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "label": "Raydium",
+        "outAmount": "14754689",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    },
+    {
+      "bps": 7358,
+      "percent": 73.58,
+      "swapInfo": {
+        "ammKey": "AVs9TA4nWDzfPJE9gGVNJMVhcQy3V9PGazuz33BfG2RA",
+        "inAmount": "735817742",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Raydium",
+        "outAmount": "41084468",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 45
+}

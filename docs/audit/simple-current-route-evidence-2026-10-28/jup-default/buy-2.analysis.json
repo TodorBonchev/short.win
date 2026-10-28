@@ -1,0 +1,98 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      222,
+      5,
+      26,
+      191,
+      38,
+      69,
+      40,
+      4,
+      66,
+      85,
+      181,
+      58,
+      188,
+      28,
+      115,
+      29,
+      150,
+      35,
+      191,
+      133,
+      99,
+      160,
+      9,
+      231,
+      99,
+      138,
+      12,
+      56,
+      20,
+      141,
+      121,
+      208
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 590298366,
+      "secs_since_epoch": 1793217411
+    },
+    "lastValidBlockHeight": 440627175
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 84025878,
+  "history_qualified": false,
+  "labels": [
+    "BisonFi",
+    "ZeroFi"
+  ],
+  "minimum_output": 83605749,
+  "request_amount": 235657988,
+  "response_file": "buy-2.json",
+  "response_sha256": "6e4ab689cb46748c28133ec8fefdcc002e6f3a2cf17c2cc99c49ff922aa39636",
+  "route_data_bytes": 46,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+        "inAmount": "235657988",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "BisonFi",
+        "outAmount": "24226106",
+        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "Et6HnPjetV8AzmxNAfzKJ6ax5VM82ZB7phY465Ns5iZW",
+        "inAmount": "24226106",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "label": "ZeroFi",
+        "outAmount": "84025878",
+        "outputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 42
+}

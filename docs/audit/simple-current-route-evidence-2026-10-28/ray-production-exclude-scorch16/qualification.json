@@ -1,0 +1,424 @@
+{
+  "binding": {
+    "execution_authority": "3evyjL8agmEKZXauC2fa3USg5CLDt4S9PcP5V3tfEFuk",
+    "execution_base": "AK5Kr8k8NrcD5r36QwpgYk2TtxQ4WDmMwssqPSfZXQrC",
+    "execution_wsol": "8Tka9Xo1nNdKY8YZmnhgSdnFDMB2oTxwZzLH8CfZa55m",
+    "loan": "HEhJZyJ1MWZHCxgQGjGpc3mEiY1yNHkzNo4BMSqxt9NM"
+  },
+  "buy": {
+    "blockhash_metadata": {
+      "blockhash": [
+        175,
+        156,
+        109,
+        70,
+        83,
+        42,
+        171,
+        215,
+        136,
+        204,
+        244,
+        195,
+        77,
+        81,
+        183,
+        81,
+        71,
+        244,
+        32,
+        140,
+        115,
+        117,
+        212,
+        217,
+        116,
+        207,
+        169,
+        229,
+        118,
+        102,
+        17,
+        100
+      ],
+      "fetchedAt": {
+        "nanos_since_epoch": 679988050,
+        "secs_since_epoch": 1793217997
+      },
+      "lastValidBlockHeight": 440629901
+    },
+    "checks": {
+      "exact_domain": true,
+      "excluded_labels_absent": true,
+      "header_input": true,
+      "header_no_fees": true,
+      "header_quote": true,
+      "header_slippage50": true,
+      "jupiter_program": true,
+      "no_extra_signers": true,
+      "ordinary_route_v2": true,
+      "output_bounds": true,
+      "route_data_le768": true,
+      "slippage50": true,
+      "steps_le8": true,
+      "total_metas_le48": true
+    },
+    "cpi_execution_qualified": false,
+    "envelope_pass": true,
+    "expected_output": 10189739,
+    "history_qualified": false,
+    "labels": [
+      "Raydium CLMM"
+    ],
+    "minimum_output": 10138791,
+    "request_amount": 183413759,
+    "response_file": "buy-0.json",
+    "response_sha256": "af03f07ab38481dc11060a23b94d0e686d94e7e54d7a1e7e7ab0cc565c4fab20",
+    "route_data_bytes": 39,
+    "route_plan": [
+      {
+        "bps": 10000,
+        "percent": 100,
+        "swapInfo": {
+          "ammKey": "2AXXcN6oN9bBT5owwmTH53C7QHUXvhLeu718Kqt8rvY2",
+          "inAmount": "183413759",
+          "inputMint": "So11111111111111111111111111111111111111112",
+          "label": "Raydium CLMM",
+          "outAmount": "10189739",
+          "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+        }
+      }
+    ],
+    "side": "buy",
+    "total_metas": 25
+  },
+  "buy_markup_bps": 200,
+  "buy_search": "first successful bounded ExactIn marked-up sale-output budget, doubling; not cheapest ask proof",
+  "captured_at": "2026-10-28T20:06:44.358628+00:00",
+  "cpi_execution_qualified": false,
+  "dexes": null,
+  "exclude_dexes": "Scorch",
+  "history_qualified": false,
+  "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+  "net_bid_lamports": 178918323,
+  "quantity": 10000000,
+  "request_max_accounts": 16,
+  "requests": [
+    {
+      "file": "dependency-accounts-1.json",
+      "finished_at": "2026-10-28T20:06:31.576681+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:06:31 GMT"
+      },
+      "length": 3857801,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+            "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+            "So11111111111111111111111111111111111111112",
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "efb35920f69e4e73edc1deb0f2fac4aa7dd81e2b600693afd83bb4fc12de2d16",
+      "started_at": "2026-10-28T20:06:30.979649+00:00",
+      "status": 200
+    },
+    {
+      "file": "programdata-accounts-2.json",
+      "finished_at": "2026-10-28T20:06:33.630785+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:06:32 GMT"
+      },
+      "length": 1988036,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+            "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "c770b3baa3bdcc1d5d1f45fde959feedecd28694800de100f3be5be841f0c464",
+      "started_at": "2026-10-28T20:06:33.180433+00:00",
+      "status": 200
+    },
+    {
+      "file": "sell.json",
+      "finished_at": "2026-10-28T20:06:35.482749+00:00",
+      "headers": {
+        "Content-Type": "application/json",
+        "date": "Wed, 28 Oct 2026 20:06:35 GMT",
+        "x-ratelimit-current": "1",
+        "x-ratelimit-remaining": "4",
+        "x-ratelimit-reset": "1793218005"
+      },
+      "length": 15902,
+      "method": "GET",
+      "parameters": {
+        "amount": "10000000",
+        "destinationTokenAccount": "8Tka9Xo1nNdKY8YZmnhgSdnFDMB2oTxwZzLH8CfZa55m",
+        "excludeDexes": "Scorch",
+        "inputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "maxAccounts": "16",
+        "outputMint": "So11111111111111111111111111111111111111112",
+        "slippageBps": "50",
+        "taker": "3evyjL8agmEKZXauC2fa3USg5CLDt4S9PcP5V3tfEFuk",
+        "transactionVersion": "0",
+        "wrapAndUnwrapSol": "false"
+      },
+      "provider": "Jupiter API",
+      "sha256": "329a442d1a8342437e5a8bb3a612e1b499b3dbb18f6a2b6f6b63f86fb7107d25",
+      "started_at": "2026-10-28T20:06:35.380664+00:00",
+      "status": 200
+    },
+    {
+      "file": "buy-0.json",
+      "finished_at": "2026-10-28T20:06:37.677134+00:00",
+      "headers": {
+        "Content-Type": "application/json",
+        "date": "Wed, 28 Oct 2026 20:06:37 GMT",
+        "x-ratelimit-current": "2",
+        "x-ratelimit-remaining": "3",
+        "x-ratelimit-reset": "1793218005"
+      },
+      "length": 16542,
+      "method": "GET",
+      "parameters": {
+        "amount": "183413759",
+        "destinationTokenAccount": "AK5Kr8k8NrcD5r36QwpgYk2TtxQ4WDmMwssqPSfZXQrC",
+        "excludeDexes": "Scorch",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "maxAccounts": "16",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "slippageBps": "50",
+        "taker": "3evyjL8agmEKZXauC2fa3USg5CLDt4S9PcP5V3tfEFuk",
+        "transactionVersion": "0",
+        "wrapAndUnwrapSol": "false"
+      },
+      "provider": "Jupiter API",
+      "sha256": "af03f07ab38481dc11060a23b94d0e686d94e7e54d7a1e7e7ab0cc565c4fab20",
+      "started_at": "2026-10-28T20:06:37.581400+00:00",
+      "status": 200
+    },
+    {
+      "file": "route-accounts-3.json",
+      "finished_at": "2026-10-28T20:06:40.239753+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:06:39 GMT"
+      },
+      "length": 3950158,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "2AXXcN6oN9bBT5owwmTH53C7QHUXvhLeu718Kqt8rvY2",
+            "3AyxTmFWQvSwuxhtEFXtQX7Eo2hXdCpABsp68tstxuZX",
+            "3evyjL8agmEKZXauC2fa3USg5CLDt4S9PcP5V3tfEFuk",
+            "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+            "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+            "7mJwQZo15Q8nVS42WsdUbeqTDHUcLtGPg3j9p3fqNQcX",
+            "83X2CtntvKWQ1L7CQYh7Dg6eYcm1Jm8rYgNpjHXBgd9U",
+            "8Tka9Xo1nNdKY8YZmnhgSdnFDMB2oTxwZzLH8CfZa55m",
+            "8XSjHNq567jnmfqTH56J8yb4KoU7nPbMD2qKVTkmohKJ",
+            "9Jgp8NpqEDFd5d3RQPfuRY7gMgRFByTNFmi68Ph1yvVb",
+            "AK5Kr8k8NrcD5r36QwpgYk2TtxQ4WDmMwssqPSfZXQrC",
+            "Be1CFyoPAr8aBGxpvCPD2LD21hdz2vjYNq8EcypnmgGD",
+            "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+            "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+            "DCURDhS5do6w9EytNmFxUNp3kYqXxfkv61Gs7FtLcH5a",
+            "ErkDuZVjDcG744Zm39wVRcXn3DfPbURyFnDwvsxsU5FV",
+            "FYRLJXa5zG6xz7tWsPdarSJuqaRTF1Vf1RxLuobaDmUs",
+            "FqQoFbWYZjM5yr9uZf5xLQKGWCXakEbCU9jYKsi4svL3",
+            "GWq12s9Hb3viVbykSPXJj5C3eFBuzzzjodGcsrnKSXQh",
+            "HfERMT5DRA6C1TAqecrJQFpmkf3wsWTMncqnj3RDg5aw",
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+            "So11111111111111111111111111111111111111112",
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+            "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+            "Y72kkekMo5aFvWrnADSzyMsW3h4AssSXXNEkQG7YCXB"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "fbc995dc8016be650b8c21d5323140c85c18dc395ee98802da2bb20288039101",
+      "started_at": "2026-10-28T20:06:39.781649+00:00",
+      "status": 200
+    },
+    {
+      "file": "programdata-accounts-4.json",
+      "finished_at": "2026-10-28T20:06:42.355383+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:06:42 GMT"
+      },
+      "length": 2267203,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "HzD2cCXXT3UQNjMMY6kDv9w6gZ9qquSdfoGXrLL3LXx"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "256a162a198acc8bad7b20455ff453546f9dca257d588615b538bfcd5dfee693",
+      "started_at": "2026-10-28T20:06:41.982780+00:00",
+      "status": 200
+    },
+    {
+      "file": "snapshot-blocktime.json",
+      "finished_at": "2026-10-28T20:06:44.292056+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Wed, 28 Oct 2026 20:06:43 GMT"
+      },
+      "length": 45,
+      "method": "getBlockTime",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getBlockTime",
+        "params": [
+          462605357
+        ]
+      },
+      "sha256": "17d7842590977050b893e7b27b071aaaf82c1b2deba7744d915f99156b845259",
+      "started_at": "2026-10-28T20:06:44.183095+00:00",
+      "status": 200
+    }
+  ],
+  "scope": "read-only candidate; no financial CPI or history qualification",
+  "sell": {
+    "blockhash_metadata": {
+      "blockhash": [
+        31,
+        124,
+        87,
+        254,
+        217,
+        97,
+        186,
+        184,
+        228,
+        25,
+        112,
+        26,
+        65,
+        90,
+        191,
+        170,
+        57,
+        163,
+        32,
+        212,
+        250,
+        23,
+        221,
+        33,
+        180,
+        48,
+        207,
+        36,
+        146,
+        174,
+        235,
+        255
+      ],
+      "fetchedAt": {
+        "nanos_since_epoch": 521171748,
+        "secs_since_epoch": 1793217995
+      },
+      "lastValidBlockHeight": 440629891
+    },
+    "checks": {
+      "exact_domain": true,
+      "excluded_labels_absent": true,
+      "header_input": true,
+      "header_no_fees": true,
+      "header_quote": true,
+      "header_slippage50": true,
+      "jupiter_program": true,
+      "no_extra_signers": true,
+      "ordinary_route_v2": true,
+      "output_bounds": true,
+      "route_data_le768": true,
+      "slippage50": true,
+      "steps_le8": true,
+      "total_metas_le48": true
+    },
+    "cpi_execution_qualified": false,
+    "envelope_pass": true,
+    "expected_output": 179817410,
+    "history_qualified": false,
+    "labels": [
+      "Raydium CLMM"
+    ],
+    "minimum_output": 178918323,
+    "request_amount": 10000000,
+    "response_file": "sell.json",
+    "response_sha256": "329a442d1a8342437e5a8bb3a612e1b499b3dbb18f6a2b6f6b63f86fb7107d25",
+    "route_data_bytes": 39,
+    "route_plan": [
+      {
+        "bps": 10000,
+        "percent": 100,
+        "swapInfo": {
+          "ammKey": "2AXXcN6oN9bBT5owwmTH53C7QHUXvhLeu718Kqt8rvY2",
+          "inAmount": "10000000",
+          "inputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+          "label": "Raydium CLMM",
+          "outAmount": "179817410",
+          "outputMint": "So11111111111111111111111111111111111111112"
+        }
+      }
+    ],
+    "side": "sell",
+    "total_metas": 25
+  },
+  "snapshot_block_time": 1793218001,
+  "snapshot_slot": 462605357,
+  "spread_bps_ceil": 252,
+  "whole_q_buy_lamports": 183413759,
+  "whole_q_quote_available": true,
+  "within_500bps_spread": true
+}

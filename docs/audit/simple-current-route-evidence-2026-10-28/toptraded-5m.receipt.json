@@ -1,0 +1,8 @@
+{
+  "url": "https://api.jup.ag/tokens/v2/toptraded/5m?limit=100",
+  "started_at": "2026-10-28T20:07:23.729416+00:00",
+  "finished_at": "2026-10-28T20:07:23.949602+00:00",
+  "sha256": "9781e653cba75df3da367ceb549326b5d2f10399668abe6df1062bf397bdc2ca",
+  "bytes": 249698,
+  "status": 200
+}

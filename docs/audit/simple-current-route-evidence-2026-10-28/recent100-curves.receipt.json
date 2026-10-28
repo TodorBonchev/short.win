@@ -1,0 +1,45 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "GuM2CTz6EqSban8LjF7SosWqP9seY4HiGy11u9fQeVpH",
+        "8vk2UuJTKKY2yXdq2qTbWdsgqJJBptantaD6dGdgoZYp",
+        "4B1DBR1peDySHiPx37nbopPgxLL8FwXyBgwU19Jbw4Xp",
+        "89isHoharagvhHh9Z4WALBrkGXoCjDDLrrz5bExHRi8w",
+        "6f2iDBv9KhW2wKDz6ShhbqayDPFyJue3M4sp2btBZ95C",
+        "BZsm2tVCwk9ofEUng9xteCxDGDhELuksECQRHb6gJc4e",
+        "AGtFHqEPo6kqtEJs8VSyagYQmbkAp2F7221cJQAjrAEC",
+        "9oWLrhj7etVnvDzcVAWc2vcWFrUNAwUZa6EwLTE2CetF",
+        "6RRMoahVxWa2bSqBNWvEQMj1BZg4pezhW4GsCpeWL8qz",
+        "5hP2mAL8XQgtNo1tdJw3RjXj1gAUJSYW8u6qx6bjjHK7",
+        "2iZ8H54vWKq3pkqwGqUWj7MM6F6ALvV9jpgz2DqGFg8K",
+        "DGq3MKbntCNpN8yENtXSQv8YF9hodU3q1pJzTC26DP5K",
+        "3f8wyYfYh3YiX1AwfHZuykT1mcrayPaigpWmxd21XbdG",
+        "7kKgff5bo82rdME1Wst2vc1g7Hgm5XBkqepeY8bZeGia",
+        "3YWKNhGvSDioW4JJs3rAfDU4ureNieG9FaLfJTcxHGE3",
+        "8F3qqdLKZ1tp34PYpGGogCDLgGGLHEpdfLhbfz3bBT4F",
+        "94ixQxmUDktY7zXiMdKpHapZtJ8DeerWfnpZKGXxjGy2",
+        "9WBQtSG7u51fpRYNLkw7tDKgtAumVvHGAXf2o1vY7htw",
+        "7pt4bSw9HkNMkGRP4kf2eyFigNNPKFSEVWSwG5c1Q1i1",
+        "8VDiTGVHgYvjfKntQtwdEGGQ6HGXJPaWcXqdPNBY8m8S",
+        "8KQNW1F3PEqhiqTLbtWdVuJhZ55CdMAaQ9FYafXVyv8z",
+        "7zdURJGTCDQKHFXirtbAjAuefbeZN9QQbYpx6DRepihE",
+        "J222CDSrqcFcMjG3pyYSbQ6SEgvRY4opAr5P94EDQ69s",
+        "EVJeJvQzvQhWqAQBiKczN6A71jW2S4b4SxBYCpuAxhyG",
+        "9tXGmmE4XYLLyZMSBDhZt5VFudnzAjeEpqM3ENNEs4VN",
+        "3abjteVaptyAQvbJGCbwKpbx3Z1E6UVp1C1GsnSWmyUr"
+      ],
+      {
+        "encoding": "base64",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "started_at": "2026-10-28T20:18:25.566764+00:00",
+  "finished_at": "2026-10-28T20:18:25.673845+00:00",
+  "sha256": "5f28252817c022b2c8c179df386de7e970675ce31c2a8f8ff6245b11e4516caf",
+  "bytes": 10101
+}

@@ -1,0 +1,99 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      144,
+      233,
+      192,
+      126,
+      221,
+      174,
+      137,
+      125,
+      191,
+      144,
+      211,
+      92,
+      121,
+      74,
+      236,
+      59,
+      37,
+      218,
+      115,
+      218,
+      27,
+      63,
+      3,
+      169,
+      105,
+      28,
+      106,
+      94,
+      31,
+      31,
+      113,
+      164
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 716343839,
+      "secs_since_epoch": 1793217831
+    },
+    "lastValidBlockHeight": 440629126
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 10195772,
+  "history_qualified": false,
+  "labels": [
+    "Mercurial",
+    "Raydium"
+  ],
+  "minimum_output": 10144794,
+  "request_amount": 183538800,
+  "response_file": "buy-0.json",
+  "response_sha256": "6f8d68e525fce0781e9ee98773a525b0189e49938d7e9a47d5967770f2f3bdbd",
+  "route_data_bytes": 45,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "MAR1zHjHaQcniE2gXsDptkyKUnNfMEsLBVcfP7vLyv7",
+        "inAmount": "183538800",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Mercurial",
+        "outAmount": "129923631",
+        "outputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "6gpZ9JkLoYvpA5cwdyPZFsDw6tkbPyyXM5FqRqHxMCny",
+        "inAmount": "129923631",
+        "inputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "label": "Raydium",
+        "outAmount": "10195772",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 30
+}

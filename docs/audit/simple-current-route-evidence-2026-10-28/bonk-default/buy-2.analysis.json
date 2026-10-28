@@ -1,0 +1,98 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      254,
+      82,
+      129,
+      223,
+      39,
+      222,
+      204,
+      206,
+      57,
+      67,
+      167,
+      213,
+      32,
+      237,
+      95,
+      3,
+      159,
+      143,
+      115,
+      89,
+      196,
+      167,
+      10,
+      89,
+      153,
+      174,
+      120,
+      207,
+      228,
+      82,
+      70,
+      45
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 568857656,
+      "secs_since_epoch": 1793217367
+    },
+    "lastValidBlockHeight": 440626972
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 41996882042,
+  "history_qualified": false,
+  "labels": [
+    "Manifest",
+    "Bonkswap"
+  ],
+  "minimum_output": 41786897632,
+  "request_amount": 12924380,
+  "response_file": "buy-2.json",
+  "response_sha256": "c0041bdb3d7617183eb04fa22d44560dd1d9d5f797b04778c1eced865c035234",
+  "route_data_bytes": 46,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "7SanaZyHJVdcr56szAJb1Vezsi491bqs4sU8bLLef1YG",
+        "inAmount": "12924380",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Manifest",
+        "outAmount": "9777523",
+        "outputMint": "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "HxhY3cDvaHDnsv7JhdeVPNYPjDSeTcKhnpLuZyfPXYwc",
+        "inAmount": "9777523",
+        "inputMint": "bSo13r4TkiE4KumL71LsHTPpL2euBYLFx6h9HP3piy1",
+        "label": "Bonkswap",
+        "outAmount": "41996882042",
+        "outputMint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 43
+}

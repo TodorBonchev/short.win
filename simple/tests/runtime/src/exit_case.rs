@@ -83,6 +83,7 @@ pub fn close(c: &Case, input: u64, minimum: u64) -> Instruction {
         temporary_funding: 100_000_000,
         route: RouteArgs {
             input_amount: input,
+            setup_lamports: 0,
             data: HistoricalRoute::data(input, minimum),
         },
     };
@@ -106,6 +107,7 @@ pub fn force(c: &Case, keeper: &Keypair, input: u64) -> Instruction {
         minimum_reference_sequence: 1,
         route: RouteArgs {
             input_amount: input,
+            setup_lamports: 0,
             data: HistoricalRoute::data(input, Q),
         },
     };

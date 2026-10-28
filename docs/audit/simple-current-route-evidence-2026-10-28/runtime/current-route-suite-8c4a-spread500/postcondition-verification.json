@@ -1,0 +1,58 @@
+{
+  "checked_at": "2026-10-28T20:48:02.009273+00:00",
+  "checks": [
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "bonk-production-adaptive",
+      "postconditions_verified": true,
+      "summary_sha256": "f2a483355d17ae4cc7dbbe1c3b91c1f6963581d5cf964015a1504ec6901ff646"
+    },
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "jup-production-adaptive",
+      "postconditions_verified": true,
+      "summary_sha256": "ee9c8571b6bdae2c819c9e10a716af1a71d46b767cf94d693e23ab6ec3049068"
+    },
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "ray-production-exclude-scorch16",
+      "postconditions_verified": true,
+      "summary_sha256": "35814382714930825e3d1c93dc4886b1f97ae6acda6abb39db0fefec5e740a83"
+    },
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "pump-curve-adaptive",
+      "postconditions_verified": true,
+      "summary_sha256": "76b20511f8b3c2bf8f0acf6b2cec456505ab5adaf98724b83f7ff6f45c452f8f"
+    },
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "pump-graduated-adaptive-440",
+      "postconditions_verified": true,
+      "summary_sha256": "7e0103233e0c26245bed210ddde1f44bc5262203f975e9154f7725901109c754"
+    },
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "pump-fresh-native-adaptive",
+      "postconditions_verified": true,
+      "summary_sha256": "379e4cc27a761317c5508f75c3c18bf295eae7ccd8e39f03a364a87e5a3391a8"
+    },
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "jup-direct-budget16",
+      "postconditions_verified": true,
+      "summary_sha256": "7170c8effc1345ae80727eaf54e6560fb22581780c1a772263a355cb4dc4bb07"
+    },
+    {
+      "all_exact_log_hashes_match": true,
+      "name": "ray-direct-budget16",
+      "postconditions_verified": true,
+      "summary_sha256": "413dc208246a0365ecd20b4b4bd96f092f75653fa3258e054adfa0aabcd5030a"
+    }
+  ],
+  "native_runner_sha256": "051866471c8c59a11a2e5c9d762b78adda3d6d35759749c1039b7ea7dd05ff69",
+  "own_program_sha256": "8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d",
+  "status": "passed",
+  "suite_summary_sha256": "f51a54304d2fbb546a4e9366651476a75bb793364bb37c7f91aeb36d4976634f",
+  "wrapper_sha256": "3951b90e98c0019f3c492b7802bd85ab55bac52a8b129059a2bf4384fe97052b"
+}

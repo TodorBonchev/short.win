@@ -1,0 +1,78 @@
+Program ComputeBudget111111111111111111111111111111 invoke [1]
+Program ComputeBudget111111111111111111111111111111 success
+Program kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 invoke [1]
+Program log: Instruction: OpenPosition
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+Program log: Instruction: InitializeAccount3
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 3064 of 1330089 compute units
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 229 of 1321834 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+Program log: Instruction: TransferChecked
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2737 of 1318641 compute units
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 invoke [2]
+Program log: Instruction: RouteV2
+Program 11111111111111111111111111111111 invoke [3]
+Program 11111111111111111111111111111111 success
+Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [3]
+Program log: Instruction: SellV3
+Program 11111111111111111111111111111111 invoke [4]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [4]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [4]
+Program 11111111111111111111111111111111 success
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [4]
+Program log: Instruction: TransferChecked
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 2857 of 1253584 compute units
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+Program data: vdt/007mYe5BQXW0irqMk2d/3p8IQ4AmjS1JHtoz+jR1k9XOS/PyL1Lt5QcAAAAAAECUUqMDAAAAw9FqSWsCtaSWa3kTH6uO4RJg/vhV3H8U8Vg9A+UlV/e7WOJqAAAAAG3YdZYHAAAAMlk3d1uCAwBtLFKaAAAAADLBJCvKgwIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABfAAAAAAAAAFQ1EwAAAAAAQVqoCj3fpiYk4ygHFpHWx/edn1NPIvzCXt8vavxwecEeAAAAAAAAANgQBgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAHNlbGwAAAAAAAAAAAAAAAAAAAAAAIgTAAAAAAAAqpoJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABS7eUHAAAAAG3YdZYHAAAAbSxSmgAAAAAAAAAAAAAAAAAAAAAAAAAA2BAGAAAAAAAAAAAAAAAAAA==
+Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P invoke [4]
+Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 2170 of 1242966 compute units
+Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success
+Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P consumed 50902 of 1289395 compute units
+Program 6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P success
+Program 11111111111111111111111111111111 invoke [3]
+Program 11111111111111111111111111111111 success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [3]
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 201 of 1236302 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 invoke [3]
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 consumed 91 of 1234230 compute units
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 success
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 consumed 61405 of 1295048 compute units
+Program return: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 FjjEBwAAAAA=
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb invoke [2]
+Program log: Instruction: CloseAccount
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb consumed 1371 of 1229349 compute units
+Program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 116 of 1226276 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program log: AnchorError thrown in programs/shortwin-simple/src/open.rs:265. Error Code: FeeAboveMax. Error Number: 6024. Error Message: Upfront fee exceeds the signed maximum.
+Program log: Left: 0
+Program log: Right: 1366102
+Program kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 consumed 179840 of 1399850 compute units
+Program kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 failed: custom program error: 0x1788

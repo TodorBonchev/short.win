@@ -5,7 +5,12 @@ use anchor_lang::solana_program::{
     bpf_loader_upgradeable,
     instruction::{AccountMeta, Instruction},
     program::invoke_signed,
+    program_pack::Pack,
     system_instruction, system_program,
+};
+use anchor_spl::token_2022::spl_token_2022::{
+    extension::{BaseStateWithExtensions, ExtensionType, StateWithExtensions},
+    state::Mint,
 };
 use anchor_spl::token_interface::{self, CloseAccount, InitializeAccount3, TransferChecked};
 use header::isolation::{self, RuntimeAccount, ScratchBinding, ScratchState};
@@ -22,6 +27,8 @@ pub const AUTHORITY_SEED: &[u8] = b"simple_exec";
 pub const BASE_SEED: &[u8] = b"simple_base";
 pub const WSOL_SEED: &[u8] = b"simple_wsol";
 pub const TOKEN_ACCOUNT_LEN: usize = 165;
+pub const MAX_SUPPORTED_MINT_BYTES: usize = 4096;
+pub const MAX_SETUP_LAMPORTS: u64 = 5_000_000;
 pub const MAX_ROUTE_ACCOUNTS: usize = 48;
 pub const MAX_ROUTE_BYTES: usize = 768;
 pub const MAX_ROUTE_STEPS: u32 = 8;
@@ -30,6 +37,8 @@ pub const MAX_ROUTE_SLIPPAGE_BPS: u16 = 1000;
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct RouteArgs {
     pub input_amount: u64,
+    /// Actor-signed native route allowance, separate from WSOL trade economics.
+    pub setup_lamports: u64,
     pub data: Vec<u8>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,12 +50,14 @@ pub struct ReviewedDeployment {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Sale {
     pub proceeds: u64,
+    pub setup_spent: u64,
     /// Arbitrary prior System-account prefunding is not trade proceeds.
     pub recovered_prefund: u64,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Buyback {
     pub spent: u64,
+    pub setup_spent: u64,
     pub pool_credit: u64,
     pub recovered_prefund: u64,
 }
@@ -131,8 +142,9 @@ pub fn validate_deployment(
     );
     Ok(())
 }
-/// Only plain initialized SPL/T22 mints in the first implementation. A quote or
-/// token name is not evidence that extension-bearing/frozen behavior is supported.
+/// Plain SPL mints and Token-2022 mints with metadata-only extensions.
+/// Metadata never supplies financial identity or price; transfer-changing extensions
+/// remain excluded and all protocol token accounts remain plain 165-byte accounts.
 pub fn supported_mint(mint: &AccountInfo<'_>, token_program: &Pubkey) -> Result<u8> {
     require!(
         [TOKEN_ID, TOKEN_2022_ID].contains(token_program)
@@ -144,10 +156,105 @@ pub fn supported_mint(mint: &AccountInfo<'_>, token_program: &Pubkey) -> Result<
     );
     let bytes = mint.try_borrow_data()?;
     require!(
-        bytes.len() == 82 && bytes[45] == 1 && bytes[46..50] == [0; 4],
+        bytes.len() <= MAX_SUPPORTED_MINT_BYTES,
         SimpleError::RouteMintUnsupported
     );
-    Ok(bytes[44])
+    if token_program == &TOKEN_ID {
+        require!(bytes.len() == Mint::LEN, SimpleError::RouteMintUnsupported);
+    }
+    // The pinned SPL decoder checks initialized base state, canonical COptions,
+    // zero mint padding, Mint account type and the reserved multisig size.
+    let state = StateWithExtensions::<Mint>::unpack(&bytes)
+        .map_err(|_| error!(SimpleError::RouteMintUnsupported))?;
+    require!(
+        state.base.freeze_authority.is_none(),
+        SimpleError::RouteMintUnsupported
+    );
+    metadata_only_tlv(state.get_tlv_data(), mint.key)?;
+    Ok(state.base.decimals)
+}
+fn metadata_only_tlv(tlv: &[u8], mint: &Pubkey) -> Result<()> {
+    let mut at = 0usize;
+    let mut seen = 0u8;
+    while at < tlv.len() {
+        let rest = &tlv[at..];
+        // Token-2022 may retain unallocated zero padding, including the two-byte
+        // multisig-length adjustment. Nonzero bytes after an empty type fail.
+        if rest.iter().all(|byte| *byte == 0) {
+            break;
+        }
+        require!(rest.len() >= 4, SimpleError::RouteMintUnsupported);
+        let kind = u16::from_le_bytes([rest[0], rest[1]]);
+        let length = usize::from(u16::from_le_bytes([rest[2], rest[3]]));
+        let end = at
+            .checked_add(4)
+            .and_then(|x| x.checked_add(length))
+            .ok_or_else(|| error!(SimpleError::RouteMintUnsupported))?;
+        require!(end <= tlv.len(), SimpleError::RouteMintUnsupported);
+        let value = &tlv[at + 4..end];
+        let bit = if kind == u16::from(ExtensionType::MetadataPointer) {
+            require!(length == 64, SimpleError::RouteMintUnsupported);
+            1
+        } else if kind == u16::from(ExtensionType::TokenMetadata) {
+            validate_token_metadata(value, mint)?;
+            2
+        } else {
+            return err!(SimpleError::RouteMintUnsupported);
+        };
+        require!(seen & bit == 0, SimpleError::RouteMintUnsupported);
+        seen |= bit;
+        at = end;
+    }
+    Ok(())
+}
+fn metadata_u32(bytes: &[u8], at: &mut usize) -> Result<usize> {
+    let end = at
+        .checked_add(4)
+        .ok_or_else(|| error!(SimpleError::RouteMintUnsupported))?;
+    let value: [u8; 4] = bytes
+        .get(*at..end)
+        .ok_or_else(|| error!(SimpleError::RouteMintUnsupported))?
+        .try_into()
+        .map_err(|_| error!(SimpleError::RouteMintUnsupported))?;
+    *at = end;
+    usize::try_from(u32::from_le_bytes(value))
+        .map_err(|_| error!(SimpleError::RouteMintUnsupported))
+}
+fn metadata_string<'a>(bytes: &'a [u8], at: &mut usize) -> Result<&'a str> {
+    let length = metadata_u32(bytes, at)?;
+    let end = at
+        .checked_add(length)
+        .ok_or_else(|| error!(SimpleError::RouteMintUnsupported))?;
+    let value = bytes
+        .get(*at..end)
+        .ok_or_else(|| error!(SimpleError::RouteMintUnsupported))?;
+    let string =
+        core::str::from_utf8(value).map_err(|_| error!(SimpleError::RouteMintUnsupported))?;
+    *at = end;
+    Ok(string)
+}
+/// TokenMetadata's pinned Borsh shape, borrowed rather than allocating strings
+/// from untrusted lengths. Authorities/name/URI never affect protocol accounting.
+fn validate_token_metadata(bytes: &[u8], mint: &Pubkey) -> Result<()> {
+    require!(
+        bytes.len() >= 80 && bytes[32..64] == mint.to_bytes(),
+        SimpleError::RouteMintUnsupported
+    );
+    let mut at = 64;
+    for _ in 0..3 {
+        metadata_string(bytes, &mut at)?;
+    }
+    let pairs = metadata_u32(bytes, &mut at)?;
+    require!(
+        pairs <= (bytes.len() - at) / 8,
+        SimpleError::RouteMintUnsupported
+    );
+    for _ in 0..pairs {
+        metadata_string(bytes, &mut at)?;
+        metadata_string(bytes, &mut at)?;
+    }
+    require!(at == bytes.len(), SimpleError::RouteMintUnsupported);
+    Ok(())
 }
 fn plain_token(
     account: &AccountInfo<'_>,
@@ -217,7 +324,6 @@ impl RouteAccounts<'_, '_> {
         let (wsol, wb) = derive(WSOL_SEED, self.loan.key);
         require!(
             self.execution_authority.key == &authority
-                && !self.execution_authority.is_writable
                 && !self.execution_authority.is_signer
                 && self.execution_authority.owner == &system_program::ID
                 && self.execution_authority.data_is_empty()
@@ -305,6 +411,69 @@ fn normalize_prefund<'info>(
         )?;
     }
     Ok(amount)
+}
+fn authority_unchanged(account: &AccountInfo<'_>, expected_lamports: u64) -> Result<()> {
+    require!(
+        account.owner == &system_program::ID
+            && account.data_is_empty()
+            && !account.executable
+            && !account.is_signer
+            && account.lamports() == expected_lamports,
+        SimpleError::RouteBalance
+    );
+    Ok(())
+}
+fn settle_setup<'info>(
+    a: &RouteAccounts<'_, 'info>,
+    authority_seeds: &[&[u8]],
+    baseline: u64,
+    setup: u64,
+) -> Result<u64> {
+    require!(
+        a.execution_authority.owner == &system_program::ID
+            && a.execution_authority.data_is_empty()
+            && !a.execution_authority.executable
+            && !a.execution_authority.is_signer,
+        SimpleError::RouteBalance
+    );
+    let unused = sub(a.execution_authority.lamports(), baseline)?;
+    require!(unused <= setup, SimpleError::RouteBalance);
+    let spent = sub(setup, unused)?;
+    if unused > 0 {
+        invoke_signed(
+            &system_instruction::transfer(a.execution_authority.key, a.loan.key, unused),
+            &[
+                a.execution_authority.clone(),
+                a.loan.clone(),
+                a.system_program.clone(),
+            ],
+            &[authority_seeds],
+        )?;
+    }
+    authority_unchanged(a.execution_authority, baseline)?;
+    Ok(spent)
+}
+fn fund_setup(a: &RouteAccounts<'_, '_>, setup: u64, authority_seeds: &[&[u8]]) -> Result<()> {
+    require!(setup <= MAX_SETUP_LAMPORTS, SimpleError::FundingAboveMax);
+    if setup > 0 {
+        require!(
+            a.execution_authority.is_writable,
+            SimpleError::RouteAccounts
+        );
+        move_owned(a.loan, a.execution_authority, setup)?;
+        // Flush both sides of the direct program-owned loan debit before a
+        // Jupiter CPI which deliberately never receives that financial account.
+        invoke_signed(
+            &system_instruction::transfer(a.execution_authority.key, a.loan.key, 0),
+            &[
+                a.execution_authority.clone(),
+                a.loan.clone(),
+                a.system_program.clone(),
+            ],
+            &[authority_seeds],
+        )?;
+    }
+    Ok(())
 }
 #[allow(clippy::too_many_arguments)]
 fn initialize_scratch<'info>(
@@ -491,7 +660,7 @@ fn invoke_jupiter<'info>(
         a.token_vault.key.to_bytes(),
         a.jupiter_program_data.key.to_bytes(),
     ]);
-    isolation::check_surface(
+    isolation::check_surface_allowing_writable_authority(
         &proposed,
         &actual,
         &expected,
@@ -517,6 +686,15 @@ pub fn temporary_rent() -> Result<u64> {
         .minimum_balance(TOKEN_ACCOUNT_LEN)
         .checked_mul(2)
         .ok_or_else(|| error!(SimpleError::MathOverflow))
+}
+/// Actual actor advance; existing temporary_funding fields sign its maximum.
+/// Consumed native setup allowance is not reimbursed from collateral or fees.
+pub fn temporary_advance(args: &RouteArgs) -> Result<u64> {
+    require!(
+        args.setup_lamports <= MAX_SETUP_LAMPORTS,
+        SimpleError::FundingAboveMax
+    );
+    add(temporary_rent()?, args.setup_lamports)
 }
 fn available(loan: &AccountInfo<'_>, floor: u64, need: u64) -> Result<()> {
     require!(
@@ -554,11 +732,29 @@ pub fn sell<'info>(
     let base_seeds: &[&[u8]] = &[BASE_SEED, a.loan.key.as_ref(), &base_bump];
     let wsol_seeds: &[&[u8]] = &[WSOL_SEED, a.loan.key.as_ref(), &wsol_bump];
     let authority_seeds: &[&[u8]] = &[AUTHORITY_SEED, a.loan.key.as_ref(), &authority_bump];
+    let authority_prefund = if a.execution_authority.is_writable {
+        normalize_prefund(
+            a.execution_authority,
+            a.loan,
+            a.system_program,
+            authority_seeds,
+        )?
+    } else {
+        0
+    };
+    let authority_baseline = a.execution_authority.lamports();
     let prefund = add(
-        normalize_prefund(a.execution_base, a.loan, a.system_program, base_seeds)?,
-        normalize_prefund(a.execution_wsol, a.loan, a.system_program, wsol_seeds)?,
+        authority_prefund,
+        add(
+            normalize_prefund(a.execution_base, a.loan, a.system_program, base_seeds)?,
+            normalize_prefund(a.execution_wsol, a.loan, a.system_program, wsol_seeds)?,
+        )?,
     )?;
-    available(a.loan, loan_floor, add(rent, rent)?)?;
+    available(
+        a.loan,
+        loan_floor,
+        add(add(rent, rent)?, args.setup_lamports)?,
+    )?;
     initialize_scratch(
         a.execution_base,
         a.loan,
@@ -602,7 +798,9 @@ pub fn sell<'info>(
         0,
         SimpleError::RouteBalance
     );
+    fund_setup(a, args.setup_lamports, authority_seeds)?;
     invoke_jupiter(a, remaining, args, authority_seeds, false, minimum_proceeds)?;
+    let setup_spent = settle_setup(a, authority_seeds, authority_baseline, args.setup_lamports)?;
     require_eq!(
         a.scratch_state(false, rent)?.amount(),
         0,
@@ -611,16 +809,18 @@ pub fn sell<'info>(
     let proceeds = a.scratch_state(true, rent)?.amount();
     require!(proceeds >= minimum_proceeds, SimpleError::RouteOutputShort);
     close_scratch(a, authority_seeds)?;
+    authority_unchanged(a.execution_authority, authority_baseline)?;
     let after = plain_token(a.token_vault, a.base_program.key, a.mint.key, a.pool.key)?;
     require!(
         same_token_metadata(before, after)
             && sub(token_amount(&before), token_amount(&after))? == quantity
             && a.token_vault.lamports() == token_lamports
-            && a.loan.lamports() == add(add(start, prefund)?, proceeds)?,
+            && a.loan.lamports() == sub(add(add(start, prefund)?, proceeds)?, setup_spent)?,
         SimpleError::RouteBalance
     );
     Ok(Sale {
         proceeds,
+        setup_spent,
         recovered_prefund: prefund,
     })
 }
@@ -652,14 +852,31 @@ pub fn buyback<'info>(
     let base_seeds: &[&[u8]] = &[BASE_SEED, a.loan.key.as_ref(), &base_bump];
     let wsol_seeds: &[&[u8]] = &[WSOL_SEED, a.loan.key.as_ref(), &wsol_bump];
     let authority_seeds: &[&[u8]] = &[AUTHORITY_SEED, a.loan.key.as_ref(), &authority_bump];
+    let authority_prefund = if a.execution_authority.is_writable {
+        normalize_prefund(
+            a.execution_authority,
+            a.loan,
+            a.system_program,
+            authority_seeds,
+        )?
+    } else {
+        0
+    };
+    let authority_baseline = a.execution_authority.lamports();
     let prefund = add(
-        normalize_prefund(a.execution_base, a.loan, a.system_program, base_seeds)?,
-        normalize_prefund(a.execution_wsol, a.loan, a.system_program, wsol_seeds)?,
+        authority_prefund,
+        add(
+            normalize_prefund(a.execution_base, a.loan, a.system_program, base_seeds)?,
+            normalize_prefund(a.execution_wsol, a.loan, a.system_program, wsol_seeds)?,
+        )?,
     )?;
     available(
         a.loan,
         loan_floor,
-        add(add(rent, rent)?, args.input_amount)?,
+        add(
+            add(add(rent, rent)?, args.input_amount)?,
+            args.setup_lamports,
+        )?,
     )?;
     initialize_scratch(
         a.execution_base,
@@ -685,7 +902,9 @@ pub fn buyback<'info>(
     )?;
     let source_before = a.scratch_state(true, rent)?;
     let destination_before = a.scratch_state(false, rent)?;
+    fund_setup(a, args.setup_lamports, authority_seeds)?;
     invoke_jupiter(a, remaining, args, authority_seeds, true, required_quantity)?;
+    let setup_spent = settle_setup(a, authority_seeds, authority_baseline, args.setup_lamports)?;
     let source_after = a.scratch_state(true, rent)?;
     let destination_after = a.scratch_state(false, rent)?;
     let deltas = isolation::measure_buyback(
@@ -714,6 +933,7 @@ pub fn buyback<'info>(
         SimpleError::RouteBalance
     );
     close_scratch(a, authority_seeds)?;
+    authority_unchanged(a.execution_authority, authority_baseline)?;
     let after = plain_token(a.token_vault, a.base_program.key, a.mint.key, a.pool.key)?;
     let credit = sub(token_amount(&after), token_amount(&before))?;
     require!(
@@ -721,11 +941,16 @@ pub fn buyback<'info>(
             && credit == deltas.received_tokens
             && credit >= required_quantity
             && a.token_vault.lamports() == token_lamports
-            && a.loan.lamports() == sub(add(start, prefund)?, deltas.spent_lamports)?,
+            && a.loan.lamports()
+                == sub(
+                    sub(add(start, prefund)?, deltas.spent_lamports)?,
+                    setup_spent
+                )?,
         SimpleError::RouteBalance
     );
     Ok(Buyback {
         spent: deltas.spent_lamports,
+        setup_spent,
         pool_credit: credit,
         recovered_prefund: prefund,
     })
@@ -866,6 +1091,160 @@ mod tests {
                 AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &owner, false);
             assert!(supported_mint(&account, &owner).is_err());
         }
+    }
+    fn metadata_mint(key: &Pubkey) -> Vec<u8> {
+        let mut bytes = vec![0; 166];
+        bytes[44] = 6;
+        bytes[45] = 1;
+        bytes[165] = 1; // AccountType::Mint, after canonical zero padding.
+        bytes.extend(18u16.to_le_bytes());
+        bytes.extend(64u16.to_le_bytes());
+        bytes.extend([0; 32]);
+        bytes.extend(key.to_bytes());
+        let mut value = vec![0; 32]; // Mutable/immutable metadata authority is not token authority.
+        value.extend(key.to_bytes());
+        for string in [
+            "Example pump metadata",
+            "META",
+            "https://example.invalid/meta.json",
+        ] {
+            value.extend((string.len() as u32).to_le_bytes());
+            value.extend(string.as_bytes());
+        }
+        value.extend(0u32.to_le_bytes());
+        bytes.extend(19u16.to_le_bytes());
+        bytes.extend((value.len() as u16).to_le_bytes());
+        bytes.extend(value);
+        bytes
+    }
+    fn accepts_mint(mut bytes: Vec<u8>, key: Pubkey, owner: Pubkey) -> bool {
+        let mut lamports = 1;
+        let account =
+            AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &owner, false);
+        supported_mint(&account, &owner).is_ok()
+    }
+    #[test]
+    fn token2022_metadata_only_mints_and_zero_tail_keep_plain_account_semantics() {
+        let key = Pubkey::new_unique();
+        let bytes = metadata_mint(&key);
+        assert!(accepts_mint(bytes.clone(), key, TOKEN_2022_ID));
+        assert!(!accepts_mint(bytes.clone(), key, TOKEN_ID));
+        for tail in [1, 2, 4, 19] {
+            let mut padded = bytes.clone();
+            padded.resize(padded.len() + tail, 0);
+            assert!(accepts_mint(padded, key, TOKEN_2022_ID));
+        }
+        let mut maximum = bytes.clone();
+        maximum.resize(MAX_SUPPORTED_MINT_BYTES, 0);
+        assert!(accepts_mint(maximum.clone(), key, TOKEN_2022_ID));
+        maximum.push(0);
+        assert!(!accepts_mint(maximum, key, TOKEN_2022_ID));
+        assert!(accepts_mint(bytes[..234].to_vec(), key, TOKEN_2022_ID));
+        // Only metadata changes are admitted; no token-account extension is required.
+        assert_eq!(
+            ExtensionType::get_required_init_account_extensions(&[
+                ExtensionType::MetadataPointer,
+                ExtensionType::TokenMetadata,
+            ]),
+            vec![]
+        );
+        assert_eq!(TOKEN_ACCOUNT_LEN, 165);
+    }
+    #[test]
+    fn token2022_behavior_unknown_and_duplicate_extensions_are_rejected() {
+        let key = Pubkey::new_unique();
+        let bytes = metadata_mint(&key);
+        for kind in (1u16..=28).chain([65535]) {
+            if [18, 19].contains(&kind) {
+                continue;
+            }
+            let mut altered = bytes.clone();
+            altered.extend(kind.to_le_bytes());
+            altered.extend(0u16.to_le_bytes());
+            assert!(
+                !accepts_mint(altered, key, TOKEN_2022_ID),
+                "extension {kind}"
+            );
+        }
+        for duplicate in [&bytes[166..234], &bytes[234..]] {
+            let mut altered = bytes.clone();
+            altered.extend(duplicate);
+            assert!(!accepts_mint(altered, key, TOKEN_2022_ID));
+        }
+        let mut hidden = bytes.clone();
+        hidden.extend([0, 0, 0, 0, 18, 0, 0, 0]);
+        assert!(!accepts_mint(hidden, key, TOKEN_2022_ID));
+    }
+    #[test]
+    fn token2022_metadata_bounds_canonical_base_and_full_tlv_are_checked() {
+        let key = Pubkey::new_unique();
+        let bytes = metadata_mint(&key);
+        for (at, value) in [
+            (0, 2),
+            (45, 0),
+            (45, 2),
+            (46, 1),
+            (82, 1),
+            (164, 1),
+            (165, 0),
+            (165, 2),
+            (168, 63),
+            (168, 65),
+            (238 + 32, 1),
+            (238 + 64, 255),
+            (238 + 68, 255),
+        ] {
+            let mut altered = bytes.clone();
+            altered[at] = value;
+            assert!(
+                !accepts_mint(altered, key, TOKEN_2022_ID),
+                "byte {at}={value}"
+            );
+        }
+        for length in [0, 81, 83, 165, 167, 169, bytes.len() - 1] {
+            assert!(
+                !accepts_mint(bytes[..length].to_vec(), key, TOKEN_2022_ID),
+                "length {length}"
+            );
+        }
+        let mut trailing = bytes.clone();
+        trailing.push(1);
+        assert!(!accepts_mint(trailing, key, TOKEN_2022_ID));
+        let mut overrun = bytes.clone();
+        overrun[236..238].copy_from_slice(&u16::MAX.to_le_bytes());
+        assert!(!accepts_mint(overrun, key, TOKEN_2022_ID));
+        let mut extra_value = bytes.clone();
+        let length = u16::from_le_bytes([extra_value[236], extra_value[237]]) + 1;
+        extra_value[236..238].copy_from_slice(&length.to_le_bytes());
+        extra_value.push(0);
+        assert!(!accepts_mint(extra_value, key, TOKEN_2022_ID));
+        let mut huge_pairs = bytes;
+        let end = huge_pairs.len();
+        huge_pairs[end - 4..].copy_from_slice(&u32::MAX.to_le_bytes());
+        assert!(!accepts_mint(huge_pairs, key, TOKEN_2022_ID));
+    }
+    #[test]
+    fn authority_postcondition_rejects_foreign_owner_data_signer_and_unaccounted_sol() {
+        fn matches(
+            owner: Pubkey,
+            bytes: &mut [u8],
+            mut lamports: u64,
+            baseline: u64,
+            signer: bool,
+            executable: bool,
+        ) -> bool {
+            let key = Pubkey::new_unique();
+            let account =
+                AccountInfo::new(&key, signer, true, &mut lamports, bytes, &owner, executable);
+            authority_unchanged(&account, baseline).is_ok()
+        }
+        assert!(matches(system_program::ID, &mut [], 0, 0, false, false));
+        assert!(matches(system_program::ID, &mut [], 37, 37, false, false));
+        assert!(!matches(system_program::ID, &mut [], 1, 0, false, false));
+        assert!(!matches(TOKEN_ID, &mut [], 0, 0, false, false));
+        assert!(!matches(system_program::ID, &mut [0], 0, 0, false, false));
+        assert!(!matches(system_program::ID, &mut [], 0, 0, true, false));
+        assert!(!matches(system_program::ID, &mut [], 0, 0, false, true));
     }
     #[test]
     fn token_metadata_comparison_allows_only_the_amount_to_change() {

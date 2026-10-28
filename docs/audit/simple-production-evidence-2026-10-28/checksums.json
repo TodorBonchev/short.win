@@ -1,0 +1,79 @@
+{
+  "files": [
+    {
+      "file": "build-ui-final.log",
+      "sha256": "2b5321abb1550b431e7f7523218a3bd8df996161aadc5b7d98407b3029c3a4af",
+      "bytes": 944
+    },
+    {
+      "file": "client-final.log",
+      "sha256": "c8796827e5c6993703b2d8a0ba4d9ac881ade38e73d164e591ce9d4f5f7896cf",
+      "bytes": 2829
+    },
+    {
+      "file": "config-final.log",
+      "sha256": "8c7160aa098303c2232a732f1a6bf3d6c0d92f8b2c20e2951f93ee301c407b7f",
+      "bytes": 1147
+    },
+    {
+      "file": "current-suite-independent-predicates.json",
+      "sha256": "8ee68e1065095fc09522e1957007252a2647517ea8e827304e4b5e80dac3bb06",
+      "bytes": 2172
+    },
+    {
+      "file": "program-smoke-completion.json",
+      "sha256": "790cdb5873197cbb4fe38166c7575a957c77a17abcdb60476e4c48eba2478f25",
+      "bytes": 227
+    },
+    {
+      "file": "program-smoke-final.log",
+      "sha256": "30721ca8eff7d7dbdcb8b9ecd9c8134c94c5c5f7fcf336939e8b13a735fbf808",
+      "bytes": 1610
+    },
+    {
+      "file": "program-smoke-metadata.json",
+      "sha256": "a656d54ef81311fa41422689d6f803b4e2eefa173b77fc9936ba9c386db2d00e",
+      "bytes": 53101
+    },
+    {
+      "file": "program-smoke-run.log",
+      "sha256": "77606040dd4bf517e5c36a281f0fc46b774ceed8b0e4bc6334239cc016ea177e",
+      "bytes": 4125
+    },
+    {
+      "file": "program-smoke-summary.json",
+      "sha256": "b6fe9c5f1293bb3e140ac58cf15ce355fd0d019c557e6b4ad5900d32bc7efc11",
+      "bytes": 1986
+    },
+    {
+      "file": "python-final.log",
+      "sha256": "2eb754f236b1d04c7f7884d9fd2f9b41d010ef3fd399c7042ed2387c540c0def",
+      "bytes": 3197
+    },
+    {
+      "file": "rust-clippy-final.log",
+      "sha256": "936a629157ff87f297e62aeb3036b5fb71e2f8aade78373aab645282db3b2ddb",
+      "bytes": 365
+    },
+    {
+      "file": "rust-format-final.log",
+      "sha256": "10ed60a3de7c76de5dc7468d4e844c74c2c92aab0adc4e3967b4bd8aa6a33cdf",
+      "bytes": 53
+    },
+    {
+      "file": "rust-tests-final.log",
+      "sha256": "8a821f2c23b24ddd0ca2f9c06893aa219b098bd913f9c473ec24f0436bece565",
+      "bytes": 8980
+    },
+    {
+      "file": "scope.log",
+      "sha256": "9fe63083c863783b31efffdcc0a22782315e27ed6e70c36d8287cfd841879b83",
+      "bytes": 181
+    },
+    {
+      "file": "web-final.log",
+      "sha256": "387f7b00d78e82e66c2d6f1b0803bd1751da7c608beefd5728977ed52b82683f",
+      "bytes": 1082
+    }
+  ]
+}

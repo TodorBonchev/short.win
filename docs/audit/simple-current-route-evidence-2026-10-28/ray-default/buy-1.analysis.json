@@ -1,0 +1,111 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      84,
+      78,
+      37,
+      169,
+      239,
+      177,
+      1,
+      134,
+      8,
+      57,
+      146,
+      117,
+      241,
+      132,
+      208,
+      65,
+      98,
+      250,
+      202,
+      69,
+      255,
+      205,
+      180,
+      149,
+      199,
+      173,
+      67,
+      5,
+      186,
+      101,
+      120,
+      215
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 17782479,
+      "secs_since_epoch": 1793217434
+    },
+    "lastValidBlockHeight": 440627278
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 10492827,
+  "history_qualified": false,
+  "labels": [
+    "Raydium CLMM",
+    "Raydium",
+    "Orca V1"
+  ],
+  "minimum_output": 10440363,
+  "request_amount": 187849758,
+  "response_file": "buy-1.json",
+  "response_sha256": "21a49cd355cf3f97238605451fab083a47911cf0f6d5eb9cea957c4ca7233557",
+  "route_data_bytes": 50,
+  "route_plan": [
+    {
+      "bps": 8464,
+      "percent": 84.64,
+      "swapInfo": {
+        "ammKey": "8EzbUfvcRT1Q6RL462ekGkgqbxsPmwC5FMLQZhSPMjJ3",
+        "inAmount": "158991706",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Raydium CLMM",
+        "outAmount": "112580624",
+        "outputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "6gpZ9JkLoYvpA5cwdyPZFsDw6tkbPyyXM5FqRqHxMCny",
+        "inAmount": "112580624",
+        "inputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "label": "Raydium",
+        "outAmount": "8880826",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    },
+    {
+      "bps": 1536,
+      "percent": 15.36,
+      "swapInfo": {
+        "ammKey": "4c8jpn6sLMrZHMYNq6idFfMdLBWEqn1r1wFNtgsPqTwE",
+        "inAmount": "28858052",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Orca V1",
+        "outAmount": "1612001",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 47
+}

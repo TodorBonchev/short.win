@@ -1,0 +1,66 @@
+{
+  "checked_at": "2026-10-28T20:02:01.796260+00:00",
+  "lookup_table_checks": [
+    {
+      "response": "buy-0.json",
+      "key": "2uZBAmspSFSykv1t27L2ipJL1j6N9R8qpU5c5FAezWhj",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-0.json",
+      "key": "9AsimPML6N36BAe8keQRAHpLuKgCKv9QJV9912TXZhBD",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-0.json",
+      "key": "CdrRqtdFbmxGABkbNsBWQhFc4iiSav2NTfARPQv4QvnQ",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-1.json",
+      "key": "CdrRqtdFbmxGABkbNsBWQhFc4iiSav2NTfARPQv4QvnQ",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-1.json",
+      "key": "9AsimPML6N36BAe8keQRAHpLuKgCKv9QJV9912TXZhBD",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-1.json",
+      "key": "5PYjskbpPUAWj6qE1MDs1RqqDG64vWhFLyTYwHRbjPZy",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "sell.json",
+      "key": "5PYjskbpPUAWj6qE1MDs1RqqDG64vWhFLyTYwHRbjPZy",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    }
+  ],
+  "all_lookup_tables_match": true,
+  "net_bid_lamports": 88777135,
+  "whole_q_buy_lamports": null,
+  "spread_bps_ceil": null,
+  "within_500bps_spread": false
+}

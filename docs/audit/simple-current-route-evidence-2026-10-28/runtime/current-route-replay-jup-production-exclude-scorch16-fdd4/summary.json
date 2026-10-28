@@ -1,0 +1,82 @@
+{
+  "actual_snapshot_packets_fit": true,
+  "base_token_conservation": true,
+  "binding": {
+    "execution_authority": "DJVwQ5rGdEn9FoU1mRZPukiviMRkAMMNcN9SPvsZSPhT",
+    "execution_base": "5eEpU4UxvKn48YmiVuuQgeF89j4VBcfQYoG1z7oXeGpG",
+    "execution_wsol": "4bo3Np5gjPWBDqqg7wZEYEX3wR5RZ6Mm48QvATcEx1Tr",
+    "loan": "12DkqgY4f6UGRaYiTaehMzDguH76V6btsCWREa1fyVcr",
+    "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "q": 40000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "buyback_spend": 114252703,
+  "error": null,
+  "full_buyback_net_credit": 40759448,
+  "functional_execution_passed": true,
+  "invariants": "principal/exposure, whole-q net vault credit, actual paid fees, collateral, rent/scratch closure, immutable real mint bytes, full post-CPI rollback",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "e8dd1125420792bb59bb1a0e7355985afeb74dba0c7a544a78f9bcf584e5df89",
+  "name": "jup-production-exclude-scorch16",
+  "native_runner_sha256": "0baa1d154274c6d84afa3b2cb363b41ad06c7080a7046ce8fddd8aa69bf2e259",
+  "own_program_sha256": "fdd4cdfeafa8655cbb1ca84df2efa895e5e607f1d122d1e5b0c57b5ebb3c89f9",
+  "packet_fit_failures": {},
+  "post_cpi_rollback": true,
+  "schema": 1,
+  "sell_proceeds": 112012453,
+  "status": "passed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 114252703,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 1000,
+    "live_ask_upper": 114252703,
+    "live_bid_lower": 111452391,
+    "spread_bps_ceiling": 252
+  },
+  "transactions": {
+    "full_buyback": {
+      "compute_units": 114579,
+      "error": null,
+      "log_file": "full_buyback.log",
+      "log_sha256": "c524bc52f0fe9c3aa86860445dd3fbb930544f904ee03ba2ae2714900b1a1c8b",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1047
+    },
+    "open_sell": {
+      "compute_units": 159034,
+      "error": null,
+      "log_file": "open_sell.log",
+      "log_sha256": "019939337d4b3ffb68dbd089f26bcc5fc2a5d4cfc45ad32f5a9481b4fe92f8da",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1164
+    },
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 149202,
+      "error": "InstructionError(1, Custom(6024))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "16bf27aa210b03503488e8b2090e2d7a926f358ccfa262967351687f5542f532",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1164
+    }
+  },
+  "wsol_delta_lamports": "2240250"
+}

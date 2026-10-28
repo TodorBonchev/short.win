@@ -176,7 +176,7 @@ export type OpenPositionInstructionData = {
   minProceeds: bigint;
   maxMargin: bigint;
   maxTermFee: bigint;
-  /** Signed maximum for the separately refunded scratch-account rent advance. */
+  /** Signed maximum for scratch rent plus native setup advance; unused setup is refunded. */
   temporaryFunding: bigint;
   maxAccountRent: bigint;
   minimumReferenceSequence: bigint;
@@ -189,7 +189,7 @@ export type OpenPositionInstructionDataArgs = {
   minProceeds: number | bigint;
   maxMargin: number | bigint;
   maxTermFee: number | bigint;
-  /** Signed maximum for the separately refunded scratch-account rent advance. */
+  /** Signed maximum for scratch rent plus native setup advance; unused setup is refunded. */
   temporaryFunding: number | bigint;
   maxAccountRent: number | bigint;
   minimumReferenceSequence: number | bigint;

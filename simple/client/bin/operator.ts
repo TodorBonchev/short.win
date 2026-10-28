@@ -13,7 +13,7 @@ RPC: --rpc-url URL or SOLANA_RPC_URL
 Optional: --tick --keeper-address ADDRESS --reporter-keyfile FILE --keeper-keyfile FILE
 --execute explicitly signs/submits; never enable until roles, funding and settings are reviewed.
 Bounds: --max-accounts N --max-event-transactions N --max-actions N --max-fee-lamports N
---max-pass-fees-lamports N --min-balance-lamports N --max-temporary-lamports N --max-reference-rent-lamports N
+--max-pass-fees-lamports N --min-balance-lamports N --max-temporary-lamports N --max-reference-rent-lamports N --max-new-reference-accounts N --max-route-setup-lamports N --max-daily-publication-fees-lamports N
 Run passes with a supervisor that prevents overlap. The HTTP bridge does not sign.`);
  process.exit(0);
 }
@@ -39,6 +39,9 @@ const permitted = new Set([
   "min-balance-lamports",
   "max-temporary-lamports",
   "max-reference-rent-lamports",
+  "max-new-reference-accounts",
+  "max-route-setup-lamports",
+  "max-daily-publication-fees-lamports",
 ]);
 for (let i = 0; i < args.length; i++) {
   const arg = args[i]!;
@@ -95,6 +98,9 @@ const options: OperatorOptions = {
   minBalanceLamports: amount("min-balance-lamports"),
   maxTemporaryLamports: amount("max-temporary-lamports"),
   maxReferenceRentLamports: amount("max-reference-rent-lamports"),
+  maxNewReferenceAccounts: count("max-new-reference-accounts"),
+  maxRouteSetupLamports: amount("max-route-setup-lamports"),
+  maxDailyPublicationFeesLamports: amount("max-daily-publication-fees-lamports"),
 };
 const result = await runOperator(options);
 process.stdout.write(stringify(result) + "\n");

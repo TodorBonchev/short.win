@@ -46,3 +46,83 @@ The Python `capacity` command reports a spacing-only request-budget bound and ex
 `cargo run -p shortwin-simple-runtime-tests --example program_fuzz -- --help` describes the actual-SBF runner. Use `--cases 32` for a bounded smoke. The mutually exclusive duration mode is available for a separately approved/frozen campaign; do not infer 24-hour qualification from a short smoke or from the pure-core model runner.
 
 The harness freezes its native executable, new program, source and fixture bytes and records actual scenario/operation counts, wall time, readable summary, exact log hashes, and completion data. Review [the harness documentation](../tests/runtime/README.md) for its limits and replay contract. A long qualifying record must pass duration, zero anomalies/failures/setup/invariant failures, required real scenario coverage, unchanged frozen inputs and summary/log checks. Finish in-flight work after the deadline, and preserve partial/error evidence instead of silently restarting.
+
+## Initial production proposal and on-demand cost bounds (2026-10-28)
+
+The reviewable financial, service, role and payer manifests are in
+[`config/`](../config/README.md). The owner selected a free Jupiter key and role
+setup with public identities still unassigned. Do not substitute test public keys
+or the local program placeholder. Verify the financial policy and actual service
+model together before constructing initialization instructions.
+
+Private exact-q observations remain off chain while an unarmed loan is healthy.
+A public warm request records a publication intent; it expires after
+`epoch_seconds * (history_epochs + 2) + reference_max_age_seconds`. A usable
+confirmed reference satisfies it without a new transaction. Otherwise one finite
+candidate is published once and fulfillment is stored after confirmation.
+Publishing is also needed to arm/confirm adverse prices, clear a recovered arm, or
+attempt maturity buyback. Unknown observations confer no eligibility and do not
+cause periodic chain updates. A newer healthy or Unknown private observation
+vetoes this operator's actions based on an older adverse on-chain snapshot. Other
+callers remain governed by the program's explicit reference-freshness window.
+Each priced action
+still rereads the confirmed reference and loan; local candidates never stand in
+for a confirmed publication.
+
+The persistent operator database reserves distinct new reference addresses before
+submission. The initial allowance is four (`--max-new-reference-accounts 4`),
+including unresolved outcomes and failed preparation. It also reserves publication
+fees before signing against a 1,000,000-lamport **UTC calendar day** ceiling
+(`--max-daily-publication-fees-lamports 1000000`). Unknown outcomes keep their
+reserved budget. These local bounds require preserving the operator database;
+they are not protocol-wide caps and do not authorize automatic funding. The daily
+limit excludes reference-account deposits and keeper action fees. Exhaustion
+keeps priced work pending and must alert; direct repayment and deterministic
+default remain independent of price publication. Dry-run checks existing
+allowances and projects additional work without consuming durable allowance.
+
+The initial request profile tries `maxAccounts=16` then a single `maxAccounts=32`
+fallback for no-route or unsupported responses, with `transactionVersion=0` and
+`excludeDexes=Scorch`. This deliberately excludes a current family whose quotes
+passed envelope checks but failed actual CPI execution. The ordinary RouteV2
+header, amounts, quoted output, zero fees, slippage and route-step envelope are
+checked before a response becomes a price observation or managed route. The
+initial off-chain quote/client cap is 40 total metas (the program cap is 48),
+filtering a captured 46-meta route whose actual opening transaction exceeded
+1,232 bytes. This is a filter, not proof that every smaller response fits; full
+transaction construction with actual lookup tables and simulation remains
+required. Shared,
+legacy or otherwise unsupported response shapes are unavailable. These settings
+are part of the price model hash, so changes require fresh local history.
+
+A history observation retains the first **actually quoted** budget guaranteeing
+all q within the current live spread cap. A successful prior budget uses one sale
+and one logical buy quote; a capped growth probe uses one extra buy. The
+account-budget fallback can double those HTTP request counts to six per history
+observation. This does not claim
+the cheapest ask or monotonic router behavior. Execution buy searches retain their
+separate bounded request budget. Measure combined history, route construction,
+RPC latency and action work on the actual free account before commissioning more
+than one quantity. The initial Free-key profile admits one exact quantity;
+configuration alone is not evidence of measured capacity.
+
+## Native DEX setup allowance
+
+Some Jupiter adapters initialize or extend DEX accounts using native SOL from
+the taker. The signed `route.setupLamports` is a separate native-spend allowance,
+maximum 5,000,000 lamports. The payer advances that allowance plus the two scratch
+account deposits within the signed `temporaryFunding` maximum. Unused allowance
+and temporary scratch deposits return to the payer; actual consumed setup stays
+outside WSOL sale proceeds, opening notional, margin, collateral, term fees and
+keeper reward bases. This is a bounded spend allowance, not proof that arbitrary
+route recipients use it only for refundable rent. Current Pump captures consume
+it for observed initialization/extension instructions.
+
+The authority is loan-specific, so these expenses may recur for every new loan
+and DEX family. Borrower wallet review must show the separate maximum before
+signing. The initial keeper configuration sets `maxRouteSetupLamports=0`; the
+keeper cannot silently subsidize new DEX setup, charge it to collateral or take it
+from lenders. Commission a separately bounded payer subsidy before enabling a
+nonzero keeper allowance, and reserve its entire maximum as potential permanent
+spending in each dry-run pass. Real setup charges can exceed a small loan's keeper
+reward. No profitability or self-funding claim follows from the upfront fee.

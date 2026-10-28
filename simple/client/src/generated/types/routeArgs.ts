@@ -24,16 +24,24 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 
-export type RouteArgs = { inputAmount: bigint; data: ReadonlyUint8Array };
+export type RouteArgs = {
+  inputAmount: bigint;
+  /** Actor-signed native route allowance, separate from WSOL trade economics. */
+  setupLamports: bigint;
+  data: ReadonlyUint8Array;
+};
 
 export type RouteArgsArgs = {
   inputAmount: number | bigint;
+  /** Actor-signed native route allowance, separate from WSOL trade economics. */
+  setupLamports: number | bigint;
   data: ReadonlyUint8Array;
 };
 
 export function getRouteArgsEncoder(): Encoder<RouteArgsArgs> {
   return getStructEncoder([
     ["inputAmount", getU64Encoder()],
+    ["setupLamports", getU64Encoder()],
     ["data", addEncoderSizePrefix(getBytesEncoder(), getU32Encoder())],
   ]);
 }
@@ -41,6 +49,7 @@ export function getRouteArgsEncoder(): Encoder<RouteArgsArgs> {
 export function getRouteArgsDecoder(): Decoder<RouteArgs> {
   return getStructDecoder([
     ["inputAmount", getU64Decoder()],
+    ["setupLamports", getU64Decoder()],
     ["data", addDecoderSizePrefix(getBytesDecoder(), getU32Decoder())],
   ]);
 }

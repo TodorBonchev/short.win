@@ -2457,6 +2457,7 @@ dependencies = [
  "agave-feature-set",
  "agave-reserved-account-keys",
  "anchor-lang",
+ "base64 0.22.1",
  "litesvm",
  "litesvm-token",
  "serde_json",

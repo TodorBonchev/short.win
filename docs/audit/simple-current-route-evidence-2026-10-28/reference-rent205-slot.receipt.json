@@ -1,0 +1,16 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "getSlot",
+    "params": [
+      {
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "started_at": "2026-10-28T19:57:48.451057+00:00",
+  "finished_at": "2026-10-28T19:57:48.564912+00:00",
+  "sha256": "1d60bfc65ea4747a55d1809feaa645ff1134a0a46e637ad703a95ef09d552be8",
+  "bytes": 44
+}

@@ -1,0 +1,55 @@
+{
+  "finished_at": "2026-10-28T19:59:58.403428+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Wed, 28 Oct 2026 19:59:57 GMT"
+  },
+  "length": 3964401,
+  "method": "getMultipleAccounts",
+  "provider": "Solana public mainnet RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "2qJr7TWGCw3qdHXSfez1YftQcyqyfDVdVGbvvJNQZkPz",
+        "3ne4mWqdYuNiYrYZC9TrA3FcfuFdErghH97vNPbjicr1",
+        "47BkLC5ReY8tfQF5Web2nk3zA4TKskdk8NARKuMGV8gE",
+        "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+        "4dmvFGeQH2eqa3ktNHMgm4wZ8vuTukBiK9M7gxW5oR9F",
+        "4gyQ7s2xQg4jErH5xuEqjv3FTjRBuxy2KBKo5Z8k2tKx",
+        "5MB6MvDbvdjDgSKs4zhcDNcRcDhUJtJU8z2Nvt3Aa2cE",
+        "5P1WCqrJkD3tjDsU5aWU42btM3M8UMdD5gVSWzdgv19X",
+        "5exgoTBDmaCRsZh2nWNbr6UvQVofk9PjK2H3SKo6WoBR",
+        "5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9",
+        "6hsJmQuw9dEvdsrt4ePpGj1cF8mGFesPs5rnm2HC3Whb",
+        "8awKRv1oTfwBWQrM5URSzB9b93DhEYPKiPn685Xq2Zri",
+        "8axfK9ywSV3JBaGhQd76Aok4QtFMBA2qYRbnNYveuw1f",
+        "8rEM7SiZRaSZLHU6ouo4NULBj7ZRcRYTvib2B16TqNFG",
+        "95k7D3PCFdiVzjwLA8sYhBR1hpeiFvp1ZFEqCrMf7LA",
+        "9MSyH6ptUM1a885FUhawyYLd6YfVjDRUhqib4Apqjm3Z",
+        "AaRNwYQTyx8nEx3AjtvEXakfG9qfC4pEkpps2bpoVsvA",
+        "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        "ES7yhSrYeFo4U1PfJHNRkbfCWxCwPLk2DjrEbmN8bg58",
+        "EXpqcVuTTPEmyeVu2LHM75ha7FwmjJ88MnhSMRRdy5Sh",
+        "HwehHVLdNzykTidRxnU6WwY8o8FrUKikqqfS61A9JEDD",
+        "J3b4mh7Gittp2zWq6kWrvTf1W6qt7R1X8frcHDnJ8xii",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "So11111111111111111111111111111111111111112",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "ce4eWh89x6rKomYveYsrBBK7Avauj2wyEwDHuQi5hkS",
+        "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "b66e37746e3ad40a053e74746e43519e69b8fadb3a0ad75167abd5e6241c1518",
+  "started_at": "2026-10-28T19:59:57.975070+00:00",
+  "status": 200
+}

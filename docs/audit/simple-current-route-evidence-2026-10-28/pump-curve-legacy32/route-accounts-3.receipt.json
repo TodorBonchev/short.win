@@ -1,0 +1,49 @@
+{
+  "finished_at": "2026-10-28T20:09:48.084963+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Wed, 28 Oct 2026 20:09:47 GMT"
+  },
+  "length": 3874349,
+  "method": "getMultipleAccounts",
+  "provider": "Solana public mainnet RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "11111111111111111111111111111111",
+        "2NUjECsRWBwRezdcdenaLbL6B8SBZHm539iLiovNrQ8b",
+        "2dHtbFcx1XBXiJAYHagpAFd5mYH3iurAdsc7RoFS8omi",
+        "39jBoFaaYPVabt9ASvVsZ7b8GU6C4TaowDnFicLur3w6",
+        "3K8gv2kiAgFskVPKSPmVE8k7DiUMHB6fsXF5WPAQLTre",
+        "3oy9ojnsDzqmMNi87Gs7Hn5v3MPVqnWjG9k8BmzKR7yW",
+        "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+        "4EebpFqWgDALBL89UTLu5rZmTQNyvHpFLwZPkEVv2dJP",
+        "4KqSMVrkWgWFLb2sbXqC79gdChV7a1hGCgAaR8aaaP3a",
+        "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+        "5XuAX7DA1voLyDWKqsRUKNoJowBf1uXDkPr6LBQrUHmL",
+        "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+        "6n2AdsdUzdSo56yMNPRDwQVKVVdQAsLancPG7bfhuYf2",
+        "8FxewF272LJ7Usov6PZk2gu1JKoR5Dq1v4sDqavJpump",
+        "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+        "8YBQaacJXu4mqBHE19Wa4bZnLSjY6CrgamBh7UD2hrgr",
+        "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+        "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+        "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "So11111111111111111111111111111111111111112",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "c009f1122c9604be199f98a138b7e730eab0d489bbf1e42cebc9b4b7d5b04a92",
+  "started_at": "2026-10-28T20:09:47.682240+00:00",
+  "status": 200
+}

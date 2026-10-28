@@ -1,0 +1,86 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      130,
+      113,
+      240,
+      193,
+      87,
+      59,
+      213,
+      41,
+      12,
+      238,
+      35,
+      139,
+      239,
+      57,
+      89,
+      61,
+      57,
+      46,
+      162,
+      126,
+      229,
+      151,
+      28,
+      139,
+      45,
+      148,
+      212,
+      11,
+      33,
+      209,
+      255,
+      83
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 191983762,
+      "secs_since_epoch": 1793217816
+    },
+    "lastValidBlockHeight": 440629052
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 112290000,
+  "history_qualified": false,
+  "labels": [
+    "Scorch"
+  ],
+  "minimum_output": 111728550,
+  "request_amount": 40000000,
+  "response_file": "sell.json",
+  "response_sha256": "304696bc1a472f7cf42c1f78e98fac47976b7daff1cd3201d5f5285d0732c2e2",
+  "route_data_bytes": 55,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "7T5BKFBFLGSgVBKKcBwrrUTHPtpVGvorKfmYuS4TzdfV",
+        "inAmount": "40000000",
+        "inputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "label": "Scorch",
+        "outAmount": "112290000",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  ],
+  "side": "sell",
+  "total_metas": 28
+}

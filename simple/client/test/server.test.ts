@@ -1,3 +1,4 @@
+function header(input:bigint,output:bigint,slip:number){const b=new Uint8Array(39),v=new DataView(b.buffer);b.set([187,100,250,204,49,196,175,20]);v.setBigUint64(8,input,true);v.setBigUint64(16,output,true);v.setUint16(24,slip,true);v.setUint32(30,1,true);return getBase64Decoder().decode(b);}
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {address,getBase64Decoder,type AddressesByLookupTableAddress} from '@solana/kit';
@@ -28,7 +29,7 @@ async function fixture(){
    if(command[0]==='enqueue')return JSON.stringify([{accepted}]);
    const buy=command[0]==='build-buy',amount=buy?'50':'100',minimum=buy?'100':'10';
    const build={inputMint:buy?WSOL:mint,outputMint:buy?mint:WSOL,inAmount:amount,outAmount:minimum,otherAmountThreshold:minimum,swapMode:'ExactIn',
-    swapInstruction:{programId:JUPITER,data:getBase64Decoder().decode(new Uint8Array(8).fill(1)),accounts:[
+    swapInstruction:{programId:JUPITER,data:header(BigInt(amount),BigInt(minimum),0),accounts:[
      {pubkey:exec.executionAuthority,isSigner:true,isWritable:false},{pubkey:buy?exec.executionWsol:exec.executionBase,isSigner:false,isWritable:true},
      {pubkey:buy?exec.executionBase:exec.executionWsol,isSigner:false,isWritable:true}]}};
    return JSON.stringify({status:'Ready',input_amount:amount,build,evidence_hash:'11'.repeat(32)});

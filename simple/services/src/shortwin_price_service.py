@@ -24,10 +24,13 @@ import urllib.request
 WSOL = "So11111111111111111111111111111111111111112"
 BUILD_URL = "https://api.jup.ag/swap/v2/build"
 JUPITER_PROGRAM = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
-REQUEST_ROUTE_ACCOUNT_BUDGET = 32
-MAX_ROUTE_ACCOUNTS = 48
+REQUEST_ROUTE_ACCOUNT_BUDGET = 16
+FALLBACK_ROUTE_ACCOUNT_BUDGET = 32
+MAX_ROUTE_ACCOUNTS = 40
 MAX_ROUTE_DATA_BYTES = 768
-MODEL_VERSION = "shortwin-simple-exact-q-v1"
+EXCLUDED_DEXES = "Scorch"
+ROUTE_V2 = bytes([187, 100, 250, 204, 49, 196, 175, 20])
+MODEL_VERSION = "shortwin-simple-exact-q-v2-retained-bounded-ask"
 U64_MAX = (1 << 64) - 1
 
 
@@ -84,11 +87,13 @@ class Settings:
     def model_hash(self) -> str:
         # Match immutable Policy.price_policy_hash before enabling opens.
         return digest({"model": MODEL_VERSION, "settings": asdict(self),
-                       "route_profile": {"request_account_budget": REQUEST_ROUTE_ACCOUNT_BUDGET,
+                       "route_profile": {"request_account_budgets": [REQUEST_ROUTE_ACCOUNT_BUDGET, FALLBACK_ROUTE_ACCOUNT_BUDGET],
                                          "maximum_total_accounts": MAX_ROUTE_ACCOUNTS,
                                          "maximum_instruction_data_bytes": MAX_ROUTE_DATA_BYTES,
                                          "program": JUPITER_PROGRAM, "swap_mode": "ExactIn",
-                                         "transaction_version": 0}})
+                                         "transaction_version": 0, "header": "ordinary-route-v2-zero-fees",
+                                          "observation_ask": "first-actual-full-q-within-live-spread",
+                                          "exclude_dexes": EXCLUDED_DEXES}})
 
 
 def verify_policy(settings: Settings, policy: dict) -> None:
@@ -161,6 +166,10 @@ class Unavailable(RuntimeError):
     """Missing, malformed, stale, or unsuccessful observations are Unknown."""
 
 
+class RouteUnavailable(Unavailable):
+    """A bounded alternate account budget may provide a supported route."""
+
+
 class Jupiter:
     def __init__(self, settings: Settings, taker: str, api_key: str,
                  transport: Callable[[dict], dict] | None = None, *,
@@ -183,16 +192,31 @@ class Jupiter:
                 if len(raw) > 2_000_000:
                     raise Unavailable("Jupiter response exceeds bounded size")
                 return json.loads(raw)
-        except (OSError, ValueError, urllib.error.HTTPError) as error:
+        except urllib.error.HTTPError as error:
+            # 400 includes no-route responses. Do not amplify rate limits,
+            # authentication failures, provider outages or connection failures.
+            if error.code == 400:
+                raise RouteUnavailable("Jupiter has no route for this request budget") from None
+            raise Unavailable(f"Jupiter read failed: HTTP {error.code}") from None
+        except (OSError, ValueError) as error:
             # Never retain URLs, headers, credentials or provider error bodies.
             raise Unavailable(f"Jupiter read failed: {type(error).__name__}") from None
 
     def quote(self, input_mint: str, output_mint: str, amount: int) -> Quote:
+        last = None
+        for budget in (REQUEST_ROUTE_ACCOUNT_BUDGET, FALLBACK_ROUTE_ACCOUNT_BUDGET):
+            try:
+                return self._quote(input_mint, output_mint, amount, budget)
+            except RouteUnavailable as error:
+                last = error
+        raise last or Unavailable("no supported bounded route")
+
+    def _quote(self, input_mint: str, output_mint: str, amount: int, account_budget: int) -> Quote:
         integer(amount, "quote amount", 1)
         params = {"inputMint": input_mint, "outputMint": output_mint,
                   "amount": str(amount), "taker": self.taker,
                   "slippageBps": str(self.settings.slippage_bps),
-                  "wrapAndUnwrapSol": "false", "maxAccounts": str(REQUEST_ROUTE_ACCOUNT_BUDGET), "transactionVersion": "0"}
+                  "wrapAndUnwrapSol": "false", "maxAccounts": str(account_budget), "transactionVersion": "0", "excludeDexes": EXCLUDED_DEXES}
         # /swap/v2/build is ExactIn. Do not send an ignored ExactOut flag.
         if self.rate_gate:
             self.rate_gate()
@@ -217,24 +241,49 @@ class Jupiter:
                 raise ValueError("slippage mismatch")
             if not raw.get("swapInstruction") or not isinstance(raw.get("routePlan"), list) or not raw["routePlan"]:
                 raise ValueError("missing executable route witness")
+            if any(not isinstance(step, dict) or not isinstance(step.get("swapInfo", {}), dict) for step in raw["routePlan"]):
+                raise ValueError("malformed route plan witness")
+            if any(step.get("swapInfo", {}).get("label") in EXCLUDED_DEXES.split(",") for step in raw["routePlan"]):
+                raise ValueError("route uses an excluded incompatible DEX")
             swap = raw["swapInstruction"]
             if (not isinstance(swap, dict) or swap.get("programId") != JUPITER_PROGRAM
                     or not isinstance(swap.get("accounts"), list) or not 1 <= len(swap["accounts"]) <= MAX_ROUTE_ACCOUNTS
                     or not isinstance(swap.get("data"), str) or len(swap["data"]) > (MAX_ROUTE_DATA_BYTES+2)//3*4
                     or not 8 <= len(base64.b64decode(swap["data"], validate=True)) <= MAX_ROUTE_DATA_BYTES):
                 raise ValueError("route lies outside the current program/client envelope")
+            data = base64.b64decode(swap["data"], validate=True)
+            # Match the program's supported scalar envelope before any quote
+            # becomes a trusted price. Shared/legacy/ExactOut responses are Unknown.
+            if (len(data) < 39 or data[:8] != ROUTE_V2
+                    or int.from_bytes(data[8:16], "little") != amount
+                    or int.from_bytes(data[16:24], "little") != output
+                    or int.from_bytes(data[24:26], "little") != self.settings.slippage_bps
+                    or data[26:30] != bytes(4)):
+                raise ValueError("unsupported or mismatched ordinary RouteV2 header")
+            steps = int.from_bytes(data[30:34], "little")
+            if not 1 <= steps <= 8 or len(data)-34 < steps*5:
+                raise ValueError("route step envelope mismatch")
+            if guaranteed != (output * (10000-self.settings.slippage_bps)+9999)//10000:
+                raise ValueError("threshold does not match signed route slippage")
         except (KeyError, TypeError, ValueError) as error:
-            raise Unavailable(f"Jupiter quote rejected: {error}") from None
+            raise RouteUnavailable(f"Jupiter quote rejected: {error}") from None
         return Quote(amount, output, guaranteed, digest(raw), raw)
 
     def observe(self, job: Job, previous_ask: int | None = None) -> tuple[int, int, dict]:
         sale = self.quote(job.mint, WSOL, job.quantity)
-        ask = self.buy(job, previous_ask or sale.guaranteed_output)
+        # A fresh executable ask need not be numerically minimal. Reuse the
+        # last successful budget when still within today's live spread. At most
+        # one capped growth probe is needed because the initial budget >= bid.
+        cap = min(self.settings.max_buy_lamports,
+                  sale.guaranteed_output * (10000+self.settings.max_spread_bps)//10000)
+        ask = self.buy(job, max(previous_ask or 0, sale.guaranteed_output), cap,
+                       retain_first=True)
         return sale.guaranteed_output, ask.amount, {
             "sale": {"hash": sale.raw_hash, "response": sale.raw},
             "buy": {"hash": ask.raw_hash, "response": ask.raw}}
 
-    def buy(self, job: Job, initial: int, maximum: int | None = None) -> Quote:
+    def buy(self, job: Job, initial: int, maximum: int | None = None, *,
+            retain_first: bool = False) -> Quote:
         """Return only an actually quoted ExactIn budget guaranteeing all q tokens.
 
         Router monotonicity is not assumed. Binary probes improve a retained
@@ -258,6 +307,8 @@ class Jupiter:
             used += 1
             if quote.guaranteed_output >= job.quantity:
                 best = quote
+                if retain_first:
+                    return best
                 break
             low = amount
             if amount == cap:
@@ -312,6 +363,8 @@ class History:
         CREATE TABLE IF NOT EXISTS jobs(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
           mint TEXT NOT NULL,active INTEGER NOT NULL,due INTEGER NOT NULL,failures INTEGER NOT NULL DEFAULT 0,
           PRIMARY KEY(market,policy,q));
+        CREATE TABLE IF NOT EXISTS publication_requests(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
+          requested_at INTEGER NOT NULL,PRIMARY KEY(market,policy,q));
         CREATE TABLE IF NOT EXISTS observations(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
           ts INTEGER NOT NULL,slot TEXT NOT NULL,bid TEXT NOT NULL,ask TEXT NOT NULL,finite INTEGER NOT NULL,
           evidence TEXT NOT NULL,reason TEXT NOT NULL,PRIMARY KEY(market,policy,q,ts));
@@ -345,7 +398,10 @@ class History:
 
     def enqueue(self, job: Job, now: int) -> bool:
         with self.db:
-            return self._enqueue(job, now)
+            accepted = self._enqueue(job, now)
+            if accepted and not job.active_loan:
+                self.db.execute("INSERT OR REPLACE INTO publication_requests VALUES(?,?,?,?)", (*job.key, now))
+            return accepted
 
     def _enqueue(self, job: Job, now: int) -> bool:
         integer(now, "now", 1, (1 << 63) - 1)
@@ -367,6 +423,7 @@ class History:
                 return False
             self.db.execute("DELETE FROM jobs WHERE market=? AND policy=? AND q=?", victim)
             self.db.execute("DELETE FROM observations WHERE market=? AND policy=? AND q=?", victim)
+            self.db.execute("DELETE FROM publication_requests WHERE market=? AND policy=? AND q=?", victim)
         self.db.execute("INSERT INTO jobs(market,policy,q,mint,active,due) VALUES(?,?,?,?,?,?)",
                         (*job.key, job.mint, int(job.active_loan), now))
         return True
@@ -380,6 +437,10 @@ class History:
         rows = self.db.execute("SELECT market,policy,mint,q,active FROM jobs ORDER BY active DESC,due,market,policy,q LIMIT ?",
                                (self.settings.max_jobs,)).fetchall()
         return [Job(market, policy, mint, int(q), bool(active)) for market, policy, mint, q, active in rows]
+
+    def publication_requested_at(self, job: Job) -> int:
+        row = self.db.execute("SELECT requested_at FROM publication_requests WHERE market=? AND policy=? AND q=?", job.key).fetchone()
+        return int(row[0]) if row else 0
 
     def sync_loans(self, jobs: list[Job], now: int) -> None:
         """Trusted complete indexer snapshot only; never accept a public payload."""
@@ -485,15 +546,21 @@ def tick(history: History, jupiter: Jupiter, clock: Callable[[], tuple[int, int]
 
 
 def capacity_report(settings: Settings) -> dict:
-    calls = 1 + settings.max_ask_requests
-    minimum_cycle = settings.max_jobs * calls * settings.request_interval_ms / 1000
+    calls = 2 * (1 + settings.max_ask_requests)
+    history_calls = min(calls, 6)
+    minimum_cycle = settings.max_jobs * history_calls * settings.request_interval_ms / 1000
     # Request spacing alone is a lower bound. Leave half the sampling gap for
     # provider/RPC latency, transaction work, other API use and scheduler delay.
     sample_target = max(1, settings.max_sample_gap_seconds//2)
-    return {"identity_capacity_configured": settings.max_jobs, "requests_per_identity_worst_case": calls,
+    return {"identity_capacity_configured": settings.max_jobs, "requests_per_identity_worst_case": history_calls,
+             "execution_buy_http_requests_maximum": 2*settings.max_ask_requests,
+             "observation_requests_steady": 2, "observation_requests_maximum": min(calls, 6),
+             "maximum_http_requests_per_quote_probe": 2,
+             "observation_spacing_cycle_steady_seconds": settings.max_jobs*2*settings.request_interval_ms/1000,
+             "observation_spacing_cycle_maximum_seconds": settings.max_jobs*min(calls, 6)*settings.request_interval_ms/1000,
             "spacing_only_cycle_seconds": minimum_cycle, "target_sampling_seconds": sample_target,
             "spacing_fits_target": minimum_cycle <= sample_target,
-            "nominal_identities_with_half_gap_margin": int(sample_target*1000 // (calls*settings.request_interval_ms)),
+            "nominal_identities_with_half_gap_margin": int(sample_target*1000 // (history_calls*settings.request_interval_ms)),
             "measured_latency_and_sustained_coverage": "pending",
             "ready_for_mainnet": False,
             "reason": "Measured provider/RPC latency and active-loan coverage are required; this is a spacing lower bound"}
@@ -546,7 +613,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = [{"job": item, "accepted": history.enqueue(Job(**item), now)} for item in jobs]
         elif args.command in ("plan", "jobs"):
             selected = history.plan(now) if args.command == "plan" else history.jobs()
-            result = [dict(asdict(job), quantity=str(job.quantity)) for job in selected]
+            result = [dict(asdict(job), quantity=str(job.quantity),
+                           publication_requested_at=history.publication_requested_at(job)) for job in selected]
         elif args.command == "tick":
             rpc, key = os.environ.get("SOLANA_RPC_URL"), os.environ.get("JUPITER_API_KEY", "")
             if not rpc:

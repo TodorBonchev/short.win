@@ -1,0 +1,61 @@
+{
+  "reviewed_at": "2026-10-28T20:50:02.094425+00:00",
+  "attribution": "independent AI engineering review; no external audit firm claim",
+  "own_program_sha256": "8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d",
+  "native_runner_sha256": "051866471c8c59a11a2e5c9d762b78adda3d6d35759749c1039b7ea7dd05ff69",
+  "final_suite_sha256": "f51a54304d2fbb546a4e9366651476a75bb793364bb37c7f91aeb36d4976634f",
+  "files": [
+    {
+      "file": "simple/programs/shortwin-simple/src/route.rs",
+      "sha256": "0474656f4727875f0019d569295753ddb785442418d9632291cc3cb09db008bb"
+    },
+    {
+      "file": "simple/programs/shortwin-simple/src/open.rs",
+      "sha256": "8e407d9f69f6714f333d265000385dec4ddf784ec9debe81ac9dec928c4c1da5"
+    },
+    {
+      "file": "simple/programs/shortwin-simple/src/exits.rs",
+      "sha256": "82635c8195a86880d51c9831b9c38d9d4ea6d5203ae38865273fcd04f8bfd617"
+    },
+    {
+      "file": "simple/crates/jupiter-route/src/isolation.rs",
+      "sha256": "79aaf751503f5cb2cc72431734c6e940f7335479442c09a1b0d21c8932c7b298"
+    },
+    {
+      "file": "simple/services/src/shortwin_price_service.py",
+      "sha256": "73ef2078c47fd22d21bbd7aba522f393e0088f13f81fef7a7b67e41eb8042b02"
+    },
+    {
+      "file": "simple/client/src/route.ts",
+      "sha256": "2152dab02ee95b0a2f92a8e67496e78106808637701505153441209cc2d7c8a5"
+    },
+    {
+      "file": "simple/client/src/operator.ts",
+      "sha256": "d14f3c60ae79fd60b696252b2da509d4709ae68aee38cf8a3f396e2ee01c2d51"
+    },
+    {
+      "file": "simple/client/bin/operator.ts",
+      "sha256": "ba14cd4a624d9e34c1d9d01b068941919709b5893a71c034835a05fd0eec1471"
+    },
+    {
+      "file": "simple/scripts/materialize-current-route-candidate.py",
+      "sha256": "f503cd1395d7131c629bd7890d4ce65487a90f0870e1c53055a175b0338232d8"
+    },
+    {
+      "file": "simple/scripts/qualify-current-route-suite.py",
+      "sha256": "3951b90e98c0019f3c492b7802bd85ab55bac52a8b129059a2bf4384fe97052b"
+    },
+    {
+      "file": "simple/tests/runtime/current-routes.json",
+      "sha256": "220b6e160bfd6d99120432259dd65e7568718875e13c532799ade3dc9c731190"
+    },
+    {
+      "file": "simple/tests/runtime/examples/qualify_current_route.rs",
+      "sha256": "7b8769331a7a3e47415886d0752860db5d609d74ee7ab8cc78771cc143617374"
+    },
+    {
+      "file": "simple/target/idl/shortwin_simple.json",
+      "sha256": "9b262cb8ddfe2d55ada06c31aa11049044515c9a6b85324b6f2167b17c61cc26"
+    }
+  ]
+}

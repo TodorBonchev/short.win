@@ -65,7 +65,7 @@ pub struct LoanTokenAccounts<'info> {
 }
 #[derive(Accounts)]
 pub struct RouteExecution<'info> {
-    /// CHECK: route binds the readonly loan-local scratch authority.
+    /// CHECK: route binds the isolated loan-local authority and exact native setup budget.
     pub execution_authority: UncheckedAccount<'info>,
     /// CHECK: route creates, checks and closes the exact loan-local scratch account.
     #[account(mut)]
@@ -373,7 +373,7 @@ fn buy<'info>(
     maximum: u64,
     temporary_max: u64,
 ) -> Result<route::Buyback> {
-    let temporary = route::temporary_rent()?;
+    let temporary = route::temporary_advance(args)?;
     require_gte!(temporary_max, temporary, SimpleError::FundingAboveMax);
     pay(
         actor,
@@ -432,7 +432,19 @@ fn buy<'info>(
             elf_sha256: p.config.jupiter_elf_hash,
         },
     )?;
-    finance::move_sol(&loan, &actor.to_account_info(), temporary)?;
+    finance::move_sol(
+        &loan,
+        &actor.to_account_info(),
+        temporary.checked_sub(result.setup_spent).checked()?,
+    )?;
+    if args.setup_lamports > 0 {
+        msg!(
+            "RouteSetup actor={} allowance={} spent={}",
+            actor.key(),
+            args.setup_lamports,
+            result.setup_spent
+        );
+    }
     Ok(result)
 }
 

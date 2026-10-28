@@ -404,3 +404,148 @@ fn reporter_rotation_invalidates_old_cr_arm_until_a_new_epoch_is_armed() {
     let i = force(&c, &k, 3_000_000);
     error(c.env.send_v0(&[i], &[&k]).0, "HealthyFill");
 }
+
+#[test]
+fn real_token2022_metadata_mint_registers_and_lends_with_plain_165_byte_token_accounts() {
+    use litesvm_token::spl_token::{
+        extension::{
+            metadata_pointer::instruction as pointer, BaseStateWithExtensions, ExtensionType,
+            StateWithExtensions,
+        },
+        instruction as token_instruction,
+        state::Mint,
+    };
+    use sha2::{Digest, Sha256};
+    use shortwin_simple_runtime_tests::{
+        tokens::{self, TokenProgram},
+        Env,
+    };
+    use solana_instruction::{AccountMeta, Instruction};
+    use solana_system_interface::instruction as system;
+
+    let mut env = Env::initialized();
+    let authority = deterministic_key(197);
+    let mint = deterministic_key(198);
+    let key = mint.pubkey();
+    let program = TokenProgram::Token2022;
+    env.fund(authority.pubkey(), 1_000_000_000);
+    let strings = [
+        "Runtime metadata token",
+        "RMT",
+        "https://example.invalid/token.json",
+    ];
+    let metadata_len = 80 + strings.iter().map(|s| s.len()).sum::<usize>();
+    let mint_len = 166 + 4 + 64 + 4 + metadata_len;
+    let create = system::create_account(
+        &env.payer.pubkey(),
+        &key,
+        env.svm.minimum_balance_for_rent_exemption(mint_len),
+        234,
+        &program.id(),
+    );
+    let pointer = pointer::initialize(&program.id(), &key, None, Some(key)).unwrap();
+    let initialize =
+        token_instruction::initialize_mint2(&program.id(), &key, &authority.pubkey(), None, 6)
+            .unwrap();
+    // Exact official metadata-interface Initialize wire format; this exercises
+    // the actual Token-2022 program rather than injecting initialized mint bytes.
+    let mut data = Sha256::digest(b"spl_token_metadata_interface:initialize_account")[..8].to_vec();
+    for value in strings {
+        data.extend((value.len() as u32).to_le_bytes());
+        data.extend(value.as_bytes());
+    }
+    let metadata = Instruction {
+        program_id: program.id(),
+        accounts: vec![
+            AccountMeta::new(key, false),
+            AccountMeta::new_readonly(authority.pubkey(), false),
+            AccountMeta::new_readonly(key, false),
+            AccountMeta::new_readonly(authority.pubkey(), true),
+        ],
+        data,
+    };
+    assert_ok(env.send(
+        &[create, pointer, initialize, metadata],
+        &[&mint, &authority],
+    ));
+    let account = env.svm.get_account(&key).unwrap();
+    let state = StateWithExtensions::<Mint>::unpack(&account.data).unwrap();
+    assert_eq!(
+        state.get_extension_types().unwrap(),
+        vec![ExtensionType::MetadataPointer, ExtensionType::TokenMetadata]
+    );
+    assert!(state.base.freeze_authority.is_none());
+    assert_eq!(account.data.len(), mint_len);
+    assert_ok(env.register_market(&authority, key, program.id(), 10_000, 100_000_000));
+    let market = pda::market(&key);
+    let pool = pda::pool(&market, 0);
+    let token_vault = pda::token_vault(&pool);
+    let owner_tokens = tokens::create_account(
+        &mut env,
+        &deterministic_key(199),
+        &key,
+        &authority.pubkey(),
+        program,
+    );
+    tokens::mint_to(
+        &mut env,
+        &key,
+        &owner_tokens,
+        &authority,
+        1_000_000,
+        program,
+    );
+    let receipt = pda::lender(&pool, &authority.pubkey());
+    assert_ok(env.send(
+        &[ix(
+            accounts::DepositTokens {
+                owner: authority.pubkey(),
+                market,
+                pool,
+                receipt,
+                mint: key,
+                owner_tokens,
+                token_vault,
+                token_program: program.id(),
+                system_program: anchor_lang::system_program::ID,
+                event_authority: pda::event_authority(),
+                program: shortwin_simple::ID,
+            },
+            instruction::Deposit {
+                amount: 1_000_000,
+                min_shares: 1_000_000,
+                max_receipt_rent: 100_000_000,
+            },
+        )],
+        &[&authority],
+    ));
+    assert_eq!(env.svm.get_account(&token_vault).unwrap().data.len(), 165);
+    assert_eq!(env.token_amount(&token_vault), 1_000_000);
+    assert_eq!(env.token_amount(&owner_tokens), 0);
+    assert_ok(env.send(
+        &[ix(
+            accounts::WithdrawTokens {
+                owner: authority.pubkey(),
+                market,
+                pool,
+                receipt,
+                mint: key,
+                owner_tokens,
+                token_vault,
+                token_program: program.id(),
+                event_authority: pda::event_authority(),
+                program: shortwin_simple::ID,
+            },
+            instruction::Withdraw {
+                shares: 1_000_000,
+                min_tokens: 1_000_000,
+                min_sol: 0,
+            },
+        )],
+        &[&authority],
+    ));
+    assert_eq!(env.token_amount(&owner_tokens), 1_000_000);
+    assert_eq!(env.token_amount(&token_vault), 0);
+    let after: PoolGeneration = env.read(&pool);
+    assert_eq!((after.cash, after.principal_out, after.shares), (0, 0, 0));
+}

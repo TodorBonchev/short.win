@@ -1,0 +1,48 @@
+{
+  "binding": {
+    "execution_authority": "XJ6G3jwwL5y66M2vFyVsGAP2yHZmB2UzgsTpZv3zNn7",
+    "execution_base": "4qe4ir8fAM9k8Zn66aoGFnkE1j5xHVBKPfNRrH2QTcZN",
+    "execution_wsol": "2cWEmfBX83rCq92owgf6FrW3ADNCA5jjPjhGjT6fmPNS",
+    "loan": "9H6tRhUsxt2kDhqCKcrRGU88oj7UaPfBAZttekcXaMD",
+    "mint": "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+    "q": 3500000000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "error": "candidate setup/replay panic: transaction InstructionError(0, Custom(6013))\nProgram kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 invoke [1]\nProgram log: Instruction: PublishReference\nProgram 11111111111111111111111111111111 invoke [2]\nProgram 11111111111111111111111111111111 success\nProgram log: AnchorError thrown in programs/shortwin-simple/src/reference.rs:90. Error Code: BadReference. Error Number: 6013. Error Message: The reference does not bind the required mint, quantity and policy.\nProgram kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 consumed 22466 of 200000 compute units\nProgram kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 failed: custom program error: 0x177d",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "5ad1db8bd19a18ffbdf385f4e3173758d4fd650dd2195df5e7c3462222951812",
+  "name": "pump-graduated32",
+  "native_runner_sha256": "32fdc97eaeca27e17cb400f4e669549dcd72fc988d094c093d567ee0e76fcf01",
+  "own_program_sha256": "b87598a00c788c30a64b4e232f5f2040c0c8eb333c0cce5fb09403d27159544c",
+  "packet_fit_failures": {},
+  "schema": 1,
+  "status": "failed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 255340188,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 1000,
+    "live_ask_upper": 255340188,
+    "live_bid_lower": 124540925,
+    "spread_bps_ceiling": 10503
+  },
+  "transactions": {}
+}

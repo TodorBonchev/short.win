@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "assignmentStatus": "unassigned",
+  "network": "mainnet-beta",
+  "programId": null,
+  "genesisHash": null,
+  "rolePublicKeys": {
+    "governance": null,
+    "emergency": null,
+    "reporter": null,
+    "feeRecipient": null,
+    "keeper": null
+  },
+  "jupiterReview": {
+    "programId": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+    "deploySlot": null,
+    "programDataLength": null,
+    "elfSha256": null
+  },
+  "keyfiles": {
+    "reporter": null,
+    "keeper": null
+  },
+  "execute": false
+}

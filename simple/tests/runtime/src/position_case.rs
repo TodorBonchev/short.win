@@ -181,6 +181,7 @@ impl PositionCase {
             minimum_reference_sequence: 1,
             route: RouteArgs {
                 input_amount: Q,
+                setup_lamports: 0,
                 data: HistoricalRoute::data(Q, 1),
             },
         }

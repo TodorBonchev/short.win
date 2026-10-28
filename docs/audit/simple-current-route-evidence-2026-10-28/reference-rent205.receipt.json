@@ -1,0 +1,17 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "getMinimumBalanceForRentExemption",
+    "params": [
+      205,
+      {
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "started_at": "2026-10-28T19:57:48.323922+00:00",
+  "finished_at": "2026-10-28T19:57:48.450888+00:00",
+  "sha256": "e3533cddf22cdac9e1b41a7fdedf4d0ed7d82734fbb42c4d0ef0c188a16e2499",
+  "bytes": 42
+}

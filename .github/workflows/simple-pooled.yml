@@ -4,6 +4,7 @@ on:
     branches: [codex/jupiter-only-pooled]
     paths:
       - 'simple/**'
+      - 'docs/audit/simple-current-route-evidence-2026-10-28/**'
       - 'tests/fixtures/**'
       - 'tests/jupiter_exec_probe/fixtures/**'
       - 'scripts/materialize-jupiter-probe.py'
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - 'simple/**'
+      - 'docs/audit/simple-current-route-evidence-2026-10-28/**'
       - 'tests/fixtures/**'
       - 'tests/jupiter_exec_probe/fixtures/**'
       - 'scripts/materialize-jupiter-probe.py'
@@ -75,6 +77,8 @@ jobs:
           cargo fmt --all --check
           cargo clippy --workspace --all-targets --locked -- -D warnings
           python3 -m unittest discover -s services/tests -v
+          python3 -m unittest discover -s config -p 'test_*.py' -v
+          python3 config/verify-production-proposal.py
       - name: Build replacement and check SBF stack
         working-directory: simple
         run: |
@@ -91,6 +95,9 @@ jobs:
           cargo test --workspace --locked
           cargo run -p shortwin-pooled-core --example model_fuzz --release --locked -- 103410000 200000
           cargo run -p shortwin-simple-runtime-tests --example program_fuzz --locked -- --seed 103410000 --cases 32 --out "$RUNNER_TEMP/simple-program-fuzz-smoke"
+      - name: Current route compatibility from pinned mainnet snapshots
+        working-directory: simple
+        run: python3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/simple-current-route-suite"
       - name: Client and web
         working-directory: simple
         run: |
@@ -118,4 +125,11 @@ jobs:
           name: simple-pooled-fuzz-smoke
           retention-days: 7
           path: ${{ runner.temp }}/simple-program-fuzz-smoke
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: simple-current-route-suite
+          retention-days: 7
+          path: ${{ runner.temp }}/simple-current-route-suite
           if-no-files-found: warn

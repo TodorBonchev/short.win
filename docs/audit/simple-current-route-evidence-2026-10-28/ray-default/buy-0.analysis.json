@@ -1,0 +1,111 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      132,
+      223,
+      30,
+      35,
+      137,
+      234,
+      18,
+      44,
+      158,
+      231,
+      161,
+      239,
+      140,
+      173,
+      248,
+      58,
+      60,
+      50,
+      37,
+      190,
+      186,
+      164,
+      159,
+      239,
+      221,
+      54,
+      18,
+      126,
+      94,
+      59,
+      2,
+      2
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 998243196,
+      "secs_since_epoch": 1793217431
+    },
+    "lastValidBlockHeight": 440627268
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 5247661,
+  "history_qualified": false,
+  "labels": [
+    "Kipseli",
+    "Orca V2",
+    "Raydium"
+  ],
+  "minimum_output": 5221423,
+  "request_amount": 93924879,
+  "response_file": "buy-0.json",
+  "response_sha256": "1c1c943b1e4ccc40819a4164b5652471553f260480dbcb6ba2f311ce3f2d5791",
+  "route_data_bytes": 51,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "7yD7gfXv49SFxhx9uTc11dEd7Nj98rGWeYMdZJgheZbG",
+        "inAmount": "93924879",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Kipseli",
+        "outAmount": "9662742",
+        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "Hme4Jnqhdz2jAPUMnS7jGE5zv6Y1ynqrUEhmUAWkXmzn",
+        "inAmount": "9662742",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "label": "Orca V2",
+        "outAmount": "66518686",
+        "outputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "6gpZ9JkLoYvpA5cwdyPZFsDw6tkbPyyXM5FqRqHxMCny",
+        "inAmount": "66518686",
+        "inputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "label": "Raydium",
+        "outAmount": "5247661",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 48
+}

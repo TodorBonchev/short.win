@@ -1,0 +1,166 @@
+command ['cargo', 'test', '--workspace', '--locked']
+
+running 14 tests
+test isolation::tests::explicit_writable_authority_mode_keeps_other_isolation_guards_and_strict_default ... ok
+test isolation::tests::native_rent_lamports_and_delegated_amount_are_checked ... ok
+test isolation::tests::refuses_protocol_state_keys_unexpected_signers_and_writable_mints ... ok
+test isolation::tests::refuses_hidden_extensions_state_and_authority_changes ... ok
+test isolation::tests::rejects_runtime_union_and_alias_privileges ... ok
+test isolation::tests::whole_debt_net_credit_bounded_funding_and_surplus ... ok
+test tests::amount_mode_ranges_slippage_and_both_fees_are_checked ... ok
+test tests::every_truncated_header_and_tail_is_rejected_without_panics ... ok
+test tests::every_fixed_key_is_bound_and_minimum_account_counts_hold ... ok
+test tests::four_current_idl_headers_and_exact_u64_fields ... ok
+test tests::opaque_route_data_is_deliberately_not_full_authorization ... ok
+test tests::oversized_counts_lengths_and_u64_maximum_are_bounded ... ok
+test tests::recipient_signer_and_writable_substitution_is_rejected ... ok
+test tests::shared_id_and_trusted_binding_sanity_are_checked ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 16 tests
+test tests::a_donated_token_surplus_increases_existing_share_value ... ok
+test tests::all_failed_mutations_preserve_the_inputs ... ok
+test tests::default_allocates_loss_and_real_sol_only_to_current_pool_holders ... ok
+test tests::final_receipt_exit_clears_fraction_and_last_holder_receives_tracked_dust ... ok
+test tests::newcomer_cannot_claim_previously_paid_fees ... ok
+test tests::no_generation_reset_or_income_without_real_owners ... ok
+test tests::outstanding_principal_limits_withdrawal_and_forbids_last_share_exit ... ok
+test tests::paid_income_is_attributed_before_deposit_and_share_changes ... ok
+test tests::persisted_state_validation_rejects_inconsistent_aggregates_and_receipts ... ok
+test tests::repeated_claims_keep_receipt_fraction_until_whole_lamport_exists ... ok
+test tests::reward_and_generation_overflows_are_atomic ... ok
+test tests::tiny_floor_share_mint_is_refused_before_state_changes ... ok
+test tests::wide_income_index_survives_multiple_u64_lifetimes_without_truncation ... ok
+test tests::wiped_generation_keeps_claims_separate_from_new_lenders ... ok
+test tests::deterministic_multi_lender_sequences_conserve_all_paid_income_and_principal ... ok
+test tests::wide_mul_div_vectors_cover_high_limbs_and_remainders ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+
+running 1 test
+test model_sequences_cover_randomized_loans_defaults_shares_and_generations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+
+
+running 12 tests
+test exits::tests::second_quote_must_itself_postdate_both_confirmation_delays ... ok
+test exits::tests::surplus_output_cannot_make_an_otherwise_healthy_loan_liquidatable ... ok
+test finance::tests::checked_bounds_and_exact_cr_boundary ... ok
+test finance::tests::fixed_paid_fee_and_conservative_margin ... ok
+test finance::tests::reward_and_budget_never_consume_rent_or_borrower_surplus ... ok
+test route::tests::authority_postcondition_rejects_foreign_owner_data_signer_and_unaccounted_sol ... ok
+test route::tests::deployment_tuple_binds_current_loader_instance_without_a_fresh_hash_claim ... ok
+test route::tests::mint_scope_is_plain_initialized_unfrozen_spl_or_token2022 ... ok
+test route::tests::token2022_behavior_unknown_and_duplicate_extensions_are_rejected ... ok
+test route::tests::token2022_metadata_bounds_canonical_base_and_full_tlv_are_checked ... ok
+test route::tests::token_metadata_comparison_allows_only_the_amount_to_change ... ok
+test route::tests::token2022_metadata_only_mints_and_zero_tail_keep_plain_account_semantics ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test jupiter::tests::pinned_real_elf_snapshot_loads_without_the_historical_product ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+
+running 1 test
+test rust_client_wire_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 10 tests
+test real_token2022_metadata_mint_registers_and_lends_with_plain_165_byte_token_accounts ... ok
+test real_borrower_buyback_refunds_both_rents_and_prefunds_and_credits_token_surplus ... ok
+test wrong_input_and_actual_router_underfill_revert_pool_loan_user_and_dex ... ok
+test retiring_one_of_two_loans_preserves_other_debt_and_exposure_rent ... ok
+test expiry_buyback_pays_capped_keeper_and_refunds_surplus_before_grace_end ... ok
+test direct_full_repayment_works_during_price_hold_without_jupiter_and_preserves_fee ... ok
+test confirmed_bad_cr_executes_full_debt_after_a_synthetic_market_price_rise ... ok
+test exact_grace_boundary_is_default_only_and_recovers_collateral_without_price_token_or_router ... ok
+test reporter_rotation_invalidates_old_cr_arm_until_a_new_epoch_is_armed ... ok
+test delayed_source_observations_health_clear_and_actual_fill_veto_are_atomic ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s
+
+
+running 5 tests
+test actual_roll_and_old_claims_separate_wiped_generation_from_new_deposits ... ok
+test actual_claims_preserve_fraction_and_last_exit_pays_tracked_dust ... ok
+test registration_fee_rent_and_plain_mint_rules_are_actual_handler_checks ... ok
+test spl_and_t22_deposit_withdraw_move_exact_principal_and_obey_signed_minima ... ok
+test unsolicited_tokens_remain_untracked_and_in_their_original_generation ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.58s
+
+
+running 2 tests
+test real_jupiter_open_books_principal_and_pays_fixed_upfront_fee_exactly ... ok
+test signed_max_fee_margin_and_market_nonce_refuse_atomically ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+
+running 4 tests
+test only_reporter_can_publish_and_creation_rent_is_explicitly_bounded ... ok
+test old_immutable_policy_remains_publishable_and_price_hold_can_be_refreshed ... ok
+test unknown_clears_eligibility_and_reporter_rotation_keeps_monotonic_identity ... ok
+test reference_sequence_exact_history_spread_and_dual_clock_checks_are_atomic ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s
+
+
+running 4 tests
+test writable_authority_gifts_stay_untracked_and_return_separately_on_buyback ... ok
+test readonly_authority_gift_stays_outside_the_loan_and_route ... ok
+test writable_foreign_or_data_bearing_authority_is_refused_atomically ... ok
+test signed_setup_maximum_and_total_advance_refuse_without_spending ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.88s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling shortwin-simple v0.1.0 (/root/short.win-simple/simple/programs/shortwin-simple)
+   Compiling shortwin-simple-runtime-tests v0.1.0 (/root/short.win-simple/simple/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.78s
+     Running unittests src/lib.rs (target/simple-native/debug/deps/shortwin_jupiter_route-845ae7fc0bbaba67)
+     Running unittests src/lib.rs (target/simple-native/debug/deps/shortwin_pooled_core-86d452ad45dbfad0)
+     Running tests/model_sequences.rs (target/simple-native/debug/deps/model_sequences-b5b99110108ba08c)
+     Running unittests src/lib.rs (target/simple-native/debug/deps/shortwin_simple-4b2cf35f8ce234a3)
+     Running unittests src/lib.rs (target/simple-native/debug/deps/shortwin_simple_runtime_tests-0acf3005bcd98c1c)
+     Running tests/client_compat.rs (target/simple-native/debug/deps/client_compat-8743e2e6495721c0)
+     Running tests/jupiter_route.rs (target/simple-native/debug/deps/jupiter_route-69192a51b8ddbf47)
+     Running tests/lender.rs (target/simple-native/debug/deps/lender-0dfb3718c3b51c31)
+     Running tests/open_position.rs (target/simple-native/debug/deps/open_position-8c4708d9b700306e)
+     Running tests/reference.rs (target/simple-native/debug/deps/reference-3d58e534d61594d4)
+     Running tests/writable_authority.rs (target/simple-native/debug/deps/writable_authority-df337c44348117f7)
+   Doc-tests shortwin_jupiter_route
+   Doc-tests shortwin_pooled_core
+   Doc-tests shortwin_simple
+   Doc-tests shortwin_simple_runtime_tests
+
+exit 0

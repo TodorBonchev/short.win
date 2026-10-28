@@ -1,0 +1,82 @@
+{
+  "actual_snapshot_packets_fit": true,
+  "base_token_conservation": true,
+  "binding": {
+    "execution_authority": "3evyjL8agmEKZXauC2fa3USg5CLDt4S9PcP5V3tfEFuk",
+    "execution_base": "AK5Kr8k8NrcD5r36QwpgYk2TtxQ4WDmMwssqPSfZXQrC",
+    "execution_wsol": "8Tka9Xo1nNdKY8YZmnhgSdnFDMB2oTxwZzLH8CfZa55m",
+    "loan": "HEhJZyJ1MWZHCxgQGjGpc3mEiY1yNHkzNo4BMSqxt9NM",
+    "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+    "q": 10000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "buyback_spend": 183413759,
+  "error": null,
+  "full_buyback_net_credit": 10188519,
+  "functional_execution_passed": true,
+  "invariants": "principal/exposure, whole-q net vault credit, actual paid fees, collateral, rent/scratch closure, immutable real mint bytes, full post-CPI rollback",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "221b1ae840ba01067519e870f384f7779f74940f3d3e7157e8c1045216ebd4a8",
+  "name": "ray-production-exclude-scorch16",
+  "native_runner_sha256": "0baa1d154274c6d84afa3b2cb363b41ad06c7080a7046ce8fddd8aa69bf2e259",
+  "own_program_sha256": "fdd4cdfeafa8655cbb1ca84df2efa895e5e607f1d122d1e5b0c57b5ebb3c89f9",
+  "packet_fit_failures": {},
+  "post_cpi_rollback": true,
+  "schema": 1,
+  "sell_proceeds": 179840039,
+  "status": "passed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 183413759,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 1000,
+    "live_ask_upper": 183413759,
+    "live_bid_lower": 178918323,
+    "spread_bps_ceiling": 252
+  },
+  "transactions": {
+    "full_buyback": {
+      "compute_units": 135894,
+      "error": null,
+      "log_file": "full_buyback.log",
+      "log_sha256": "ad81c6267abc1c8a696e660a66f117c788427e12654ade44c475c3e4ad6dd312",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1017
+    },
+    "open_sell": {
+      "compute_units": 155012,
+      "error": null,
+      "log_file": "open_sell.log",
+      "log_sha256": "9a2d70a2fa829ce3606fc0d94cc945cc58ca376c34c8b7be671ba6cf42dbcb75",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1161
+    },
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 145180,
+      "error": "InstructionError(1, Custom(6024))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "9e081c0c38a3ff5afdff199273ec1d6032a520b03d5e842a053509f63e1c4c8e",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1161
+    }
+  },
+  "wsol_delta_lamports": "3573720"
+}

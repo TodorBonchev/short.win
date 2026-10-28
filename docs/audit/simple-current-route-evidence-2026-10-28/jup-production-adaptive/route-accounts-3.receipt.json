@@ -1,0 +1,58 @@
+{
+  "finished_at": "2026-10-28T20:14:23.361546+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Wed, 28 Oct 2026 20:14:22 GMT"
+  },
+  "length": 3976005,
+  "method": "getMultipleAccounts",
+  "provider": "Solana public mainnet RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "2uGxKZ9AjFn3gZCPvXJpHrJx3tpv4bTyVn3xE1348fFY",
+        "39pntUnrCpTD1guELfACDR22NMTLDohV3Z3oePAqBDH2",
+        "48nZ6A9pnAsEtUqBUgG8DwGqDNu5GhZKofdVMSYGvPtd",
+        "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+        "4bo3Np5gjPWBDqqg7wZEYEX3wR5RZ6Mm48QvATcEx1Tr",
+        "4oKbjzJLwvzPqTw4XuUjH8FwikiNd61zd3rLxkrUi31Y",
+        "4wVRntu3HmKkRkRfYvLrovv41Tpm6yt66uNWB9TWgZjj",
+        "5FUiaik7o28J37kGV5yzCQjTefXp31UjqtkdWBziBxLZ",
+        "5eEpU4UxvKn48YmiVuuQgeF89j4VBcfQYoG1z7oXeGpG",
+        "6pkA4kTvKqgiWDrcTVVcJ3N6GszDdK6QC1fxT6GcmEvc",
+        "71pndhVHt3rHjN1fmemRAef9ExuhGcLQJxLvT6ccVazf",
+        "72uc9nXozQS2SKXzdbT115mMxjNeWwUjMoJgwbkN7VMU",
+        "8MFbZEaXp8Ky8ufhZRgphgMgKVwsjhDhZtNqmEPcxvQK",
+        "9cqQfiKayCkMeHa5cUPpVw2i3Xvqjy5cp5kXAGwcAutk",
+        "BMNUGJFFSSoEXZm2DtAswHaTFEFNyGV1LGi2y5ZsoVT7",
+        "BuWMX1xnRX6hQBLPJkEjTikNQbjqtoYQu2udEe2TTtLm",
+        "C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz",
+        "CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK",
+        "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+        "DJVwQ5rGdEn9FoU1mRZPukiviMRkAMMNcN9SPvsZSPhT",
+        "DnBTfre88FAEEaDf7EmLW2JpeJU9JG4fpTU1tnb3Y1BB",
+        "EZVkeboWeXygtq8LMyENHyXdF5wpYrtExRNH9UwB1qYw",
+        "GdbG1eUc9NJLPspQDN7qqPxatBLSm9YUmbw33kvcv1dw",
+        "HVJuVW2dRbZ2fynWEY2JK6Ak2YTfVpji73sHZMCqiXSb",
+        "HfERMT5DRA6C1TAqecrJQFpmkf3wsWTMncqnj3RDg5aw",
+        "J7znuMyVHurxwjL19Rbtq2CSbjPEhqWvwEcgdWajEtnc",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "So11111111111111111111111111111111111111112",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "fe2f15c1eedd2b0c197a0c2e1f1a9ea46213b52b2a4dc179700a67426493c20e",
+  "started_at": "2026-10-28T20:14:22.997000+00:00",
+  "status": 200
+}

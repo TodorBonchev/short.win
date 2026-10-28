@@ -1,0 +1,53 @@
+{
+  "own_sha256_for_manifest_binding_only": "a81d64038d49df3c7375d97f39d712f3e40c87b82063d67cbc33dbf69744af55",
+  "checks": [
+    {
+      "capture": "bonk-production-exclude-scorch16",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 30, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-bonk-production-exclude-scorch16/candidate.json\", \"sha256\": \"6f8814847e350056d9337e6310f4501e1854b60fc705c4581373a768e5d24dad\"}",
+      "stderr": ""
+    },
+    {
+      "capture": "jup-production-exclude-scorch16",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 30, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-jup-production-exclude-scorch16/candidate.json\", \"sha256\": \"7eb974ed08eb40a6878609fb0e7c6bf1140543108f85255d2007c50e42c76195\"}",
+      "stderr": ""
+    },
+    {
+      "capture": "ray-production-exclude-scorch16",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 23, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-ray-production-exclude-scorch16/candidate.json\", \"sha256\": \"0e1fdc32137d23779764d99fd4e637814824eb862b3437b8baa4ffc0cd655e80\"}",
+      "stderr": ""
+    },
+    {
+      "capture": "jup-direct-budget16",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 34, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-jup-direct-budget16/candidate.json\", \"sha256\": \"aacdfd855b09811c000b25b10e55527ec3e5a504400a0dd4219ca10521dec0bf\"}",
+      "stderr": ""
+    },
+    {
+      "capture": "ray-direct-budget16",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 34, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-ray-direct-budget16/candidate.json\", \"sha256\": \"fd867dbd18402adb68cfdd729541dcd918ab854e98e7705607d761389d0fcd7b\"}",
+      "stderr": ""
+    },
+    {
+      "capture": "pump-curve-adaptive",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 19, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-pump-curve-adaptive/candidate.json\", \"sha256\": \"e34747e187a9da6f7b24b1032bd65519b98b88420ea6a8e76f14f25983a40f8a\"}",
+      "stderr": ""
+    },
+    {
+      "capture": "pump-graduated-adaptive-440",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 20, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-pump-graduated-adaptive-440/candidate.json\", \"sha256\": \"ad064bae2f81dd0bf9190229241908ca59761fb68c9ddba1c58e78819c5220bd\"}",
+      "stderr": ""
+    },
+    {
+      "capture": "pump-fresh-native-adaptive",
+      "exit_code": 0,
+      "stdout": "{\"account_count\": 19, \"candidate\": \"/root/short.win-simple/simple/target/archive-reconstruction-pump-fresh-native-adaptive/candidate.json\", \"sha256\": \"23f218e9088c05525b817570d97fecf72bd933a48790b6553d8656416604a0bb\"}",
+      "stderr": ""
+    }
+  ]
+}

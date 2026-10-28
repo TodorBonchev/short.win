@@ -1,0 +1,25 @@
+command ['python3', '-m', 'unittest', 'discover', '-s', 'services/tests', '-v']
+test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages (test_price_service.PriceServiceTests.test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages) ... ok
+test_complete_loan_snapshot_updates_priority_atomically (test_price_service.PriceServiceTests.test_complete_loan_snapshot_updates_priority_atomically) ... ok
+test_completed_exact_quantity_history_survives_restart (test_price_service.PriceServiceTests.test_completed_exact_quantity_history_survives_restart) ... ok
+test_exact_in_buy_search_requires_guaranteed_full_quantity (test_price_service.PriceServiceTests.test_exact_in_buy_search_requires_guaranteed_full_quantity) ... ok
+test_gap_unknown_stale_and_future_never_become_finite (test_price_service.PriceServiceTests.test_gap_unknown_stale_and_future_never_become_finite) ... ok
+test_keyless_http_omits_api_header_and_keeps_exact_input_contract (test_price_service.PriceServiceTests.test_keyless_http_omits_api_header_and_keeps_exact_input_contract) ... ok
+test_model_change_requires_fresh_history_and_u64_quantities_remain_exact (test_price_service.PriceServiceTests.test_model_change_requires_fresh_history_and_u64_quantities_remain_exact) ... ok
+test_nonadvancing_history_write_rolls_back_without_replacing_evidence (test_price_service.PriceServiceTests.test_nonadvancing_history_write_rolls_back_without_replacing_evidence) ... ok
+test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread (test_price_service.PriceServiceTests.test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread) ... ok
+test_policy_hash_export_and_stdin_cli_match_immutable_terms (test_price_service.PriceServiceTests.test_policy_hash_export_and_stdin_cli_match_immutable_terms) ... ok
+test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them (test_price_service.PriceServiceTests.test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them) ... ok
+test_queue_is_bounded_and_existing_loans_preempt_new_requests (test_price_service.PriceServiceTests.test_queue_is_bounded_and_existing_loans_preempt_new_requests) ... ok
+test_quote_domain_and_threshold_are_validated_without_float_amounts (test_price_service.PriceServiceTests.test_quote_domain_and_threshold_are_validated_without_float_amounts) ... ok
+test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model (test_price_service.PriceServiceTests.test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model) ... ok
+test_shared_database_provider_spacing_and_capacity_are_explicit (test_price_service.PriceServiceTests.test_shared_database_provider_spacing_and_capacity_are_explicit) ... ok
+test_shared_or_mismatched_scalar_header_is_not_a_finite_quote (test_price_service.PriceServiceTests.test_shared_or_mismatched_scalar_header_is_not_a_finite_quote) ... ok
+test_tick_preserves_explicit_unknown_on_provider_failure (test_price_service.PriceServiceTests.test_tick_preserves_explicit_unknown_on_provider_failure) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 1.474s
+
+OK
+
+exit 0

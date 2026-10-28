@@ -1,0 +1,20 @@
+{
+  "started_at": "2026-10-28T20:09:16.094557+00:00",
+  "finished_at": "2026-10-28T20:09:16.225432+00:00",
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "EFaHFb1y6tvYAend74ajCgQz7QxNJhWPRViFkevyGu3K",
+        "J4MnYzQheU4Lc1ziWsEhtAt8NZpe2Q9BTSpoB4Wxfrcb"
+      ],
+      {
+        "encoding": "base64",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "response_sha256": "ed8f4b6532164a8123a2fdf2058eebf6afae6164a3cdd64aa5ca5454631a7800"
+}

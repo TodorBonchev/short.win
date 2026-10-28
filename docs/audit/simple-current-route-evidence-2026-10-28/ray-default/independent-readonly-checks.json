@@ -1,0 +1,146 @@
+{
+  "checked_at": "2026-10-28T20:02:01.736028+00:00",
+  "lookup_table_checks": [
+    {
+      "response": "buy-0.json",
+      "key": "6WivwtTGTpezkBpDCJ4VbuaXe1QbSdqDsmf5P48LEtww",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-0.json",
+      "key": "2Lvj7QkiAWMHziSQbP4yZcoYJPLTESKUWdscnpbj7Ham",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-0.json",
+      "key": "5xvt4K2qgGkmASxVnCPaYpG9DUWcvG1NDnax557w2TUG",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-1.json",
+      "key": "CjDJksgWbD9MKmu2CZxJh1FA6kz51ymJP29xevsFTus2",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-1.json",
+      "key": "6WivwtTGTpezkBpDCJ4VbuaXe1QbSdqDsmf5P48LEtww",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-1.json",
+      "key": "771hXUdus1gxhTN5yBwsqqusykfg1AmorSLfr71Hg4pv",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-2.json",
+      "key": "CdrRqtdFbmxGABkbNsBWQhFc4iiSav2NTfARPQv4QvnQ",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-2.json",
+      "key": "2Lvj7QkiAWMHziSQbP4yZcoYJPLTESKUWdscnpbj7Ham",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-2.json",
+      "key": "8C1prTGFgNwayEWY1U7JfUotySB4JpDLbp6BK1eQGjMH",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-3.json",
+      "key": "9tpyaUSosDCUwkzgNMkYVMMLEEGuzFK5U1FLJUhUaMpH",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-3.json",
+      "key": "95k7D3PCFdiVzjwLA8sYhBR1hpeiFvp1ZFEqCrMf7LA",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-3.json",
+      "key": "2Lvj7QkiAWMHziSQbP4yZcoYJPLTESKUWdscnpbj7Ham",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-4.json",
+      "key": "6WivwtTGTpezkBpDCJ4VbuaXe1QbSdqDsmf5P48LEtww",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-4.json",
+      "key": "8X1qPxVAYtcre6hAg9CH9NG1fXsonTpUeXXgveAjzDSY",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "buy-4.json",
+      "key": "CjDJksgWbD9MKmu2CZxJh1FA6kz51ymJP29xevsFTus2",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "sell.json",
+      "key": "5kVRgivqNE2bwV726DiKEZU7d2EgRqomwoHK195xvXHb",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    },
+    {
+      "response": "sell.json",
+      "key": "CeFtyxQaJgY2wFBgVFrWn3VtezDovEanXezS3f8Q7VnY",
+      "owner_ok": true,
+      "state_ok": true,
+      "vector_matches_chain": true,
+      "deactivation_slot": 18446744073709551615
+    }
+  ],
+  "all_lookup_tables_match": true,
+  "net_bid_lamports": 89005004,
+  "whole_q_buy_lamports": null,
+  "spread_bps_ceil": null,
+  "within_500bps_spread": false
+}

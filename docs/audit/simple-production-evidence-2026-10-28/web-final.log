@@ -1,0 +1,21 @@
+command ['pnpm', '--dir', 'web', 'check']
+✔ amount entry is exact beyond Number precision and refuses truncation (0.843781ms)
+✔ preview follows floor principal and actually paid income without time accrual (0.264977ms)
+✔ editing or cancelling while route preparation is pending revokes later review (0.874783ms)
+✔ wallet account or feature changes while signing prevent broadcast and clean old subscriptions (0.722784ms)
+✔ wallets without change events are rechecked after their async reply, including chain support (0.371838ms)
+✔ cancel during the final blockheight check prevents even the broadcast RPC call (12.19556ms)
+✔ managed service preserves exact quantities and uses fixed endpoints (18.68807ms)
+✔ managed service rejects insecure hosted URLs and reports capacity refusals (0.613871ms)
+✔ managed buy input can shrink but cannot exceed or reinterpret the signed user budget (0.334546ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 238.487004
+$ tsc --noEmit && node --test test/*.test.ts
+
+exit 0

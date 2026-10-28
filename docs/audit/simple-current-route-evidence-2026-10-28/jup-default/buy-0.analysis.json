@@ -1,0 +1,98 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      137,
+      51,
+      228,
+      193,
+      200,
+      13,
+      221,
+      41,
+      183,
+      164,
+      20,
+      175,
+      175,
+      139,
+      102,
+      219,
+      118,
+      4,
+      112,
+      39,
+      106,
+      91,
+      116,
+      0,
+      183,
+      35,
+      178,
+      62,
+      252,
+      105,
+      205,
+      46
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 332514088,
+      "secs_since_epoch": 1793217407
+    },
+    "lastValidBlockHeight": 440627156
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 20999655,
+  "history_qualified": false,
+  "labels": [
+    "TesseraV",
+    "Meteora DLMM"
+  ],
+  "minimum_output": 20894657,
+  "request_amount": 58914497,
+  "response_file": "buy-0.json",
+  "response_sha256": "5a5b08b679ff621739f6eda60bfb9aafb55c3414047765b03b1484e5d11a27a0",
+  "route_data_bytes": 46,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "4U2JzGENeMhYuVMGMUeLdzPP9d4PwqnKX9iLxjwPXZU8",
+        "inAmount": "58914497",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "TesseraV",
+        "outAmount": "6056596",
+        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "BhQEFZCRnWKQ21LEt4DUby7fKynfmLVJcNjfHNqjEF61",
+        "inAmount": "6056596",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "label": "Meteora DLMM",
+        "outAmount": "20999655",
+        "outputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 47
+}

@@ -5,7 +5,8 @@
 - [x] Implement Jupiter-only pooled vaults, fixed upfront SOL term fees, whole-position exits and the selected 24h-grace default.
 - [x] Add trusted exact-quantity history, bounded automatic warm-up/publication, keeper/indexer, generated client and wallet UI.
 - [x] Pass fresh focused CI and short actual-program fuzz; verify byte-identical program builds across checkout locations. [Checkpoint](docs/audit/simple-pooled-reproducibility-2026-10-28.md).
-- [ ] Review production program/role identities, financial policy and history settings together.
+- [x] Prepare the [production policy/service/payer proposal](simple/config/README.md), free-key profile, non-executable role setup and bounded on-demand publisher.
+- [ ] Assign and review actual production program/role identities with the proposed policy/model; commission real funding and capacity.
 - [ ] Qualify current external program bytes and additional Jupiter route families on the final inputs.
 - [ ] Complete a fresh independently supervised >=24h campaign; retain duration, coverage, zero-anomaly and frozen-input evidence.
 - [ ] Commission real funded operator/HTTP/web services with measured quote capacity, payer budgets and tested monitoring/alerts.

@@ -1,0 +1,111 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      102,
+      155,
+      116,
+      247,
+      116,
+      142,
+      167,
+      135,
+      91,
+      107,
+      229,
+      114,
+      89,
+      115,
+      49,
+      209,
+      210,
+      5,
+      253,
+      80,
+      181,
+      137,
+      234,
+      235,
+      8,
+      28,
+      146,
+      98,
+      184,
+      228,
+      113,
+      185
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 368609621,
+      "secs_since_epoch": 1793217436
+    },
+    "lastValidBlockHeight": 440627289
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": false
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 20984365,
+  "history_qualified": false,
+  "labels": [
+    "Kipseli",
+    "Whirlpool",
+    "Raydium"
+  ],
+  "minimum_output": 20879444,
+  "request_amount": 375699516,
+  "response_file": "buy-2.json",
+  "response_sha256": "d3a6ef5a1bf3a0339cde23aabf5ffd00c3b6ab0de034dbd4164cade8ad40bca1",
+  "route_data_bytes": 52,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "7yD7gfXv49SFxhx9uTc11dEd7Nj98rGWeYMdZJgheZbG",
+        "inAmount": "375699516",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Kipseli",
+        "outAmount": "38657963",
+        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    },
+    {
+      "bps": 2270,
+      "percent": 22.7,
+      "swapInfo": {
+        "ammKey": "A2J7vmG9xAdWUzYscN7oQssxZBFihwD3UonkWB8Kod1A",
+        "inAmount": "8774336",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "label": "Whirlpool",
+        "outAmount": "4764308",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    },
+    {
+      "bps": 7730,
+      "percent": 77.3,
+      "swapInfo": {
+        "ammKey": "6UmmUiYoBjSrhakAobJw8BvkmJtDVxaeBtbt7rxWo1mg",
+        "inAmount": "29883627",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "label": "Raydium",
+        "outAmount": "16220057",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 49
+}

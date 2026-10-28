@@ -1,0 +1,18 @@
+command ['pnpm', 'build']
+vite v8.3.1 building client environment for production...
+transforming...
+✓ 116 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.40 kB │ gzip:  0.29 kB
+dist/assets/index-BWPJxP0o.css    3.59 kB │ gzip:  1.33 kB
+dist/assets/index-DEnq0GXb.js   155.24 kB │ gzip: 40.60 kB
+
+✓ built in 125ms
+$ pnpm -r build
+$ tsc --noEmit
+$ tsc --noEmit && vite build
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0m../node_modules/.pnpm/@solana+kit@8.3.0_typescript@5.9.3/node_modules/@solana/kit/dist/index.browser.mjs is dynamically imported by ../client/src/transactions.ts but also statically imported by ../client/src/chain.ts, ../client/src/generated/accounts/config.ts, ../client/src/generated/accounts/exposure.ts, ../client/src/generated/accounts/lenderReceipt.ts, ../client/src/generated/accounts/loan.ts, ..., dynamic import will not move module into another chunk.
+
+
+exit 0

@@ -1,0 +1,72 @@
+{
+  "base_token_conservation": true,
+  "binding": {
+    "execution_authority": "6hsJmQuw9dEvdsrt4ePpGj1cF8mGFesPs5rnm2HC3Whb",
+    "execution_base": "5MB6MvDbvdjDgSKs4zhcDNcRcDhUJtJU8z2Nvt3Aa2cE",
+    "execution_wsol": "4gyQ7s2xQg4jErH5xuEqjv3FTjRBuxy2KBKo5Z8k2tKx",
+    "loan": "4nu9KSdrahoHnzNLiTKH3HZeMSA2pJD7d3W8ZqzYWTXb",
+    "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "q": 30000000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "buyback_spend": 9430011,
+  "error": null,
+  "full_buyback_net_credit": 30555548818,
+  "invariants": "principal/exposure, whole-q net vault credit, actual paid fees, collateral, rent/scratch closure, immutable real mint bytes, full post-CPI rollback",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "b6bd755ce86c28e07cab7eb3c217b3225d2f155de9043faa98b25d6a014f95f1",
+  "name": "bonk-direct-budget16",
+  "native_runner_sha256": "90eace8d8a7075219d221f96284062d6ddee20c9271cd20fb67e2a93c616a5dd",
+  "own_program_sha256": "b87598a00c788c30a64b4e232f5f2040c0c8eb333c0cce5fb09403d27159544c",
+  "packet_fit_failures": {},
+  "post_cpi_rollback": true,
+  "schema": 1,
+  "sell_proceeds": 9249650,
+  "status": "passed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "transactions": {
+    "full_buyback": {
+      "compute_units": 123650,
+      "error": null,
+      "log_file": "full_buyback.log",
+      "log_sha256": "cceda9511043c6ecc8032e0cc44ac696bb7195ea2dabc2cb5234089c9d011a9c",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1016
+    },
+    "open_sell": {
+      "compute_units": 139513,
+      "error": null,
+      "log_file": "open_sell.log",
+      "log_sha256": "23bdc2fbbc4e26c45ce7d36367c43778669576dc327c1a37be23b47259fd8d3a",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1157
+    },
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 129432,
+      "error": "InstructionError(1, Custom(6024))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "63e6850bc52bc6d6b7a34aa53db7980769c4951ee1c8a870c8ff2c14c84b4d35",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1157
+    }
+  },
+  "wsol_delta_lamports": "180361"
+}

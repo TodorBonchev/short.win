@@ -1,0 +1,95 @@
+{
+  "actual_snapshot_packets_fit": true,
+  "base_token_conservation": true,
+  "binding": {
+    "execution_authority": "DJVwQ5rGdEn9FoU1mRZPukiviMRkAMMNcN9SPvsZSPhT",
+    "execution_base": "5eEpU4UxvKn48YmiVuuQgeF89j4VBcfQYoG1z7oXeGpG",
+    "execution_wsol": "4bo3Np5gjPWBDqqg7wZEYEX3wR5RZ6Mm48QvATcEx1Tr",
+    "loan": "12DkqgY4f6UGRaYiTaehMzDguH76V6btsCWREa1fyVcr",
+    "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "q": 40000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "buyback_spend": 113923568,
+  "error": null,
+  "external_liquidity_account_count": 31,
+  "external_native_and_wrapped_lamports_delta": "2233796",
+  "full_buyback_net_credit": 40760520,
+  "functional_execution_passed": true,
+  "invariants": "principal/exposure, whole-q net vault credit, actual paid fees, collateral, rent/scratch closure, immutable real mint bytes, full post-CPI rollback",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "liquidity_conservation_scope": "All captured raw and both-route outer account keys, including initially absent PDAs; native curve/fee/rent plus WSOL vault lamports, excluding protocol financial actors/accounts and scratch; WSOL data delta retained separately without double counting.",
+  "live_transactions_sent": 0,
+  "manifest_sha256": "38670510a0c61e1555bcb02cb91123098d5ff6398d82e0d39d714774ad040142",
+  "name": "jup-production-adaptive",
+  "native_runner_sha256": "051866471c8c59a11a2e5c9d762b78adda3d6d35759749c1039b7ea7dd05ff69",
+  "own_program_sha256": "8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d",
+  "packet_fit_failures": {},
+  "post_cpi_rollback": true,
+  "schema": 1,
+  "sell_proceeds": 111689772,
+  "setup_allowance": {
+    "closing_actual_actor_cost": 0,
+    "closing_signed_maximum": 0,
+    "closing_unused_refunded": 0,
+    "cost_excluded_from_WSOL_notional_collateral_and_protocol_fees": true,
+    "opening_actual_actor_cost": 0,
+    "opening_signed_maximum": 0,
+    "opening_unused_refunded": 0
+  },
+  "setup_budget_rejections": {},
+  "status": "passed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 113923568,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 500,
+    "live_ask_upper": 113923568,
+    "live_bid_lower": 111131324,
+    "spread_bps_ceiling": 252
+  },
+  "transactions": {
+    "full_buyback": {
+      "compute_units": 135583,
+      "error": null,
+      "log_file": "full_buyback.log",
+      "log_sha256": "eadab395eda628fb5dedd63957b6e6537fc1c87044996606336d41314e6756bf",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1059
+    },
+    "open_sell": {
+      "compute_units": 141252,
+      "error": null,
+      "log_file": "open_sell.log",
+      "log_sha256": "2b1e5defd5573b5b6845f98a6edc6c220351133f92152cd11779f722a198a672",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1169
+    },
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 131409,
+      "error": "InstructionError(1, Custom(6024))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "36039d98e0f67c4784f7495036ba245830043b1a83246895198492c760affd94",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1169
+    }
+  },
+  "wsol_delta_lamports": "2233796"
+}

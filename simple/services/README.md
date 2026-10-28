@@ -18,11 +18,19 @@ threshold covers the full token debt. It never requests ExactOut or interprets
 expected output as guaranteed output. It retains the successful sale and buy
 response bodies and their canonical JSON SHA256 hashes. A tested buy budget is
 an upper bound from that response; no globally cheapest route is claimed.
-The request uses a Jupiter routing-account budget of 32. This differs from the
+Each logical quote first requests a Jupiter routing-account budget of 16, then
+tries 32 once if no supported route is returned, and excludes Scorch, whose captured ordinary-header quotes failed actual protocol CPI replay.
+It requests transaction version 0. This differs from the
 48-total-account protocol/client envelope: Jupiter's `maxAccounts` parameter is
-not a guarantee of total returned account count. Responses above 48 total metas
-or 768 instruction-data bytes remain Unknown. The request budget, total caps,
-program identity, swap mode and transaction version are part of the model hash.
+not a guarantee of total returned account count. The initial quote/client profile rejects responses above 40 total metas or 768
+instruction-data bytes; the program itself retains its 48-meta limit. This
+filters the observed 46-meta route that exceeded a real 1,232-byte transaction,
+but total-meta limits do not prove packet fit. Actual lookup-table resolution and
+full protocol transaction simulation remain required. The request budget, total caps,
+program identity, swap mode, transaction version, excluded DEX set and retained-ask
+algorithm and deterministic fallback are part of the model hash. Ordinary RouteV2 scalar headers and amounts,
+zero route fees, ceil-rounded threshold and step/data limits must match; shared or
+other unsupported header shapes remain Unknown.
 
 Completed history is sampled off-chain evidence trusted to this operator. For H
 completed epochs immediately preceding the source epoch, the service requires
@@ -83,13 +91,21 @@ reference freshness. This needs no paid provider plan.
 It performs HTTP GET quotes and read-only RPC `getSlot`/`getBlockTime` calls.
 The indexer and supervisor must schedule ticks, alert on skipped/Unknown jobs,
 and ensure every active loan receives service within freshness and sampling
-bounds. Worst-case quote requests per tick are
-`jobs_per_tick * (1 + max_ask_requests)`, plus up to two clock reads per job.
+bounds. History observations first reuse a successful previous acquisition
+budget, capped to the current bid plus the reviewed spread; a retained candidate
+is always a new actual full-q quote. A successful normal observation uses two
+logical quotes and a capped growth probe uses at most three in total (up to six
+HTTP requests when every quote needs the 32-account fallback), without assuming
+monotonicity or inventing interpolated prices. Execution `build-buy` still has
+its independent `max_ask_requests` budget. RPC clock reads are additional.
 Jobs become due at half their maximum sample gap to leave scheduling margin.
 The `capacity` command reports the spacing-only lower bound and leaves measured
 latency and sustained coverage pending. The example admits one exact quantity,
 targets 15-second scheduling with a 30-second maximum sample gap, and budgets up
-to 13 requests per observation. It does not claim simultaneous monitoring of
+to six HTTP requests per history observation and twelve logical buy probes per
+execution search. Each execution probe can also need the account-budget fallback.
+HTTP400/no-route or unsupported shape can select the alternate budget; rate limits,
+authentication failures, connection errors and provider outages do not trigger it. It does not claim simultaneous monitoring of
 every mint or arbitrary quantities. The keyless interval doubles request time
 and can require fewer probes, a different reviewed history policy or a Free key.
 
@@ -97,3 +113,11 @@ The rolling database retains H plus two epochs. Archive emitted evidence before
 pruning and back up SQLite with a consistent backup method. No real provider
 credentials, deployed operator configuration, funding, alert delivery, sustained
 quote throughput or live mainnet compatibility was available or exercised here.
+
+The initial Free-key production proposal and separate slower keyless fallback are
+in [config/README.md](../config/README.md). Public warm requests record a dated
+publication intent; authoritative debt synchronization does not refresh it.
+`jobs` includes `publication_requested_at` for the Node operator's on-demand
+publication decision. Healthy unarmed debt continues private sampling without
+continuous reporter transactions. Active-debt capacity, public warm/rent
+admission and combined history/action throughput still require commissioning.

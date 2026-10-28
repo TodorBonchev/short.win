@@ -1,0 +1,80 @@
+{
+  "checked_at": "2026-10-28T20:50:01.581050+00:00",
+  "scope": "Current indexed full RPC captures, reconstructed independently from archived gzip bytes. Program hash binds candidate only; replay result is separate.",
+  "index_sha256": "6b228de2b7b96da44dd143a461893967d5fc194750dd34072a3f8f17c1b4164f",
+  "own_program_sha256": "8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d",
+  "checks": [
+    {
+      "capture": "bonk-production-adaptive",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 25,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-bonk-production-adaptive/candidate.json",
+        "sha256": "6e9cf1763fc0b0cf0c9c49c66bf7f6722840b3f6cf77698e880c8802f940daef"
+      }
+    },
+    {
+      "capture": "jup-production-adaptive",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 30,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-jup-production-adaptive/candidate.json",
+        "sha256": "38670510a0c61e1555bcb02cb91123098d5ff6398d82e0d39d714774ad040142"
+      }
+    },
+    {
+      "capture": "ray-production-exclude-scorch16",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 23,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-ray-production-exclude-scorch16/candidate.json",
+        "sha256": "0e4ffd3d0d13bd288d2d0e7bcc815735bb3fb098e50280032215b213f7bd4846"
+      }
+    },
+    {
+      "capture": "jup-direct-budget16",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 34,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-jup-direct-budget16/candidate.json",
+        "sha256": "60f297bd7556442ad38fe72d9dd2bd2d93321906c6e21eeced401024161c4ee0"
+      }
+    },
+    {
+      "capture": "ray-direct-budget16",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 34,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-ray-direct-budget16/candidate.json",
+        "sha256": "9778de8e6e93f9098851bae6b414d0ed744350ed74fc3122a9fd8b20fac3d539"
+      }
+    },
+    {
+      "capture": "pump-curve-adaptive",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 19,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-pump-curve-adaptive/candidate.json",
+        "sha256": "b2f80b87ba68c56dcaad5de4808f66902927071dc3b4843288d2e242cd95693e"
+      }
+    },
+    {
+      "capture": "pump-graduated-adaptive-440",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 20,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-pump-graduated-adaptive-440/candidate.json",
+        "sha256": "5b8b936a5da338dcd9e6cfcd9cb95ce63334e74f8df43ee8cd39e567f355d423"
+      }
+    },
+    {
+      "capture": "pump-fresh-native-adaptive",
+      "exit_code": 0,
+      "materializer_result": {
+        "account_count": 19,
+        "candidate": "/root/short.win-simple/simple/target/final-archive-reconstruction8c4a-pump-fresh-native-adaptive/candidate.json",
+        "sha256": "2ff9f6c40da0132290f6da0adb5710dfca527d0240eea960bdb9a8631b9c12b6"
+      }
+    }
+  ]
+}

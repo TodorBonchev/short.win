@@ -1,0 +1,98 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      40,
+      154,
+      30,
+      110,
+      53,
+      240,
+      110,
+      189,
+      40,
+      207,
+      72,
+      155,
+      171,
+      135,
+      251,
+      225,
+      90,
+      224,
+      244,
+      208,
+      225,
+      94,
+      95,
+      201,
+      27,
+      167,
+      113,
+      166,
+      101,
+      228,
+      241,
+      212
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 11807823,
+      "secs_since_epoch": 1793217405
+    },
+    "lastValidBlockHeight": 440627146
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 56109044,
+  "history_qualified": false,
+  "labels": [
+    "GoonFi V2",
+    "BisonFi"
+  ],
+  "minimum_output": 55828499,
+  "request_amount": 20000000,
+  "response_file": "sell.json",
+  "response_sha256": "570c5831dd35b697418526a16abb18aa300946ae6b3fa9df838378087f5c3105",
+  "route_data_bytes": 47,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "AkxuRa1soguFpVRjnDrRsXAcfTkZjRv1XyNXySzVivmC",
+        "inAmount": "20000000",
+        "inputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "label": "GoonFi V2",
+        "outAmount": "5767280",
+        "outputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+        "inAmount": "5767280",
+        "inputMint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        "label": "BisonFi",
+        "outAmount": "56109044",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  ],
+  "side": "sell",
+  "total_metas": 41
+}

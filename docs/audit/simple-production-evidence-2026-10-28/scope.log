@@ -1,0 +1,5 @@
+started 2026-10-28T20:25:00.590345+00:00
+command ['python3', 'scripts/audit_scope.py', 'check']
+ok: scope.txt matches git ls-files at HEAD; every watched file is classified
+
+exit 0

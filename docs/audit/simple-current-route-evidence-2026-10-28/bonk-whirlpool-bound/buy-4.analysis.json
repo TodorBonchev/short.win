@@ -1,0 +1,111 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      231,
+      117,
+      110,
+      84,
+      95,
+      76,
+      248,
+      202,
+      37,
+      254,
+      16,
+      9,
+      220,
+      80,
+      245,
+      156,
+      4,
+      39,
+      165,
+      124,
+      144,
+      46,
+      254,
+      194,
+      210,
+      97,
+      236,
+      161,
+      183,
+      152,
+      82,
+      38
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 428626872,
+      "secs_since_epoch": 1793217522
+    },
+    "lastValidBlockHeight": 440627692
+  },
+  "checks": {
+    "exact_domain": true,
+    "header_input": false,
+    "header_no_fees": true,
+    "header_quote": false,
+    "header_slippage50": false,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": false,
+    "route_data_le768": true,
+    "slippage50": true,
+    "steps_le8": false,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 503596956550,
+  "history_qualified": false,
+  "labels": [
+    "Whirlpool",
+    "Whirlpool",
+    "Whirlpool"
+  ],
+  "minimum_output": 501078971768,
+  "request_amount": 155325632,
+  "response_file": "buy-4.json",
+  "response_sha256": "51e2f48c668c3eb2971adb846e6cc5ae5540703d6f0bad79ef5ef14d30c4d94a",
+  "route_data_bytes": 53,
+  "route_plan": [
+    {
+      "bps": 8977,
+      "percent": 89.77,
+      "swapInfo": {
+        "ammKey": "3ne4mWqdYuNiYrYZC9TrA3FcfuFdErghH97vNPbjicr1",
+        "inAmount": "139439638",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Whirlpool",
+        "outAmount": "452075687078",
+        "outputMint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+      }
+    },
+    {
+      "bps": 1023,
+      "percent": 10.23,
+      "swapInfo": {
+        "ammKey": "A6cVoMU1Z7oRi9R774QarVxHUmHPQkxQfYVFGNQuAx2b",
+        "inAmount": "15885994",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Whirlpool",
+        "outAmount": "8813628",
+        "outputMint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "56Ekyu6uBpTna3LR2qkjHjNbDNkCLWK2Lt3uWh7J2R8Z",
+        "inAmount": "8813628",
+        "inputMint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+        "label": "Whirlpool",
+        "outAmount": "51521269472",
+        "outputMint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 48
+}

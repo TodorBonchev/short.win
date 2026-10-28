@@ -1,0 +1,7 @@
+{
+  "url": "https://api.jup.ag/tokens/v2/recent?limit=100",
+  "started_at": "2026-10-28T20:18:25.252943+00:00",
+  "finished_at": "2026-10-28T20:18:25.440522+00:00",
+  "sha256": "d55daddac0f24c01a5fb41ffbc6cc1f7fdce7d9076e223f94c6801de2a7ca15a",
+  "bytes": 44987
+}

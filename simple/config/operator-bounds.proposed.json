@@ -1,0 +1,32 @@
+{
+  "status": "proposed-not-commissioned",
+  "execute": false,
+  "tick": true,
+  "settings": "config/production-service.proposed.json",
+  "roleManifest": "config/production-roles.template.json",
+  "requiredEnvironment": [
+    "SOLANA_RPC_URL",
+    "JUPITER_API_KEY"
+  ],
+  "maxAccounts": 2048,
+  "maxEventTransactions": 32,
+  "maxActions": 8,
+  "maxFeeLamports": 25000,
+  "maxPassFeesLamports": 100000,
+  "minBalanceLamports": 50000000,
+  "maxTemporaryLamports": 10000000,
+  "maxReferenceRentLamports": 10000000,
+  "suggestedInitialLamportsPerOperatingPayer": 100000000,
+  "minTimerStartSpacingSeconds": 15,
+  "overlappingPassesAllowed": false,
+  "evidenceStatus": {
+    "payerFunding": "pending",
+    "alertsDelivered": "pending",
+    "sustainedCoverage": "pending",
+    "currentRoutes": "pending",
+    "roles": "unassigned"
+  },
+  "maxNewReferenceAccounts": 4,
+  "maxDailyPublicationFeesLamports": 1000000,
+  "maxRouteSetupLamports": 0
+}

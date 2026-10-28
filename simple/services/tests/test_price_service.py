@@ -54,13 +54,16 @@ class Provider:
         self.calls.append(params)
         amount = int(params["amount"])
         output = amount * 2 if params["inputMint"] == service.WSOL else amount // 2
+        slip = int(params["slippageBps"])
+        data = (service.ROUTE_V2 + amount.to_bytes(8, "little") + output.to_bytes(8, "little")
+                + slip.to_bytes(2, "little") + bytes(4) + (1).to_bytes(4, "little") + bytes(5))
         return {"inputMint": params["inputMint"], "outputMint": params["outputMint"],
                 "inAmount": str(amount), "outAmount": str(output),
-                "otherAmountThreshold": str(max(1, output-1)), "swapMode": "ExactIn",
+                "otherAmountThreshold": str(max(1, (output*(10000-slip)+9999)//10000)), "swapMode": "ExactIn",
                 "slippageBps": int(params["slippageBps"]), "routePlan": [{"fixture": True}],
                 "swapInstruction": {"programId": service.JUPITER_PROGRAM,
                                     "accounts": [{"pubkey": MARKET, "isSigner": True, "isWritable": False}],
-                                    "data": "AQEBAQEBAQE="}}
+                                    "data": service.base64.b64encode(data).decode()}}
 
 
 class PriceServiceTests(unittest.TestCase):
@@ -86,7 +89,7 @@ class PriceServiceTests(unittest.TestCase):
         jupiter = client(settings(), provider)
         quote = jupiter.buy(job(), 20)
         self.assertGreaterEqual(quote.guaranteed_output, 100)
-        self.assertEqual(quote.amount, 51)
+        self.assertEqual(quote.amount, 50)
         self.assertLessEqual(len(provider.calls), settings().max_ask_requests)
         self.assertTrue(all("swapMode" not in call for call in provider.calls))
         self.assertTrue(all(call["wrapAndUnwrapSol"] == "false" for call in provider.calls))
@@ -98,6 +101,58 @@ class PriceServiceTests(unittest.TestCase):
         with patch.object(jupiter, "quote", return_value=service.Quote(100, 200, 199, "", {})):
             with self.assertRaises(service.Unavailable):
                 jupiter.buy(job(), 100)
+
+    def test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread(self):
+        provider = Provider()
+        jupiter = client(settings(), provider)
+        bid, ask, evidence = jupiter.observe(job(), 51)
+        self.assertEqual((bid, ask), (50, 51))
+        self.assertEqual(len(provider.calls), 2)
+        self.assertEqual(evidence["buy"]["response"]["inAmount"], "51")
+        provider.calls.clear()
+        self.assertEqual(jupiter.observe(job(), 999)[1], 55)
+        self.assertEqual(len(provider.calls), 2)
+        provider.calls.clear()
+        self.assertGreaterEqual(jupiter.observe(job())[1], 50)
+        self.assertLessEqual(len(provider.calls), 3)
+        with self.assertRaises(service.Unavailable):
+            client(settings(max_buy_lamports=49), Provider()).observe(job())
+
+    def test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages(self):
+        provider=Provider()
+        def transport(params):
+            if params["maxAccounts"] == "16":
+                provider.calls.append(params)
+                raise service.RouteUnavailable("fixture no route")
+            return provider(params)
+        quote=client(settings(),transport).quote(MINT,service.WSOL,100)
+        self.assertEqual(quote.amount,100)
+        self.assertEqual([p["maxAccounts"] for p in provider.calls],["16","32"])
+        def outage(params):
+            provider.calls.append(params)
+            raise service.Unavailable("fixture rate limit")
+        provider.calls.clear()
+        with self.assertRaises(service.Unavailable):
+            client(settings(),outage).quote(MINT,service.WSOL,100)
+        self.assertEqual(len(provider.calls),1)
+
+    def test_shared_or_mismatched_scalar_header_is_not_a_finite_quote(self):
+        for offset, value in [(0, 209), (8, 1), (16, 1), (24, 51), (26, 1), (28, 1), (30, 9)]:
+            def transport(params, offset=offset, value=value):
+                raw = Provider()(params)
+                data = bytearray(service.base64.b64decode(raw["swapInstruction"]["data"]))
+                data[offset] = value
+                raw["swapInstruction"]["data"] = service.base64.b64encode(data).decode()
+                return raw
+            with self.assertRaises(service.Unavailable, msg=str(offset)):
+                client(settings(), transport).quote(MINT, service.WSOL, 100)
+
+    def test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them(self):
+        self.assertEqual(self.history.publication_requested_at(job()), 600)
+        self.history.sync_loans([job()], 700)
+        self.assertEqual(self.history.publication_requested_at(job()), 600)
+        self.history.enqueue(job(), 800)
+        self.assertEqual(self.history.publication_requested_at(job()), 800)
 
     def test_quote_domain_and_threshold_are_validated_without_float_amounts(self):
         for field, value in [("swapMode", "ExactOut"), ("inAmount", "99"),
@@ -259,7 +314,7 @@ class PriceServiceTests(unittest.TestCase):
     def test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model(self):
         provider = Provider()
         client(settings(), provider).quote(MINT, service.WSOL, 100)
-        self.assertEqual(provider.calls[0]["maxAccounts"], "32")
+        self.assertEqual(provider.calls[0]["maxAccounts"], "16")
 
         def oversized(params):
             raw = Provider()(params)
@@ -268,8 +323,17 @@ class PriceServiceTests(unittest.TestCase):
 
         with self.assertRaises(service.Unavailable):
             client(settings(), oversized).quote(MINT, service.WSOL, 100)
+        def excluded(params):
+            raw = Provider()(params)
+            raw["routePlan"] = [{"swapInfo": {"label": "Scorch"}}]
+            return raw
+        with self.assertRaises(service.Unavailable):
+            client(settings(), excluded).quote(MINT, service.WSOL, 100)
+        self.assertEqual(provider.calls[0]["excludeDexes"], "Scorch")
         original = settings().model_hash
         with patch.object(service, "REQUEST_ROUTE_ACCOUNT_BUDGET", 31):
+            self.assertNotEqual(settings().model_hash, original)
+        with patch.object(service, "EXCLUDED_DEXES", ""):
             self.assertNotEqual(settings().model_hash, original)
         with patch.object(service, "MAX_ROUTE_ACCOUNTS", 47):
             self.assertNotEqual(settings().model_hash, original)

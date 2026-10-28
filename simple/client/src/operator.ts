@@ -99,6 +99,9 @@ export type OperatorOptions = {
   minBalanceLamports?: bigint;
   maxTemporaryLamports?: bigint;
   maxReferenceRentLamports?: bigint;
+  maxNewReferenceAccounts?: number;
+  maxDailyPublicationFeesLamports?: bigint;
+  maxRouteSetupLamports?: bigint;
 };
 const SCRIPT = fileURLToPath(
   new URL("../../services/src/shortwin_price_service.py", import.meta.url),
@@ -428,6 +431,18 @@ export function selectAction(
     ? "force"
     : "wait";
 }
+/** Private history chooses when a chain snapshot is useful. It never authorizes
+ * a financial action until publication is confirmed and the state is reread. */
+export function publicationNeeded(
+  candidate: g.PriceReference, loans: readonly g.Loan[], policy: g.Policy,
+  config: g.Config, clock: { slot: bigint; timestamp: bigint },
+  requestedAt: bigint, fulfilledAt: bigint,
+): boolean {
+  if (!candidate.finite || config.pricesPaused) return false;
+  if (loans.some(l => ["arm", "clear-arm", "force"].includes(selectAction(l, policy, config, candidate, clock)))) return true;
+  const ttl = BigInt(policy.terms.historyEpochSeconds * (policy.terms.minimumHistoryEpochs + 2) + policy.terms.referenceMaxAgeSeconds);
+  return requestedAt > fulfilledAt && requestedAt <= clock.timestamp && clock.timestamp-requestedAt <= ttl;
+}
 export function keeperCap(l: g.Loan, p: g.Policy, r: g.PriceReference): bigint {
   const price =
     (r.acquisitionReference * (10000n + BigInt(p.terms.buybackPremiumBps))) /
@@ -461,6 +476,41 @@ export class OperatorStore {
         "INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
       )
       .run(key, value);
+  }
+  checkReferenceAllowance(reference: Address, maximum: number, projected: ReadonlySet<Address> = new Set()): void {
+    if (this.get("reference-allocation:"+reference) || projected.has(reference)) return;
+    const row=this.db.prepare("SELECT count(*) AS n FROM meta WHERE key LIKE 'reference-allocation:%'").get() as {n:number};
+    const additional=[...projected].filter(key=>!this.get("reference-allocation:"+key)).length;
+    if(row.n+additional>=maximum) throw new Error("New reference account allowance exhausted; review funded capacity before increasing it");
+  }
+  publicationFees(day: number): bigint {
+    return BigInt(this.get("publication-fees-utc-day:"+day) ?? "0");
+  }
+  reservePublicationFees(day: number, amount: bigint, maximum: bigint): void {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const used=this.publicationFees(day);
+      if(amount<0n || maximum<0n || used+amount>maximum) throw new Error("UTC-day publication fee allowance exhausted; priced actions remain pending");
+      this.set("publication-fees-utc-day:"+day,(used+amount).toString());
+      this.db.exec("COMMIT");
+    } catch(error){this.db.exec("ROLLBACK");throw error;}
+  }
+  reserveReference(reference: Address, maximum: number): void {
+    // Reserve before any submission. Unknown outcomes/preparation failures keep
+    // their allowance; restarting cannot turn paid creations into uncounted ones.
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const key = "reference-allocation:" + reference;
+      if (!this.get(key)) {
+        const row = this.db.prepare("SELECT count(*) AS n FROM meta WHERE key LIKE 'reference-allocation:%'").get() as {n:number};
+        if (row.n >= maximum) throw new Error("New reference account allowance exhausted; review funded capacity before increasing it");
+        this.set(key, "reserved");
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
   snapshot(s: Snapshot): void {
     this.db.exec("BEGIN IMMEDIATE");
@@ -890,6 +940,8 @@ export async function runOperator(
     remainingFees: options.maxPassFeesLamports ?? 100_000n,
     minBalance: options.minBalanceLamports ?? 100_000n,
   };
+  const routeSetupMax = options.maxRouteSetupLamports ?? 0n;
+  if (routeSetupMax<0n || routeSetupMax>5_000_000n) throw new Error("Native route setup allowance exceeds cap");
   const temporaryMax = options.maxTemporaryLamports ?? 10_000_000n,
     referenceRentMax = options.maxReferenceRentLamports ?? 10_000_000n;
   if (
@@ -949,6 +1001,11 @@ export async function runOperator(
     }
     let count = 0;
     const reservedFunds = new Map<Address, bigint>();
+    const projectedReferences = new Set<Address>();
+    const feeDay = Math.floor(Date.now()/86_400_000);
+    const dailyPublicationMaximum = options.maxDailyPublicationFeesLamports ?? 1_000_000n;
+    if (dailyPublicationMaximum < 0n) throw new Error("Negative publication fee allowance");
+    let projectedPublicationFees = store.publicationFees(feeDay);
     const actor = options.keeperAddress ?? snapshot.config.data.reporter;
     const event = await eventAuthority();
     const dispatch = async (
@@ -1019,6 +1076,11 @@ export async function runOperator(
       await writeFile(artifact, stringify(record) + "\n", { mode: 0o600 });
       const plan: ObjectValue = { ...record, artifact, status: "simulated" };
       plans.push(plan);
+      if (kind === "publish-reference") {
+        if (projectedPublicationFees+prepared.feeLamports > dailyPublicationMaximum)
+          throw new Error("UTC-day publication fee allowance exhausted; priced actions remain pending");
+        projectedPublicationFees += prepared.feeLamports;
+      }
       if (!options.execute) {
         reservedFunds.set(
           payer,
@@ -1035,6 +1097,8 @@ export async function runOperator(
       if (!keyfile)
         throw new Error("Explicit role keyfile required for execute");
       const signer = await signerFile(keyfile, payer);
+      if (kind === "publish-reference")
+        store.reservePublicationFees(feeDay, prepared.feeLamports, dailyPublicationMaximum);
       const signed = await signTransaction(
         [signer.keyPair],
         getTransactionDecoder().decode(prepared.bytes),
@@ -1141,7 +1205,7 @@ export async function runOperator(
         alerts,
       };
     }
-    const grouped = new Map<string, { job: Job; rows: Row<g.Loan>[] }>();
+    const grouped = new Map<string, { job: Job; rows: Row<g.Loan>[]; requestedAt: bigint }>();
     for (const row of pending) {
       const l = row.data,
         id = [l.market, l.policy, l.q].join(":");
@@ -1153,7 +1217,7 @@ export async function runOperator(
         quantity: l.q.toString(),
         active_loan: true,
       };
-      grouped.set(id, { job, rows: [...(found?.rows ?? []), row] });
+      grouped.set(id, { job, rows: [...(found?.rows ?? []), row], requestedAt: 0n });
     }
     const queue = JSON.parse(await service(["jobs"]));
     if (
@@ -1177,10 +1241,15 @@ export async function runOperator(
       )
         throw new Error("Queued identity is not an indexed market/policy");
       const id = [job.market, job.policy, job.quantity].join(":");
-      if (grouped.has(id)) continue;
+      const requestedAt = u64(raw.publication_requested_at ?? 0, "publication request time");
+      const existingGroup = grouped.get(id);
+      if (existingGroup) {
+        if (job.policy === snapshot.config.data.currentPolicy) existingGroup.requestedAt = requestedAt;
+        continue;
+      }
       if (job.active_loan) continue; // Only the authoritative pending-loan set gives old-policy priority.
       if (job.policy !== snapshot.config.data.currentPolicy) continue;
-      grouped.set(id, { job, rows: [] });
+      grouped.set(id, { job, rows: [], requestedAt });
     }
     const identity = (group: { job: Job }) =>
       [group.job.market, group.job.policy, group.job.quantity].join(":");
@@ -1196,7 +1265,7 @@ export async function runOperator(
         identity,
       ),
     ];
-    for (const { job, rows } of groups)
+    for (const { job, rows, requestedAt } of groups)
       try {
         if (count >= maxActions) {
           alerts.push(
@@ -1254,13 +1323,28 @@ export async function runOperator(
           old,
           clock,
         );
+        const requestKey = "fulfilled-request:" + identity({ job });
+        let fulfilledAt = BigInt(store.get(requestKey) ?? "0");
+        // A still-usable confirmed snapshot satisfies a new open request for free.
+        if (requestedAt > fulfilledAt && referenceReady(old, l as g.Loan, p, snapshot.config.data, clock)) {
+          fulfilledAt = requestedAt;
+          if (options.execute) store.set(requestKey, fulfilledAt.toString());
+        }
+        const currentRows = (await Promise.all(rows.map(row => confirmedLoan(rpc, row)))).filter((row): row is Row<g.Loan> => row !== undefined);
+        const needed = publicationNeeded(candidate, currentRows.map(row => row.data), p, snapshot.config.data, clock, requestedAt, fulfilledAt);
         const publication: Instruction[] = [];
         let peak = 0n;
         if (
-          !old ||
+          needed && (!old ||
           (candidate.sourceSlot > old.sourceSlot &&
-            candidate.sourceTs >= old.sourceTs)
+            candidate.sourceTs >= old.sourceTs))
         ) {
+          if (!old) {
+            const maximum=limit(options.maxNewReferenceAccounts, 4, 4096);
+            store.checkReferenceAllowance(reference,maximum,projectedReferences);
+            projectedReferences.add(reference);
+            if (options.execute) store.reserveReference(reference,maximum);
+          }
           r = candidate;
           const rent = old
             ? 0n
@@ -1335,7 +1419,12 @@ export async function runOperator(
               return g.getPriceReferenceDecoder().decode(bytes);
             },
           );
-          if (options.execute) clock = await currentClock(rpc);
+          if (options.execute) {
+            if (requestedAt > fulfilledAt) store.set(requestKey, requestedAt.toString());
+            clock = await currentClock(rpc);
+          }
+        } else {
+          plans.push({kind: "private-history", job, status: "retained-without-publication"});
         }
         const cursor = "loan_cursor:" + identity({ job });
         for (const original of roundRobin(
@@ -1362,13 +1451,12 @@ export async function runOperator(
             }
             clock = await currentClock(rpc);
             const loan = row.data;
-            const decision = selectAction(
-              loan,
-              p,
-              snapshot.config.data,
-              r,
-              clock,
-            );
+            const privateDecision = selectAction(loan, p, snapshot.config.data, candidate, clock);
+            const confirmedDecision = selectAction(loan, p, snapshot.config.data, r, clock);
+            // A newer healthy/Unknown private observation vetoes an old adverse
+            // chain snapshot; a private candidate alone never permits execution.
+            const decision = privateDecision === confirmedDecision ? confirmedDecision :
+              privateDecision === "default" ? "default" : "wait-reference";
             if (decision === "default") {
               await dispatch(
                 "default",
@@ -1461,6 +1549,7 @@ export async function runOperator(
               quantity: loan.q,
               inputAmount: input,
               minimumOutput: loan.q,
+              setupLamports: routeSetupMax,
               ...exec,
             });
             const rent =
@@ -1470,7 +1559,7 @@ export async function runOperator(
                   { commitment: "confirmed" },
                 ]),
                 "scratch rent",
-              ) * 2n;
+              ) * 2n + routeSetupMax;
             if (rent > temporaryMax)
               throw new Error("Scratch rent exceeds explicit bound");
             const instruction = g.getForceExitInstruction({
@@ -1497,6 +1586,7 @@ export async function runOperator(
               options.keeperKeyfile,
               rent,
               tables,
+              routeSetupMax,
             );
           } catch (error) {
             alerts.push(original.address + ": " + String(error));

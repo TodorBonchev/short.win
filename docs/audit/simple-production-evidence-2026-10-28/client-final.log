@@ -1,0 +1,38 @@
+command ['pnpm', '--dir', 'client', 'check']
+✔ generated client decodes exact Rust account and instruction bytes without precision loss (3.331899ms)
+✔ route uses loan-local scratch, with no outer PDA signature or API setup instructions (14.743118ms)
+✔ route rejects wrong mode, quantity, threshold, and unexpected signer (9.605427ms)
+✔ buy minimum output must cover whole token debt (4.920838ms)
+✔ wallet signatures may change but reviewed message bytes may not (8.199399ms)
+✔ Jupiter request leaves envelope room and still refuses over-budget responses (11.197966ms)
+✔ managed request tries16 then32 for no-route or unsupported shape and stops on rate limits (2011.089937ms)
+✔ native setup allowance is separately signed and marks only loan-local authority writable (5.811735ms)
+✔ direct requests reject provider-widened slippage and excluded venue responses (4011.958203ms)
+✔ mint discovery and HTTP admission accept metadata-only Token2022 and reject changed token behavior (2.510315ms)
+✔ default boundary wins without price, pause, history or route; expiry requires fresh feed (1.162723ms)
+✔ CR actions bind both bad bids, strict sequence, source delays and reporter epoch (0.331724ms)
+✔ service model drift and fee/funding caps fail before signing (0.531406ms)
+✔ confirmed publication continues to a priced action; dry-run never assumes publication (0.210715ms)
+✔ finalized event pagination is resumable and idempotent; failed tx is never projected (4.092179ms)
+✔ empty authoritative loan snapshot still clears priority and processes queued warm work (72.648921ms)
+✔ post-tick confirmed clock accepts newer sources than initial finalized snapshot and rejects actual future (0.678349ms)
+✔ an inactive warmed quantity publishes before the first loan without reading a keyfile (71.649349ms)
+✔ bounded rotation advances beyond a persistently failing first identity (6.321835ms)
+✔ healthy private history stays off chain; requests, adverse prices and maturity publish on demand (0.301582ms)
+✔ reference allocation reservations survive unknown outcomes, restarts and duplicate submissions (62.142697ms)
+✔ UTC-day publication fee reservations survive failures and never consume default action budget (0.884607ms)
+✔ prewarm validates current policy and enqueues inactive exact-u64 identity only (10.877985ms)
+✔ Unknown or stale reference never becomes Finite and cannot authorize a sale route (11.071319ms)
+✔ route binds new loan nonce/scratch and returns fresh raw build plus verified table contents (19.655843ms)
+✔ CORS/body/IP limits and unsupported RPC overrides reject before provider calls (4.676273ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6338.423262
+$ tsc --noEmit && node --test test/*.test.ts
+
+exit 0

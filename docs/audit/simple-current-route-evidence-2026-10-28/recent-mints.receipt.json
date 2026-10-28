@@ -1,0 +1,49 @@
+{
+  "request": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "CWVUnSU2hVY1KfFTU3zAGGNx6cGUcKc2JuKPjUAJZNF6",
+        "FMw9QHhE34kRHw21pJdooikKU4K1tYkWymjc6HUhpump",
+        "C9Xfs2MYMMQU54uxXC27ybqjDLJz9GqiUqJ7H3YMpump",
+        "39vDWdGqcyo1Jw2QujM4rUWWZhciwCS3sbif6f9mT6zo",
+        "5vaP4zPzH7sCmd2bXmxAJksd23m6BeBxi1PMDjrupump",
+        "AsV1qmqW6L1Dus3xDsqCU7qpBLpLGWRtBfMaKVQDpump",
+        "5Lf9PgbWKobh4AfJwZWyxjzwUx7T1UJ9tvbLY1Bo2GW",
+        "2rNHEgCYoBC8e7jJ4gwuHDuxUgRDezKzfy1cp3UVpump",
+        "GEt3DYGQ7ECWmPdpJWNfve8R6YJAsk55KxS6jYSct5RC",
+        "gJJGLa4Bs2qEAoxxmZUEFrvMPbLVkgWRDb67e9ppump",
+        "BH5sDQy97A74hrQ86ZYQymLxL5waFpeokMjDXK35pump",
+        "7BRB3vgkk9VZU2LjnUrTZbwTseFugQ3H72tpjcxapump",
+        "6Hh53ikUi6rRtbupfCcH7FFB1aVXeiHse4B3X54Wpump",
+        "GyqC85GavttksRWgdVFqUbsWSiz2JRkCxmQocNpNpump",
+        "GT532gc25tpS8gkznusjzvk33AUu7LZCy5vguSDerDGq",
+        "E7FgcCAqBheebgTQ14Ezkho7ZdjaNgEDb4YtRWQQpump",
+        "AFc4vnyik7LP8VG3DtA8v3a9xYLySL1wH23ZduWDpump",
+        "HiXiddcfqQ5UW4ZqScAAGnjr4UmfYsfBNfNDHdRpS6b4",
+        "6TdTqxM1AywsWJY2VkQn4xceDhh4B7LMqWUd2eZTtcv6",
+        "4toxi777SMhmbqji4CBAXoadQgGX8UWrqYDnJDpmpump",
+        "8T7mjW9aCKdaYKUE78VjHx9WdM3bow8vWtH8QMRW4Jbg",
+        "CswvgbVq9XSoxmtS3MeUQGyXAN9ei7FcNUZyLqsKMjr4",
+        "3gkX2buZDNMgpmWPJBFEbP1bW8FKHrb8Ga8sQsvCpump",
+        "Eo8p1HkcRGhJMNdmuqac9gGi5y4uDipVxAMJTD55K3Y8",
+        "9TbMdwaKthNkNyFA2xshXbBJsJ4JyUh28ohyTijRpump",
+        "J6Ee13ioKqFQaKPc7JgcVqKvHUirsqT1JUZbkSkvs4L4",
+        "DVxKAHBSnWN3yPAhfBhE3Gq5GsaPzw8CdLLmHQETpump",
+        "8QLgiUwSLUanQnNy7uWYenJ4gFNRLLZhWKJydLojpump",
+        "6JmCoJgmuZrcZ33zg4BJEiXtawbs3iddU6fekRQ8kELp",
+        "FS1jbyyqo6LoigHHmuFmy4BnkduvMxwhzSKLaCXznhot"
+      ],
+      {
+        "encoding": "base64",
+        "commitment": "confirmed"
+      }
+    ]
+  },
+  "started_at": "2026-10-28T20:07:10.224081+00:00",
+  "finished_at": "2026-10-28T20:07:10.393990+00:00",
+  "sha256": "a2ac427736ec9ea259950fd52c8651786518b9ec083727c344e2c14c57eeb876",
+  "bytes": 20343
+}

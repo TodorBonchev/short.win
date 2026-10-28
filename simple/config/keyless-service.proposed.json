@@ -1,0 +1,15 @@
+{
+  "epoch_seconds": 60,
+  "history_epochs": 3,
+  "max_sample_gap_seconds": 60,
+  "reference_max_age_seconds": 60,
+  "reference_max_age_slots": 150,
+  "slippage_bps": 50,
+  "max_spread_bps": 500,
+  "max_buy_lamports": 4000000000,
+  "max_ask_requests": 8,
+  "max_jobs": 1,
+  "jobs_per_tick": 1,
+  "request_timeout_seconds": 3,
+  "request_interval_ms": 2000
+}

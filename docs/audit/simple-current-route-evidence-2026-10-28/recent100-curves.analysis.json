@@ -1,0 +1,262 @@
+[
+  {
+    "mint": "9YtSDLA2JJSGGKVkQgYbembPv8p5i5XSkdJTvHyJpump",
+    "curve": "GuM2CTz6EqSban8LjF7SosWqP9seY4HiGy11u9fQeVpH",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 78673432,
+    "virtual_quote": 243311578,
+    "virtual_tokens": 726051585716254,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "5PjPp8gDLjDsoXyvUtYzWKPYaRbfNaoxW29LTFvVpump",
+    "curve": "8vk2UuJTKKY2yXdq2qTbWdsgqJJBptantaD6dGdgoZYp",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 2721585599,
+    "virtual_quote": 32721585599,
+    "virtual_tokens": 983754283882802,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "8GVcbvQa1HtLvwH5ZScmrPyf2ByvamqQkoPkpbknpump",
+    "curve": "4B1DBR1peDySHiPx37nbopPgxLL8FwXyBgwU19Jbw4Xp",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 2186205840,
+    "virtual_quote": 32186205840,
+    "virtual_tokens": 1000117881555988,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "88Eg8nz1F2ckMS278UBxb8AJPhZDY9szbVtBjfhgpump",
+    "curve": "89isHoharagvhHh9Z4WALBrkGXoCjDDLrrz5bExHRi8w",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 90650233,
+    "virtual_quote": 28031413662,
+    "virtual_tokens": 1069567544026748,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "3yJARjERSKPtz4DJ5Ngsqei23BD9v6FRcGNwfJLLZiDS",
+    "curve": "6f2iDBv9KhW2wKDz6ShhbqayDPFyJue3M4sp2btBZ95C",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 0,
+    "virtual_quote": 164638146,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "H47F7eowvDqKJoghQAtTeKfYPPqtagGFcAAy2MTnpump",
+    "curve": "BZsm2tVCwk9ofEUng9xteCxDGDhELuksECQRHb6gJc4e",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 17829873,
+    "virtual_quote": 182468019,
+    "virtual_tokens": 968151805963311,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "GML7rNbwspk5772DqG7WB6FpfE8Vq16PJMg1kCrDMmfj",
+    "curve": "AGtFHqEPo6kqtEJs8VSyagYQmbkAp2F7221cJQAjrAEC",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 5,
+    "virtual_quote": 164638151,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "HJScejXFSZwZYdas7mqroVNqtEePkXZcGEKd92JJpump",
+    "curve": "9oWLrhj7etVnvDzcVAWc2vcWFrUNAwUZa6EwLTE2CetF",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 65387369,
+    "virtual_quote": 7722235772,
+    "virtual_tokens": 1072811938516254,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "AqwFksXAcwNXFCb321rjHsLjTMJ5rsSH7btCu3Kqpump",
+    "curve": "6RRMoahVxWa2bSqBNWvEQMj1BZg4pezhW4GsCpeWL8qz",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 167576839,
+    "virtual_quote": 332214985,
+    "virtual_tokens": 531754357800258,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "7WjbLWGhk1aDnA4EdufKpMCMttgP8v1CSsmiT6Lzpump",
+    "curve": "5hP2mAL8XQgtNo1tdJw3RjXj1gAUJSYW8u6qx6bjjHK7",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 98224097,
+    "virtual_quote": 217493625,
+    "virtual_tokens": 588413799053038,
+    "quote_hex": "0530fc02b63292b80fa3e8cfde7f3a0d0a1d995220c5f4c21eb293b21e32e8a6"
+  },
+  {
+    "mint": "Aqk3Sb3XyA9Q8FfgwNXpnQb6VvQcFyWr2mQZkvJkpump",
+    "curve": "2iZ8H54vWKq3pkqwGqUWj7MM6F6ALvV9jpgz2DqGFg8K",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 100000001,
+    "virtual_quote": 30100000001,
+    "virtual_tokens": 1069435215946845,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "BgHapCUWqdwaaBK495t6wZC3gHPeNueuCkLRKFPR2uK5",
+    "curve": "DGq3MKbntCNpN8yENtXSQv8YF9hodU3q1pJzTC26DP5K",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 0,
+    "virtual_quote": 22769297,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "06809edcbf7425ab33585dc91cbeece17a16fe14b0aa3db5e2e1795421ef8580"
+  },
+  {
+    "mint": "3T5MvESuHGF2xiwJHdMDMPqkTeG4nNr6J4oHzYuWpump",
+    "curve": "3f8wyYfYh3YiX1AwfHZuykT1mcrayPaigpWmxd21XbdG",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 1,
+    "virtual_quote": 17755551781,
+    "virtual_tokens": 1074472033794500,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "A4uC8Lb6jDK9iCMijMwFT95ZZitG4RfgAWoFU2Cbpump",
+    "curve": "7kKgff5bo82rdME1Wst2vc1g7Hgm5XBkqepeY8bZeGia",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 1697867366,
+    "virtual_quote": 31697867366,
+    "virtual_tokens": 1015525733689052,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "6DgFQUrQkbHxkeApQk75a9FX7itH5aEb8my4uedtpump",
+    "curve": "3YWKNhGvSDioW4JJs3rAfDU4ureNieG9FaLfJTcxHGE3",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 3,
+    "virtual_quote": 30000000003,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "CdSJ3fpC7ZKggJvVWBei1MCtVETfpouHT1EBgRWjpump",
+    "curve": "8F3qqdLKZ1tp34PYpGGogCDLgGGLHEpdfLhbfz3bBT4F",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 1,
+    "virtual_quote": 33968308562,
+    "virtual_tokens": 1072180128323306,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "EbsZdeJucrNsG5GHpyVwJLafYzogcn7DZfQVWT39pump",
+    "curve": "94ixQxmUDktY7zXiMdKpHapZtJ8DeerWfnpZKGXxjGy2",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 383789138,
+    "virtual_quote": 16876300611,
+    "virtual_tokens": 1034645212978305,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "241Nh6s78PdMpL8XZzH6f9szYXcVdSnxRjGMAULyu63g",
+    "curve": "9WBQtSG7u51fpRYNLkw7tDKgtAumVvHGAXf2o1vY7htw",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 0,
+    "virtual_quote": 164638146,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "4kxJfFb1apBgCZUokbEi54kPWtUB4eNxTmaNZyBdKGRa",
+    "curve": "7pt4bSw9HkNMkGRP4kf2eyFigNNPKFSEVWSwG5c1Q1i1",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 0,
+    "virtual_quote": 750201962208,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "0c45f7df8d9e72956284933f6d98b757032e83df84604fb5e117fff61d5b12f9"
+  },
+  {
+    "mint": "4VDzLgvzevYMDdaqpgYDFdMYcKCnYiZcFUNtveVEpump",
+    "curve": "8VDiTGVHgYvjfKntQtwdEGGQ6HGXJPaWcXqdPNBY8m8S",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 11800219,
+    "virtual_quote": 176438365,
+    "virtual_tokens": 1001237721934841,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "BAnhNVdyoE7PuyUgmhKWsRthoHapFP2ef3MpJ6Umpump",
+    "curve": "8KQNW1F3PEqhiqTLbtWdVuJhZ55CdMAaQ9FYafXVyv8z",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 1111870763,
+    "virtual_quote": 31111870763,
+    "virtual_tokens": 1034653308514107,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "7JA6Lq8dE9Nmx1f3zB1GGNjVybNTiasco24zy4xqpump",
+    "curve": "7zdURJGTCDQKHFXirtbAjAuefbeZN9QQbYpx6DRepihE",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 774612930,
+    "virtual_quote": 30774612930,
+    "virtual_tokens": 1045992035744996,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "4XvFKQUHUZUgFnapcZFaMrcZ4ZnAHhqKAEfmXV2YUkUx",
+    "curve": "J222CDSrqcFcMjG3pyYSbQ6SEgvRY4opAr5P94EDQ69s",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 1,
+    "virtual_quote": 30000000001,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  {
+    "mint": "1nopjjnZRbpkQAymRftcXrx89H7dLL1gd4QZGYL6Gqx",
+    "curve": "EVJeJvQzvQhWqAQBiKczN6A71jW2S4b4SxBYCpuAxhyG",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 7320570,
+    "virtual_quote": 171958716,
+    "virtual_tokens": 1027320730132441,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "EFuCFtMwhyUNnoANsNbGWrB1MunwErPXmrgpdSX3nAN4",
+    "curve": "9tXGmmE4XYLLyZMSBDhZt5VFudnzAjeEpqM3ENNEs4VN",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 0,
+    "virtual_quote": 164638146,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "b700be211a67d5d5c7bf2f169217071f9da622ecf419dbfb4ae3bc7a4eb25732"
+  },
+  {
+    "mint": "3j9PuvhEumZrHLpMsgKgsUt3WiQxVCA7hULArQjvpump",
+    "curve": "3abjteVaptyAQvbJGCbwKpbx3Z1E6UVp1C1GsnSWmyUr",
+    "length": 166,
+    "complete": 0,
+    "real_quote": 5,
+    "virtual_quote": 30000000005,
+    "virtual_tokens": 1073000000000000,
+    "quote_hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+]

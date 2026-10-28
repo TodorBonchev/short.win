@@ -20,7 +20,7 @@ pub struct OpenArgs {
     pub min_proceeds: u64,
     pub max_margin: u64,
     pub max_term_fee: u64,
-    /// Signed maximum for the separately refunded scratch-account rent advance.
+    /// Signed maximum for scratch rent plus native setup advance; unused setup is refunded.
     pub temporary_funding: u64,
     pub max_account_rent: u64,
     pub minimum_reference_sequence: u64,
@@ -171,7 +171,7 @@ pub fn open_position<'info>(
         a.pool.key(),
         SimpleError::AccountMismatch
     );
-    let temporary = route::temporary_rent()?;
+    let temporary = route::temporary_advance(&args.route)?;
     require_gte!(
         args.temporary_funding,
         temporary,
@@ -330,7 +330,11 @@ pub fn open_position<'info>(
         cr_arm_sequence: 0,
         cr_arm_reporter_epoch: 0,
     });
-    finance::move_sol(&loan_info, &a.borrower.to_account_info(), temporary)?;
+    finance::move_sol(
+        &loan_info,
+        &a.borrower.to_account_info(),
+        temporary.checked_sub(sale.setup_spent).checked()?,
+    )?;
     require_gte!(
         loan_info.lamports(),
         rent.minimum_balance(Loan::SPACE)
@@ -339,6 +343,14 @@ pub fn open_position<'info>(
         SimpleError::BalanceMismatch
     );
     crate::lender::require_sol_reserve(&pool_info, core.sol_reserve)?;
+    if args.route.setup_lamports > 0 {
+        msg!(
+            "RouteSetup actor={} allowance={} spent={}",
+            a.borrower.key(),
+            args.route.setup_lamports,
+            sale.setup_spent
+        );
+    }
     let event = Opened {
         market: a.market.key(),
         pool: a.pool.key(),
