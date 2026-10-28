@@ -1,0 +1,4 @@
+   Compiling shortwin-jupiter-route v0.1.0 (/root/short.win-simple/simple/crates/jupiter-route)
+   Compiling shortwin-simple v0.1.0 (/root/short.win-simple/simple/programs/shortwin-simple)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.58s
+     Running unittests src/lib.rs (/root/short.win-simple/target/simple-native/debug/deps/shortwin_simple-8e835642bc01ff4f)

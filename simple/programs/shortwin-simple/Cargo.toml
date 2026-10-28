@@ -22,4 +22,4 @@ custom-panic = []
 anchor-lang = { version = "=1.2.0", features = ["init-if-needed", "event-cpi"] }
 anchor-spl = { version = "=1.2.0", default-features = false, features = ["token", "token_2022", "associated_token"] }
 shortwin-pooled-core = { path = "../../crates/pooled-core" }
-shortwin-jupiter-route = { path = "../../../crates/shortwin-jupiter-route" }
+shortwin-jupiter-route = { path = "../../crates/jupiter-route" }

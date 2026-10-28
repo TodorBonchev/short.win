@@ -4,7 +4,6 @@ on:
     branches: [codex/jupiter-only-pooled]
     paths:
       - 'simple/**'
-      - 'crates/shortwin-jupiter-route/**'
       - 'tests/fixtures/**'
       - 'tests/jupiter_exec_probe/fixtures/**'
       - 'scripts/materialize-jupiter-probe.py'
@@ -13,13 +12,10 @@ on:
       - '.github/workflows/simple-pooled.yml'
       - 'rust-toolchain.toml'
       - 'mise.toml'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
       - 'LICENSE'
   pull_request:
     paths:
       - 'simple/**'
-      - 'crates/shortwin-jupiter-route/**'
       - 'tests/fixtures/**'
       - 'tests/jupiter_exec_probe/fixtures/**'
       - 'scripts/materialize-jupiter-probe.py'
@@ -28,8 +24,6 @@ on:
       - '.github/workflows/simple-pooled.yml'
       - 'rust-toolchain.toml'
       - 'mise.toml'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
       - 'LICENSE'
   workflow_dispatch:
 permissions:
@@ -75,8 +69,6 @@ jobs:
         run: cargo install --force --git https://github.com/otter-sec/anchor --rev "$ANCHOR_REV" anchor-cli --locked
       - name: Materialize hash-pinned historical Jupiter witness
         run: python3 scripts/materialize-jupiter-probe.py
-      - name: Header parser tests
-        run: cargo test -p shortwin-jupiter-route --locked
       - name: Native checks
         working-directory: simple
         run: |
@@ -98,7 +90,7 @@ jobs:
         run: |
           cargo test --workspace --locked
           cargo run -p shortwin-pooled-core --example model_fuzz --release --locked -- 103410000 200000
-          cargo run -p shortwin-simple-runtime-tests --example program_fuzz --locked -- --seed 103410000 --cases 32 --out target/program-fuzz-smoke
+          cargo run -p shortwin-simple-runtime-tests --example program_fuzz --locked -- --seed 103410000 --cases 32 --out "$RUNNER_TEMP/simple-program-fuzz-smoke"
       - name: Client and web
         working-directory: simple
         run: |
@@ -119,11 +111,11 @@ jobs:
             simple/target/deploy/shortwin_simple.so
             simple/target/idl/shortwin_simple.json
             simple/target/sbf-build.log
-            simple/target/program-fuzz-smoke/metadata.json
-            simple/target/program-fuzz-smoke/summary.json
-            simple/target/program-fuzz-smoke/completion.json
-            simple/target/program-fuzz-smoke/run.log
-            simple/target/program-fuzz-smoke/runner
-            simple/target/program-fuzz-smoke/source
-            simple/target/program-fuzz-smoke/frozen-root
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: simple-pooled-fuzz-smoke
+          retention-days: 7
+          path: ${{ runner.temp }}/simple-program-fuzz-smoke
           if-no-files-found: warn

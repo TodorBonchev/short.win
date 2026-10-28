@@ -1,0 +1,5 @@
+    Checking shortwin-pooled-core v0.1.0 (/root/short.win-simple/simple/crates/pooled-core)
+    Checking shortwin-jupiter-route v0.1.0 (/root/short.win-simple/simple/crates/jupiter-route)
+    Checking shortwin-simple v0.1.0 (/root/short.win-simple/simple/programs/shortwin-simple)
+    Checking shortwin-simple-runtime-tests v0.1.0 (/root/short.win-simple/simple/tests/runtime)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.03s

@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-10-28T17:13:40.570611+00:00",
+  "copied_from": "crates/shortwin-jupiter-route",
+  "copied_to": "simple/crates/jupiter-route",
+  "base_commit": "f4377093e1058c2aaf0c9b26865b092d7cec641c",
+  "source_files": {
+    "src/isolation.rs": "ba164075e7c088bb680d83c41c87cd9d461cdd560c62657ac87ad2f08b36aee1",
+    "src/lib.rs": "1c95a7a0bb278825cffaab351b102ae15a376e704235a7e16fe996e8cc7dd07a"
+  },
+  "source_manifest_format": "one UTF-8 line per source path sorted: relative_path SPACE sha256 NEWLINE",
+  "source_manifest_sha256": "1cf49776317f3e4adb5f17077cd52e4dc0f73fa1fd17fc55d315f9a5a6448b75",
+  "original_cargo_sha256": "fc7eed3fbd5c57824ec9941f069f0c169fcb9cbfd23aed76622fb36b4e5db174",
+  "original_readme_sha256": "61d02234e5155245ef92b6e4b5f30e0285a980a8a86d43a1493f50d7a4d33a21",
+  "copied_readme_sha256": "61d02234e5155245ef92b6e4b5f30e0285a980a8a86d43a1493f50d7a4d33a21",
+  "manifest_only_changes": "provenance comments and license-file ../../../LICENSE",
+  "program_body_changed": false,
+  "legacy_source_unchanged": true
+}

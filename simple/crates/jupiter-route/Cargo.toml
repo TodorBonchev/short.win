@@ -1,0 +1,20 @@
+# Pure parser/isolation code copied from crates/shortwin-jupiter-route at f4377093e1058c2aaf0c9b26865b092d7cec641c.
+# Original src path/hash manifest SHA256: 1cf49776317f3e4adb5f17077cd52e4dc0f73fa1fd17fc55d315f9a5a6448b75.
+# Source bytes are unchanged; only this manifest license path is adjusted.
+[package]
+name = "shortwin-jupiter-route"
+version = "0.1.0"
+publish = false
+description = "short.win Jupiter V2 header and fixed-account validation prototype (no_std)"
+edition = "2024"
+rust-version = "1.89"
+license-file = "../../../LICENSE"
+repository = "https://github.com/TodorBonchev/short.win"
+homepage = "https://short.win"
+readme = "README.md"
+keywords = ["solana", "jupiter", "parsing", "no-std"]
+categories = ["cryptography::cryptocurrencies", "parsing", "no-std"]
+include = ["/src/**", "/Cargo.toml", "/README.md"]
+
+# Deliberately no SDK, allocator, runtime, oracle or production-program dependency.
+[dependencies]

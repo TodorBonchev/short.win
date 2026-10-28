@@ -510,7 +510,7 @@ fn freeze(out: &Path) -> Value {
     hashes.insert("shortwin_simple.so".into(), hash(&program));
     let mut source = BTreeMap::new();
     for part in [
-        "crates/shortwin-jupiter-route",
+        "simple/crates/jupiter-route",
         "simple/crates/pooled-core",
         "simple/programs/shortwin-simple",
         "simple/tests/runtime",
@@ -519,7 +519,8 @@ fn freeze(out: &Path) -> Value {
             if file.components().any(|x| x.as_os_str() == "target") {
                 continue;
             }
-            if file.extension().is_some_and(|e| e == "rs")
+            if part == "simple/crates/jupiter-route"
+                || file.extension().is_some_and(|e| e == "rs")
                 || file.file_name().is_some_and(|n| n == "Cargo.toml")
             {
                 let rel = file.strip_prefix(&source_root).unwrap();

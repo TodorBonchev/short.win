@@ -1,6 +1,6 @@
 # Jupiter-only pooled implementation checkpoint — 2026-10-28
 
-Status: local implementation and focused validation, **not mainnet release approval**. Branch `codex/jupiter-only-pooled` replaces the old financial program with the owner-selected [pooled model](../../simple/docs/SPEC.md). The 2026-10-28 owner choice is a fixed upfront SOL term fee, without an early-close refund. No legacy state migration is required because the owner reports that the program was never deployed.
+Status: initial implementation and focused validation on `f4377093e`, **not mainnet release approval**. The subsequent [build-isolation follow-up](simple-pooled-reproducibility-2026-10-28.md) supersedes this checkpoint's runtime identity for the final candidate. Branch `codex/jupiter-only-pooled` replaces the old financial program with the owner-selected [pooled model](../../simple/docs/SPEC.md). The 2026-10-28 owner choice is a fixed upfront SOL term fee, without an early-close refund. No legacy state migration is required because the owner reports that the program was never deployed.
 
 ## Implemented scope
 
@@ -10,7 +10,7 @@ The generated client and small browser interface use the new IDL. Final strict T
 
 ## Evidence and limits
 
-The final local SBF v3 ELF SHA256 is `49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a` (770,800 bytes). The generated IDL SHA256 is `83748440336bcfeb41bcb37ae6d1f7083df3341ab8e0b9199655ca5a436cc60c`. Explicit platform-tools v1.57/arch v3 compilation passed the stack check. This is local build evidence; a clean independent/verifiable release build remains part of final qualification.
+The initial local SBF v3 ELF SHA256 is `49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a` (770,800 bytes). The generated IDL SHA256 is `83748440336bcfeb41bcb37ae6d1f7083df3341ab8e0b9199655ca5a436cc60c`. Explicit platform-tools v1.57/arch v3 compilation passed the stack check. This is local build evidence; a clean independent/verifiable release build remains part of final qualification.
 
 The [retained evidence directory](simple-pooled-evidence-2026-10-28/) contains exact logs and JSON receipts. Final Rust formatting, strict workspace Clippy, locked workspace tests and the shared Router V2 parser's tests passed. The workspace tests include 16 ledger unit tests plus a randomized model regression, 8 program unit tests and 22 actual-SBF runtime tests; the stateless parser has 13 additional tests. Runtime tests exercise both plain token programs for lender flows and the frozen real Jupiter-to-CPMM route for trading. Historical state, initial lender allocations, test lookup table, clocks and selected reserve shocks are explicitly synthetic. This does not establish every DEX/mint, current mainnet dependency compatibility or live landing.
 

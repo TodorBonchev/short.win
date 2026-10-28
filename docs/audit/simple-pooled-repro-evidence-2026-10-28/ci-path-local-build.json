@@ -1,0 +1,23 @@
+{
+  "source_commit": "f4377093e1058c2aaf0c9b26865b092d7cec641c",
+  "source_archive_sha256": "f7408f32434bb4ff67d20310d3b73bf6836503e6d54012fee2c417add690d80f",
+  "build_path": "/home/runner/work/short.win/short.win/simple",
+  "command": [
+    "/root/.local/share/solana/install/active_release/bin/cargo-build-sbf",
+    "--manifest-path",
+    "programs/shortwin-simple/Cargo.toml",
+    "--tools-version",
+    "v1.57",
+    "--arch",
+    "v3",
+    "--sbf-out-dir",
+    "target/deploy",
+    "--verbose",
+    "--",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "duration_seconds": 40.622875452041626,
+  "sha256": "6330465280e6f27bfb6c6a3b21c853932ff385e7025b16c3d05ffb26770cbbe7",
+  "bytes": 770800
+}

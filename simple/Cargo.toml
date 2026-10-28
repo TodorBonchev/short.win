@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/pooled-core", "programs/shortwin-simple", "tests/runtime"]
+members = ["crates/pooled-core", "crates/jupiter-route", "programs/shortwin-simple", "tests/runtime"]
 
 [profile.release]
 overflow-checks = true

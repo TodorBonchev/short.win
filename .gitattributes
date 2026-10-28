@@ -1,3 +1,4 @@
 
 # Exact command logs are byte evidence, not hand-edited source diffs.
 docs/audit/simple-pooled-evidence-2026-10-28/*.log -text -diff
+docs/audit/simple-pooled-repro-evidence-2026-10-28/*.log -text -diff

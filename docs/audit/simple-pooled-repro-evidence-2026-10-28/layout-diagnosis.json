@@ -1,0 +1,72 @@
+{
+  "local_sha256": "49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a",
+  "ci_sha256": "6330465280e6f27bfb6c6a3b21c853932ff385e7025b16c3d05ffb26770cbbe7",
+  "identical_rodata": true,
+  "text_offset": 21816,
+  "text_size": 748696,
+  "local_allocator_file_start": 152464,
+  "allocator_bytes": 912,
+  "entry_bytes": 1528,
+  "ci_entry_before_allocators": true,
+  "relative_call_adjustments": 201,
+  "normalized_text_exactly_equal": true,
+  "proof_scope": "layout normalization only; not a reproducible-build pass or qualification promotion",
+  "same_path_clean_release_rebuilds": [
+    {
+      "log": "local-package-release-rebuild.log",
+      "sha256": "49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a"
+    },
+    {
+      "log": "local-package-release-rebuild-2.log",
+      "sha256": "49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a"
+    }
+  ],
+  "cross_path_experiment": {
+    "source_commit": "f4377093e1058c2aaf0c9b26865b092d7cec641c",
+    "source_archive_sha256": "f7408f32434bb4ff67d20310d3b73bf6836503e6d54012fee2c417add690d80f",
+    "build_path": "/home/runner/work/short.win/short.win/simple",
+    "command": [
+      "/root/.local/share/solana/install/active_release/bin/cargo-build-sbf",
+      "--manifest-path",
+      "programs/shortwin-simple/Cargo.toml",
+      "--tools-version",
+      "v1.57",
+      "--arch",
+      "v3",
+      "--sbf-out-dir",
+      "target/deploy",
+      "--verbose",
+      "--",
+      "--locked"
+    ],
+    "exit_code": 0,
+    "duration_seconds": 40.622875452041626,
+    "sha256": "6330465280e6f27bfb6c6a3b21c853932ff385e7025b16c3d05ffb26770cbbe7",
+    "bytes": 770800
+  },
+  "compiler": "rustc 1.95.0-dev (ae660768a 2026-08-17), platform tools v1.57, arch v3",
+  "causal_observation": "The same archived f437 source built with the same local compiler and Cargo registry home at the CI checkout path exactly reproduced the CI ELF. The only changed dependency artifact identity was the Jupiter route path dependency outside the simple workspace; its identity propagates into root crate metadata and changes allocator/entry layout.",
+  "cargo_identities": {
+    "local_external_jupiter": "f31206799cda8401",
+    "ci_path_external_jupiter": "28ab25f4f8f8a2be",
+    "unchanged_pooled_core": "e346ddbeabc081a6",
+    "unchanged_anchor_lang": "1c7d66d6916ccbb2",
+    "local_program_metadata": "32f23f5d28db94c8",
+    "ci_path_program_metadata": "0ace53e850618345"
+  },
+  "named_blocks": [
+    {
+      "name": "Rust allocator shims: alloc, dealloc, realloc, alloc_zeroed",
+      "local_file_start": 152464,
+      "ci_file_start": 153992,
+      "bytes": 912
+    },
+    {
+      "name": "shortwin_simple::entry",
+      "local_file_start": 153376,
+      "ci_file_start": 152464,
+      "bytes": 1528
+    }
+  ],
+  "qualification_status": "Diagnostic explanation only. The workspace-local dependency copy and any newly emitted ELF require their own exact-byte build, CI, runtime/fuzz qualification."
+}

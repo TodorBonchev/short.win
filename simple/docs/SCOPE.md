@@ -1,6 +1,6 @@
 # Scope of the replacement
 
-Production on-chain: `programs/shortwin-simple/src/*.rs`, `crates/pooled-core/src/*.rs`, and the stateless header/isolation dependency `../crates/shortwin-jupiter-route/src/*.rs`. Their Cargo manifests and the standalone `Cargo.lock` pin the build graph. There is no dependency on the legacy `shortwin` program or venue readers.
+Production on-chain: `programs/shortwin-simple/src/*.rs`, `crates/pooled-core/src/*.rs`, and the internal stateless header/isolation crate `crates/jupiter-route/src/*.rs`. Their Cargo manifests and the standalone `Cargo.lock` pin the build graph. There is no dependency on the legacy `shortwin` program or venue readers.
 
 Production off-chain: `client/src/` (generated IDL client, address/route/transaction helpers and Node-only operator), `client/idl/`, `services/src/` (trusted Python history), and `web/src/` (development frontend). The operator's signing and networking are outside the on-chain program; private history is explicitly trusted. A built browser bundle is not an operating receipt.
 
