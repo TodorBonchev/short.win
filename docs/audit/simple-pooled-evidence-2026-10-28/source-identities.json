@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-10-28T16:26:36.121709+00:00",
+  "scope": "runtime sources/dependency lockfiles and IDL; candidate commit recorded in follow-up CI record",
+  "elf_sha256": "49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a",
+  "sha256": {
+    "simple/programs/shortwin-simple/src/errors.rs": "d714d22b8af5c93cf84bb76b855c53d7f7fef03e87e5a70902acbfc71b506d11",
+    "simple/programs/shortwin-simple/src/exits.rs": "df061f963c55e295494f64f625ecc241690b83ece994828680a7bea9330a56bc",
+    "simple/programs/shortwin-simple/src/events.rs": "00dbe7df26b9a001ac9c903f99776a859978ad6e48ff229263a52a8d19aaa088",
+    "simple/programs/shortwin-simple/src/open.rs": "53f4d07d325f95ecae62262a4a09f00b9865b6efb9e22f387e25f1cde4b14efd",
+    "simple/programs/shortwin-simple/src/initialization.rs": "92e485d6b470a640ecfc5f56183150d0893101e7cc4f908731f02f83bdec50c8",
+    "simple/programs/shortwin-simple/src/route.rs": "e0771bd6a2d69ca72cb52999e5e6501fda30f9dadbce1c8992e14140b6dfda2c",
+    "simple/programs/shortwin-simple/src/finance.rs": "11772d4eac5e7b0605368d27c4b686df3fa8ff9dad46a580287d842cf11533f2",
+    "simple/programs/shortwin-simple/src/reference.rs": "b786577816dab47d688d1fdf5c10793ddd94cff1367a52cfc968b92341a88b67",
+    "simple/programs/shortwin-simple/src/lib.rs": "c4e975f36834b021fd590b4b52d686adc2597870b4fa54b745df1ceedb9c800c",
+    "simple/programs/shortwin-simple/src/state.rs": "4588d9272a629165cb1bfaeaafa0a9d207127e493aedbefd5d28ca0504b9b8e9",
+    "simple/programs/shortwin-simple/src/lender.rs": "799988e179e49d2739f0df767a32a0fe59e3de663909c203e15362cd097c4a72",
+    "simple/crates/pooled-core/src/tests.rs": "364959ca8d6c1df6fe20827175749fca60f60812009e6dd6118201573b7148af",
+    "simple/crates/pooled-core/src/wide.rs": "3acfd54e205689dffa6030696ec58b8de726c330b44c0d0292430379fee90d95",
+    "simple/crates/pooled-core/src/lib.rs": "67b6de6f8c667c8340475374292bab58d0906ddde8afbc0566287330b5748204",
+    "crates/shortwin-jupiter-route/src/isolation.rs": "ba164075e7c088bb680d83c41c87cd9d461cdd560c62657ac87ad2f08b36aee1",
+    "crates/shortwin-jupiter-route/src/lib.rs": "1c95a7a0bb278825cffaab351b102ae15a376e704235a7e16fe996e8cc7dd07a",
+    "simple/Cargo.lock": "bec0acb945573606de0dcedfd460067cbcba6aca5fe576ca8343dbb4ba5c9a76",
+    "simple/Cargo.toml": "0fff0dcba3092ed9211becf2cf43cd53fc2c947172c89638c151833d88ee9b08",
+    "simple/programs/shortwin-simple/Cargo.toml": "a3a89f1368577416b4983750ef79121470ba3bf5a682e44d972abed19fb5ef45",
+    "simple/client/idl/shortwin_simple.json": "83748440336bcfeb41bcb37ae6d1f7083df3341ab8e0b9199655ca5a436cc60c",
+    "simple/pnpm-lock.yaml": "c0222c8ecd956a00e4ee1676606e1af781b6ff260fca2cf049361e1cad4ea57a",
+    "rust-toolchain.toml": "1e977a72694dfd8a4b1b5d2253f22ce5dad4e09bf522c902236476b1801dd803",
+    "mise.toml": "0ec9d3a68a1eb0a1aed491290c7d84830798405115e94557d5a61058477f831b",
+    "simple/tests/runtime/Cargo.toml": "941e8d32d7e3877e79c8a5cd9549e65af5de563a459135dd138ad40da143e6a3"
+  }
+}

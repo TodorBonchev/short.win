@@ -1,0 +1,46 @@
+$ pnpm -r check
+$ tsc --noEmit && node --test test/*.test.ts
+✔ generated client decodes exact Rust account and instruction bytes without precision loss (2.586592ms)
+✔ route uses loan-local scratch, with no outer PDA signature or API setup instructions (12.352705ms)
+✔ route rejects wrong mode, quantity, threshold, and unexpected signer (9.302144ms)
+✔ buy minimum output must cover whole token debt (7.404013ms)
+✔ wallet signatures may change but reviewed message bytes may not (8.172205ms)
+✔ default boundary wins without price, pause, history or route; expiry requires fresh feed (0.774724ms)
+✔ CR actions bind both bad bids, strict sequence, source delays and reporter epoch (0.234412ms)
+✔ service model drift and fee/funding caps fail before signing (0.43678ms)
+✔ confirmed publication continues to a priced action; dry-run never assumes publication (0.23587ms)
+✔ finalized event pagination is resumable and idempotent; failed tx is never projected (3.511094ms)
+✔ empty authoritative loan snapshot still clears priority and processes queued warm work (77.920627ms)
+✔ post-tick confirmed clock accepts newer sources than initial finalized snapshot and rejects actual future (0.531483ms)
+✔ an inactive warmed quantity publishes before the first loan without reading a keyfile (74.600595ms)
+✔ bounded rotation advances beyond a persistently failing first identity (5.324221ms)
+✔ prewarm validates current policy and enqueues inactive exact-u64 identity only (12.160934ms)
+✔ Unknown or stale reference never becomes Finite and cannot authorize a sale route (14.261113ms)
+✔ route binds new loan nonce/scratch and returns fresh raw build plus verified table contents (23.207212ms)
+✔ CORS/body/IP limits and unsupported RPC overrides reject before provider calls (4.869061ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 408.029305
+$ tsc --noEmit && node --test test/*.test.ts
+✔ amount entry is exact beyond Number precision and refuses truncation (0.900675ms)
+✔ preview follows floor principal and actually paid income without time accrual (0.258787ms)
+✔ editing or cancelling while route preparation is pending revokes later review (0.83727ms)
+✔ wallet account or feature changes while signing prevent broadcast and clean old subscriptions (0.611808ms)
+✔ wallets without change events are rechecked after their async reply, including chain support (0.390092ms)
+✔ cancel during the final blockheight check prevents even the broadcast RPC call (11.317203ms)
+✔ managed service preserves exact quantities and uses fixed endpoints (20.359515ms)
+✔ managed service rejects insecure hosted URLs and reports capacity refusals (0.698074ms)
+✔ managed buy input can shrink but cannot exceed or reinterpret the signed user budget (0.353991ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 225.112332

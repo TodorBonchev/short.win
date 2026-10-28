@@ -1,0 +1,15 @@
+/target/
+/node_modules/
+/web/dist/
+*.keypair.json
+*.env
+
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.sqlite3-*
+.run/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*

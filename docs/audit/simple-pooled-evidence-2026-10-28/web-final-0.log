@@ -1,0 +1,18 @@
+$ tsc --noEmit && node --test test/*.test.ts
+✔ amount entry is exact beyond Number precision and refuses truncation (0.973332ms)
+✔ preview follows floor principal and actually paid income without time accrual (0.279419ms)
+✔ editing or cancelling while route preparation is pending revokes later review (0.967184ms)
+✔ wallet account or feature changes while signing prevent broadcast and clean old subscriptions (0.691707ms)
+✔ wallets without change events are rechecked after their async reply, including chain support (0.363677ms)
+✔ cancel during the final blockheight check prevents even the broadcast RPC call (11.451337ms)
+✔ managed service preserves exact quantities and uses fixed endpoints (18.72643ms)
+✔ managed service rejects insecure hosted URLs and reports capacity refusals (0.567685ms)
+✔ managed buy input can shrink but cannot exceed or reinterpret the signed user budget (0.32087ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 233.538465

@@ -1,3 +1,5 @@
+> **Superseded implementation scope, 2026-10-28:** current work is the independent [Jupiter-only pooled version](../../simple/README.md) with a fixed upfront SOL term fee. Use its [specification](../../simple/docs/SPEC.md) and [operating prerequisites](../../simple/docs/OPERATIONS.md). This earlier document is retained as design/release history and does not qualify the replacement.
+
 # Pump curves and broad Jupiter execution — design proposal
 
 **Status: design and isolated prototypes; production integration is unimplemented.**

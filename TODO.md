@@ -1,3 +1,5 @@
+> **2026-10-28 active replacement:** the owner selected a Jupiter-only pooled lending/shorting implementation with a fixed upfront SOL term fee. See [simple/README.md](simple/README.md), [the new specification](simple/docs/SPEC.md) and [operating prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement.
+
 # Pending work
 
 This file lists unfinished work only. Completed audit and release evidence is in

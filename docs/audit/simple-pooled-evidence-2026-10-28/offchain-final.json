@@ -1,0 +1,38 @@
+{
+  "timestamp": "2026-10-28T16:25:41.808278+00:00",
+  "commands": [
+    {
+      "command": [
+        "pnpm",
+        "check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.001,
+      "log": "target/final-verification/offchain-final-0.log",
+      "sha256": "73d344cc738f86ae248efacf75dcd216d22bd8b02897d140431b8550fa273b48"
+    },
+    {
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 6.502,
+      "log": "target/final-verification/offchain-final-1.log",
+      "sha256": "11d2e00fc92557a47577835a330a06879e800d28eb9cd41d92907559de718ba4"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--dir",
+        "client",
+        "generate"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.061,
+      "log": "target/final-verification/offchain-final-2.log",
+      "sha256": "c32684602a3b5ed3498701c17f161c12772925be9853842922e9fc03a223a8dd"
+    }
+  ],
+  "generated_client_identical": true
+}

@@ -1,0 +1,25 @@
+[package]
+name = "shortwin-simple"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license-file = "../../../LICENSE"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "shortwin_simple"
+
+[features]
+default = []
+no-entrypoint = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "=1.2.0", features = ["init-if-needed", "event-cpi"] }
+anchor-spl = { version = "=1.2.0", default-features = false, features = ["token", "token_2022", "associated_token"] }
+shortwin-pooled-core = { path = "../../crates/pooled-core" }
+shortwin-jupiter-route = { path = "../../../crates/shortwin-jupiter-route" }

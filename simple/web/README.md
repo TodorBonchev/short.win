@@ -1,0 +1,13 @@
+# New pooled local interface
+
+This independent Vite + vanilla TypeScript interface imports only `@shortwin/simple-client` and Solana Kit. It is a local development client, not a qualified mainnet release. It does not import the previous frontend, financial handlers or WASM model.
+
+From `simple/`, install the frozen workspace lock and run `pnpm --filter @shortwin/simple-web dev`. The default RPC is `http://127.0.0.1:8899`. Initialize the new program with a real matching validator genesis hash before preparing transactions. A Wallet Standard wallet with `solana:signTransaction` is required for signing; browser testing never sends transactions.
+
+The interface reads the actual config, immutable policy, mint, current or selected historical pool generation, wallet receipt and wallet loans. It prepares public registration, deposits, signed-minimum withdrawals, SOL claims, opening, whole-token repayment, collateral additions and full Jupiter close. The SDK simulates a bounded v0 transaction, then the user reviews it and separately approves the exact message in the wallet. Account rent caps and refunded scratch advances are visible in local development settings. Token accounts must already exist; a holder's associated token account is filled in by default.
+
+Automatic managed route discovery is pending. Opening and closing currently require a real fresh Jupiter V2 ExactIn build response pasted in local development settings. Route addresses are displayed for the actual prospective loan. The SDK binds the response to those endpoints and the whole-position amount; address lookup table contents come from RPC. No API keys or wallet secrets are stored. A finite quantity-specific on-chain trusted reference must already be available for opening; the program enforces freshness and all economic limits.
+
+Only plain initialized SPL/Token-2022 mints without freeze authority qualify. A registered market can still be Unknown/warming for borrowing. The UI discloses trusted in-house pricing, uncapped deposits/market count, upfront fee with no early refund, available-cash withdrawal constraints and deterministic collateral forfeiture after deadline plus 24-hour grace. Archived generation claims remain accessible by selecting that generation.
+
+`pnpm --filter @shortwin/simple-web check` verifies type consistency and exact precision/rounding behavior; `build` creates the static local bundle. These checks do not replace actual program qualification, a funded operator deployment, wallet integration checks or the planned later external review. The owner’s release policy remains borrowing-capped mainnet before external audit and bug bounty; this prototype has not completed its technical release qualification.

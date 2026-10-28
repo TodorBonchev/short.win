@@ -1,0 +1,9 @@
+$ node bin/operator.ts --help
+One bounded operator pass; dry-run is the default.
+Required: --settings FILE --database FILE --service-database FILE --evidence-directory DIR
+RPC: --rpc-url URL or SOLANA_RPC_URL
+Optional: --tick --keeper-address ADDRESS --reporter-keyfile FILE --keeper-keyfile FILE
+--execute explicitly signs/submits; never enable until roles, funding and settings are reviewed.
+Bounds: --max-accounts N --max-event-transactions N --max-actions N --max-fee-lamports N
+--max-pass-fees-lamports N --min-balance-lamports N --max-temporary-lamports N --max-reference-rent-lamports N
+Run passes with a supervisor that prevents overlap. The HTTP bridge does not sign.

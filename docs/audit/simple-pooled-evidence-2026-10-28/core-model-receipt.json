@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-10-28T15:36:17.123230+00:00",
+  "scope": "pure-core-model-only, no SBF/route/oracle or 24h qualification",
+  "checks": [
+    {
+      "name": "cargo-model-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "-p",
+        "shortwin-pooled-core",
+        "--target-dir",
+        "target/core-cargo"
+      ],
+      "exit_code": 0,
+      "sha256": "372c258b80d461ff2cdfb2ceac15a6817a8e9bedae1560934796d3953b7bbc7c"
+    },
+    {
+      "name": "cargo-model-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "-p",
+        "shortwin-pooled-core",
+        "--all-targets",
+        "--target-dir",
+        "target/core-cargo",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "sha256": "d2b134e30dd75feffe8cc4de03be8a6d25b04c5c157c8ded9873a6cbdb68307f"
+    },
+    {
+      "name": "model-103410000-200000",
+      "command": [
+        "cargo",
+        "run",
+        "--offline",
+        "--release",
+        "-p",
+        "shortwin-pooled-core",
+        "--example",
+        "model_fuzz",
+        "--target-dir",
+        "target/core-cargo",
+        "--",
+        "103410000",
+        "200000"
+      ],
+      "exit_code": 0,
+      "sha256": "5d657eb0f34dbf94efc584d9fd0f2e927560d740caac64f1d6db60e1fd22c4ea"
+    }
+  ]
+}

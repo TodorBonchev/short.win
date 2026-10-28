@@ -1,0 +1,31 @@
+{
+  "name": "@shortwin/simple-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client for the independent Jupiter-only pooled program",
+  "license": "BUSL-1.1",
+  "exports": {
+    ".": "./src/index.ts",
+    "./idl": "./idl/shortwin_simple.json",
+    "./operator": "./src/operator.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "generate": "codama run js --config codama.json",
+    "check": "tsc --noEmit && node --test test/*.test.ts",
+    "build": "tsc --noEmit",
+    "operator": "node bin/operator.ts",
+    "server": "node bin/server.ts"
+  },
+  "dependencies": {
+    "@solana/kit": "8.3.0"
+  },
+  "devDependencies": {
+    "@codama/nodes-from-anchor": "1.5.6",
+    "@codama/renderers-js": "2.5.0",
+    "@types/node": "24.19.0",
+    "codama": "1.11.0",
+    "typescript": "5.9.3"
+  }
+}

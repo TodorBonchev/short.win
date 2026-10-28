@@ -1,0 +1,4 @@
+$ codama run js --config codama.json
+PDA name collision: "tokenVault" has different seeds across instructions. Renaming to "rollPoolTokenVault".
+→ Running script "js" with 1 visitor...
+✔ Executed script "js" with 1 visitor!

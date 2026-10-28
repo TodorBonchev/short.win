@@ -1708,6 +1708,21 @@ These are where we would look first. They are not limits on the scope.
 
 ## 12. Logistics and change policy
 
+**Current replacement decision, 2026-10-28:** the owner selected a separate
+Jupiter-only pooled lending/shorting implementation and a fixed upfront SOL term
+fee with no early-close refund. The [new specification](../simple/docs/SPEC.md)
+and [operating contract](../simple/docs/OPERATIONS.md) describe its distinct
+accounts, share ledger, trusted exact-quantity history and deadline-plus-24h
+collateral default. The previous paid infrastructure proposal was subsequently
+declined; a paid external oracle/provider is not part of this design. Provider
+capacity, funded operation and automatic end-to-end commissioning still require
+actual evidence. Old 1.0.x and intermediate redesign CI/fuzz/review evidence stays
+attributed to its original bytes and does not qualify this replacement. No finding
+status, stable tag, deployment approval or external-audit claim is changed by this
+implementation. Mainnet-before-external-audit/bounty funding timing remains the
+owner's policy, subject to fresh technical qualification of the new scope.
+
+
 **Later owner scope decision, 2026-10-27:** first mainnet is postponed for the
 [broad Jupiter redesign](design/JUPITER_REDESIGN.md), as recorded in the
 [new decision](audit/owner-jupiter-redesign-decision-2026-10-27.md). The owner

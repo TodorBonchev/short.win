@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-10-28T16:16:22.180479+00:00",
+  "run": "/root/short.win-simple/simple/target/program-fuzz-frozen-smoke-20261028",
+  "metadata_sha256": "328b2a33c42cd11203cce92068b34af039d8007d3b1a48e6d23ee76b5fd95d38",
+  "summary_sha256": "53f87201b1e1837febe7f72b11f55871b115a125afcddf6c21a143f64fce0693",
+  "completion_sha256": "49bda33869330852fd7c21fa5d05669ba76c2ceff5dfd103c51bd457c3a3a4f2",
+  "log_sha256": "b0fe4da76471a749d877d90688e81eb7cdec6e8b11af787da82e31b94a1cac05",
+  "runner_sha256": "a494d33f8f0d24b00adad7ba0b3c2420d444790626e5b22ec8ea6704054c8c2e",
+  "program_sha256": "49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a",
+  "artifact_files_verified": 342,
+  "source_files_verified": 37,
+  "local_route_dependency_and_license_frozen": true,
+  "frozen_runner_help_exit": 0,
+  "completed_cases": 32,
+  "wall_seconds": 22.018593601,
+  "transaction_counts": {
+    "attempted_transactions": 147,
+    "successful_transactions": 98,
+    "expected_rejected_transactions": 49,
+    "actual_cpmm_success_logs": 65
+  },
+  "scenario_counts": {
+    "close": 2,
+    "cr_fill_veto": 3,
+    "cr_market_rise": 3,
+    "default_boundary": 5,
+    "expiry": 5,
+    "margin_repay": 8,
+    "repay": 3,
+    "underfill": 3
+  },
+  "failures": 0,
+  "anomalies": 0,
+  "setup_failures": 0,
+  "invariant_failures": 0,
+  "scope": "bounded actual-program smoke only, not a 24h campaign"
+}

@@ -1,0 +1,4770 @@
+{
+  "address": "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2",
+  "metadata": {
+    "name": "shortwin_simple",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
+  "instructions": [
+    {
+      "name": "add_margin",
+      "discriminator": [
+        211,
+        238,
+        238,
+        90,
+        223,
+        228,
+        228,
+        76
+      ],
+      "accounts": [
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "position",
+          "accounts": [
+            {
+              "name": "config",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      99,
+                      111,
+                      110,
+                      102,
+                      105,
+                      103
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "policy",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      108,
+                      105,
+                      99,
+                      121
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "config"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "policy.policy_version",
+                    "account": "Policy"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "market",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      109,
+                      97,
+                      114,
+                      107,
+                      101,
+                      116
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market.mint",
+                    "account": "Market"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "pool",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      111,
+                      108
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool.generation",
+                    "account": "PoolGeneration"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "loan",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      108,
+                      111,
+                      97,
+                      110
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "loan.nonce",
+                    "account": "Loan"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "exposure",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      101,
+                      120,
+                      112,
+                      111,
+                      115,
+                      117,
+                      114,
+                      101
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "borrower",
+              "writable": true
+            }
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "arm_liquidation",
+      "discriminator": [
+        86,
+        26,
+        23,
+        248,
+        74,
+        228,
+        28,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "actor",
+          "signer": true
+        },
+        {
+          "name": "position",
+          "accounts": [
+            {
+              "name": "config",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      99,
+                      111,
+                      110,
+                      102,
+                      105,
+                      103
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "policy",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      108,
+                      105,
+                      99,
+                      121
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "config"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "policy.policy_version",
+                    "account": "Policy"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "market",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      109,
+                      97,
+                      114,
+                      107,
+                      101,
+                      116
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market.mint",
+                    "account": "Market"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "pool",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      111,
+                      108
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool.generation",
+                    "account": "PoolGeneration"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "loan",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      108,
+                      111,
+                      97,
+                      110
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "loan.nonce",
+                    "account": "Loan"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "exposure",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      101,
+                      120,
+                      112,
+                      111,
+                      115,
+                      117,
+                      114,
+                      101
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "borrower",
+              "writable": true
+            }
+          ]
+        },
+        {
+          "name": "reference"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "minimum_reference_sequence",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim_sol",
+      "discriminator": [
+        139,
+        113,
+        179,
+        189,
+        190,
+        30,
+        132,
+        195
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.market",
+                "account": "PoolGeneration"
+              },
+              {
+                "kind": "account",
+                "path": "pool.generation",
+                "account": "PoolGeneration"
+              }
+            ]
+          }
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  110,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "min_sol",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "close_position",
+      "discriminator": [
+        123,
+        134,
+        81,
+        0,
+        49,
+        68,
+        98,
+        98
+      ],
+      "accounts": [
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "position",
+          "accounts": [
+            {
+              "name": "config",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      99,
+                      111,
+                      110,
+                      102,
+                      105,
+                      103
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "policy",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      108,
+                      105,
+                      99,
+                      121
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "config"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "policy.policy_version",
+                    "account": "Policy"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "market",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      109,
+                      97,
+                      114,
+                      107,
+                      101,
+                      116
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market.mint",
+                    "account": "Market"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "pool",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      111,
+                      108
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool.generation",
+                    "account": "PoolGeneration"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "loan",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      108,
+                      111,
+                      97,
+                      110
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "loan.nonce",
+                    "account": "Loan"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "exposure",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      101,
+                      120,
+                      112,
+                      111,
+                      115,
+                      117,
+                      114,
+                      101
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "borrower",
+              "writable": true
+            }
+          ]
+        },
+        {
+          "name": "token",
+          "accounts": [
+            {
+              "name": "mint"
+            },
+            {
+              "name": "token_vault",
+              "writable": true
+            },
+            {
+              "name": "token_program"
+            }
+          ]
+        },
+        {
+          "name": "execution",
+          "accounts": [
+            {
+              "name": "execution_authority"
+            },
+            {
+              "name": "execution_base",
+              "writable": true
+            },
+            {
+              "name": "execution_wsol",
+              "writable": true
+            },
+            {
+              "name": "wsol_mint"
+            },
+            {
+              "name": "wsol_token_program",
+              "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+            },
+            {
+              "name": "jupiter"
+            },
+            {
+              "name": "jupiter_program_data"
+            },
+            {
+              "name": "system_program",
+              "address": "11111111111111111111111111111111"
+            }
+          ]
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "CloseArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "default_loan",
+      "discriminator": [
+        237,
+        211,
+        0,
+        72,
+        206,
+        248,
+        36,
+        79
+      ],
+      "accounts": [
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "position",
+          "accounts": [
+            {
+              "name": "config",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      99,
+                      111,
+                      110,
+                      102,
+                      105,
+                      103
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "policy",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      108,
+                      105,
+                      99,
+                      121
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "config"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "policy.policy_version",
+                    "account": "Policy"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "market",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      109,
+                      97,
+                      114,
+                      107,
+                      101,
+                      116
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market.mint",
+                    "account": "Market"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "pool",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      111,
+                      108
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool.generation",
+                    "account": "PoolGeneration"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "loan",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      108,
+                      111,
+                      97,
+                      110
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "loan.nonce",
+                    "account": "Loan"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "exposure",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      101,
+                      120,
+                      112,
+                      111,
+                      115,
+                      117,
+                      114,
+                      101
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "borrower",
+              "writable": true
+            }
+          ]
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "deposit",
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "pool.generation",
+                "account": "PoolGeneration"
+              }
+            ]
+          }
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  110,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "owner_tokens",
+          "writable": true
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_shares",
+          "type": "u128"
+        },
+        {
+          "name": "max_receipt_rent",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "force_exit",
+      "discriminator": [
+        137,
+        6,
+        17,
+        146,
+        173,
+        218,
+        179,
+        61
+      ],
+      "accounts": [
+        {
+          "name": "actor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "position",
+          "accounts": [
+            {
+              "name": "config",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      99,
+                      111,
+                      110,
+                      102,
+                      105,
+                      103
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "policy",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      108,
+                      105,
+                      99,
+                      121
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "config"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "policy.policy_version",
+                    "account": "Policy"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "market",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      109,
+                      97,
+                      114,
+                      107,
+                      101,
+                      116
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market.mint",
+                    "account": "Market"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "pool",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      111,
+                      108
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool.generation",
+                    "account": "PoolGeneration"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "loan",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      108,
+                      111,
+                      97,
+                      110
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "loan.nonce",
+                    "account": "Loan"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "exposure",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      101,
+                      120,
+                      112,
+                      111,
+                      115,
+                      117,
+                      114,
+                      101
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "borrower",
+              "writable": true
+            }
+          ]
+        },
+        {
+          "name": "token",
+          "accounts": [
+            {
+              "name": "mint"
+            },
+            {
+              "name": "token_vault",
+              "writable": true
+            },
+            {
+              "name": "token_program"
+            }
+          ]
+        },
+        {
+          "name": "execution",
+          "accounts": [
+            {
+              "name": "execution_authority"
+            },
+            {
+              "name": "execution_base",
+              "writable": true
+            },
+            {
+              "name": "execution_wsol",
+              "writable": true
+            },
+            {
+              "name": "wsol_mint"
+            },
+            {
+              "name": "wsol_token_program",
+              "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+            },
+            {
+              "name": "jupiter"
+            },
+            {
+              "name": "jupiter_program_data"
+            },
+            {
+              "name": "system_program",
+              "address": "11111111111111111111111111111111"
+            }
+          ]
+        },
+        {
+          "name": "reference"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "ForcedExitArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              },
+              {
+                "kind": "arg",
+                "path": "args.policy_version"
+              }
+            ]
+          }
+        },
+        {
+          "name": "program_account",
+          "address": "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2"
+        },
+        {
+          "name": "program_data"
+        },
+        {
+          "name": "jupiter"
+        },
+        {
+          "name": "jupiter_program_data"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "InitializeArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "new_policy",
+      "discriminator": [
+        114,
+        143,
+        76,
+        33,
+        230,
+        198,
+        24,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              },
+              {
+                "kind": "arg",
+                "path": "args.version"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "NewPolicyArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_position",
+      "discriminator": [
+        135,
+        128,
+        47,
+        77,
+        15,
+        152,
+        240,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              },
+              {
+                "kind": "account",
+                "path": "policy.policy_version",
+                "account": "Policy"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "pool.generation",
+                "account": "PoolGeneration"
+              }
+            ]
+          }
+        },
+        {
+          "name": "loan",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  111,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              },
+              {
+                "kind": "arg",
+                "path": "args.nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "exposure",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  112,
+                  111,
+                  115,
+                  117,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "borrower"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reference"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "fee_recipient",
+          "writable": true
+        },
+        {
+          "name": "execution_authority"
+        },
+        {
+          "name": "execution_base",
+          "writable": true
+        },
+        {
+          "name": "execution_wsol",
+          "writable": true
+        },
+        {
+          "name": "wsol_mint"
+        },
+        {
+          "name": "wsol_token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "jupiter"
+        },
+        {
+          "name": "jupiter_program_data"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "OpenArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "publish_reference",
+      "discriminator": [
+        147,
+        231,
+        0,
+        54,
+        179,
+        217,
+        208,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "reporter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.mint",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              },
+              {
+                "kind": "account",
+                "path": "policy.policy_version",
+                "account": "Policy"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reference",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  101,
+                  114,
+                  101,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "policy"
+              },
+              {
+                "kind": "arg",
+                "path": "args.quantity"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "PublishReferenceArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "register_market",
+      "discriminator": [
+        24,
+        163,
+        183,
+        185,
+        145,
+        243,
+        36,
+        146
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "config"
+              },
+              {
+                "kind": "account",
+                "path": "policy.policy_version",
+                "account": "Policy"
+              }
+            ]
+          }
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "fee_recipient",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_creation_fee",
+          "type": "u64"
+        },
+        {
+          "name": "max_setup_rent",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "repay",
+      "discriminator": [
+        234,
+        103,
+        67,
+        82,
+        208,
+        234,
+        219,
+        166
+      ],
+      "accounts": [
+        {
+          "name": "actor",
+          "signer": true
+        },
+        {
+          "name": "position",
+          "accounts": [
+            {
+              "name": "config",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      99,
+                      111,
+                      110,
+                      102,
+                      105,
+                      103
+                    ]
+                  }
+                ]
+              }
+            },
+            {
+              "name": "policy",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      108,
+                      105,
+                      99,
+                      121
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "config"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "policy.policy_version",
+                    "account": "Policy"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "market",
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      109,
+                      97,
+                      114,
+                      107,
+                      101,
+                      116
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market.mint",
+                    "account": "Market"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "pool",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      112,
+                      111,
+                      111,
+                      108
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "market"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool.generation",
+                    "account": "PoolGeneration"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "loan",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      108,
+                      111,
+                      97,
+                      110
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "loan.nonce",
+                    "account": "Loan"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "exposure",
+              "writable": true,
+              "pda": {
+                "seeds": [
+                  {
+                    "kind": "const",
+                    "value": [
+                      101,
+                      120,
+                      112,
+                      111,
+                      115,
+                      117,
+                      114,
+                      101
+                    ]
+                  },
+                  {
+                    "kind": "account",
+                    "path": "pool"
+                  },
+                  {
+                    "kind": "account",
+                    "path": "borrower"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "borrower",
+              "writable": true
+            }
+          ]
+        },
+        {
+          "name": "token",
+          "accounts": [
+            {
+              "name": "mint"
+            },
+            {
+              "name": "token_vault",
+              "writable": true
+            },
+            {
+              "name": "token_program"
+            }
+          ]
+        },
+        {
+          "name": "source",
+          "writable": true
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "review_jupiter",
+      "discriminator": [
+        232,
+        9,
+        189,
+        35,
+        3,
+        130,
+        22,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "jupiter"
+        },
+        {
+          "name": "jupiter_program_data"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "deploy_slot",
+          "type": "u64"
+        },
+        {
+          "name": "programdata_len",
+          "type": "u32"
+        },
+        {
+          "name": "elf_sha256",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "roll_pool",
+      "discriminator": [
+        54,
+        9,
+        99,
+        105,
+        92,
+        18,
+        146,
+        194
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.mint",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "old_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "old_pool.generation",
+                "account": "PoolGeneration"
+              }
+            ]
+          }
+        },
+        {
+          "name": "new_pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "market.active_generation.checked_add(1).ok_or(SimpleError :: Arithmetic) ?\n",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "new_pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "max_setup_rent",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "set_pause",
+      "discriminator": [
+        63,
+        32,
+        154,
+        2,
+        56,
+        103,
+        79,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "prices",
+          "type": "bool"
+        },
+        {
+          "name": "paused",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_reporter",
+      "discriminator": [
+        85,
+        106,
+        154,
+        18,
+        252,
+        50,
+        144,
+        189
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "reporter",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "pool.generation",
+                "account": "PoolGeneration"
+              }
+            ]
+          }
+        },
+        {
+          "name": "receipt",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  101,
+                  110,
+                  100,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "owner_tokens",
+          "writable": true
+        },
+        {
+          "name": "token_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "event_authority"
+        },
+        {
+          "name": "program"
+        }
+      ],
+      "args": [
+        {
+          "name": "shares",
+          "type": "u128"
+        },
+        {
+          "name": "min_tokens",
+          "type": "u64"
+        },
+        {
+          "name": "min_sol",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Config",
+      "discriminator": [
+        155,
+        12,
+        170,
+        224,
+        30,
+        250,
+        204,
+        130
+      ]
+    },
+    {
+      "name": "Exposure",
+      "discriminator": [
+        248,
+        75,
+        204,
+        21,
+        92,
+        251,
+        197,
+        147
+      ]
+    },
+    {
+      "name": "LenderReceipt",
+      "discriminator": [
+        185,
+        16,
+        229,
+        4,
+        90,
+        37,
+        117,
+        171
+      ]
+    },
+    {
+      "name": "Loan",
+      "discriminator": [
+        20,
+        195,
+        70,
+        117,
+        165,
+        227,
+        182,
+        1
+      ]
+    },
+    {
+      "name": "Market",
+      "discriminator": [
+        219,
+        190,
+        213,
+        55,
+        0,
+        227,
+        198,
+        154
+      ]
+    },
+    {
+      "name": "Policy",
+      "discriminator": [
+        222,
+        135,
+        7,
+        163,
+        235,
+        177,
+        33,
+        68
+      ]
+    },
+    {
+      "name": "PoolGeneration",
+      "discriminator": [
+        189,
+        242,
+        206,
+        119,
+        99,
+        116,
+        220,
+        190
+      ]
+    },
+    {
+      "name": "PriceReference",
+      "discriminator": [
+        8,
+        201,
+        17,
+        248,
+        29,
+        47,
+        219,
+        72
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Closed",
+      "discriminator": [
+        50,
+        31,
+        87,
+        155,
+        135,
+        220,
+        195,
+        239
+      ]
+    },
+    {
+      "name": "ConfigChanged",
+      "discriminator": [
+        147,
+        25,
+        86,
+        98,
+        98,
+        77,
+        78,
+        192
+      ]
+    },
+    {
+      "name": "Defaulted",
+      "discriminator": [
+        56,
+        74,
+        221,
+        194,
+        133,
+        27,
+        201,
+        235
+      ]
+    },
+    {
+      "name": "Deposit",
+      "discriminator": [
+        62,
+        205,
+        242,
+        175,
+        244,
+        169,
+        136,
+        52
+      ]
+    },
+    {
+      "name": "ForcedExit",
+      "discriminator": [
+        106,
+        63,
+        209,
+        136,
+        158,
+        117,
+        144,
+        222
+      ]
+    },
+    {
+      "name": "LiquidationArmed",
+      "discriminator": [
+        202,
+        23,
+        48,
+        54,
+        233,
+        89,
+        223,
+        69
+      ]
+    },
+    {
+      "name": "MarginAdded",
+      "discriminator": [
+        121,
+        187,
+        28,
+        95,
+        195,
+        171,
+        37,
+        8
+      ]
+    },
+    {
+      "name": "MarketRegistered",
+      "discriminator": [
+        242,
+        192,
+        131,
+        54,
+        137,
+        236,
+        116,
+        90
+      ]
+    },
+    {
+      "name": "Opened",
+      "discriminator": [
+        166,
+        172,
+        97,
+        9,
+        77,
+        76,
+        189,
+        109
+      ]
+    },
+    {
+      "name": "PolicyCreated",
+      "discriminator": [
+        59,
+        189,
+        65,
+        121,
+        86,
+        157,
+        108,
+        10
+      ]
+    },
+    {
+      "name": "PoolRolled",
+      "discriminator": [
+        54,
+        145,
+        229,
+        38,
+        157,
+        55,
+        220,
+        229
+      ]
+    },
+    {
+      "name": "ReferencePublished",
+      "discriminator": [
+        25,
+        80,
+        218,
+        248,
+        195,
+        13,
+        201,
+        194
+      ]
+    },
+    {
+      "name": "Repaid",
+      "discriminator": [
+        38,
+        248,
+        231,
+        7,
+        150,
+        164,
+        172,
+        23
+      ]
+    },
+    {
+      "name": "SolClaimed",
+      "discriminator": [
+        112,
+        80,
+        238,
+        167,
+        120,
+        101,
+        47,
+        207
+      ]
+    },
+    {
+      "name": "Withdraw",
+      "discriminator": [
+        192,
+        241,
+        201,
+        217,
+        70,
+        150,
+        90,
+        247
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Arithmetic",
+      "msg": "Checked arithmetic overflow"
+    },
+    {
+      "code": 6001,
+      "name": "Unauthorized",
+      "msg": "The signer is not authorized"
+    },
+    {
+      "code": 6002,
+      "name": "AccountMismatch",
+      "msg": "Account identity, owner, size or generation does not match"
+    },
+    {
+      "code": 6003,
+      "name": "Paused",
+      "msg": "New borrowing is paused"
+    },
+    {
+      "code": 6004,
+      "name": "PricePaused",
+      "msg": "Price-dependent actions are paused"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidPolicy",
+      "msg": "Configuration or immutable policy is invalid"
+    },
+    {
+      "code": 6006,
+      "name": "MintUnsupported",
+      "msg": "This token program or mint layout is not supported"
+    },
+    {
+      "code": 6007,
+      "name": "MintUnsafe",
+      "msg": "This mint behavior is not supported for entry"
+    },
+    {
+      "code": 6008,
+      "name": "ZeroAmount",
+      "msg": "Amount must be positive"
+    },
+    {
+      "code": 6009,
+      "name": "MinimumNotMet",
+      "msg": "Output is below a signed minimum"
+    },
+    {
+      "code": 6010,
+      "name": "InsufficientLiquidity",
+      "msg": "The pool has insufficient available principal"
+    },
+    {
+      "code": 6011,
+      "name": "LastSharesBorrowed",
+      "msg": "The last shares cannot leave while loans remain"
+    },
+    {
+      "code": 6012,
+      "name": "GenerationNotEmpty",
+      "msg": "This generation cannot be retired or replaced"
+    },
+    {
+      "code": 6013,
+      "name": "BadReference",
+      "msg": "The reference does not bind the required mint, quantity and policy"
+    },
+    {
+      "code": 6014,
+      "name": "StaleReference",
+      "msg": "The reference is stale"
+    },
+    {
+      "code": 6015,
+      "name": "WrongSequence",
+      "msg": "The reference sequence must progress"
+    },
+    {
+      "code": 6016,
+      "name": "UnknownReference",
+      "msg": "The reference is not finite and ready"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidNonce",
+      "msg": "The loan nonce is not the next market nonce"
+    },
+    {
+      "code": 6018,
+      "name": "PositionLimit",
+      "msg": "The position notional cap would be exceeded"
+    },
+    {
+      "code": 6019,
+      "name": "MarketLimit",
+      "msg": "The market notional cap would be exceeded"
+    },
+    {
+      "code": 6020,
+      "name": "UtilizationLimit",
+      "msg": "The inventory utilization cap would be exceeded"
+    },
+    {
+      "code": 6021,
+      "name": "WalletLimit",
+      "msg": "The wallet notional cap would be exceeded"
+    },
+    {
+      "code": 6022,
+      "name": "BelowMinNotional",
+      "msg": "The position is below the minimum notional"
+    },
+    {
+      "code": 6023,
+      "name": "MarginAboveMax",
+      "msg": "Required margin exceeds the signed maximum"
+    },
+    {
+      "code": 6024,
+      "name": "FeeAboveMax",
+      "msg": "Upfront fee exceeds the signed maximum"
+    },
+    {
+      "code": 6025,
+      "name": "ProceedsBelowMin",
+      "msg": "Actual sale proceeds are below the signed minimum"
+    },
+    {
+      "code": 6026,
+      "name": "BadRoute",
+      "msg": "The route is not compatible with the required action"
+    },
+    {
+      "code": 6027,
+      "name": "BuybackAboveMax",
+      "msg": "Buyback input exceeds the signed or policy maximum"
+    },
+    {
+      "code": 6028,
+      "name": "NotLiquidatable",
+      "msg": "This loan is not eligible for liquidation"
+    },
+    {
+      "code": 6029,
+      "name": "ConfirmationPending",
+      "msg": "The delayed liquidation confirmation is not complete"
+    },
+    {
+      "code": 6030,
+      "name": "NotMatured",
+      "msg": "The loan has not reached maturity"
+    },
+    {
+      "code": 6031,
+      "name": "NotOverdue",
+      "msg": "The loan has not reached its locked overdue recovery time"
+    },
+    {
+      "code": 6032,
+      "name": "FundingAboveMax",
+      "msg": "Temporary execution funding exceeds the signed maximum"
+    },
+    {
+      "code": 6033,
+      "name": "SetupFeeAboveMax",
+      "msg": "Creation fee exceeds the signed maximum"
+    },
+    {
+      "code": 6034,
+      "name": "SetupRentAboveMax",
+      "msg": "Required setup rent exceeds the signed maximum"
+    },
+    {
+      "code": 6035,
+      "name": "BalanceMismatch",
+      "msg": "Actual token or SOL balances do not match the agreed flow"
+    },
+    {
+      "code": 6036,
+      "name": "RetiredPool",
+      "msg": "This pool generation is retired for new borrowing and deposits"
+    },
+    {
+      "code": 6037,
+      "name": "CoreAccounting",
+      "msg": "Pool or lender accounting refused the transition"
+    },
+    {
+      "code": 6038,
+      "name": "RouteInvalid",
+      "msg": "Route instruction is not supported"
+    },
+    {
+      "code": 6039,
+      "name": "RouteAccounts",
+      "msg": "Route accounts do not match the isolated execution"
+    },
+    {
+      "code": 6040,
+      "name": "RouteMintUnsupported",
+      "msg": "This mint cannot use the current routed execution"
+    },
+    {
+      "code": 6041,
+      "name": "RouteOutputShort",
+      "msg": "Actual route output is insufficient"
+    },
+    {
+      "code": 6042,
+      "name": "RouteBalance",
+      "msg": "Actual execution balances do not match the agreed flow"
+    },
+    {
+      "code": 6043,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient collateral or transaction funding"
+    },
+    {
+      "code": 6044,
+      "name": "MathOverflow",
+      "msg": "Checked route arithmetic overflow"
+    },
+    {
+      "code": 6045,
+      "name": "HealthyFill",
+      "msg": "Actual buyback cost leaves a non-expired loan healthy"
+    },
+    {
+      "code": 6046,
+      "name": "BadClock",
+      "msg": "Source or runtime clock is invalid"
+    },
+    {
+      "code": 6047,
+      "name": "LoanClosed",
+      "msg": "The loan has already been resolved"
+    },
+    {
+      "code": 6048,
+      "name": "DefaultRequired",
+      "msg": "The grace period has ended; only deterministic default is available"
+    }
+  ],
+  "types": [
+    {
+      "name": "CloseArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_buyback_cost",
+            "type": "u64"
+          },
+          {
+            "name": "temporary_funding",
+            "type": "u64"
+          },
+          {
+            "name": "route",
+            "type": {
+              "defined": {
+                "name": "RouteArgs"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Closed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "loan",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_cost",
+            "type": "u64"
+          },
+          {
+            "name": "token_surplus",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_refund",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Config",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "emergency",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "genesis_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "current_policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "current_policy_version",
+            "type": "u64"
+          },
+          {
+            "name": "reporter_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "opens_paused",
+            "type": "bool"
+          },
+          {
+            "name": "prices_paused",
+            "type": "bool"
+          },
+          {
+            "name": "market_creation_fee",
+            "type": "u64"
+          },
+          {
+            "name": "jupiter_deploy_slot",
+            "docs": [
+              "Governance's reviewed Jupiter upgrade instance, not a fresh hash per trade."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "jupiter_program_data_len",
+            "type": "u32"
+          },
+          {
+            "name": "jupiter_elf_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "kind",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Defaulted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "loan",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "keeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity_lost",
+            "type": "u64"
+          },
+          {
+            "name": "lender_sol",
+            "type": "u64"
+          },
+          {
+            "name": "keeper_reward",
+            "type": "u64"
+          },
+          {
+            "name": "borrower_collateral_refund",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Deposit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u128"
+          },
+          {
+            "name": "total_shares",
+            "type": "u128"
+          },
+          {
+            "name": "cash",
+            "type": "u64"
+          },
+          {
+            "name": "principal_out",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Exposure",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "q",
+            "type": "u64"
+          },
+          {
+            "name": "notional",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FinancialPolicy",
+      "docs": [
+        "Economics are fixed per policy version. Reporter authorization is separate in Config."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "term_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "default_grace_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "term_fee_bps",
+            "type": "u16"
+          },
+          {
+            "name": "protocol_share_bps",
+            "type": "u16"
+          },
+          {
+            "name": "cr_open_bps",
+            "type": "u32"
+          },
+          {
+            "name": "cr_liq_bps",
+            "type": "u32"
+          },
+          {
+            "name": "min_notional_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "position_notional_cap_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "market_notional_cap_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "utilization_cap_bps",
+            "type": "u16"
+          },
+          {
+            "name": "wallet_notional_cap_bps",
+            "type": "u16"
+          },
+          {
+            "name": "keeper_fixed_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "keeper_bps",
+            "type": "u16"
+          },
+          {
+            "name": "keeper_cap_lamports",
+            "type": "u64"
+          },
+          {
+            "name": "buyback_premium_bps",
+            "type": "u16"
+          },
+          {
+            "name": "reference_max_age_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "reference_max_age_slots",
+            "type": "u64"
+          },
+          {
+            "name": "history_epoch_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "minimum_history_epochs",
+            "type": "u8"
+          },
+          {
+            "name": "max_spread_bps",
+            "type": "u16"
+          },
+          {
+            "name": "cr_confirmation_delay_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "cr_confirmation_delay_slots",
+            "type": "u64"
+          },
+          {
+            "name": "price_policy_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ForcedExit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "loan",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "keeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "kind",
+            "type": "u8"
+          },
+          {
+            "name": "buyback_cost",
+            "type": "u64"
+          },
+          {
+            "name": "token_surplus",
+            "type": "u64"
+          },
+          {
+            "name": "keeper_reward",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_refund",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ForcedExitArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "max_buyback_cost",
+            "type": "u64"
+          },
+          {
+            "name": "temporary_funding",
+            "type": "u64"
+          },
+          {
+            "name": "minimum_reference_sequence",
+            "type": "u64"
+          },
+          {
+            "name": "route",
+            "type": {
+              "defined": {
+                "name": "RouteArgs"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "InitializeArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "emergency",
+            "type": "pubkey"
+          },
+          {
+            "name": "reporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "genesis_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "policy_version",
+            "type": "u64"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "FinancialPolicy"
+              }
+            }
+          },
+          {
+            "name": "opens_paused",
+            "type": "bool"
+          },
+          {
+            "name": "market_creation_fee",
+            "type": "u64"
+          },
+          {
+            "name": "jupiter_deploy_slot",
+            "type": "u64"
+          },
+          {
+            "name": "jupiter_program_data_len",
+            "type": "u32"
+          },
+          {
+            "name": "jupiter_elf_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "max_setup_rent",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LenderReceipt",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "generation",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u128"
+          },
+          {
+            "name": "checkpoint",
+            "type": {
+              "array": [
+                "u64",
+                4
+              ]
+            }
+          },
+          {
+            "name": "fraction",
+            "type": "u128"
+          },
+          {
+            "name": "pending_sol",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LiquidationArmed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "loan",
+            "type": "pubkey"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "reporter_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "armed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Loan",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "q",
+            "type": "u64"
+          },
+          {
+            "name": "sale_proceeds",
+            "type": "u64"
+          },
+          {
+            "name": "margin",
+            "type": "u64"
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          },
+          {
+            "name": "opening_notional",
+            "type": "u64"
+          },
+          {
+            "name": "term_fee",
+            "type": "u64"
+          },
+          {
+            "name": "lender_fee",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fee",
+            "type": "u64"
+          },
+          {
+            "name": "opened_at",
+            "type": "i64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "default_at",
+            "type": "i64"
+          },
+          {
+            "name": "cr_arm_timestamp",
+            "type": "i64"
+          },
+          {
+            "name": "cr_arm_slot",
+            "type": "u64"
+          },
+          {
+            "name": "cr_arm_sequence",
+            "type": "u64"
+          },
+          {
+            "name": "cr_arm_reporter_epoch",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarginAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "loan",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "active_generation",
+            "type": "u64"
+          },
+          {
+            "name": "next_loan_nonce",
+            "docs": [
+              "Monotonic across generations, so a closed loan address is never reused."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "generation",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NewPolicyArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u64"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "FinancialPolicy"
+              }
+            }
+          },
+          {
+            "name": "max_setup_rent",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OpenArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "q",
+            "type": "u64"
+          },
+          {
+            "name": "min_proceeds",
+            "type": "u64"
+          },
+          {
+            "name": "max_margin",
+            "type": "u64"
+          },
+          {
+            "name": "max_term_fee",
+            "type": "u64"
+          },
+          {
+            "name": "temporary_funding",
+            "docs": [
+              "Signed maximum for the separately refunded scratch-account rent advance."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "max_account_rent",
+            "type": "u64"
+          },
+          {
+            "name": "minimum_reference_sequence",
+            "type": "u64"
+          },
+          {
+            "name": "route",
+            "type": {
+              "defined": {
+                "name": "RouteArgs"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Opened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "loan",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "sale_proceeds",
+            "type": "u64"
+          },
+          {
+            "name": "margin",
+            "type": "u64"
+          },
+          {
+            "name": "collateral",
+            "type": "u64"
+          },
+          {
+            "name": "opening_notional",
+            "type": "u64"
+          },
+          {
+            "name": "term_fee",
+            "type": "u64"
+          },
+          {
+            "name": "lender_fee",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fee",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "default_at",
+            "type": "i64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Policy",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy_version",
+            "type": "u64"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "FinancialPolicy"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PolicyCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "version",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolGeneration",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "token_vault_bump",
+            "type": "u8"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "generation",
+            "type": "u64"
+          },
+          {
+            "name": "cash",
+            "type": "u64"
+          },
+          {
+            "name": "principal_out",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u128"
+          },
+          {
+            "name": "loan_count",
+            "type": "u32"
+          },
+          {
+            "name": "sol_reserve",
+            "type": "u64"
+          },
+          {
+            "name": "sol_index",
+            "type": {
+              "array": [
+                "u64",
+                4
+              ]
+            }
+          },
+          {
+            "name": "retired",
+            "type": "bool"
+          },
+          {
+            "name": "booked_notional_out",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolRolled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "new_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "generation",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PriceReference",
+      "docs": [
+        "Trusted compact summaries of private history; no independent history proof is claimed."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "reporter_epoch",
+            "type": "u64"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "finite",
+            "type": "bool"
+          },
+          {
+            "name": "source_slot",
+            "type": "u64"
+          },
+          {
+            "name": "source_ts",
+            "type": "i64"
+          },
+          {
+            "name": "live_bid_lower",
+            "type": "u64"
+          },
+          {
+            "name": "live_ask_upper",
+            "type": "u64"
+          },
+          {
+            "name": "history_ask_upper_max",
+            "type": "u64"
+          },
+          {
+            "name": "history_bid_lower_max",
+            "type": "u64"
+          },
+          {
+            "name": "acquisition_reference",
+            "type": "u64"
+          },
+          {
+            "name": "completed_epochs",
+            "type": "u8"
+          },
+          {
+            "name": "history_start_ts",
+            "type": "i64"
+          },
+          {
+            "name": "history_end_ts",
+            "type": "i64"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PublishReferenceArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "source_slot",
+            "type": "u64"
+          },
+          {
+            "name": "source_ts",
+            "type": "i64"
+          },
+          {
+            "name": "finite",
+            "type": "bool"
+          },
+          {
+            "name": "live_bid_lower",
+            "type": "u64"
+          },
+          {
+            "name": "live_ask_upper",
+            "type": "u64"
+          },
+          {
+            "name": "history_ask_upper_max",
+            "type": "u64"
+          },
+          {
+            "name": "history_bid_lower_max",
+            "type": "u64"
+          },
+          {
+            "name": "acquisition_reference",
+            "type": "u64"
+          },
+          {
+            "name": "completed_epochs",
+            "type": "u8"
+          },
+          {
+            "name": "history_start_ts",
+            "type": "i64"
+          },
+          {
+            "name": "history_end_ts",
+            "type": "i64"
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "max_reference_rent",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferencePublished",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "reference",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "policy",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "source_slot",
+            "type": "u64"
+          },
+          {
+            "name": "source_ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Repaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "loan",
+            "type": "pubkey"
+          },
+          {
+            "name": "borrower",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity",
+            "type": "u64"
+          },
+          {
+            "name": "collateral_refund",
+            "type": "u64"
+          },
+          {
+            "name": "slot",
+            "type": "u64"
+          },
+          {
+            "name": "ts",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RouteArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "input_amount",
+            "type": "u64"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SolClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "sol",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Withdraw",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens",
+            "type": "u64"
+          },
+          {
+            "name": "sol",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u128"
+          },
+          {
+            "name": "total_shares",
+            "type": "u128"
+          },
+          {
+            "name": "cash",
+            "type": "u64"
+          },
+          {
+            "name": "principal_out",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

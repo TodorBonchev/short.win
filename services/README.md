@@ -1,3 +1,5 @@
+> **Legacy implementation:** the active 2026-10-28 replacement is in [simple/](../simple/README.md). Use its new program, client, operator and web together. This document describes the preserved earlier implementation and is not an operating guide for the pooled replacement.
+
 # services
 
 > Active Jupiter redesign: the owner accepts trusted off-chain history on the VPS

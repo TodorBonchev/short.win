@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-10-28T16:27:17.535039+00:00",
+  "scope": "last wallet-unregister invalidation change; no Rust/ABI change",
+  "commands": [
+    {
+      "command": [
+        "pnpm",
+        "--dir",
+        "web",
+        "check"
+      ],
+      "exit_code": 0,
+      "sha256": "40ffca9eb7ff9d69f3c15614fbebaa426d1c68fdfb3702c85197b856ca6d4d1a",
+      "elapsed_seconds": 3.35
+    },
+    {
+      "command": [
+        "pnpm",
+        "--dir",
+        "web",
+        "build"
+      ],
+      "exit_code": 0,
+      "sha256": "c0afd94ebac4651152722451c96905b27ddb611470b65d8689a0ea9c5291fe55",
+      "elapsed_seconds": 3.414
+    }
+  ]
+}

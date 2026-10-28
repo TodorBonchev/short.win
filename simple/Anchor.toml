@@ -1,0 +1,15 @@
+skip_local_validator = true
+[toolchain]
+anchor_version = "1.2.0"
+solana_version = "4.1.2"
+package_manager = "pnpm"
+[features]
+resolution = true
+skip-lint = false
+[workspace]
+members = ["programs/shortwin-simple"]
+[programs.localnet]
+shortwin_simple = "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2"
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"

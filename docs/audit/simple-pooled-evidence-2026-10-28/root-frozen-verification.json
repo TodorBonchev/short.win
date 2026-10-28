@@ -1,0 +1,25 @@
+{
+  "verified_at": "2026-10-28T16:29:53.159780+00:00",
+  "scope": "root file/hash/completion verification of final source after whitespace normalization; short smoke only",
+  "metadata_sha256": "4e2a82f62f7a82586a42bcd4751d05732ad6045fd66bc16f1c50fc44b8806667",
+  "summary_sha256": "bb364ad727a8d579f428969cb4defcdbff6b851beb6d8d71cef1d5165200ccd7",
+  "completion_sha256": "9fa890d0bce8940f20f7f70c8b861c1bf1a3f7b028517f1accc6dc4c955909c5",
+  "log_sha256": "e776e31f02b6917706081048d0548fa5f698c99564de2dee1ec56e23a1ff00b9",
+  "artifacts_verified": 342,
+  "sources_verified": 37,
+  "runner_sha256": "a494d33f8f0d24b00adad7ba0b3c2420d444790626e5b22ec8ea6704054c8c2e",
+  "program_sha256": "49f11f900aa9a368638dcb6a624685a85d59909c805086403ae6765bd539a54a",
+  "cases": 32,
+  "wall_seconds": 22.048472413,
+  "zero_failure_fields": true,
+  "actual_scenario_families": {
+    "close": 2,
+    "cr_fill_veto": 3,
+    "cr_market_rise": 3,
+    "default_boundary": 5,
+    "expiry": 5,
+    "margin_repay": 8,
+    "repay": 3,
+    "underfill": 3
+  }
+}

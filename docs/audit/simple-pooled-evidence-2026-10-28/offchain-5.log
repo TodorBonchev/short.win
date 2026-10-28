@@ -1,0 +1,8 @@
+$ node bin/server.ts --help
+Unsigned quote/history HTTP bridge (default 127.0.0.1:8787).
+Required: --settings FILE --service-database FILE
+RPC: --rpc-url URL or SOLANA_RPC_URL
+Optional: --frontend-origin ORIGIN --host HOST --port PORT --python PATH
+JUPITER_API_KEY stays in the server environment; keyless spacing must be >=2000ms.
+POST /v1/requests warms exact-q history. GET /v1/reference reports current on-chain readiness.
+POST /v1/route returns a checked fresh whole-position route. No HTTP signing endpoint exists.

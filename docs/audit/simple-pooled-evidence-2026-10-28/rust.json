@@ -1,0 +1,71 @@
+{
+  "timestamp": "2026-10-28T16:17:29.239168+00:00",
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.724,
+      "log": "target/final-verification/rust-0.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.678,
+      "log": "target/final-verification/rust-1.log",
+      "sha256": "fe308ec4ac11d777b87856db7cf1d962845e5fcb0fce552a12ebdcc2046dc0ff"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.61,
+      "log": "target/final-verification/rust-2.log",
+      "sha256": "a6e8ce4196cb8ab62435e8389f3be3a72828c13692fddc141c4403291bbf6ef2"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--manifest-path",
+        "../Cargo.toml",
+        "-p",
+        "shortwin-jupiter-route",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.781,
+      "log": "target/final-verification/rust-3.log",
+      "sha256": "99aff861c81fabad956576340944c4f0c844fdf7a9ad3779f326d2d7b553d250"
+    },
+    {
+      "command": [
+        "python3",
+        "../scripts/check-sbf-stack.py",
+        "target/final-sbf-build.log"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.031,
+      "log": "target/final-verification/rust-4.log",
+      "sha256": "49366b5e11f806e9645a0b7a6b5b9bce837c1226b2f9d8e4e72f8d57c4c05e60"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+   Compiling shortwin-jupiter-route v0.1.0 (/root/short.win-simple/crates/shortwin-jupiter-route)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (/root/short.win-simple/target/simple-native/debug/deps/shortwin_jupiter_route-dce983412365a464)
+
+running 13 tests
+test isolation::tests::native_rent_lamports_and_delegated_amount_are_checked ... ok
+test isolation::tests::refuses_hidden_extensions_state_and_authority_changes ... ok
+test isolation::tests::refuses_protocol_state_keys_unexpected_signers_and_writable_mints ... ok
+test isolation::tests::rejects_runtime_union_and_alias_privileges ... ok
+test tests::amount_mode_ranges_slippage_and_both_fees_are_checked ... ok
+test isolation::tests::whole_debt_net_credit_bounded_funding_and_surplus ... ok
+test tests::every_fixed_key_is_bound_and_minimum_account_counts_hold ... ok
+test tests::four_current_idl_headers_and_exact_u64_fields ... ok
+test tests::every_truncated_header_and_tail_is_rejected_without_panics ... ok
+test tests::opaque_route_data_is_deliberately_not_full_authorization ... ok
+test tests::oversized_counts_lengths_and_u64_maximum_are_bounded ... ok
+test tests::recipient_signer_and_writable_substitution_is_rejected ... ok
+test tests::shared_id_and_trusted_binding_sanity_are_checked ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests shortwin_jupiter_route
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

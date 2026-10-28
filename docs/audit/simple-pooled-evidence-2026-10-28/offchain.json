@@ -1,0 +1,77 @@
+{
+  "timestamp": "2026-10-28T16:17:31.577628+00:00",
+  "commands": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "services/tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.25,
+      "log": "target/final-verification/offchain-0.log",
+      "sha256": "80fdc796e40f787814ab6a6426127f12f0e44aaca05367b6dda918a1b75522d1"
+    },
+    {
+      "command": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.046,
+      "log": "target/final-verification/offchain-1.log",
+      "sha256": "612e6ed7909c1c3a490c3805ad3b76ce254683e5082d1902122fcdb32f75ad88"
+    },
+    {
+      "command": [
+        "pnpm",
+        "check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 8.233,
+      "log": "target/final-verification/offchain-2.log",
+      "sha256": "c8fd05e7850c496531d3a2dd5ead26da8a8ef81c150c73a4de68b6e66bc04d08"
+    },
+    {
+      "command": [
+        "pnpm",
+        "build"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.139,
+      "log": "target/final-verification/offchain-3.log",
+      "sha256": "b54df67c9bf0dbd8ce02bac63364ae9d7cb1e4588d03828c03ee4225ecf62679"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--dir",
+        "client",
+        "operator",
+        "--help"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.242,
+      "log": "target/final-verification/offchain-4.log",
+      "sha256": "e4034fdc3c4c6fdfc38a7d6f672d0322288692ea061f6f51b15746a279377f54"
+    },
+    {
+      "command": [
+        "pnpm",
+        "--dir",
+        "client",
+        "server",
+        "--help"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.232,
+      "log": "target/final-verification/offchain-5.log",
+      "sha256": "cb030f4d2a40f08d1009aa05687be756b3aee7ee1f23c2eece7e57135238193d"
+    }
+  ]
+}
