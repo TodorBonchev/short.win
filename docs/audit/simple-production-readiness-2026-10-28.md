@@ -142,8 +142,22 @@ Current IDL SHA256:
 `9b262cb8ddfe2d55ada06c31aa11049044515c9a6b85324b6f2167b17c61cc26`.
 The primary price model hash is
 `8cfc3b1258a12e2cc9abf5a5ebc8ffd363e034406d2b4465448b8cd6db9c7d96`.
-Fresh hosted CI and independent artifact-byte comparison are recorded after the
-preparation commit is published. Earlier b875/cda1/a81d/ebb28 intermediate results stay tied to those
+[Hosted CI 40766940373](https://github.com/TodorBonchev/short.win/actions/runs/40766940373)
+passed on preparation source commit
+`94b8409a787f88567d47c59b0a7ec1d13278ce46`. Independent downloaded-artifact
+comparison [receipts](simple-production-evidence-2026-10-28/ci-40766940373/independent-verification.json)
+confirm exact local/CI ELF and IDL bytes, 40 frozen source files, 342 frozen input
+files and runner identity. The hosted 32-case smoke lasted **36.847537388 seconds**
+with zero failures/anomalies/setup/invariant failures, 147 driver transactions
+(98 successful, 49 expected refusals), 65 successful actual CPMM invocation logs
+and all eight scenario families. The hosted route matrix separately verified
+six actual-packet positives and two exact downstream refusals, including all
+three Pump native-setup/zero-setup-buyback sequences. All 996 committed
+capture/validation files were independently compared byte for byte with the
+verified working files; no newline conversion changed their evidence hashes.
+The follow-up record changes documentation/evidence only; program, IDL, policy,
+service, client, workflow and frozen route inputs remain identical to the checked
+source commit. Earlier b875/cda1/a81d/ebb28 intermediate results stay tied to those
 bytes; no old fuzz duration qualifies the changed program.
 
 ## Remaining release work
@@ -155,12 +169,20 @@ bytes; no old fuzz duration qualifies the changed program.
    current-route matrix and metadata/native-setup regression tests.
 3. Freeze source, runner and current external inputs and complete a fresh >=24h
    whole-system campaign with readable summary, duration, real coverage, zero
-   failures/anomalies and retained hashes. The prior 32-case smoke is not this.
+   failures/anomalies and retained hashes. The current duration runner exercises
+   historical CPMM financial scenarios; it does not provide hours of Pump/native
+   setup coverage. Qualify any added long-run profiles or retain the current-route
+   matrix as a distinctly scoped deterministic gate. The 32-case smoke is not a
+   24-hour campaign.
 4. Configure the free API/RPC locally; commission funded payer balances, exact-q
-   admission, public warm/rent capacity, monitoring and delivered alerts,
+   admission, safe inactive-quantity retirement/re-admission, public warm/rent
+   capacity, monitoring and delivered alerts,
    restart/recovery, backups and exact running client/reporter/keeper artifacts.
    Measure history plus action throughput and retain receipts. Code tests prove
-   none of these operating conditions.
+   none of these operating conditions. The current warm-request TTL controls
+   publication intent; it does not automatically retire a durable inactive job.
+   Qualify retirement against active debt and outstanding/fresh references before
+   broad onboarding; do not delete a live identity just to free a queue slot.
 5. Present the resulting candidate and a distinct stable release line (proposed
    1.1.0) for owner review. Tag only the qualified frozen commit; deploy/initialize
    only after the separate production decision and operating prerequisites.

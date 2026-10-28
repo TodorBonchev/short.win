@@ -1,0 +1,84 @@
+{
+  "cases": [
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "bonk-production-adaptive",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "c270e26d66d51aded2059ce2346ce890e359d30b8ef7be5f4f52b415f01553a3",
+      "summary_sha256": "c5d0f9da6e178f4eacdb381b02f305ca6963565402f214fa1fa1ba323996ad77",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "jup-production-adaptive",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "04c3387477d790ed9ac1bbb9a8eee0186cdb808d000a50239850da59c7b4e0ca",
+      "summary_sha256": "181dd668ebfb0c678c9f392970411a5f889038ff350d2cf8457eaded03c2eecb",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "ray-production-exclude-scorch16",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "f22956afdc10b6b40f9ce026bc46c9d2a7778dd4849f99891b6b44d712be278e",
+      "summary_sha256": "ba81076ad7ba25ec3ec612b23a997fc35f5c3001a779983809a4eb16b6cf13d9",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "pump-curve-adaptive",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "92360a915d692a10745dcb8e4c34a58893c270995fd0acee7ffab41de1957a66",
+      "summary_sha256": "ae687a65c9e1c3d4d2db5278f5b849492519aa8d6d8e460a117629f894d084da",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "pump-graduated-adaptive-440",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "f5e91507f5f97f4a2edb934acae64418e20f7d0655970fe1595324275542b4f5",
+      "summary_sha256": "c33cfd6d048cf165eea5a8ef91aa5750b1aafffb09293e9bd87807e9dc6a925b",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "pump-fresh-native-adaptive",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "8b104a88acdd77d7e16aa21939e85c3d2bd7203579b78bb9df1544136eb756cf",
+      "summary_sha256": "085f981431bbc9b18b2b6af2e51d19e695c3e4bf82292e12ee290f8fd733f090",
+      "verified": true
+    },
+    {
+      "actual": "failed",
+      "expected": "expected_fail",
+      "name": "jup-direct-budget16",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "08e8f2fd8e5cfc0900d281764af57f73814a197b3507f075f450763fd0ab83ac",
+      "summary_sha256": "974d83da4e2b60e11bf29c093e45dcd612cbefe16f4bb625bbcf0ed61ecfaec2",
+      "verified": true
+    },
+    {
+      "actual": "failed",
+      "expected": "expected_fail",
+      "name": "ray-direct-budget16",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "ed1127caf414643476808dafc7106463759061c543c55ae5319cd2fe7d2aa489",
+      "summary_sha256": "b4f065c7163f9e50308749b386cb9ea69d284c88dae98c4e260f80340aec15c1",
+      "verified": true
+    }
+  ],
+  "live_transactions_sent": 0,
+  "matrix_sha256": "220b6e160bfd6d99120432259dd65e7568718875e13c532799ade3dc9c731190",
+  "native_runner_sha256": "75fccf870865806919b9b0845eca3b0a1a11d70b0b55b22886a1392acd8e9c7b",
+  "own_program_sha256": "8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d",
+  "pending": [],
+  "schema": 1,
+  "scope": "additive non-atomic snapshot compatibility; no live execution, history provenance or 24h qualification",
+  "status": "passed"
+}

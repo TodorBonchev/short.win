@@ -1,0 +1,11 @@
+Program ComputeBudget111111111111111111111111111111 invoke [1]
+Program ComputeBudget111111111111111111111111111111 success
+Program kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 invoke [1]
+Program log: Instruction: OpenPosition
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program log: AnchorError thrown in programs/shortwin-simple/src/route.rs:693. Error Code: FundingAboveMax. Error Number: 6032. Error Message: Temporary execution funding exceeds the signed maximum.
+Program kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 consumed 47437 of 1399850 compute units
+Program kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2 failed: custom program error: 0x1790

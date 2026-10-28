@@ -1,0 +1,1407 @@
+﻿2026-10-28T20:51:17.5972735Z Current runner version: '2.338.0'
+2026-10-28T20:51:17.6008836Z ##[group]Runner Image Provisioner
+2026-10-28T20:51:17.6009740Z Hosted Compute Agent
+2026-10-28T20:51:17.6010755Z Version: 20261021.618
+2026-10-28T20:51:17.6011498Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+2026-10-28T20:51:17.6012299Z Build Date: 2026-10-21T00:45:21Z
+2026-10-28T20:51:17.6013129Z Worker ID: {aee66d2c-c831-4a87-afdf-b642a85b8481}
+2026-10-28T20:51:17.6013940Z Region: northcentralus
+2026-10-28T20:51:17.6014671Z Cloud: Azure
+2026-10-28T20:51:17.6015261Z ##[endgroup]
+2026-10-28T20:51:17.6016809Z ##[group]Operating System
+2026-10-28T20:51:17.6017574Z Ubuntu
+2026-10-28T20:51:17.6018146Z 24.04.5
+2026-10-28T20:51:17.6018733Z LTS
+2026-10-28T20:51:17.6019322Z ##[endgroup]
+2026-10-28T20:51:17.6019970Z ##[group]Runner Image
+2026-10-28T20:51:17.6020855Z Image: ubuntu-24.04
+2026-10-28T20:51:17.6021518Z Version: 20261025.353.1
+2026-10-28T20:51:17.6022951Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261025.353/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-28T20:51:17.6024626Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261025.353
+2026-10-28T20:51:17.6025700Z ##[endgroup]
+2026-10-28T20:51:17.6026912Z ##[group]GITHUB_TOKEN Permissions
+2026-10-28T20:51:17.6028921Z Contents: read
+2026-10-28T20:51:17.6029662Z Metadata: read
+2026-10-28T20:51:17.6030331Z ##[endgroup]
+2026-10-28T20:51:17.6032757Z Secret source: Actions
+2026-10-28T20:51:17.6033721Z Cache mode: write
+2026-10-28T20:51:17.6034642Z Prepare workflow directory
+2026-10-28T20:51:17.6472623Z Prepare all required actions
+2026-10-28T20:51:17.6521233Z Getting action download info
+2026-10-28T20:51:17.9217597Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-10-28T20:51:18.0365317Z Download action repository 'Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6' (SHA:6323deb102c322ba6fcbdcafc7e3dddab59af2b6)
+2026-10-28T20:51:18.3639382Z Download action repository 'jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c' (SHA:c2a87611a18de5b3828c5652fe268e992400cb5c)
+2026-10-28T20:51:18.7138514Z Download action repository 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9' (SHA:55cc8345863c7cc4c66a329aec7e433d2d1c52a9)
+2026-10-28T20:51:18.8418470Z Download action repository 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' (SHA:043fb46d1a93c77aae656e7c1c64a875d1fc6a0a)
+2026-10-28T20:51:19.0452722Z Complete job name: replacement
+2026-10-28T20:51:19.1478003Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+2026-10-28T20:51:19.1479114Z with:
+2026-10-28T20:51:19.1479595Z   repository: TodorBonchev/short.win
+2026-10-28T20:51:19.1484017Z   token: ***
+2026-10-28T20:51:19.1484484Z   ssh-strict: true
+2026-10-28T20:51:19.1484941Z   ssh-user: git
+2026-10-28T20:51:19.1485395Z   persist-credentials: true
+2026-10-28T20:51:19.1485903Z   clean: true
+2026-10-28T20:51:19.1486359Z   sparse-checkout-cone-mode: true
+2026-10-28T20:51:19.1486921Z   fetch-depth: 1
+2026-10-28T20:51:19.1487365Z   fetch-tags: false
+2026-10-28T20:51:19.1487823Z   show-progress: true
+2026-10-28T20:51:19.1488286Z   lfs: false
+2026-10-28T20:51:19.1488698Z   submodules: false
+2026-10-28T20:51:19.1489157Z   set-safe-directory: true
+2026-10-28T20:51:19.1489666Z   allow-unsafe-pr-checkout: false
+2026-10-28T20:51:19.1490542Z env:
+2026-10-28T20:51:19.1490958Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:51:19.1491422Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:51:19.1491947Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:51:19.1492728Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:51:19.1493860Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:51:19.1494747Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:51:19.1495350Z ##[endgroup]
+2026-10-28T20:51:19.4124094Z Syncing repository: TodorBonchev/short.win
+2026-10-28T20:51:19.4128337Z ##[group]Getting Git version info
+2026-10-28T20:51:19.4130986Z Working directory is '/home/runner/work/short.win/short.win'
+2026-10-28T20:51:19.4132708Z [command]/usr/bin/git version
+2026-10-28T20:51:19.4196754Z git version 2.56.0
+2026-10-28T20:51:19.4218135Z ##[endgroup]
+2026-10-28T20:51:19.4231130Z Temporarily overriding HOME='/home/runner/work/_temp/60ae8932-bb86-4b85-b6c2-0f0e53faa44a' before making global git config changes
+2026-10-28T20:51:19.4234120Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-28T20:51:19.4237266Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/short.win/short.win
+2026-10-28T20:51:19.4288134Z Deleting the contents of '/home/runner/work/short.win/short.win'
+2026-10-28T20:51:19.4292029Z ##[group]Determining repository object format
+2026-10-28T20:51:19.4294705Z ##[endgroup]
+2026-10-28T20:51:19.4297124Z ##[group]Initializing the repository
+2026-10-28T20:51:19.4299360Z [command]/usr/bin/git init /home/runner/work/short.win/short.win
+2026-10-28T20:51:19.4397331Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-28T20:51:19.4401481Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-28T20:51:19.4405012Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-28T20:51:19.4408423Z hint: call:
+2026-10-28T20:51:19.4413391Z hint:
+2026-10-28T20:51:19.4416105Z hint: 	git config --global init.defaultBranch <name>
+2026-10-28T20:51:19.4419070Z hint:
+2026-10-28T20:51:19.4421638Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-28T20:51:19.4424926Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-28T20:51:19.4427421Z hint:
+2026-10-28T20:51:19.4429106Z hint: 	git branch -m <name>
+2026-10-28T20:51:19.4431517Z hint:
+2026-10-28T20:51:19.4434167Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-28T20:51:19.4438261Z Initialized empty Git repository in /home/runner/work/short.win/short.win/.git/
+2026-10-28T20:51:19.4445690Z [command]/usr/bin/git remote add origin https://github.com/TodorBonchev/short.win
+2026-10-28T20:51:19.4479693Z ##[endgroup]
+2026-10-28T20:51:19.4481725Z ##[group]Disabling automatic garbage collection
+2026-10-28T20:51:19.4483744Z [command]/usr/bin/git config --local gc.auto 0
+2026-10-28T20:51:19.4525678Z ##[endgroup]
+2026-10-28T20:51:19.4528274Z ##[group]Setting up auth
+2026-10-28T20:51:19.4530111Z Removing SSH command configuration
+2026-10-28T20:51:19.4533273Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-28T20:51:19.4574183Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-28T20:51:19.4977523Z Removing HTTP extra header
+2026-10-28T20:51:19.4985260Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-28T20:51:19.5036065Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-28T20:51:19.5304124Z Removing includeIf entries pointing to credentials config files
+2026-10-28T20:51:19.5318106Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-28T20:51:19.5370634Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-28T20:51:19.5647348Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-28T20:51:19.5711374Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/short.win/short.win/.git.path /home/runner/work/_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:51:19.5757919Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:51:19.5803606Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:51:19.5850547Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:51:19.5896820Z ##[endgroup]
+2026-10-28T20:51:19.5898591Z ##[group]Fetching the repository
+2026-10-28T20:51:19.5904775Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +94b8409a787f88567d47c59b0a7ec1d13278ce46:refs/remotes/origin/codex/jupiter-only-pooled
+2026-10-28T20:51:25.7663448Z From https://github.com/TodorBonchev/short.win
+2026-10-28T20:51:25.7664924Z  * [new ref]         94b8409a787f88567d47c59b0a7ec1d13278ce46 -> origin/codex/jupiter-only-pooled
+2026-10-28T20:51:25.7674298Z [command]/usr/bin/git branch --list --remote origin/codex/jupiter-only-pooled
+2026-10-28T20:51:25.7715913Z   origin/codex/jupiter-only-pooled
+2026-10-28T20:51:25.7724240Z [command]/usr/bin/git rev-parse refs/remotes/origin/codex/jupiter-only-pooled
+2026-10-28T20:51:25.7762697Z 94b8409a787f88567d47c59b0a7ec1d13278ce46
+2026-10-28T20:51:25.7768035Z ##[endgroup]
+2026-10-28T20:51:25.7768812Z ##[group]Determining the checkout info
+2026-10-28T20:51:25.7770000Z ##[endgroup]
+2026-10-28T20:51:25.7774603Z [command]/usr/bin/git sparse-checkout disable
+2026-10-28T20:51:25.7840201Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-28T20:51:25.7886349Z ##[group]Checking out the ref
+2026-10-28T20:51:25.7891834Z [command]/usr/bin/git checkout --progress --force -B codex/jupiter-only-pooled refs/remotes/origin/codex/jupiter-only-pooled
+2026-10-28T20:51:26.4575859Z Switched to a new branch 'codex/jupiter-only-pooled'
+2026-10-28T20:51:26.4580154Z branch 'codex/jupiter-only-pooled' set up to track 'origin/codex/jupiter-only-pooled'.
+2026-10-28T20:51:26.4620178Z ##[endgroup]
+2026-10-28T20:51:26.4694755Z [command]/usr/bin/git log -1 --format=%H
+2026-10-28T20:51:26.4743923Z 94b8409a787f88567d47c59b0a7ec1d13278ce46
+2026-10-28T20:51:26.4990872Z ##[group]Run rustup toolchain install || rustup show
+2026-10-28T20:51:26.4991403Z [36;1mrustup toolchain install || rustup show[0m
+2026-10-28T20:51:26.5017375Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:51:26.5017667Z env:
+2026-10-28T20:51:26.5017884Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:51:26.5018146Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:51:26.5018384Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:51:26.5018798Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:51:26.5019421Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:51:26.5019929Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:51:26.5020244Z ##[endgroup]
+2026-10-28T20:51:26.5493543Z info: syncing channel updates for 1.98.1-x86_64-unknown-linux-gnu
+2026-10-28T20:51:26.6608183Z info: latest update on 2026-09-03 for version 1.98.1 (48a229cea 2026-09-01)
+2026-10-28T20:51:26.6613361Z info: downloading 6 components
+2026-10-28T20:51:37.1378361Z info: the active toolchain `1.98.1-x86_64-unknown-linux-gnu` has been installed
+2026-10-28T20:51:37.1379359Z info: it's active because: overridden by '/home/runner/work/short.win/short.win/rust-toolchain.toml'
+2026-10-28T20:51:37.1744354Z ##[group]Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+2026-10-28T20:51:37.1744768Z with:
+2026-10-28T20:51:37.1744990Z   workspaces: simple
+2026-10-28T20:51:37.1745239Z   key: simple-pooled-v1
+2026-10-28T20:51:37.1745471Z   prefix-key: v0-rust
+2026-10-28T20:51:37.1745698Z   add-job-id-key: true
+2026-10-28T20:51:37.1745946Z   add-rust-environment-hash-key: true
+2026-10-28T20:51:37.1746419Z   cache-targets: true
+2026-10-28T20:51:37.1746644Z   cache-all-crates: false
+2026-10-28T20:51:37.1746889Z   cache-workspace-crates: false
+2026-10-28T20:51:37.1747132Z   save-if: true
+2026-10-28T20:51:37.1747345Z   cache-provider: github
+2026-10-28T20:51:37.1747570Z   cache-bin: true
+2026-10-28T20:51:37.1747773Z   lookup-only: false
+2026-10-28T20:51:37.1748008Z   cmd-format: {0}
+2026-10-28T20:51:37.1748206Z env:
+2026-10-28T20:51:37.1748401Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:51:37.1748616Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:51:37.1748839Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:51:37.1749259Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:51:37.1749860Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:51:37.1750310Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:51:37.1750855Z ##[endgroup]
+2026-10-28T20:51:37.6780550Z ##[group]Cache Configuration
+2026-10-28T20:51:37.6781198Z Cache Provider:
+2026-10-28T20:51:37.6781643Z     github
+2026-10-28T20:51:37.6781979Z Workspaces:
+2026-10-28T20:51:37.6782348Z     /home/runner/work/short.win/short.win/simple
+2026-10-28T20:51:37.6782955Z Cache Paths:
+2026-10-28T20:51:37.6783287Z     /home/runner/.cargo/bin
+2026-10-28T20:51:37.6783819Z     /home/runner/.cargo/.crates.toml
+2026-10-28T20:51:37.6806508Z     /home/runner/.cargo/.crates2.json
+2026-10-28T20:51:37.6819144Z     /home/runner/.cargo/registry
+2026-10-28T20:51:37.6819618Z     /home/runner/.cargo/git
+2026-10-28T20:51:37.6820126Z     /home/runner/work/short.win/short.win/simple/target
+2026-10-28T20:51:37.6820789Z Restore Key:
+2026-10-28T20:51:37.6821337Z     v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942
+2026-10-28T20:51:37.6821894Z Cache Key:
+2026-10-28T20:51:37.6822400Z     v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942-4852fe6c
+2026-10-28T20:51:37.6823015Z .. Prefix:
+2026-10-28T20:51:37.6823422Z   - v0-rust-simple-pooled-v1-replacement-Linux-x64
+2026-10-28T20:51:37.6823951Z .. Environment considered:
+2026-10-28T20:51:37.6824314Z   - Rust Versions:
+2026-10-28T20:51:37.6824818Z     - 1.98.1 x86_64-unknown-linux-gnu 48a229ceaefd4985c50990b14116b6d856af0985
+2026-10-28T20:51:37.6825561Z     - 1.99.1 x86_64-unknown-linux-gnu 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-28T20:51:37.6826124Z   - CARGO_BUILD_JOBS
+2026-10-28T20:51:37.6826437Z   - CARGO_INCREMENTAL
+2026-10-28T20:51:37.6826765Z .. Lockfiles considered:
+2026-10-28T20:51:37.6827332Z   - /home/runner/work/short.win/short.win/rust-toolchain.toml
+2026-10-28T20:51:37.6828160Z   - /home/runner/work/short.win/short.win/simple/Cargo.lock
+2026-10-28T20:51:37.6828676Z   - /home/runner/work/short.win/short.win/simple/crates/jupiter-route/Cargo.toml
+2026-10-28T20:51:37.6829205Z   - /home/runner/work/short.win/short.win/simple/crates/pooled-core/Cargo.toml
+2026-10-28T20:51:37.6829794Z   - /home/runner/work/short.win/short.win/simple/programs/shortwin-simple/Cargo.toml
+2026-10-28T20:51:37.6830323Z   - /home/runner/work/short.win/short.win/simple/tests/runtime/Cargo.toml
+2026-10-28T20:51:37.6831396Z ##[endgroup]
+2026-10-28T20:51:37.6831577Z 
+2026-10-28T20:51:37.6831726Z ... Restoring cache ...
+2026-10-28T20:51:37.8005077Z Cache hit for restore-key: v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942-b4ea5413
+2026-10-28T20:51:38.9401927Z Received 134217728 of 683568941 (19.6%), 127.7 MBs/sec
+2026-10-28T20:51:39.9441812Z Received 339738624 of 683568941 (49.7%), 161.8 MBs/sec
+2026-10-28T20:51:40.9407016Z Received 532676608 of 683568941 (77.9%), 169.2 MBs/sec
+2026-10-28T20:51:41.7825185Z Received 683568941 of 683568941 (100.0%), 169.5 MBs/sec
+2026-10-28T20:51:41.7825780Z Cache Size: ~652 MB (683568941 B)
+2026-10-28T20:51:41.7944416Z [command]/usr/bin/tar -xf /home/runner/work/_temp/697027b8-e954-4b64-99c1-7b8e2330cd77/cache.tzst -P -C /home/runner/work/short.win/short.win --use-compress-program unzstd
+2026-10-28T20:51:46.6642223Z Cache restored successfully
+2026-10-28T20:51:47.3298444Z Restored from cache key "v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942-b4ea5413" full match: false.
+2026-10-28T20:51:47.3357583Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/target'
+2026-10-28T20:51:47.5651468Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/target'
+2026-10-28T20:51:47.5655461Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/trybuild'
+2026-10-28T20:51:47.5659065Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/trybuild'
+2026-10-28T20:51:47.5735158Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/target'
+2026-10-28T20:51:47.5739346Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/target'
+2026-10-28T20:51:47.5743334Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/trybuild'
+2026-10-28T20:51:47.5777300Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/trybuild'
+2026-10-28T20:51:47.5782692Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/target'
+2026-10-28T20:51:47.5786265Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/target'
+2026-10-28T20:51:47.5789829Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/trybuild'
+2026-10-28T20:51:47.5793528Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/trybuild'
+2026-10-28T20:51:47.8208022Z ##[group]Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
+2026-10-28T20:51:47.8208443Z with:
+2026-10-28T20:51:47.8208663Z   install: true
+2026-10-28T20:51:47.8208908Z   bootstrap: false
+2026-10-28T20:51:47.8209130Z   cache: true
+2026-10-28T20:51:47.8209343Z   cache_save: true
+2026-10-28T20:51:47.8209562Z   cache_key_prefix: mise-v1
+2026-10-28T20:51:47.8209828Z   experimental: false
+2026-10-28T20:51:47.8210064Z   log_level: info
+2026-10-28T20:51:47.8210277Z   reshim: false
+2026-10-28T20:51:47.8210753Z   add_shims_to_path: true
+2026-10-28T20:51:47.8213384Z   github_token: ***
+2026-10-28T20:51:47.8213640Z   fetch_from_github: true
+2026-10-28T20:51:47.8214056Z   env: true
+2026-10-28T20:51:47.8214334Z   export_path: true
+2026-10-28T20:51:47.8214635Z   wings_enabled: false
+2026-10-28T20:51:47.8214960Z env:
+2026-10-28T20:51:47.8215253Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:51:47.8215596Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:51:47.8215951Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:51:47.8216650Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:51:47.8217648Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:51:47.8218413Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:51:47.8218858Z   CACHE_ON_FAILURE: false
+2026-10-28T20:51:47.8219197Z ##[endgroup]
+2026-10-28T20:51:47.9631668Z ##[group]Restoring mise cache
+2026-10-28T20:51:47.9675571Z [command]/usr/bin/ldd --version
+2026-10-28T20:51:47.9855250Z ldd (Ubuntu GLIBC 2.39-0ubuntu8.9) 2.39
+2026-10-28T20:51:47.9855878Z Copyright (C) 2024 Free Software Foundation, Inc.
+2026-10-28T20:51:47.9857212Z This is free software; see the source for copying conditions.  There is NO
+2026-10-28T20:51:47.9858070Z warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+2026-10-28T20:51:47.9858749Z Written by Roland McGrath and Ulrich Drepper.
+2026-10-28T20:51:49.8670758Z Cache hit for: mise-v1-linux-x64-ubuntu24-40c159f0ba28c92c480a840a29754a2b437c693ae445f52eaf84eadfc97c89be
+2026-10-28T20:51:50.7736999Z Received 118161541 of 118161541 (100.0%), 137.9 MBs/sec
+2026-10-28T20:51:50.7737877Z Cache Size: ~113 MB (118161541 B)
+2026-10-28T20:51:50.7803586Z [command]/usr/bin/tar -xf /home/runner/work/_temp/0e55083e-9817-46df-aec2-22ded5c229ee/cache.tzst -P -C /home/runner/work/short.win/short.win --use-compress-program unzstd
+2026-10-28T20:51:51.6255972Z Cache restored successfully
+2026-10-28T20:51:51.6322308Z mise cache restored from key: mise-v1-linux-x64-ubuntu24-40c159f0ba28c92c480a840a29754a2b437c693ae445f52eaf84eadfc97c89be
+2026-10-28T20:51:51.6330691Z ##[group]Setting env vars
+2026-10-28T20:51:51.6331102Z Setting MISE_LOG_LEVEL=info
+2026-10-28T20:51:51.6336106Z Setting MISE_GITHUB_TOKEN=***
+2026-10-28T20:51:51.6336735Z Setting MISE_TRUSTED_CONFIG_PATHS=/home/runner/work/short.win/short.win
+2026-10-28T20:51:51.6337270Z Setting MISE_YES=1
+2026-10-28T20:51:51.6337601Z Adding /home/runner/.local/share/mise/shims to PATH
+2026-10-28T20:51:51.6338121Z ##[group]Running mise --version
+2026-10-28T20:51:51.6355593Z [command]/home/runner/.local/share/mise/bin/mise --version
+2026-10-28T20:51:51.6515675Z 2026.10.0 linux-x64 (2026-10-02)
+2026-10-28T20:51:51.6532054Z ##[endgroup]
+2026-10-28T20:51:51.6757259Z ##[group]Running mise install
+2026-10-28T20:51:51.6769645Z [command]/home/runner/.local/share/mise/bin/mise install
+2026-10-28T20:51:51.6966343Z [2mmise[0m [2mby @jdx[0m – installing 2 tools
+2026-10-28T20:51:51.6969137Z [2mmise[0m [38;5;11m⇢[0m node@24.21.0  0ms · already installed
+2026-10-28T20:51:51.6981137Z [2mmise[0m [38;5;11m⇢[0m pnpm@12.7.0   1ms · already installed
+2026-10-28T20:51:51.6982703Z [2mmise[0m [36m████████████████[0m[31m[0m[2m[0m 2/2 · installed 0 tools · 2 already installed in 1ms
+2026-10-28T20:51:51.6983496Z [2mmise[0m all tools are installed
+2026-10-28T20:51:51.7052571Z ##[endgroup]
+2026-10-28T20:51:51.7053191Z ##[group]Running mise ls
+2026-10-28T20:51:51.7068389Z [command]/home/runner/.local/share/mise/bin/mise ls
+2026-10-28T20:51:51.7276706Z node  24.21.0  ~/work/short.win/short.win/mise.toml  24.21.0
+2026-10-28T20:51:51.7277406Z pnpm  12.7.0   ~/work/short.win/short.win/mise.toml  12.7.0
+2026-10-28T20:51:51.7294182Z ##[endgroup]
+2026-10-28T20:51:51.7296169Z ##[group]Exporting mise environment variables
+2026-10-28T20:51:51.7558315Z [command]/home/runner/.local/share/mise/bin/mise env --json
+2026-10-28T20:51:51.7772425Z {
+2026-10-28T20:51:51.7774390Z   "PATH": "/home/runner/.local/share/mise/installs/pnpm/12.7.0:/home/runner/.local/share/mise/installs/node/24.21.0/bin:/home/runner/.local/share/mise/shims:/home/runner/.local/share/mise/bin:/snap/bin:/home/runner/.local/bin:/opt/pipx_bin:/home/runner/.cargo/bin:/home/runner/.config/composer/vendor/bin:/usr/local/.ghcup/bin:/home/runner/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games"
+2026-10-28T20:51:51.7776042Z }
+2026-10-28T20:51:51.7793200Z Adding /home/runner/.local/share/mise/installs/node/24.21.0/bin to PATH
+2026-10-28T20:51:51.7794005Z Adding /home/runner/.local/share/mise/installs/pnpm/12.7.0 to PATH
+2026-10-28T20:51:51.7795301Z ##[endgroup]
+2026-10-28T20:51:51.8185922Z ##[group]Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+2026-10-28T20:51:51.8186330Z with:
+2026-10-28T20:51:51.8186690Z   path: ~/.local/share/solana/install
+~/.cache/solana/v1.57
+~/.cargo/bin/anchor
+
+2026-10-28T20:51:51.8187585Z   key: sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux
+2026-10-28T20:51:51.8188344Z   enableCrossOsArchive: false
+2026-10-28T20:51:51.8188929Z   fail-on-cache-miss: false
+2026-10-28T20:51:51.8189185Z   lookup-only: false
+2026-10-28T20:51:51.8189415Z   save-always: false
+2026-10-28T20:51:51.8189639Z env:
+2026-10-28T20:51:51.8189846Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:51:51.8190080Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:51:51.8190322Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:51:51.8190986Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:51:51.8191644Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:51:51.8192124Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:51:51.8192447Z   CACHE_ON_FAILURE: false
+2026-10-28T20:51:51.8192706Z   MISE_LOG_LEVEL: info
+2026-10-28T20:51:51.8195350Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:51:51.8195730Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:51:51.8196113Z   MISE_YES: 1
+2026-10-28T20:51:51.8196337Z ##[endgroup]
+2026-10-28T20:51:52.0885133Z Cache hit for: sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux
+2026-10-28T20:51:53.2014162Z Received 163577856 of 785884067 (20.8%), 156.0 MBs/sec
+2026-10-28T20:51:54.2061925Z Received 398458880 of 785884067 (50.7%), 189.8 MBs/sec
+2026-10-28T20:51:55.2033902Z Received 603979776 of 785884067 (76.9%), 191.9 MBs/sec
+2026-10-28T20:51:56.1229306Z Received 785884067 of 785884067 (100.0%), 191.1 MBs/sec
+2026-10-28T20:51:56.1231457Z Cache Size: ~749 MB (785884067 B)
+2026-10-28T20:51:56.1412939Z [command]/usr/bin/tar -xf /home/runner/work/_temp/5765cbf5-2477-43c6-985b-b95c27bd50d8/cache.tzst -P -C /home/runner/work/short.win/short.win --use-compress-program unzstd
+2026-10-28T20:52:00.6668025Z Cache restored successfully
+2026-10-28T20:52:00.7127029Z Cache restored from key: sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux
+2026-10-28T20:52:00.8657010Z ##[group]Run echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+2026-10-28T20:52:00.8657696Z [36;1mecho "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"[0m
+2026-10-28T20:52:00.8681111Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:52:00.8681395Z env:
+2026-10-28T20:52:00.8681615Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:52:00.8681867Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:52:00.8682113Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:52:00.8682522Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:52:00.8683136Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:52:00.8683606Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:52:00.8683937Z   CACHE_ON_FAILURE: false
+2026-10-28T20:52:00.8684181Z   MISE_LOG_LEVEL: info
+2026-10-28T20:52:00.8686869Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:52:00.8687290Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:52:00.8687681Z   MISE_YES: 1
+2026-10-28T20:52:00.8687932Z ##[endgroup]
+2026-10-28T20:52:01.0723807Z ##[group]Run python3 scripts/materialize-jupiter-probe.py
+2026-10-28T20:52:01.0724605Z [36;1mpython3 scripts/materialize-jupiter-probe.py[0m
+2026-10-28T20:52:01.0747752Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:52:01.0748037Z env:
+2026-10-28T20:52:01.0748253Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:52:01.0748522Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:52:01.0748775Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:52:01.0749194Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:52:01.0749807Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:52:01.0750278Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:52:01.0750964Z   CACHE_ON_FAILURE: false
+2026-10-28T20:52:01.0751215Z   MISE_LOG_LEVEL: info
+2026-10-28T20:52:01.0753962Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:52:01.0754578Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:52:01.0755019Z   MISE_YES: 1
+2026-10-28T20:52:01.0755247Z ##[endgroup]
+2026-10-28T20:52:01.1549390Z {
+2026-10-28T20:52:01.1550003Z   "scope": "candidate-only frozen runtime input; not a live route or production qualification",
+2026-10-28T20:52:01.1550789Z   "context_slot": 461997164,
+2026-10-28T20:52:01.1551080Z   "deploy_slot": 459479624,
+2026-10-28T20:52:01.1551508Z   "raw_rpc_sha256": "c611ab92f91fd6bf4ce415054a1e72cad3a3abe1bef5c2bb22f1e574d7a3c3ff",
+2026-10-28T20:52:01.1552117Z   "elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+2026-10-28T20:52:01.1552537Z   "accounts": [
+2026-10-28T20:52:01.1552757Z     {
+2026-10-28T20:52:01.1552974Z       "name": "program",
+2026-10-28T20:52:01.1553295Z       "key": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+2026-10-28T20:52:01.1553717Z       "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+2026-10-28T20:52:01.1554091Z       "lamports": 6969116527,
+2026-10-28T20:52:01.1554347Z       "executable": true,
+2026-10-28T20:52:01.1554616Z       "rentEpoch": 18446744073709551615
+2026-10-28T20:52:01.1554893Z     },
+2026-10-28T20:52:01.1555091Z     {
+2026-10-28T20:52:01.1555306Z       "name": "programdata",
+2026-10-28T20:52:01.1555631Z       "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+2026-10-28T20:52:01.1556040Z       "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+2026-10-28T20:52:01.1556376Z       "lamports": 14693376760,
+2026-10-28T20:52:01.1556636Z       "executable": false,
+2026-10-28T20:52:01.1556889Z       "rentEpoch": 18446744073709551615
+2026-10-28T20:52:01.1557162Z     }
+2026-10-28T20:52:01.1557355Z   ]
+2026-10-28T20:52:01.1557552Z }
+2026-10-28T20:52:01.1660940Z ##[group]Run cargo fmt --all --check
+2026-10-28T20:52:01.1661467Z [36;1mcargo fmt --all --check[0m
+2026-10-28T20:52:01.1662052Z [36;1mcargo clippy --workspace --all-targets --locked -- -D warnings[0m
+2026-10-28T20:52:01.1662800Z [36;1mpython3 -m unittest discover -s services/tests -v[0m
+2026-10-28T20:52:01.1663475Z [36;1mpython3 -m unittest discover -s config -p 'test_*.py' -v[0m
+2026-10-28T20:52:01.1664140Z [36;1mpython3 config/verify-production-proposal.py[0m
+2026-10-28T20:52:01.1689817Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:52:01.1690090Z env:
+2026-10-28T20:52:01.1690309Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:52:01.1690835Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:52:01.1691081Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:52:01.1691502Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:52:01.1692186Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:52:01.1692704Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:52:01.1693026Z   CACHE_ON_FAILURE: false
+2026-10-28T20:52:01.1693289Z   MISE_LOG_LEVEL: info
+2026-10-28T20:52:01.1695941Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:52:01.1696320Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:52:01.1696715Z   MISE_YES: 1
+2026-10-28T20:52:01.1696938Z ##[endgroup]
+2026-10-28T20:52:01.4469868Z     Updating crates.io index
+2026-10-28T20:52:02.5499286Z     Checking shortwin-pooled-core v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+2026-10-28T20:52:02.5552914Z     Checking shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+2026-10-28T20:52:02.6468351Z     Checking shortwin-simple v0.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+2026-10-28T20:52:04.5043727Z     Checking shortwin-simple-runtime-tests v0.1.0 (/home/runner/work/short.win/short.win/simple/tests/runtime)
+2026-10-28T20:52:05.5826690Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.17s
+2026-10-28T20:52:05.7834979Z test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages (test_price_service.PriceServiceTests.test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages) ... ok
+2026-10-28T20:52:05.7899774Z test_complete_loan_snapshot_updates_priority_atomically (test_price_service.PriceServiceTests.test_complete_loan_snapshot_updates_priority_atomically) ... ok
+2026-10-28T20:52:05.8075205Z test_completed_exact_quantity_history_survives_restart (test_price_service.PriceServiceTests.test_completed_exact_quantity_history_survives_restart) ... ok
+2026-10-28T20:52:05.8134993Z test_exact_in_buy_search_requires_guaranteed_full_quantity (test_price_service.PriceServiceTests.test_exact_in_buy_search_requires_guaranteed_full_quantity) ... ok
+2026-10-28T20:52:05.8502884Z test_gap_unknown_stale_and_future_never_become_finite (test_price_service.PriceServiceTests.test_gap_unknown_stale_and_future_never_become_finite) ... ok
+2026-10-28T20:52:05.8562976Z test_keyless_http_omits_api_header_and_keeps_exact_input_contract (test_price_service.PriceServiceTests.test_keyless_http_omits_api_header_and_keeps_exact_input_contract) ... ok
+2026-10-28T20:52:05.8615381Z test_model_change_requires_fresh_history_and_u64_quantities_remain_exact (test_price_service.PriceServiceTests.test_model_change_requires_fresh_history_and_u64_quantities_remain_exact) ... ok
+2026-10-28T20:52:05.8663815Z test_nonadvancing_history_write_rolls_back_without_replacing_evidence (test_price_service.PriceServiceTests.test_nonadvancing_history_write_rolls_back_without_replacing_evidence) ... ok
+2026-10-28T20:52:05.8709155Z test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread (test_price_service.PriceServiceTests.test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread) ... ok
+2026-10-28T20:52:05.9634025Z test_policy_hash_export_and_stdin_cli_match_immutable_terms (test_price_service.PriceServiceTests.test_policy_hash_export_and_stdin_cli_match_immutable_terms) ... ok
+2026-10-28T20:52:05.9683702Z test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them (test_price_service.PriceServiceTests.test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them) ... ok
+2026-10-28T20:52:05.9736622Z test_queue_is_bounded_and_existing_loans_preempt_new_requests (test_price_service.PriceServiceTests.test_queue_is_bounded_and_existing_loans_preempt_new_requests) ... ok
+2026-10-28T20:52:05.9780947Z test_quote_domain_and_threshold_are_validated_without_float_amounts (test_price_service.PriceServiceTests.test_quote_domain_and_threshold_are_validated_without_float_amounts) ... ok
+2026-10-28T20:52:05.9826518Z test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model (test_price_service.PriceServiceTests.test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model) ... ok
+2026-10-28T20:52:05.9880022Z test_shared_database_provider_spacing_and_capacity_are_explicit (test_price_service.PriceServiceTests.test_shared_database_provider_spacing_and_capacity_are_explicit) ... ok
+2026-10-28T20:52:05.9926694Z test_shared_or_mismatched_scalar_header_is_not_a_finite_quote (test_price_service.PriceServiceTests.test_shared_or_mismatched_scalar_header_is_not_a_finite_quote) ... ok
+2026-10-28T20:52:05.9981686Z test_tick_preserves_explicit_unknown_on_provider_failure (test_price_service.PriceServiceTests.test_tick_preserves_explicit_unknown_on_provider_failure) ... ok
+2026-10-28T20:52:05.9982738Z 
+2026-10-28T20:52:05.9983126Z ----------------------------------------------------------------------
+2026-10-28T20:52:05.9983697Z Ran 17 tests in 0.223s
+2026-10-28T20:52:05.9983931Z 
+2026-10-28T20:52:05.9984058Z OK
+2026-10-28T20:52:06.0936194Z test_both_profiles_match_actual_service_and_reject_drift (test_production_proposal.ProductionProposalTests.test_both_profiles_match_actual_service_and_reject_drift) ... ok
+2026-10-28T20:52:06.0937634Z test_execute_cannot_be_enabled_in_review_manifest (test_production_proposal.ProductionProposalTests.test_execute_cannot_be_enabled_in_review_manifest) ... ok
+2026-10-28T20:52:06.0939250Z test_local_placeholder_program_is_not_production_assignment (test_production_proposal.ProductionProposalTests.test_local_placeholder_program_is_not_production_assignment) ... ok
+2026-10-28T20:52:06.0941655Z test_reporter_cannot_be_governance (test_production_proposal.ProductionProposalTests.test_reporter_cannot_be_governance) ... ok
+2026-10-28T20:52:06.0952270Z test_unassigned_proposal_cannot_pass_assignment_gate (test_production_proposal.ProductionProposalTests.test_unassigned_proposal_cannot_pass_assignment_gate) ... ok
+2026-10-28T20:52:06.0954141Z test_zero_or_malformed_public_key_is_rejected (test_production_proposal.ProductionProposalTests.test_zero_or_malformed_public_key_is_rejected) ... ok
+2026-10-28T20:52:06.0955079Z 
+2026-10-28T20:52:06.0955340Z ----------------------------------------------------------------------
+2026-10-28T20:52:06.0955769Z Ran 6 tests in 0.002s
+2026-10-28T20:52:06.0955935Z 
+2026-10-28T20:52:06.0956031Z OK
+2026-10-28T20:52:06.1765108Z {
+2026-10-28T20:52:06.1765530Z   "captured_reference_deposit": {
+2026-10-28T20:52:06.1765964Z     "allocation_bytes": 205,
+2026-10-28T20:52:06.1766397Z     "deposit_lamports": 1691640,
+2026-10-28T20:52:06.1766998Z     "minimum_size_loan_protocol_fee_shares_to_cover_deposit_before_other_costs": 9,
+2026-10-28T20:52:06.1768207Z     "note": "Storage deposit is locked capital, not a funded-operation receipt or a current price guarantee; no reference close instruction exists.",
+2026-10-28T20:52:06.1769261Z     "observed_utc": "2026-10-28T19:57:48.450888+00:00",
+2026-10-28T20:52:06.1770022Z     "response_sha256": "e3533cddf22cdac9e1b41a7fdedf4d0ed7d82734fbb42c4d0ef0c188a16e2499",
+2026-10-28T20:52:06.1770969Z     "status": "dated_read_only_rpc_observation"
+2026-10-28T20:52:06.1771385Z   },
+2026-10-28T20:52:06.1771670Z   "financial_model": {
+2026-10-28T20:52:06.1772512Z     "bid_trigger_factor_bps_of_opening_notional_at_equal_sale_ask": 12500,
+2026-10-28T20:52:06.1773127Z     "conditional_bounds": [
+2026-10-28T20:52:06.1774098Z       "The 25% bid-rise trigger assumes unchanged collateral and initial bid equals N; max historical bid must also qualify and confirmation must complete.",
+2026-10-28T20:52:06.1775757Z       "Finite ask upper is one successful exact-input guaranteed-output quote, not fair value, global cheapest price, monotonicity, or a future executable guarantee.",
+2026-10-28T20:52:06.1777314Z       "Default distributes SOL, not a guarantee of recovering the lent token quantity. No economic payout goes to the borrower after grace.",
+2026-10-28T20:52:06.1778688Z       "Fee examples omit network fees and refundable account/scratch deposits. No accrued fee or rate refund exists.",
+2026-10-28T20:52:06.1780344Z       "Utilization and booked SOL caps are checked on opening; withdrawals, current prices, sybil wallets and uncapped market creation defeat any claimed global or permanent cash reserve."
+2026-10-28T20:52:06.1781821Z     ],
+2026-10-28T20:52:06.1782295Z     "example_1000_token_cash_opening_borrow_limit_raw_tokens": 600,
+2026-10-28T20:52:06.1783012Z     "example_three_transactions_at_25000_lamports_each": 75000,
+2026-10-28T20:52:06.1783866Z     "maximum_size_positions_at_market_booked_cap": 5,
+2026-10-28T20:52:06.1784661Z     "minimum_fee_protocol_revenue_covers_25000_lamport_transactions_before_other_costs": 8,
+2026-10-28T20:52:06.1785450Z     "minimum_notional_stress_examples": [
+2026-10-28T20:52:06.1785917Z       {
+2026-10-28T20:52:06.1786350Z         "ask_upper_at_maximum_spread_lamports": 105000000,
+2026-10-28T20:52:06.1786940Z         "bid_factor_bps_of_opening_notional": 10000,
+2026-10-28T20:52:06.1787531Z         "bid_health_unhealthy_strict_boundary": false,
+2026-10-28T20:52:06.1788066Z         "bid_lower_lamports": 100000000,
+2026-10-28T20:52:06.1788600Z         "default_borrower_economic_sol_lamports": 0,
+2026-10-28T20:52:06.1789165Z         "default_lender_sol_lamports": 248650000,
+2026-10-28T20:52:06.1789708Z         "default_sol_as_bps_of_current_tested_ask": 23680,
+2026-10-28T20:52:06.1790281Z         "illustrative_forced_budget_lamports": 110250000,
+2026-10-28T20:52:06.1791112Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 625000,
+2026-10-28T20:52:06.1792005Z         "this_tested_ask_fits_budget": true
+2026-10-28T20:52:06.1792443Z       },
+2026-10-28T20:52:06.1792735Z       {
+2026-10-28T20:52:06.1793113Z         "ask_upper_at_maximum_spread_lamports": 131250000,
+2026-10-28T20:52:06.1793681Z         "bid_factor_bps_of_opening_notional": 12500,
+2026-10-28T20:52:06.1794152Z         "bid_health_unhealthy_strict_boundary": false,
+2026-10-28T20:52:06.1794592Z         "bid_lower_lamports": 125000000,
+2026-10-28T20:52:06.1795014Z         "default_borrower_economic_sol_lamports": 0,
+2026-10-28T20:52:06.1795528Z         "default_lender_sol_lamports": 248650000,
+2026-10-28T20:52:06.1796098Z         "default_sol_as_bps_of_current_tested_ask": 18944,
+2026-10-28T20:52:06.1796707Z         "illustrative_forced_budget_lamports": 137812500,
+2026-10-28T20:52:06.1797319Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 756250,
+2026-10-28T20:52:06.1797914Z         "this_tested_ask_fits_budget": true
+2026-10-28T20:52:06.1798441Z       },
+2026-10-28T20:52:06.1798760Z       {
+2026-10-28T20:52:06.1799151Z         "ask_upper_at_maximum_spread_lamports": 131260500,
+2026-10-28T20:52:06.1799732Z         "bid_factor_bps_of_opening_notional": 12501,
+2026-10-28T20:52:06.1800521Z         "bid_health_unhealthy_strict_boundary": true,
+2026-10-28T20:52:06.1801045Z         "bid_lower_lamports": 125010000,
+2026-10-28T20:52:06.1801571Z         "default_borrower_economic_sol_lamports": 0,
+2026-10-28T20:52:06.1802118Z         "default_lender_sol_lamports": 248650000,
+2026-10-28T20:52:06.1802703Z         "default_sol_as_bps_of_current_tested_ask": 18943,
+2026-10-28T20:52:06.1803299Z         "illustrative_forced_budget_lamports": 137823525,
+2026-10-28T20:52:06.1804165Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 756302,
+2026-10-28T20:52:06.1804808Z         "this_tested_ask_fits_budget": true
+2026-10-28T20:52:06.1805265Z       },
+2026-10-28T20:52:06.1805570Z       {
+2026-10-28T20:52:06.1805960Z         "ask_upper_at_maximum_spread_lamports": 157500000,
+2026-10-28T20:52:06.1806522Z         "bid_factor_bps_of_opening_notional": 15000,
+2026-10-28T20:52:06.1807069Z         "bid_health_unhealthy_strict_boundary": true,
+2026-10-28T20:52:06.1807571Z         "bid_lower_lamports": 150000000,
+2026-10-28T20:52:06.1808169Z         "default_borrower_economic_sol_lamports": 0,
+2026-10-28T20:52:06.1808763Z         "default_lender_sol_lamports": 248650000,
+2026-10-28T20:52:06.1809338Z         "default_sol_as_bps_of_current_tested_ask": 15787,
+2026-10-28T20:52:06.1809932Z         "illustrative_forced_budget_lamports": 165375000,
+2026-10-28T20:52:06.1810740Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 887500,
+2026-10-28T20:52:06.1811298Z         "this_tested_ask_fits_budget": true
+2026-10-28T20:52:06.1811729Z       },
+2026-10-28T20:52:06.1812013Z       {
+2026-10-28T20:52:06.1812379Z         "ask_upper_at_maximum_spread_lamports": 210000000,
+2026-10-28T20:52:06.1812892Z         "bid_factor_bps_of_opening_notional": 20000,
+2026-10-28T20:52:06.1813368Z         "bid_health_unhealthy_strict_boundary": true,
+2026-10-28T20:52:06.1813810Z         "bid_lower_lamports": 200000000,
+2026-10-28T20:52:06.1814265Z         "default_borrower_economic_sol_lamports": 0,
+2026-10-28T20:52:06.1814795Z         "default_lender_sol_lamports": 248650000,
+2026-10-28T20:52:06.1815371Z         "default_sol_as_bps_of_current_tested_ask": 11840,
+2026-10-28T20:52:06.1816150Z         "illustrative_forced_budget_lamports": 220500000,
+2026-10-28T20:52:06.1816755Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 1150000,
+2026-10-28T20:52:06.1817369Z         "this_tested_ask_fits_budget": true
+2026-10-28T20:52:06.1817829Z       },
+2026-10-28T20:52:06.1818128Z       {
+2026-10-28T20:52:06.1818534Z         "ask_upper_at_maximum_spread_lamports": 262500000,
+2026-10-28T20:52:06.1819102Z         "bid_factor_bps_of_opening_notional": 25000,
+2026-10-28T20:52:06.1819676Z         "bid_health_unhealthy_strict_boundary": true,
+2026-10-28T20:52:06.1820202Z         "bid_lower_lamports": 250000000,
+2026-10-28T20:52:06.1821073Z         "default_borrower_economic_sol_lamports": 0,
+2026-10-28T20:52:06.1821577Z         "default_lender_sol_lamports": 248650000,
+2026-10-28T20:52:06.1822053Z         "default_sol_as_bps_of_current_tested_ask": 9472,
+2026-10-28T20:52:06.1822556Z         "illustrative_forced_budget_lamports": 248000000,
+2026-10-28T20:52:06.1823188Z         "maturity_keeper_reward_if_this_ask_spent_lamports": null,
+2026-10-28T20:52:06.1823808Z         "this_tested_ask_fits_budget": false
+2026-10-28T20:52:06.1824249Z       },
+2026-10-28T20:52:06.1824551Z       {
+2026-10-28T20:52:06.1824921Z         "ask_upper_at_maximum_spread_lamports": 315000000,
+2026-10-28T20:52:06.1825487Z         "bid_factor_bps_of_opening_notional": 30000,
+2026-10-28T20:52:06.1826048Z         "bid_health_unhealthy_strict_boundary": true,
+2026-10-28T20:52:06.1826554Z         "bid_lower_lamports": 300000000,
+2026-10-28T20:52:06.1827047Z         "default_borrower_economic_sol_lamports": 0,
+2026-10-28T20:52:06.1827576Z         "default_lender_sol_lamports": 248650000,
+2026-10-28T20:52:06.1828110Z         "default_sol_as_bps_of_current_tested_ask": 7893,
+2026-10-28T20:52:06.1828702Z         "illustrative_forced_budget_lamports": 248000000,
+2026-10-28T20:52:06.1829355Z         "maturity_keeper_reward_if_this_ask_spent_lamports": null,
+2026-10-28T20:52:06.1829955Z         "this_tested_ask_fits_budget": false
+2026-10-28T20:52:06.1830551Z       }
+2026-10-28T20:52:06.1830859Z     ],
+2026-10-28T20:52:06.1831238Z     "minimum_size_positions_at_market_booked_cap": 50,
+2026-10-28T20:52:06.1831768Z     "opening_examples": [
+2026-10-28T20:52:06.1832144Z       {
+2026-10-28T20:52:06.1832489Z         "borrower_margin_lamports": 150000000,
+2026-10-28T20:52:06.1833415Z         "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 151000000,
+2026-10-28T20:52:06.1834169Z         "collateral_lamports": 250000000,
+2026-10-28T20:52:06.1834679Z         "history_ask_upper_max_lamports": 100000000,
+2026-10-28T20:52:06.1835192Z         "lender_fee_lamports": 800000,
+2026-10-28T20:52:06.1835698Z         "live_ask_upper_lamports": 100000000,
+2026-10-28T20:52:06.1836193Z         "notional_lamports": 100000000,
+2026-10-28T20:52:06.1836695Z         "protocol_fee_lamports": 200000,
+2026-10-28T20:52:06.1837155Z         "sale_lamports": 100000000,
+2026-10-28T20:52:06.1837611Z         "upfront_fee_lamports": 1000000
+2026-10-28T20:52:06.1838028Z       },
+2026-10-28T20:52:06.1838326Z       {
+2026-10-28T20:52:06.1838648Z         "borrower_margin_lamports": 375000000,
+2026-10-28T20:52:06.1839361Z         "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 377500000,
+2026-10-28T20:52:06.1840093Z         "collateral_lamports": 625000000,
+2026-10-28T20:52:06.1840757Z         "history_ask_upper_max_lamports": 250000000,
+2026-10-28T20:52:06.1841248Z         "lender_fee_lamports": 2000000,
+2026-10-28T20:52:06.1841726Z         "live_ask_upper_lamports": 250000000,
+2026-10-28T20:52:06.1842208Z         "notional_lamports": 250000000,
+2026-10-28T20:52:06.1842668Z         "protocol_fee_lamports": 500000,
+2026-10-28T20:52:06.1843112Z         "sale_lamports": 250000000,
+2026-10-28T20:52:06.1843516Z         "upfront_fee_lamports": 2500000
+2026-10-28T20:52:06.1843949Z       },
+2026-10-28T20:52:06.1844257Z       {
+2026-10-28T20:52:06.1844606Z         "borrower_margin_lamports": 1500000000,
+2026-10-28T20:52:06.1845364Z         "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 1510000000,
+2026-10-28T20:52:06.1846128Z         "collateral_lamports": 2500000000,
+2026-10-28T20:52:06.1846654Z         "history_ask_upper_max_lamports": 1000000000,
+2026-10-28T20:52:06.1847184Z         "lender_fee_lamports": 8000000,
+2026-10-28T20:52:06.1847674Z         "live_ask_upper_lamports": 1000000000,
+2026-10-28T20:52:06.1848182Z         "notional_lamports": 1000000000,
+2026-10-28T20:52:06.1848639Z         "protocol_fee_lamports": 2000000,
+2026-10-28T20:52:06.1849101Z         "sale_lamports": 1000000000,
+2026-10-28T20:52:06.1849525Z         "upfront_fee_lamports": 10000000
+2026-10-28T20:52:06.1850256Z       }
+2026-10-28T20:52:06.1850670Z     ],
+2026-10-28T20:52:06.1850973Z     "rounding_example": {
+2026-10-28T20:52:06.1851398Z       "borrower_margin_lamports": 150000003,
+2026-10-28T20:52:06.1852136Z       "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 151000004,
+2026-10-28T20:52:06.1852834Z       "collateral_lamports": 250000003,
+2026-10-28T20:52:06.1853329Z       "history_ask_upper_max_lamports": 99999999,
+2026-10-28T20:52:06.1853818Z       "lender_fee_lamports": 800001,
+2026-10-28T20:52:06.1854276Z       "live_ask_upper_lamports": 100000001,
+2026-10-28T20:52:06.1854747Z       "notional_lamports": 100000001,
+2026-10-28T20:52:06.1855212Z       "protocol_fee_lamports": 200000,
+2026-10-28T20:52:06.1855664Z       "sale_lamports": 100000000,
+2026-10-28T20:52:06.1856115Z       "upfront_fee_lamports": 1000001
+2026-10-28T20:52:06.1856524Z     },
+2026-10-28T20:52:06.1856914Z     "small_loan_default_keeper_reward_lamports": 1350000,
+2026-10-28T20:52:06.1857645Z     "small_loan_maturity_keeper_reward_at_initial_notional_lamports": 600000,
+2026-10-28T20:52:06.1858453Z     "wallet_booked_notional_cap_lamports_per_market": 1000000000
+2026-10-28T20:52:06.1859039Z   },
+2026-10-28T20:52:06.1859372Z   "financial_source_sha256": {
+2026-10-28T20:52:06.1860188Z     "crates/jupiter-route/src/isolation.rs": "79aaf751503f5cb2cc72431734c6e940f7335479442c09a1b0d21c8932c7b298",
+2026-10-28T20:52:06.1861581Z     "programs/shortwin-simple/src/exits.rs": "82635c8195a86880d51c9831b9c38d9d4ea6d5203ae38865273fcd04f8bfd617",
+2026-10-28T20:52:06.1862890Z     "programs/shortwin-simple/src/finance.rs": "11772d4eac5e7b0605368d27c4b686df3fa8ff9dad46a580287d842cf11533f2",
+2026-10-28T20:52:06.1864516Z     "programs/shortwin-simple/src/open.rs": "8e407d9f69f6714f333d265000385dec4ddf784ec9debe81ac9dec928c4c1da5",
+2026-10-28T20:52:06.1865776Z     "programs/shortwin-simple/src/route.rs": "0474656f4727875f0019d569295753ddb785442418d9632291cc3cb09db008bb",
+2026-10-28T20:52:06.1867014Z     "programs/shortwin-simple/src/state.rs": "4588d9272a629165cb1bfaeaafa0a9d207127e493aedbefd5d28ca0504b9b8e9"
+2026-10-28T20:52:06.1867880Z   },
+2026-10-28T20:52:06.1868195Z   "operator_bounds": {
+2026-10-28T20:52:06.1868569Z     "evidenceStatus": {
+2026-10-28T20:52:06.1868970Z       "alertsDelivered": "pending",
+2026-10-28T20:52:06.1869409Z       "currentRoutes": "pending",
+2026-10-28T20:52:06.1869834Z       "payerFunding": "pending",
+2026-10-28T20:52:06.1870240Z       "roles": "unassigned",
+2026-10-28T20:52:06.1870824Z       "sustainedCoverage": "pending"
+2026-10-28T20:52:06.1871239Z     },
+2026-10-28T20:52:06.1871544Z     "execute": false,
+2026-10-28T20:52:06.1871897Z     "maxAccounts": 2048,
+2026-10-28T20:52:06.1872268Z     "maxActions": 8,
+2026-10-28T20:52:06.1872699Z     "maxDailyPublicationFeesLamports": 1000000,
+2026-10-28T20:52:06.1873225Z     "maxEventTransactions": 32,
+2026-10-28T20:52:06.1873654Z     "maxFeeLamports": 25000,
+2026-10-28T20:52:06.1874061Z     "maxNewReferenceAccounts": 4,
+2026-10-28T20:52:06.1874468Z     "maxPassFeesLamports": 100000,
+2026-10-28T20:52:06.1874921Z     "maxReferenceRentLamports": 10000000,
+2026-10-28T20:52:06.1875390Z     "maxRouteSetupLamports": 0,
+2026-10-28T20:52:06.1875845Z     "maxTemporaryLamports": 10000000,
+2026-10-28T20:52:06.1876259Z     "minBalanceLamports": 50000000,
+2026-10-28T20:52:06.1876688Z     "minTimerStartSpacingSeconds": 15,
+2026-10-28T20:52:06.1877168Z     "overlappingPassesAllowed": false,
+2026-10-28T20:52:06.1877630Z     "requiredEnvironment": [
+2026-10-28T20:52:06.1877994Z       "SOLANA_RPC_URL",
+2026-10-28T20:52:06.1878327Z       "JUPITER_API_KEY"
+2026-10-28T20:52:06.1878653Z     ],
+2026-10-28T20:52:06.1879032Z     "roleManifest": "config/production-roles.template.json",
+2026-10-28T20:52:06.1879651Z     "settings": "config/production-service.proposed.json",
+2026-10-28T20:52:06.1880170Z     "status": "proposed-not-commissioned",
+2026-10-28T20:52:06.1880880Z     "suggestedInitialLamportsPerOperatingPayer": 100000000,
+2026-10-28T20:52:06.1881407Z     "tick": true
+2026-10-28T20:52:06.1881918Z   },
+2026-10-28T20:52:06.1882470Z   "price_service_model_version": "shortwin-simple-exact-q-v2-retained-bounded-ask",
+2026-10-28T20:52:06.1883167Z   "profiles": [
+2026-10-28T20:52:06.1883481Z     {
+2026-10-28T20:52:06.1883919Z       "all_identity_maximum_observation_spacing_only_round_ms": 6000,
+2026-10-28T20:52:06.1884707Z       "all_maximum_observations_plus_one_execution_buy_search_spacing_ms": 22000,
+2026-10-28T20:52:06.1885378Z       "configured_exact_quantity_slots": 1,
+2026-10-28T20:52:06.1885915Z       "existing_service_worst_case_capacity_report": {
+2026-10-28T20:52:06.1886450Z         "execution_buy_http_requests_maximum": 16,
+2026-10-28T20:52:06.1886954Z         "identity_capacity_configured": 1,
+2026-10-28T20:52:06.1887465Z         "maximum_http_requests_per_quote_probe": 2,
+2026-10-28T20:52:06.1888064Z         "measured_latency_and_sustained_coverage": "pending",
+2026-10-28T20:52:06.1888645Z         "nominal_identities_with_half_gap_margin": 2,
+2026-10-28T20:52:06.1889157Z         "observation_requests_maximum": 6,
+2026-10-28T20:52:06.1889608Z         "observation_requests_steady": 2,
+2026-10-28T20:52:06.1890126Z         "observation_spacing_cycle_maximum_seconds": 6.0,
+2026-10-28T20:52:06.1890843Z         "observation_spacing_cycle_steady_seconds": 2.0,
+2026-10-28T20:52:06.1891347Z         "ready_for_mainnet": false,
+2026-10-28T20:52:06.1892161Z         "reason": "Measured provider/RPC latency and active-loan coverage are required; this is a spacing lower bound",
+2026-10-28T20:52:06.1892949Z         "requests_per_identity_worst_case": 6,
+2026-10-28T20:52:06.1893405Z         "spacing_fits_target": true,
+2026-10-28T20:52:06.1893856Z         "spacing_only_cycle_seconds": 6.0,
+2026-10-28T20:52:06.1894499Z         "target_sampling_seconds": 15
+2026-10-28T20:52:06.1894919Z       },
+2026-10-28T20:52:06.1895545Z       "hypothetical_continuous_publication_1_signature_base_fee_5000_lamports_per_day": 28800000,
+2026-10-28T20:52:06.1896525Z       "hypothetical_continuous_publication_at_25000_lamports_per_tx_per_day": 144000000,
+2026-10-28T20:52:06.1897271Z       "maximum_http_starts_per_quote_probe": 2,
+2026-10-28T20:52:06.1897767Z       "measured_live_coverage": "pending",
+2026-10-28T20:52:06.1898330Z       "minimum_completed_history_seconds": 180,
+2026-10-28T20:52:06.1898866Z       "minimum_loan_protocol_revenue_lamports": 200000,
+2026-10-28T20:52:06.1899620Z       "model_hash": "8cfc3b1258a12e2cc9abf5a5ebc8ffd363e034406d2b4465448b8cd6db9c7d96",
+2026-10-28T20:52:06.1900351Z       "normal_latency_and_rpc_headroom_ms": 13000,
+2026-10-28T20:52:06.1901014Z       "normal_spacing_only_round_ms": 2000,
+2026-10-28T20:52:06.1901538Z       "normal_two_successful_gets_per_identity_assumption": true,
+2026-10-28T20:52:06.1902175Z       "on_demand_two_publications_at_25000_lamports_per_loan": 50000,
+2026-10-28T20:52:06.1902667Z       "one_execution_buy_search_additional_maximum_spacing_ms": 16000,
+2026-10-28T20:52:06.1903121Z       "one_fallback_plus_other_normal_spacing_only_round_ms": 6000,
+2026-10-28T20:52:06.1903496Z       "profile": "production",
+2026-10-28T20:52:06.1903769Z       "ready_for_activation": false,
+2026-10-28T20:52:06.1904050Z       "target_round_ms": 15000,
+2026-10-28T20:52:06.1904369Z       "warmup_worst_case_without_boundary_latency_seconds": 240
+2026-10-28T20:52:06.1904741Z     },
+2026-10-28T20:52:06.1904959Z     {
+2026-10-28T20:52:06.1905254Z       "all_identity_maximum_observation_spacing_only_round_ms": 12000,
+2026-10-28T20:52:06.1906200Z       "all_maximum_observations_plus_one_execution_buy_search_spacing_ms": 44000,
+2026-10-28T20:52:06.1906888Z       "configured_exact_quantity_slots": 1,
+2026-10-28T20:52:06.1907406Z       "existing_service_worst_case_capacity_report": {
+2026-10-28T20:52:06.1907971Z         "execution_buy_http_requests_maximum": 16,
+2026-10-28T20:52:06.1908408Z         "identity_capacity_configured": 1,
+2026-10-28T20:52:06.1908745Z         "maximum_http_requests_per_quote_probe": 2,
+2026-10-28T20:52:06.1909118Z         "measured_latency_and_sustained_coverage": "pending",
+2026-10-28T20:52:06.1909711Z         "nominal_identities_with_half_gap_margin": 2,
+2026-10-28T20:52:06.1910061Z         "observation_requests_maximum": 6,
+2026-10-28T20:52:06.1910647Z         "observation_requests_steady": 2,
+2026-10-28T20:52:06.1911004Z         "observation_spacing_cycle_maximum_seconds": 12.0,
+2026-10-28T20:52:06.1911396Z         "observation_spacing_cycle_steady_seconds": 4.0,
+2026-10-28T20:52:06.1911732Z         "ready_for_mainnet": false,
+2026-10-28T20:52:06.1912256Z         "reason": "Measured provider/RPC latency and active-loan coverage are required; this is a spacing lower bound",
+2026-10-28T20:52:06.1912827Z         "requests_per_identity_worst_case": 6,
+2026-10-28T20:52:06.1913150Z         "spacing_fits_target": true,
+2026-10-28T20:52:06.1913447Z         "spacing_only_cycle_seconds": 12.0,
+2026-10-28T20:52:06.1913750Z         "target_sampling_seconds": 30
+2026-10-28T20:52:06.1914028Z       },
+2026-10-28T20:52:06.1914426Z       "hypothetical_continuous_publication_1_signature_base_fee_5000_lamports_per_day": 14400000,
+2026-10-28T20:52:06.1915046Z       "hypothetical_continuous_publication_at_25000_lamports_per_tx_per_day": 72000000,
+2026-10-28T20:52:06.1915499Z       "maximum_http_starts_per_quote_probe": 2,
+2026-10-28T20:52:06.1915832Z       "measured_live_coverage": "pending",
+2026-10-28T20:52:06.1916140Z       "minimum_completed_history_seconds": 180,
+2026-10-28T20:52:06.1916489Z       "minimum_loan_protocol_revenue_lamports": 200000,
+2026-10-28T20:52:06.1916939Z       "model_hash": "980f7fdfd926d376dccdcaf45b55b2e74b92f7240f2b73cc49ac5ef22f1d40d9",
+2026-10-28T20:52:06.1917395Z       "normal_latency_and_rpc_headroom_ms": 26000,
+2026-10-28T20:52:06.1917728Z       "normal_spacing_only_round_ms": 4000,
+2026-10-28T20:52:06.1918251Z       "normal_two_successful_gets_per_identity_assumption": true,
+2026-10-28T20:52:06.1918704Z       "on_demand_two_publications_at_25000_lamports_per_loan": 50000,
+2026-10-28T20:52:06.1919148Z       "one_execution_buy_search_additional_maximum_spacing_ms": 32000,
+2026-10-28T20:52:06.1919602Z       "one_fallback_plus_other_normal_spacing_only_round_ms": 12000,
+2026-10-28T20:52:06.1919964Z       "profile": "keyless",
+2026-10-28T20:52:06.1920250Z       "ready_for_activation": false,
+2026-10-28T20:52:06.1920731Z       "target_round_ms": 30000,
+2026-10-28T20:52:06.1921065Z       "warmup_worst_case_without_boundary_latency_seconds": 240
+2026-10-28T20:52:06.1921407Z     }
+2026-10-28T20:52:06.1921617Z   ],
+2026-10-28T20:52:06.1921817Z   "role_setup": {
+2026-10-28T20:52:06.1922089Z     "complete_public_identity_assignment": false,
+2026-10-28T20:52:06.1922412Z     "execution_enabled": false,
+2026-10-28T20:52:06.1922691Z     "missing_public_identity_fields": [
+2026-10-28T20:52:06.1922978Z       "programId",
+2026-10-28T20:52:06.1923216Z       "genesisHash",
+2026-10-28T20:52:06.1923455Z       "governance",
+2026-10-28T20:52:06.1923685Z       "emergency",
+2026-10-28T20:52:06.1923902Z       "reporter",
+2026-10-28T20:52:06.1924133Z       "feeRecipient",
+2026-10-28T20:52:06.1924367Z       "keeper",
+2026-10-28T20:52:06.1924616Z       "jupiterReview.deploySlot",
+2026-10-28T20:52:06.1924918Z       "jupiterReview.programDataLength",
+2026-10-28T20:52:06.1925233Z       "jupiterReview.elfSha256"
+2026-10-28T20:52:06.1925483Z     ],
+2026-10-28T20:52:06.1926067Z     "note": "Complete assignments still require deployment/loader review and commissioned operating evidence; this tool never signs or submits."
+2026-10-28T20:52:06.1926668Z   },
+2026-10-28T20:52:06.1926973Z   "status": "proposed_configuration_verified_offline_not_activated"
+2026-10-28T20:52:06.1927344Z }
+2026-10-28T20:52:06.1961994Z ##[group]Run set -o pipefail
+2026-10-28T20:52:06.1962342Z [36;1mset -o pipefail[0m
+2026-10-28T20:52:06.1962636Z [36;1mmkdir -p target/deploy target/idl[0m
+2026-10-28T20:52:06.1963424Z [36;1mcargo build-sbf --manifest-path programs/shortwin-simple/Cargo.toml --tools-version v1.57 --arch v3 --sbf-out-dir target/deploy -- --locked 2>&1 | tee target/sbf-build.log[0m
+2026-10-28T20:52:06.1964446Z [36;1mpython3 ../scripts/check-sbf-stack.py target/sbf-build.log[0m
+2026-10-28T20:52:06.1965178Z [36;1mpython3 -c "import pathlib,struct; assert struct.unpack_from('<I',pathlib.Path('target/deploy/shortwin_simple.so').read_bytes(),48)[0]==3"[0m
+2026-10-28T20:52:06.1966052Z [36;1manchor idl build -p shortwin_simple -o target/idl/shortwin_simple.json -- --locked[0m
+2026-10-28T20:52:06.1967021Z [36;1mdiff -u client/idl/shortwin_simple.json target/idl/shortwin_simple.json[0m
+2026-10-28T20:52:06.2009034Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:52:06.2009329Z env:
+2026-10-28T20:52:06.2009598Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:52:06.2009860Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:52:06.2010099Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:52:06.2010650Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:52:06.2011274Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:52:06.2011763Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:52:06.2012107Z   CACHE_ON_FAILURE: false
+2026-10-28T20:52:06.2012352Z   MISE_LOG_LEVEL: info
+2026-10-28T20:52:06.2014974Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:52:06.2015351Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:52:06.2015730Z   MISE_YES: 1
+2026-10-28T20:52:06.2015967Z ##[endgroup]
+2026-10-28T20:52:07.1707320Z    Compiling shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+2026-10-28T20:52:07.1708814Z    Compiling shortwin-pooled-core v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+2026-10-28T20:52:07.7063519Z    Compiling shortwin-simple v0.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+2026-10-28T20:52:17.4781216Z     Finished `release` profile [optimized] target(s) in 10.53s
+2026-10-28T20:52:17.5281130Z ok: no SBF frame/stack overflow diagnostics in supplied build logs
+2026-10-28T20:52:17.8775418Z    Compiling shortwin-pooled-core v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+2026-10-28T20:52:17.8776563Z    Compiling shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+2026-10-28T20:52:18.0623924Z    Compiling shortwin-simple v0.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+2026-10-28T20:52:22.2541917Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 4.61s
+2026-10-28T20:52:22.2691385Z      Running unittests src/lib.rs (/home/runner/work/short.win/short.win/simple/target/debug/deps/shortwin_simple-1e6f23019fbfc3ee)
+2026-10-28T20:52:22.3274260Z ##[group]Run cargo test --workspace --locked
+2026-10-28T20:52:22.3274684Z [36;1mcargo test --workspace --locked[0m
+2026-10-28T20:52:22.3275211Z [36;1mcargo run -p shortwin-pooled-core --example model_fuzz --release --locked -- 103410000 200000[0m
+2026-10-28T20:52:22.3276137Z [36;1mcargo run -p shortwin-simple-runtime-tests --example program_fuzz --locked -- --seed 103410000 --cases 32 --out "$RUNNER_TEMP/simple-program-fuzz-smoke"[0m
+2026-10-28T20:52:22.3299046Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:52:22.3299337Z env:
+2026-10-28T20:52:22.3299571Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:52:22.3299820Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:52:22.3300063Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:52:22.3300598Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:52:22.3301258Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:52:22.3301786Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:52:22.3302109Z   CACHE_ON_FAILURE: false
+2026-10-28T20:52:22.3302360Z   MISE_LOG_LEVEL: info
+2026-10-28T20:52:22.3305014Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:52:22.3305386Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:52:22.3305776Z   MISE_YES: 1
+2026-10-28T20:52:22.3306002Z ##[endgroup]
+2026-10-28T20:52:22.6502713Z    Compiling shortwin-pooled-core v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+2026-10-28T20:52:22.6568139Z    Compiling shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+2026-10-28T20:52:22.8736501Z    Compiling shortwin-simple v0.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+2026-10-28T20:52:26.7203118Z    Compiling shortwin-simple-runtime-tests v0.1.0 (/home/runner/work/short.win/short.win/simple/tests/runtime)
+2026-10-28T20:52:31.1487125Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 8.77s
+2026-10-28T20:52:31.1768540Z      Running unittests src/lib.rs (target/debug/deps/shortwin_jupiter_route-8ede3a037c7711a1)
+2026-10-28T20:52:31.1785441Z 
+2026-10-28T20:52:31.1785923Z running 14 tests
+2026-10-28T20:52:31.1799279Z test isolation::tests::explicit_writable_authority_mode_keeps_other_isolation_guards_and_strict_default ... ok
+2026-10-28T20:52:31.1800648Z test isolation::tests::native_rent_lamports_and_delegated_amount_are_checked ... ok
+2026-10-28T20:52:31.1801396Z test isolation::tests::refuses_protocol_state_keys_unexpected_signers_and_writable_mints ... ok
+2026-10-28T20:52:31.1802140Z test isolation::tests::rejects_runtime_union_and_alias_privileges ... ok
+2026-10-28T20:52:31.1803000Z test isolation::tests::refuses_hidden_extensions_state_and_authority_changes ... ok
+2026-10-28T20:52:31.1803655Z test tests::amount_mode_ranges_slippage_and_both_fees_are_checked ... ok
+2026-10-28T20:52:31.1804206Z test tests::every_truncated_header_and_tail_is_rejected_without_panics ... ok
+2026-10-28T20:52:31.1804787Z test isolation::tests::whole_debt_net_credit_bounded_funding_and_surplus ... ok
+2026-10-28T20:52:31.1805321Z test tests::four_current_idl_headers_and_exact_u64_fields ... ok
+2026-10-28T20:52:31.1805800Z test tests::every_fixed_key_is_bound_and_minimum_account_counts_hold ... ok
+2026-10-28T20:52:31.1806302Z test tests::shared_id_and_trusted_binding_sanity_are_checked ... ok
+2026-10-28T20:52:31.1806790Z test tests::opaque_route_data_is_deliberately_not_full_authorization ... ok
+2026-10-28T20:52:31.1807287Z test tests::oversized_counts_lengths_and_u64_maximum_are_bounded ... ok
+2026-10-28T20:52:31.1807781Z test tests::recipient_signer_and_writable_substitution_is_rejected ... ok
+2026-10-28T20:52:31.1808121Z 
+2026-10-28T20:52:31.1808400Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-28T20:52:31.1808763Z 
+2026-10-28T20:52:31.1809040Z      Running unittests src/lib.rs (target/debug/deps/shortwin_pooled_core-d096a616abb30dee)
+2026-10-28T20:52:31.1814910Z 
+2026-10-28T20:52:31.1815932Z running 16 tests
+2026-10-28T20:52:31.1821267Z test tests::a_donated_token_surplus_increases_existing_share_value ... ok
+2026-10-28T20:52:31.1822218Z test tests::default_allocates_loss_and_real_sol_only_to_current_pool_holders ... ok
+2026-10-28T20:52:31.1823060Z test tests::all_failed_mutations_preserve_the_inputs ... ok
+2026-10-28T20:52:31.1823757Z test tests::newcomer_cannot_claim_previously_paid_fees ... ok
+2026-10-28T20:52:31.1824524Z test tests::no_generation_reset_or_income_without_real_owners ... ok
+2026-10-28T20:52:31.1826414Z test tests::outstanding_principal_limits_withdrawal_and_forbids_last_share_exit ... ok
+2026-10-28T20:52:31.1827842Z test tests::paid_income_is_attributed_before_deposit_and_share_changes ... ok
+2026-10-28T20:52:31.1829190Z test tests::persisted_state_validation_rejects_inconsistent_aggregates_and_receipts ... ok
+2026-10-28T20:52:31.1830685Z test tests::repeated_claims_keep_receipt_fraction_until_whole_lamport_exists ... ok
+2026-10-28T20:52:31.1831932Z test tests::tiny_floor_share_mint_is_refused_before_state_changes ... ok
+2026-10-28T20:52:31.1833076Z test tests::wide_income_index_survives_multiple_u64_lifetimes_without_truncation ... ok
+2026-10-28T20:52:31.1841669Z test tests::reward_and_generation_overflows_are_atomic ... ok
+2026-10-28T20:52:31.1842759Z test tests::final_receipt_exit_clears_fraction_and_last_holder_receives_tracked_dust ... ok
+2026-10-28T20:52:31.1844308Z test tests::wiped_generation_keeps_claims_separate_from_new_lenders ... ok
+2026-10-28T20:52:31.1845482Z test tests::deterministic_multi_lender_sequences_conserve_all_paid_income_and_principal ... ok
+2026-10-28T20:52:31.1945814Z test tests::wide_mul_div_vectors_cover_high_limbs_and_remainders ... ok
+2026-10-28T20:52:31.1946255Z 
+2026-10-28T20:52:31.1946618Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+2026-10-28T20:52:31.1947167Z 
+2026-10-28T20:52:31.1950920Z      Running tests/model_sequences.rs (target/debug/deps/model_sequences-963ba6cde6a21f77)
+2026-10-28T20:52:31.1964114Z 
+2026-10-28T20:52:31.1964271Z running 1 test
+2026-10-28T20:52:32.1860941Z test model_sequences_cover_randomized_loans_defaults_shares_and_generations ... ok
+2026-10-28T20:52:32.1861545Z 
+2026-10-28T20:52:32.1861938Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+2026-10-28T20:52:32.1862350Z 
+2026-10-28T20:52:32.1863530Z      Running unittests src/lib.rs (target/debug/deps/shortwin_simple-5ace9037552e7ff4)
+2026-10-28T20:52:32.1877620Z 
+2026-10-28T20:52:32.1877905Z running 12 tests
+2026-10-28T20:52:32.1881746Z test exits::tests::second_quote_must_itself_postdate_both_confirmation_delays ... ok
+2026-10-28T20:52:32.1882787Z test exits::tests::surplus_output_cannot_make_an_otherwise_healthy_loan_liquidatable ... ok
+2026-10-28T20:52:32.1889098Z test finance::tests::fixed_paid_fee_and_conservative_margin ... ok
+2026-10-28T20:52:32.1889873Z test finance::tests::checked_bounds_and_exact_cr_boundary ... ok
+2026-10-28T20:52:32.1890970Z test finance::tests::reward_and_budget_never_consume_rent_or_borrower_surplus ... ok
+2026-10-28T20:52:32.1891733Z test route::tests::deployment_tuple_binds_current_loader_instance_without_a_fresh_hash_claim ... ok
+2026-10-28T20:52:32.1892540Z test route::tests::authority_postcondition_rejects_foreign_owner_data_signer_and_unaccounted_sol ... ok
+2026-10-28T20:52:32.1893166Z test route::tests::mint_scope_is_plain_initialized_unfrozen_spl_or_token2022 ... ok
+2026-10-28T20:52:32.1893744Z test route::tests::token2022_behavior_unknown_and_duplicate_extensions_are_rejected ... ok
+2026-10-28T20:52:32.1894338Z test route::tests::token2022_metadata_bounds_canonical_base_and_full_tlv_are_checked ... ok
+2026-10-28T20:52:32.1894976Z test route::tests::token2022_metadata_only_mints_and_zero_tail_keep_plain_account_semantics ... ok
+2026-10-28T20:52:32.1895587Z test route::tests::token_metadata_comparison_allows_only_the_amount_to_change ... ok
+2026-10-28T20:52:32.1895914Z 
+2026-10-28T20:52:32.1896568Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-28T20:52:32.1896934Z 
+2026-10-28T20:52:32.1897259Z      Running unittests src/lib.rs (target/debug/deps/shortwin_simple_runtime_tests-96ded15b65a3254b)
+2026-10-28T20:52:32.1908571Z 
+2026-10-28T20:52:32.1908802Z running 1 test
+2026-10-28T20:52:32.8572904Z test jupiter::tests::pinned_real_elf_snapshot_loads_without_the_historical_product ... ok
+2026-10-28T20:52:32.8573364Z 
+2026-10-28T20:52:32.8573655Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+2026-10-28T20:52:32.8574031Z 
+2026-10-28T20:52:32.8592693Z      Running tests/client_compat.rs (target/debug/deps/client_compat-c32c89d0015f30a9)
+2026-10-28T20:52:32.8606932Z 
+2026-10-28T20:52:32.8607249Z running 1 test
+2026-10-28T20:52:32.8610805Z test rust_client_wire_contract ... ok
+2026-10-28T20:52:32.8611094Z 
+2026-10-28T20:52:32.8611477Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-28T20:52:32.8611886Z 
+2026-10-28T20:52:32.8613848Z      Running tests/jupiter_route.rs (target/debug/deps/jupiter_route-e8a1cc215795709d)
+2026-10-28T20:52:32.8629988Z 
+2026-10-28T20:52:32.8630147Z running 10 tests
+2026-10-28T20:52:34.3172274Z test direct_full_repayment_works_during_price_hold_without_jupiter_and_preserves_fee ... ok
+2026-10-28T20:52:34.3673674Z test confirmed_bad_cr_executes_full_debt_after_a_synthetic_market_price_rise ... ok
+2026-10-28T20:52:34.4261914Z test exact_grace_boundary_is_default_only_and_recovers_collateral_without_price_token_or_router ... ok
+2026-10-28T20:52:34.6461783Z test delayed_source_observations_health_clear_and_actual_fill_veto_are_atomic ... ok
+2026-10-28T20:52:35.6981870Z test expiry_buyback_pays_capped_keeper_and_refunds_surplus_before_grace_end ... ok
+2026-10-28T20:52:35.7352052Z test real_borrower_buyback_refunds_both_rents_and_prefunds_and_credits_token_surplus ... ok
+2026-10-28T20:52:35.7822713Z test real_token2022_metadata_mint_registers_and_lends_with_plain_165_byte_token_accounts ... ok
+2026-10-28T20:52:36.2388588Z test reporter_rotation_invalidates_old_cr_arm_until_a_new_epoch_is_armed ... ok
+2026-10-28T20:52:36.8132994Z test wrong_input_and_actual_router_underfill_revert_pool_loan_user_and_dex ... ok
+2026-10-28T20:52:36.9262675Z test retiring_one_of_two_loans_preserves_other_debt_and_exposure_rent ... ok
+2026-10-28T20:52:36.9263105Z 
+2026-10-28T20:52:36.9263378Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.06s
+2026-10-28T20:52:36.9263747Z 
+2026-10-28T20:52:36.9340050Z      Running tests/lender.rs (target/debug/deps/lender-9430ae42eac087b6)
+2026-10-28T20:52:36.9358424Z 
+2026-10-28T20:52:36.9358627Z running 5 tests
+2026-10-28T20:52:38.5301846Z test actual_roll_and_old_claims_separate_wiped_generation_from_new_deposits ... ok
+2026-10-28T20:52:38.6042291Z test actual_claims_preserve_fraction_and_last_exit_pays_tracked_dust ... ok
+2026-10-28T20:52:39.6122047Z test registration_fee_rent_and_plain_mint_rules_are_actual_handler_checks ... ok
+2026-10-28T20:52:39.9275971Z test spl_and_t22_deposit_withdraw_move_exact_principal_and_obey_signed_minima ... ok
+2026-10-28T20:52:40.8758102Z test unsolicited_tokens_remain_untracked_and_in_their_original_generation ... ok
+2026-10-28T20:52:40.8766715Z 
+2026-10-28T20:52:40.8767210Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.94s
+2026-10-28T20:52:40.8767827Z 
+2026-10-28T20:52:40.8860263Z      Running tests/open_position.rs (target/debug/deps/open_position-78c4a4b737681185)
+2026-10-28T20:52:40.8879237Z 
+2026-10-28T20:52:40.8879744Z running 2 tests
+2026-10-28T20:52:42.2871958Z test real_jupiter_open_books_principal_and_pays_fixed_upfront_fee_exactly ... ok
+2026-10-28T20:52:42.3206427Z test signed_max_fee_margin_and_market_nonce_refuse_atomically ... ok
+2026-10-28T20:52:42.3206920Z 
+2026-10-28T20:52:42.3207500Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.43s
+2026-10-28T20:52:42.3208085Z 
+2026-10-28T20:52:42.3285679Z      Running tests/reference.rs (target/debug/deps/reference-0fdb17ab7d5f3b7d)
+2026-10-28T20:52:42.3303349Z 
+2026-10-28T20:52:42.3303562Z running 4 tests
+2026-10-28T20:52:44.0721959Z test old_immutable_policy_remains_publishable_and_price_hold_can_be_refreshed ... ok
+2026-10-28T20:52:44.1042128Z test unknown_clears_eligibility_and_reporter_rotation_keeps_monotonic_identity ... ok
+2026-10-28T20:52:44.1605066Z test only_reporter_can_publish_and_creation_rent_is_explicitly_bounded ... ok
+2026-10-28T20:52:44.2031438Z test reference_sequence_exact_history_spread_and_dual_clock_checks_are_atomic ... ok
+2026-10-28T20:52:44.2031996Z 
+2026-10-28T20:52:44.2032452Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s
+2026-10-28T20:52:44.2032815Z 
+2026-10-28T20:52:44.2176026Z      Running tests/writable_authority.rs (target/debug/deps/writable_authority-7678b64a430664f2)
+2026-10-28T20:52:44.2193977Z 
+2026-10-28T20:52:44.2194267Z running 4 tests
+2026-10-28T20:52:45.6372183Z test readonly_authority_gift_stays_outside_the_loan_and_route ... ok
+2026-10-28T20:52:45.6384134Z test writable_authority_gifts_stay_untracked_and_return_separately_on_buyback ... ok
+2026-10-28T20:52:46.6081020Z test writable_foreign_or_data_bearing_authority_is_refused_atomically ... ok
+2026-10-28T20:52:47.5889399Z test signed_setup_maximum_and_total_advance_refuse_without_spending ... ok
+2026-10-28T20:52:47.5890751Z 
+2026-10-28T20:52:47.5891474Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.37s
+2026-10-28T20:52:47.5891878Z 
+2026-10-28T20:52:47.5991914Z    Doc-tests shortwin_jupiter_route
+2026-10-28T20:52:47.6235477Z 
+2026-10-28T20:52:47.6235983Z running 0 tests
+2026-10-28T20:52:47.6236244Z 
+2026-10-28T20:52:47.6236679Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-28T20:52:47.6237262Z 
+2026-10-28T20:52:47.6249232Z    Doc-tests shortwin_pooled_core
+2026-10-28T20:52:47.6475590Z 
+2026-10-28T20:52:47.6476226Z running 0 tests
+2026-10-28T20:52:47.6476489Z 
+2026-10-28T20:52:47.6476839Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-28T20:52:47.6477230Z 
+2026-10-28T20:52:47.6490070Z    Doc-tests shortwin_simple
+2026-10-28T20:52:48.0956459Z 
+2026-10-28T20:52:48.0956983Z running 0 tests
+2026-10-28T20:52:48.0957241Z 
+2026-10-28T20:52:48.0957714Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-28T20:52:48.0958251Z 
+2026-10-28T20:52:48.0995976Z    Doc-tests shortwin_simple_runtime_tests
+2026-10-28T20:52:48.1722854Z 
+2026-10-28T20:52:48.1723463Z running 0 tests
+2026-10-28T20:52:48.1723751Z 
+2026-10-28T20:52:48.1724241Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-28T20:52:48.1724802Z 
+2026-10-28T20:52:48.3022936Z    Compiling shortwin-pooled-core v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+2026-10-28T20:52:51.8215276Z     Finished `release` profile [optimized] target(s) in 3.60s
+2026-10-28T20:52:51.8249730Z      Running `target/release/examples/model_fuzz 103410000 200000`
+2026-10-28T20:52:51.8983094Z {"scope":"pure-core-model-only","seed":103410000,"steps":200000,"successes":105793,"rejected":94207,"generations":12105,"deposits":15248644,"donations":4649971,"withdrawn_tokens":1533439,"defaulted_tokens":18365176,"paid_sol":12994903,"claimed_sol":12994903}
+2026-10-28T20:52:52.1737335Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.24s
+2026-10-28T20:52:52.1884541Z      Running `target/debug/examples/program_fuzz --seed 103410000 --cases 32 --out /home/runner/work/_temp/simple-program-fuzz-smoke`
+2026-10-28T20:53:35.2942915Z {"anomalies":0,"completed_cases":32,"coverage":{"actual_cpmm_success_logs":65,"attempted_fixture_setups":32,"attempted_transactions":147,"expected_rejected_transactions":49,"fixture_setup_transactions_instrumented":false,"operation_counts_attempt_success_reject":{"actual_fill_veto":[3,0,3],"add_margin":[8,8,0],"arm":[6,6,0],"close":[5,5,0],"cr_force":[3,3,0],"default":[5,5,0],"early_cr_force":[3,0,3],"expiry_force":[5,5,0],"late_close":[5,0,5],"late_margin":[5,0,5],"late_repay":[5,0,5],"margin_clear":[3,3,0],"open":[32,32,0],"publish_reference":[17,17,0],"rejected_open":[25,0,25],"repay":[14,14,0],"underfill":[3,0,3]},"scenario_counts":{"close":2,"cr_fill_veto":3,"cr_market_rise":3,"default_boundary":5,"expiry":5,"margin_repay":8,"repay":3,"underfill":3},"successful_fixture_setups":32,"successful_transactions":98},"failures":0,"finished_cleanly":true,"invariant_failures":0,"requested_duration_seconds":null,"schema_version":1,"scope":"actual-new-SBF deterministic scenario runner; setup transactions not counted; no inherited duration","setup_failures":0,"wall_seconds":36.847537388}
+2026-10-28T20:53:35.3031296Z ##[group]Run python3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/simple-current-route-suite"
+2026-10-28T20:53:35.3032706Z [36;1mpython3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/simple-current-route-suite"[0m
+2026-10-28T20:53:35.3058231Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:53:35.3058512Z env:
+2026-10-28T20:53:35.3058739Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:53:35.3058989Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:53:35.3059234Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:53:35.3059649Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:53:35.3061179Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:53:35.3061940Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:53:35.3062470Z   CACHE_ON_FAILURE: false
+2026-10-28T20:53:35.3062864Z   MISE_LOG_LEVEL: info
+2026-10-28T20:53:35.3066124Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:53:35.3066739Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:53:35.3067332Z   MISE_YES: 1
+2026-10-28T20:53:35.3067676Z ##[endgroup]
+2026-10-28T20:53:35.6351668Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s
+2026-10-28T20:53:36.2029009Z {"account_count": 25, "candidate": "/home/runner/work/_temp/simple-current-route-suite/bonk-production-adaptive/candidate/candidate.json", "sha256": "6e9cf1763fc0b0cf0c9c49c66bf7f6722840b3f6cf77698e880c8802f940daef"}
+2026-10-28T20:53:43.5238403Z {"account_count": 30, "candidate": "/home/runner/work/_temp/simple-current-route-suite/jup-production-adaptive/candidate/candidate.json", "sha256": "38670510a0c61e1555bcb02cb91123098d5ff6398d82e0d39d714774ad040142"}
+2026-10-28T20:53:50.9980813Z {"account_count": 23, "candidate": "/home/runner/work/_temp/simple-current-route-suite/ray-production-exclude-scorch16/candidate/candidate.json", "sha256": "0e4ffd3d0d13bd288d2d0e7bcc815735bb3fb098e50280032215b213f7bd4846"}
+2026-10-28T20:53:57.9528912Z {"account_count": 19, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-curve-adaptive/candidate/candidate.json", "sha256": "b2f80b87ba68c56dcaad5de4808f66902927071dc3b4843288d2e242cd95693e"}
+2026-10-28T20:54:05.4513970Z {"account_count": 20, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-graduated-adaptive-440/candidate/candidate.json", "sha256": "5b8b936a5da338dcd9e6cfcd9cb95ce63334e74f8df43ee8cd39e567f355d423"}
+2026-10-28T20:54:12.9609105Z {"account_count": 19, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-fresh-native-adaptive/candidate/candidate.json", "sha256": "2ff9f6c40da0132290f6da0adb5710dfca527d0240eea960bdb9a8631b9c12b6"}
+2026-10-28T20:54:20.2502665Z {"account_count": 34, "candidate": "/home/runner/work/_temp/simple-current-route-suite/jup-direct-budget16/candidate/candidate.json", "sha256": "60f297bd7556442ad38fe72d9dd2bd2d93321906c6e21eeced401024161c4ee0"}
+2026-10-28T20:54:27.0239772Z {"account_count": 34, "candidate": "/home/runner/work/_temp/simple-current-route-suite/ray-direct-budget16/candidate/candidate.json", "sha256": "9778de8e6e93f9098851bae6b414d0ed744350ed74fc3122a9fd8b20fac3d539"}
+2026-10-28T20:54:33.7299086Z {
+2026-10-28T20:54:33.7299463Z   "cases": [
+2026-10-28T20:54:33.7299775Z     {
+2026-10-28T20:54:33.7300133Z       "actual": "passed",
+2026-10-28T20:54:33.7300746Z       "expected": "expected_pass",
+2026-10-28T20:54:33.7301196Z       "name": "bonk-production-adaptive",
+2026-10-28T20:54:33.7301864Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7302788Z       "stdout_sha256": "c270e26d66d51aded2059ce2346ce890e359d30b8ef7be5f4f52b415f01553a3",
+2026-10-28T20:54:33.7303690Z       "summary_sha256": "c5d0f9da6e178f4eacdb381b02f305ca6963565402f214fa1fa1ba323996ad77",
+2026-10-28T20:54:33.7304353Z       "verified": true
+2026-10-28T20:54:33.7304682Z     },
+2026-10-28T20:54:33.7304944Z     {
+2026-10-28T20:54:33.7305224Z       "actual": "passed",
+2026-10-28T20:54:33.7305957Z       "expected": "expected_pass",
+2026-10-28T20:54:33.7306379Z       "name": "jup-production-adaptive",
+2026-10-28T20:54:33.7307005Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7307871Z       "stdout_sha256": "04c3387477d790ed9ac1bbb9a8eee0186cdb808d000a50239850da59c7b4e0ca",
+2026-10-28T20:54:33.7308727Z       "summary_sha256": "181dd668ebfb0c678c9f392970411a5f889038ff350d2cf8457eaded03c2eecb",
+2026-10-28T20:54:33.7309365Z       "verified": true
+2026-10-28T20:54:33.7309673Z     },
+2026-10-28T20:54:33.7310163Z     {
+2026-10-28T20:54:33.7310591Z       "actual": "passed",
+2026-10-28T20:54:33.7310957Z       "expected": "expected_pass",
+2026-10-28T20:54:33.7311444Z       "name": "ray-production-exclude-scorch16",
+2026-10-28T20:54:33.7312200Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7313150Z       "stdout_sha256": "f22956afdc10b6b40f9ce026bc46c9d2a7778dd4849f99891b6b44d712be278e",
+2026-10-28T20:54:33.7314089Z       "summary_sha256": "ba81076ad7ba25ec3ec612b23a997fc35f5c3001a779983809a4eb16b6cf13d9",
+2026-10-28T20:54:33.7314775Z       "verified": true
+2026-10-28T20:54:33.7315123Z     },
+2026-10-28T20:54:33.7315396Z     {
+2026-10-28T20:54:33.7315710Z       "actual": "passed",
+2026-10-28T20:54:33.7316096Z       "expected": "expected_pass",
+2026-10-28T20:54:33.7316545Z       "name": "pump-curve-adaptive",
+2026-10-28T20:54:33.7317206Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7318140Z       "stdout_sha256": "92360a915d692a10745dcb8e4c34a58893c270995fd0acee7ffab41de1957a66",
+2026-10-28T20:54:33.7319021Z       "summary_sha256": "ae687a65c9e1c3d4d2db5278f5b849492519aa8d6d8e460a117629f894d084da",
+2026-10-28T20:54:33.7319665Z       "verified": true
+2026-10-28T20:54:33.7320013Z     },
+2026-10-28T20:54:33.7320292Z     {
+2026-10-28T20:54:33.7320817Z       "actual": "passed",
+2026-10-28T20:54:33.7321206Z       "expected": "expected_pass",
+2026-10-28T20:54:33.7321687Z       "name": "pump-graduated-adaptive-440",
+2026-10-28T20:54:33.7322434Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7323419Z       "stdout_sha256": "f5e91507f5f97f4a2edb934acae64418e20f7d0655970fe1595324275542b4f5",
+2026-10-28T20:54:33.7324411Z       "summary_sha256": "c33cfd6d048cf165eea5a8ef91aa5750b1aafffb09293e9bd87807e9dc6a925b",
+2026-10-28T20:54:33.7325165Z       "verified": true
+2026-10-28T20:54:33.7325520Z     },
+2026-10-28T20:54:33.7325837Z     {
+2026-10-28T20:54:33.7326180Z       "actual": "passed",
+2026-10-28T20:54:33.7326575Z       "expected": "expected_pass",
+2026-10-28T20:54:33.7327033Z       "name": "pump-fresh-native-adaptive",
+2026-10-28T20:54:33.7327791Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7328741Z       "stdout_sha256": "8b104a88acdd77d7e16aa21939e85c3d2bd7203579b78bb9df1544136eb756cf",
+2026-10-28T20:54:33.7329627Z       "summary_sha256": "085f981431bbc9b18b2b6af2e51d19e695c3e4bf82292e12ee290f8fd733f090",
+2026-10-28T20:54:33.7330529Z       "verified": true
+2026-10-28T20:54:33.7330878Z     },
+2026-10-28T20:54:33.7331178Z     {
+2026-10-28T20:54:33.7331499Z       "actual": "failed",
+2026-10-28T20:54:33.7331925Z       "expected": "expected_fail",
+2026-10-28T20:54:33.7332395Z       "name": "jup-direct-budget16",
+2026-10-28T20:54:33.7333096Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7333966Z       "stdout_sha256": "08e8f2fd8e5cfc0900d281764af57f73814a197b3507f075f450763fd0ab83ac",
+2026-10-28T20:54:33.7334912Z       "summary_sha256": "974d83da4e2b60e11bf29c093e45dcd612cbefe16f4bb625bbcf0ed61ecfaec2",
+2026-10-28T20:54:33.7335633Z       "verified": true
+2026-10-28T20:54:33.7335987Z     },
+2026-10-28T20:54:33.7336269Z     {
+2026-10-28T20:54:33.7336572Z       "actual": "failed",
+2026-10-28T20:54:33.7337205Z       "expected": "expected_fail",
+2026-10-28T20:54:33.7337658Z       "name": "ray-direct-budget16",
+2026-10-28T20:54:33.7338327Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+2026-10-28T20:54:33.7339282Z       "stdout_sha256": "ed1127caf414643476808dafc7106463759061c543c55ae5319cd2fe7d2aa489",
+2026-10-28T20:54:33.7340208Z       "summary_sha256": "b4f065c7163f9e50308749b386cb9ea69d284c88dae98c4e260f80340aec15c1",
+2026-10-28T20:54:33.7341072Z       "verified": true
+2026-10-28T20:54:33.7341429Z     }
+2026-10-28T20:54:33.7341708Z   ],
+2026-10-28T20:54:33.7342030Z   "live_transactions_sent": 0,
+2026-10-28T20:54:33.7342882Z   "matrix_sha256": "220b6e160bfd6d99120432259dd65e7568718875e13c532799ade3dc9c731190",
+2026-10-28T20:54:33.7343863Z   "native_runner_sha256": "75fccf870865806919b9b0845eca3b0a1a11d70b0b55b22886a1392acd8e9c7b",
+2026-10-28T20:54:33.7344892Z   "own_program_sha256": "8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d",
+2026-10-28T20:54:33.7345648Z   "pending": [],
+2026-10-28T20:54:33.7346009Z   "schema": 1,
+2026-10-28T20:54:33.7346813Z   "scope": "additive non-atomic snapshot compatibility; no live execution, history provenance or 24h qualification",
+2026-10-28T20:54:33.7347719Z   "status": "passed"
+2026-10-28T20:54:33.7348073Z }
+2026-10-28T20:54:33.7435761Z ##[group]Run pnpm install --frozen-lockfile
+2026-10-28T20:54:33.7436177Z [36;1mpnpm install --frozen-lockfile[0m
+2026-10-28T20:54:33.7436506Z [36;1mpnpm --dir client generate[0m
+2026-10-28T20:54:33.7436840Z [36;1mgit diff --exit-code -- client/src/generated[0m
+2026-10-28T20:54:33.7437200Z [36;1mpnpm check[0m
+2026-10-28T20:54:33.7437461Z [36;1mpnpm build[0m
+2026-10-28T20:54:33.7460199Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:54:33.7460646Z env:
+2026-10-28T20:54:33.7460877Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:54:33.7461132Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:54:33.7461378Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:54:33.7461801Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:54:33.7462429Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:54:33.7462903Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:54:33.7463239Z   CACHE_ON_FAILURE: false
+2026-10-28T20:54:33.7463545Z   MISE_LOG_LEVEL: info
+2026-10-28T20:54:33.7466313Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:54:33.7466692Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:54:33.7467073Z   MISE_YES: 1
+2026-10-28T20:54:33.7467298Z ##[endgroup]
+2026-10-28T20:54:33.7701487Z Scope: all 3 workspace projects
+2026-10-28T20:54:33.7875956Z ? Verifying lockfile against supply-chain policies (137 entries)...
+2026-10-28T20:54:34.8334472Z Progress: resolved 112, reused 0, downloaded 30, added 0
+2026-10-28T20:54:34.8338395Z Packages are hard linked from the content-addressable store to the virtual store.
+2026-10-28T20:54:34.8339484Z   Content-addressable store is at: /home/runner/.local/share/pnpm/store/v11
+2026-10-28T20:54:34.8340750Z   Virtual store is at:             node_modules/.pnpm
+2026-10-28T20:54:35.2157384Z [WARN] Tarball download average speed 27 KiB/s (size 28 KiB) is below 50 KiB/s: https://registry.npmjs.org/semver/-/semver-7.8.5.tgz (GET)
+2026-10-28T20:54:35.2185754Z Downloading @rolldown/binding-linux-x64-gnu@1.2.14: 0.00 B/8.27 MB
+2026-10-28T20:54:35.3584492Z [WARN] Tarball download average speed 43 KiB/s (size 57 KiB) is below 50 KiB/s: https://registry.npmjs.org/@solana/sysvars/-/sysvars-8.3.0.tgz (GET)
+2026-10-28T20:54:35.4335380Z [WARN] Tarball download average speed 28 KiB/s (size 38 KiB) is below 50 KiB/s: https://registry.npmjs.org/codama/-/codama-1.11.0.tgz (GET)
+2026-10-28T20:54:36.1292869Z ✓ Lockfile passes supply-chain policies (137 entries in 2.3s)
+2026-10-28T20:54:36.1293566Z Lockfile is up to date, resolution step is skipped
+2026-10-28T20:54:36.1321914Z Packages: +112
+2026-10-28T20:54:36.1322417Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-10-28T20:54:36.1499011Z Progress: resolved 112, reused 0, downloaded 112, added 112, done
+2026-10-28T20:54:36.2173857Z Done in 2.5s using pnpm v12.7.0
+2026-10-28T20:54:36.2666802Z $ codama run js --config codama.json
+2026-10-28T20:54:36.4053397Z PDA name collision: "tokenVault" has different seeds across instructions. Renaming to "rollPoolTokenVault".
+2026-10-28T20:54:36.5903410Z [94m→[39m Running script "js" with 1 visitor...
+2026-10-28T20:54:36.6954103Z [32m✔[39m [32mExecuted script "js" with 1 visitor![39m
+2026-10-28T20:54:38.0297152Z $ pnpm -r check
+2026-10-28T20:54:38.0492949Z $ tsc --noEmit && node --test test/*.test.ts
+2026-10-28T20:54:43.3423066Z ✔ generated client decodes exact Rust account and instruction bytes without precision loss (6.200679ms)
+2026-10-28T20:54:43.3646574Z ✔ route uses loan-local scratch, with no outer PDA signature or API setup instructions (29.087092ms)
+2026-10-28T20:54:43.3859103Z ✔ route rejects wrong mode, quantity, threshold, and unexpected signer (26.861567ms)
+2026-10-28T20:54:43.4147527Z ✔ buy minimum output must cover whole token debt (10.658818ms)
+2026-10-28T20:54:43.4175694Z ✔ wallet signatures may change but reviewed message bytes may not (17.319475ms)
+2026-10-28T20:54:43.4362814Z ✔ Jupiter request leaves envelope room and still refuses over-budget responses (21.764055ms)
+2026-10-28T20:54:45.4546710Z ✔ managed request tries16 then32 for no-route or unsupported shape and stops on rate limits (2019.897929ms)
+2026-10-28T20:54:45.4602143Z ✔ native setup allowance is separately signed and marks only loan-local authority writable (5.66589ms)
+2026-10-28T20:54:49.4718091Z ✔ direct requests reject provider-widened slippage and excluded venue responses (4011.274977ms)
+2026-10-28T20:54:49.4897169Z ✔ mint discovery and HTTP admission accept metadata-only Token2022 and reject changed token behavior (4.000075ms)
+2026-10-28T20:54:49.4898777Z ✔ default boundary wins without price, pause, history or route; expiry requires fresh feed (4.522374ms)
+2026-10-28T20:54:49.4900088Z ✔ CR actions bind both bad bids, strict sequence, source delays and reporter epoch (0.917061ms)
+2026-10-28T20:54:49.4902047Z ✔ service model drift and fee/funding caps fail before signing (1.136965ms)
+2026-10-28T20:54:49.4903414Z ✔ confirmed publication continues to a priced action; dry-run never assumes publication (0.784817ms)
+2026-10-28T20:54:49.4907146Z ✔ finalized event pagination is resumable and idempotent; failed tx is never projected (8.95062ms)
+2026-10-28T20:54:49.4907981Z ✔ empty authoritative loan snapshot still clears priority and processes queued warm work (71.949641ms)
+2026-10-28T20:54:49.4908869Z ✔ post-tick confirmed clock accepts newer sources than initial finalized snapshot and rejects actual future (1.037439ms)
+2026-10-28T20:54:49.4909691Z ✔ an inactive warmed quantity publishes before the first loan without reading a keyfile (33.644794ms)
+2026-10-28T20:54:49.4910596Z ✔ bounded rotation advances beyond a persistently failing first identity (11.506578ms)
+2026-10-28T20:54:49.4911514Z ✔ healthy private history stays off chain; requests, adverse prices and maturity publish on demand (0.533937ms)
+2026-10-28T20:54:49.4912341Z ✔ reference allocation reservations survive unknown outcomes, restarts and duplicate submissions (21.093236ms)
+2026-10-28T20:54:49.4913215Z ✔ UTC-day publication fee reservations survive failures and never consume default action budget (1.236733ms)
+2026-10-28T20:54:49.4914000Z ✔ prewarm validates current policy and enqueues inactive exact-u64 identity only (14.83966ms)
+2026-10-28T20:54:49.4914727Z ✔ Unknown or stale reference never becomes Finite and cannot authorize a sale route (13.509449ms)
+2026-10-28T20:54:49.4915758Z ✔ route binds new loan nonce/scratch and returns fresh raw build plus verified table contents (25.356123ms)
+2026-10-28T20:54:49.4916951Z ✔ CORS/body/IP limits and unsupported RPC overrides reject before provider calls (5.505203ms)
+2026-10-28T20:54:49.4917476Z ℹ tests 26
+2026-10-28T20:54:49.4917709Z ℹ suites 0
+2026-10-28T20:54:49.4917930Z ℹ pass 26
+2026-10-28T20:54:49.4918149Z ℹ fail 0
+2026-10-28T20:54:49.4918370Z ℹ cancelled 0
+2026-10-28T20:54:49.4918605Z ℹ skipped 0
+2026-10-28T20:54:49.4918832Z ℹ todo 0
+2026-10-28T20:54:49.4919078Z ℹ duration_ms 6761.320603
+2026-10-28T20:54:49.4975751Z $ tsc --noEmit && node --test test/*.test.ts
+2026-10-28T20:54:53.9372427Z ✔ amount entry is exact beyond Number precision and refuses truncation (4.115985ms)
+2026-10-28T20:54:53.9401123Z ✔ preview follows floor principal and actually paid income without time accrual (2.485563ms)
+2026-10-28T20:54:54.1512394Z ✔ editing or cancelling while route preparation is pending revokes later review (1.330661ms)
+2026-10-28T20:54:54.1516543Z ✔ wallet account or feature changes while signing prevent broadcast and clean old subscriptions (0.982007ms)
+2026-10-28T20:54:54.1521852Z ✔ wallets without change events are rechecked after their async reply, including chain support (0.570271ms)
+2026-10-28T20:54:54.1526015Z ✔ cancel during the final blockheight check prevents even the broadcast RPC call (17.762124ms)
+2026-10-28T20:54:54.1678956Z ✔ managed service preserves exact quantities and uses fixed endpoints (36.069133ms)
+2026-10-28T20:54:54.1681076Z ✔ managed service rejects insecure hosted URLs and reports capacity refusals (1.091519ms)
+2026-10-28T20:54:54.1682761Z ✔ managed buy input can shrink but cannot exceed or reinterpret the signed user budget (0.655355ms)
+2026-10-28T20:54:54.1683705Z ℹ tests 9
+2026-10-28T20:54:54.1684200Z ℹ suites 0
+2026-10-28T20:54:54.1684571Z ℹ pass 9
+2026-10-28T20:54:54.1684925Z ℹ fail 0
+2026-10-28T20:54:54.1685278Z ℹ cancelled 0
+2026-10-28T20:54:54.1685641Z ℹ skipped 0
+2026-10-28T20:54:54.1686026Z ℹ todo 0
+2026-10-28T20:54:54.1686405Z ℹ duration_ms 381.252912
+2026-10-28T20:54:54.1952573Z $ pnpm -r build
+2026-10-28T20:54:54.2125836Z $ tsc --noEmit
+2026-10-28T20:54:58.5763791Z $ tsc --noEmit && vite build
+2026-10-28T20:55:02.8844235Z [36mvite v8.3.1 [32mbuilding client environment for production...[36m[39m
+2026-10-28T20:55:02.8951516Z transforming...
+2026-10-28T20:55:02.9539730Z ✓ 116 modules transformed.
+2026-10-28T20:55:02.9736469Z rendering chunks...
+2026-10-28T20:55:02.9951816Z computing gzip size...
+2026-10-28T20:55:02.9963069Z dist/index.html                   0.40 kB │ gzip:  0.29 kB
+2026-10-28T20:55:02.9963829Z dist/assets/index-BWPJxP0o.css    3.59 kB │ gzip:  1.33 kB
+2026-10-28T20:55:02.9964301Z dist/assets/index-DEnq0GXb.js   155.24 kB │ gzip: 40.60 kB
+2026-10-28T20:55:02.9964563Z 
+2026-10-28T20:55:02.9973876Z [33m[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0m../node_modules/.pnpm/@solana+kit@8.3.0_typescript@5.9.3/node_modules/@solana/kit/dist/index.browser.mjs is dynamically imported by ../client/src/transactions.ts but also statically imported by ../client/src/chain.ts, ../client/src/generated/accounts/config.ts, ../client/src/generated/accounts/exposure.ts, ../client/src/generated/accounts/lenderReceipt.ts, ../client/src/generated/accounts/loan.ts, ..., dynamic import will not move module into another chunk.
+2026-10-28T20:55:02.9977083Z [39m
+2026-10-28T20:55:02.9977560Z [32m✓ built in 112ms[39m
+2026-10-28T20:55:03.0227226Z ##[group]Run sha256sum simple/target/deploy/shortwin_simple.so || true
+2026-10-28T20:55:03.0227773Z [36;1msha256sum simple/target/deploy/shortwin_simple.so || true[0m
+2026-10-28T20:55:03.0251154Z shell: /usr/bin/bash -e {0}
+2026-10-28T20:55:03.0251433Z env:
+2026-10-28T20:55:03.0251654Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:55:03.0251908Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:55:03.0252155Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:55:03.0252569Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:55:03.0253220Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:55:03.0253697Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:55:03.0254024Z   CACHE_ON_FAILURE: false
+2026-10-28T20:55:03.0254270Z   MISE_LOG_LEVEL: info
+2026-10-28T20:55:03.0256972Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:55:03.0257383Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:55:03.0257757Z   MISE_YES: 1
+2026-10-28T20:55:03.0257987Z ##[endgroup]
+2026-10-28T20:55:03.0331452Z 8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d  simple/target/deploy/shortwin_simple.so
+2026-10-28T20:55:03.0382937Z ##[group]Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+2026-10-28T20:55:03.0383366Z with:
+2026-10-28T20:55:03.0383606Z   name: simple-pooled-validation
+2026-10-28T20:55:03.0383892Z   retention-days: 7
+2026-10-28T20:55:03.0384389Z   path: simple/target/deploy/shortwin_simple.so
+simple/target/idl/shortwin_simple.json
+simple/target/sbf-build.log
+
+2026-10-28T20:55:03.0385140Z   if-no-files-found: warn
+2026-10-28T20:55:03.0385400Z   compression-level: 6
+2026-10-28T20:55:03.0385645Z   overwrite: false
+2026-10-28T20:55:03.0385889Z   include-hidden-files: false
+2026-10-28T20:55:03.0386156Z   archive: true
+2026-10-28T20:55:03.0386375Z env:
+2026-10-28T20:55:03.0386590Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:55:03.0386838Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:55:03.0387089Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:55:03.0387500Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:55:03.0388162Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:55:03.0388650Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:55:03.0388982Z   CACHE_ON_FAILURE: false
+2026-10-28T20:55:03.0389227Z   MISE_LOG_LEVEL: info
+2026-10-28T20:55:03.0392094Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:55:03.0392470Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:55:03.0392853Z   MISE_YES: 1
+2026-10-28T20:55:03.0393089Z ##[endgroup]
+2026-10-28T20:55:03.1976509Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-10-28T20:55:03.1979225Z The least common ancestor is /home/runner/work/short.win/short.win/simple/target. This will be the root directory of the artifact
+2026-10-28T20:55:03.1980336Z With the provided path, there will be 3 files uploaded
+2026-10-28T20:55:03.1981301Z Artifact name is valid!
+2026-10-28T20:55:03.1982184Z Root directory input is valid!
+2026-10-28T20:55:03.4245445Z Uploading artifact: simple-pooled-validation.zip
+2026-10-28T20:55:03.4283652Z Beginning upload of artifact content to blob storage
+2026-10-28T20:55:03.6941106Z Uploaded bytes 206583
+2026-10-28T20:55:03.7295584Z Finished uploading artifact content to blob storage!
+2026-10-28T20:55:03.7296578Z SHA256 digest of uploaded artifact is 7d0ee003c39b134b91e34ac432908bc91367bd3df3b19d8c73016c87edcbc370
+2026-10-28T20:55:03.7297438Z Finalizing artifact upload
+2026-10-28T20:55:04.2659122Z Artifact simple-pooled-validation successfully finalized. Artifact ID 12849444366
+2026-10-28T20:55:04.2660138Z Artifact simple-pooled-validation has been successfully uploaded! Final size is 206583 bytes. Artifact ID is 12849444366
+2026-10-28T20:55:04.2663314Z Artifact download URL: https://github.com/TodorBonchev/short.win/actions/runs/40766940373/artifacts/12849444366
+2026-10-28T20:55:04.2845331Z ##[group]Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+2026-10-28T20:55:04.2845782Z with:
+2026-10-28T20:55:04.2846025Z   name: simple-pooled-fuzz-smoke
+2026-10-28T20:55:04.2846324Z   retention-days: 7
+2026-10-28T20:55:04.2846655Z   path: /home/runner/work/_temp/simple-program-fuzz-smoke
+2026-10-28T20:55:04.2847029Z   if-no-files-found: warn
+2026-10-28T20:55:04.2847302Z   compression-level: 6
+2026-10-28T20:55:04.2847554Z   overwrite: false
+2026-10-28T20:55:04.2847804Z   include-hidden-files: false
+2026-10-28T20:55:04.2848102Z   archive: true
+2026-10-28T20:55:04.2848321Z env:
+2026-10-28T20:55:04.2848540Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:55:04.2848811Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:55:04.2849047Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:55:04.2849470Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:55:04.2850112Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:55:04.2850872Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:55:04.2851207Z   CACHE_ON_FAILURE: false
+2026-10-28T20:55:04.2851456Z   MISE_LOG_LEVEL: info
+2026-10-28T20:55:04.2855027Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:55:04.2855420Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:55:04.2855809Z   MISE_YES: 1
+2026-10-28T20:55:04.2856043Z ##[endgroup]
+2026-10-28T20:55:04.5126973Z With the provided path, there will be 387 files uploaded
+2026-10-28T20:55:04.5132654Z Artifact name is valid!
+2026-10-28T20:55:04.5133548Z Root directory input is valid!
+2026-10-28T20:55:04.7640237Z Uploading artifact: simple-pooled-fuzz-smoke.zip
+2026-10-28T20:55:04.7676497Z Beginning upload of artifact content to blob storage
+2026-10-28T20:55:06.6984634Z Uploaded bytes 8388608
+2026-10-28T20:55:07.6645401Z Uploaded bytes 16777216
+2026-10-28T20:55:08.3878214Z Uploaded bytes 25165824
+2026-10-28T20:55:09.3808445Z Uploaded bytes 33554432
+2026-10-28T20:55:09.5367591Z Uploaded bytes 35027809
+2026-10-28T20:55:09.5825791Z Finished uploading artifact content to blob storage!
+2026-10-28T20:55:09.5828732Z SHA256 digest of uploaded artifact is 5ceff7ec4f51a082d9cee5fe25b2057042d6d2bece5b042dfffd6b906aa4e654
+2026-10-28T20:55:09.5830967Z Finalizing artifact upload
+2026-10-28T20:55:10.0526897Z Artifact simple-pooled-fuzz-smoke successfully finalized. Artifact ID 12851080972
+2026-10-28T20:55:10.0528125Z Artifact simple-pooled-fuzz-smoke has been successfully uploaded! Final size is 35027809 bytes. Artifact ID is 12851080972
+2026-10-28T20:55:10.0533552Z Artifact download URL: https://github.com/TodorBonchev/short.win/actions/runs/40766940373/artifacts/12851080972
+2026-10-28T20:55:10.0771897Z ##[group]Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+2026-10-28T20:55:10.0772666Z with:
+2026-10-28T20:55:10.0773039Z   name: simple-current-route-suite
+2026-10-28T20:55:10.0773509Z   retention-days: 7
+2026-10-28T20:55:10.0773969Z   path: /home/runner/work/_temp/simple-current-route-suite
+2026-10-28T20:55:10.0774512Z   if-no-files-found: warn
+2026-10-28T20:55:10.0774897Z   compression-level: 6
+2026-10-28T20:55:10.0775294Z   overwrite: false
+2026-10-28T20:55:10.0775680Z   include-hidden-files: false
+2026-10-28T20:55:10.0776092Z   archive: true
+2026-10-28T20:55:10.0776438Z env:
+2026-10-28T20:55:10.0776763Z   CARGO_BUILD_JOBS: 2
+2026-10-28T20:55:10.0777145Z   CARGO_INCREMENTAL: 0
+2026-10-28T20:55:10.0777503Z   AGAVE_VERSION: 4.1.2
+2026-10-28T20:55:10.0778160Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+2026-10-28T20:55:10.0779283Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+2026-10-28T20:55:10.0780108Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+2026-10-28T20:55:10.0780900Z   CACHE_ON_FAILURE: false
+2026-10-28T20:55:10.0781350Z   MISE_LOG_LEVEL: info
+2026-10-28T20:55:10.0785746Z   MISE_GITHUB_TOKEN: ***
+2026-10-28T20:55:10.0786441Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+2026-10-28T20:55:10.0787084Z   MISE_YES: 1
+2026-10-28T20:55:10.0787448Z ##[endgroup]
+2026-10-28T20:55:10.2826717Z With the provided path, there will be 285 files uploaded
+2026-10-28T20:55:10.2832893Z Artifact name is valid!
+2026-10-28T20:55:10.2833429Z Root directory input is valid!
+2026-10-28T20:55:10.5141833Z Uploading artifact: simple-current-route-suite.zip
+2026-10-28T20:55:10.5182671Z Beginning upload of artifact content to blob storage
+2026-10-28T20:55:12.8330620Z Uploaded bytes 8388608
+2026-10-28T20:55:12.9159475Z Uploaded bytes 9218672
+2026-10-28T20:55:12.9514626Z Finished uploading artifact content to blob storage!
+2026-10-28T20:55:12.9517521Z SHA256 digest of uploaded artifact is 82d87476006b6835828e9256bdb9291e7869fb168f012c9d52ac69bd3a11de37
+2026-10-28T20:55:12.9519793Z Finalizing artifact upload
+2026-10-28T20:55:13.4524294Z Artifact simple-current-route-suite successfully finalized. Artifact ID 12850781541
+2026-10-28T20:55:13.4525166Z Artifact simple-current-route-suite has been successfully uploaded! Final size is 9218672 bytes. Artifact ID is 12850781541
+2026-10-28T20:55:13.4529921Z Artifact download URL: https://github.com/TodorBonchev/short.win/actions/runs/40766940373/artifacts/12850781541
+2026-10-28T20:55:13.4801984Z Post job cleanup.
+2026-10-28T20:55:13.6184763Z Cache hit occurred on the primary key sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux, not saving cache.
+2026-10-28T20:55:13.6346240Z Post job cleanup.
+2026-10-28T20:55:13.7740225Z ##[group]Cache Configuration
+2026-10-28T20:55:13.7741073Z Cache Provider:
+2026-10-28T20:55:13.7741574Z     github
+2026-10-28T20:55:13.7741998Z Workspaces:
+2026-10-28T20:55:13.7742486Z     /home/runner/work/short.win/short.win/simple
+2026-10-28T20:55:13.7743092Z Cache Paths:
+2026-10-28T20:55:13.7743527Z     /home/runner/.cargo/bin
+2026-10-28T20:55:13.7744102Z     /home/runner/.cargo/.crates.toml
+2026-10-28T20:55:13.7745011Z     /home/runner/.cargo/.crates2.json
+2026-10-28T20:55:13.7745795Z     /home/runner/.cargo/registry
+2026-10-28T20:55:13.7746707Z     /home/runner/.cargo/git
+2026-10-28T20:55:13.7747537Z     /home/runner/work/short.win/short.win/simple/target
+2026-10-28T20:55:13.7748118Z Restore Key:
+2026-10-28T20:55:13.7748632Z     v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942
+2026-10-28T20:55:13.7749227Z Cache Key:
+2026-10-28T20:55:13.7749785Z     v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942-4852fe6c
+2026-10-28T20:55:13.7750804Z .. Prefix:
+2026-10-28T20:55:13.7751263Z   - v0-rust-simple-pooled-v1-replacement-Linux-x64
+2026-10-28T20:55:13.7751870Z .. Environment considered:
+2026-10-28T20:55:13.7752255Z   - Rust Versions:
+2026-10-28T20:55:13.7752796Z     - 1.98.1 x86_64-unknown-linux-gnu 48a229ceaefd4985c50990b14116b6d856af0985
+2026-10-28T20:55:13.7753547Z     - 1.99.1 x86_64-unknown-linux-gnu 58cf8f9c35b355199727627d07ae34a4e2846d67
+2026-10-28T20:55:13.7754137Z   - CARGO_BUILD_JOBS
+2026-10-28T20:55:13.7754467Z   - CARGO_INCREMENTAL
+2026-10-28T20:55:13.7754813Z .. Lockfiles considered:
+2026-10-28T20:55:13.7755367Z   - /home/runner/work/short.win/short.win/rust-toolchain.toml
+2026-10-28T20:55:13.7756013Z   - /home/runner/work/short.win/short.win/simple/Cargo.lock
+2026-10-28T20:55:13.7756732Z   - /home/runner/work/short.win/short.win/simple/crates/jupiter-route/Cargo.toml
+2026-10-28T20:55:13.7757490Z   - /home/runner/work/short.win/short.win/simple/crates/pooled-core/Cargo.toml
+2026-10-28T20:55:13.7758396Z   - /home/runner/work/short.win/short.win/simple/programs/shortwin-simple/Cargo.toml
+2026-10-28T20:55:13.7759240Z   - /home/runner/work/short.win/short.win/simple/tests/runtime/Cargo.toml
+2026-10-28T20:55:13.7760213Z ##[endgroup]
+2026-10-28T20:55:13.7760641Z 
+2026-10-28T20:55:14.1395360Z ... Cleaning /home/runner/work/short.win/short.win/simple/target ...
+2026-10-28T20:55:14.1443028Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/target'
+2026-10-28T20:55:14.1446166Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/target'
+2026-10-28T20:55:14.1449228Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/trybuild'
+2026-10-28T20:55:14.1452661Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/frozen-root/tests/trybuild'
+2026-10-28T20:55:14.1490265Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/target'
+2026-10-28T20:55:14.1493694Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/target'
+2026-10-28T20:55:14.1496982Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/trybuild'
+2026-10-28T20:55:14.1499953Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/crates/pooled-core/tests/trybuild'
+2026-10-28T20:55:14.1510104Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/target'
+2026-10-28T20:55:14.1513580Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/target'
+2026-10-28T20:55:14.1516831Z ##[error]ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/trybuild'
+2026-10-28T20:55:14.1519545Z ##[error]Error: ENOENT: no such file or directory, opendir '/home/runner/work/short.win/short.win/simple/target/program-fuzz-smoke/source/simple/tests/trybuild'
+2026-10-28T20:55:14.4029665Z ... Cleaning cargo registry (cache-all-crates: false) ...
+2026-10-28T20:55:15.2882527Z ... Cleaning cargo/bin ...
+2026-10-28T20:55:15.2910337Z ... Cleaning cargo git cache ...
+2026-10-28T20:55:15.2916422Z ... Saving cache ...
+2026-10-28T20:55:15.3118742Z [command]/usr/bin/tar --posix -cf cache.tzst --exclude cache.tzst -P -C /home/runner/work/short.win/short.win --files-from manifest.txt --use-compress-program zstdmt
+2026-10-28T20:55:22.2758269Z Sent 0 of 683574585 (0.0%), 0.0 MBs/sec
+2026-10-28T20:55:23.2761976Z Sent 549356857 of 683574585 (80.4%), 261.6 MBs/sec
+2026-10-28T20:55:24.2328995Z Sent 683574585 of 683574585 (100.0%), 220.2 MBs/sec
+2026-10-28T20:55:24.4751021Z Post job cleanup.
+2026-10-28T20:55:24.5753447Z [command]/usr/bin/git version
+2026-10-28T20:55:24.5802736Z git version 2.56.0
+2026-10-28T20:55:24.5838917Z Temporarily overriding HOME='/home/runner/work/_temp/ba5fb7b0-a92a-45c0-96e4-2eff3c740527' before making global git config changes
+2026-10-28T20:55:24.5840684Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-28T20:55:24.5844559Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/short.win/short.win
+2026-10-28T20:55:24.5886631Z Removing SSH command configuration
+2026-10-28T20:55:24.5894071Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-28T20:55:24.5958856Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-28T20:55:24.6288920Z Removing HTTP extra header
+2026-10-28T20:55:24.6295193Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-28T20:55:24.6346751Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-28T20:55:24.6649568Z Removing includeIf entries pointing to credentials config files
+2026-10-28T20:55:24.6657943Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-28T20:55:24.6707877Z includeif.gitdir:/home/runner/work/short.win/short.win/.git.path
+2026-10-28T20:55:24.6708954Z includeif.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path
+2026-10-28T20:55:24.6709929Z includeif.gitdir:/github/workspace/.git.path
+2026-10-28T20:55:24.6710919Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-28T20:55:24.6719356Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/short.win/short.win/.git.path
+2026-10-28T20:55:24.6770654Z /home/runner/work/_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:55:24.6785064Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/short.win/short.win/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-df6c9e4b\-6748\-46c8\-8fda\-1df7ebe53555\.config
+2026-10-28T20:55:24.6851313Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path
+2026-10-28T20:55:24.6904066Z /home/runner/work/_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:55:24.6915218Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-df6c9e4b\-6748\-46c8\-8fda\-1df7ebe53555\.config
+2026-10-28T20:55:24.6968198Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-10-28T20:55:24.7007506Z /github/runner_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:55:24.7016128Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-df6c9e4b\-6748\-46c8\-8fda\-1df7ebe53555\.config
+2026-10-28T20:55:24.7065289Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-10-28T20:55:24.7102801Z /github/runner_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config
+2026-10-28T20:55:24.7111483Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-df6c9e4b\-6748\-46c8\-8fda\-1df7ebe53555\.config
+2026-10-28T20:55:24.7162367Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-28T20:55:24.7438845Z Removing credentials config '/home/runner/work/_temp/git-credentials-df6c9e4b-6748-46c8-8fda-1df7ebe53555.config'
+2026-10-28T20:55:24.7622918Z Cleaning up orphan processes

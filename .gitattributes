@@ -11,3 +11,6 @@ docs/audit/simple-current-route-evidence-2026-10-28/official-*.md -diff
 
 docs/audit/simple-production-evidence-2026-10-28/** -text
 docs/audit/simple-production-evidence-2026-10-28/*.log -diff
+docs/audit/simple-production-evidence-2026-10-28/**/*.log -diff
+docs/audit/simple-production-evidence-2026-10-28/ci-40766940373/artifacts.json -diff
+docs/audit/simple-production-evidence-2026-10-28/ci-40766940373/run-terminal.json -diff

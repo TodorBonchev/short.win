@@ -1,0 +1,249 @@
+{
+  "current_routes": {
+    "case_results": [
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": 0,
+        "name": "bonk-production-adaptive",
+        "opening_setup_lamports": 0,
+        "outcome": "passed",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "c5d0f9da6e178f4eacdb381b02f305ca6963565402f214fa1fa1ba323996ad77"
+      },
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": 0,
+        "name": "jup-production-adaptive",
+        "opening_setup_lamports": 0,
+        "outcome": "passed",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "181dd668ebfb0c678c9f392970411a5f889038ff350d2cf8457eaded03c2eecb"
+      },
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": 0,
+        "name": "ray-production-exclude-scorch16",
+        "opening_setup_lamports": 0,
+        "outcome": "passed",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "ba81076ad7ba25ec3ec612b23a997fc35f5c3001a779983809a4eb16b6cf13d9"
+      },
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": 0,
+        "name": "pump-curve-adaptive",
+        "opening_setup_lamports": 2199360,
+        "outcome": "passed",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "ae687a65c9e1c3d4d2db5278f5b849492519aa8d6d8e460a117629f894d084da"
+      },
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": 0,
+        "name": "pump-graduated-adaptive-440",
+        "opening_setup_lamports": 1844400,
+        "outcome": "passed",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "c33cfd6d048cf165eea5a8ef91aa5750b1aafffb09293e9bd87807e9dc6a925b"
+      },
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": 0,
+        "name": "pump-fresh-native-adaptive",
+        "opening_setup_lamports": 1844400,
+        "outcome": "passed",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "085f981431bbc9b18b2b6af2e51d19e695c3e4bf82292e12ee290f8fd733f090"
+      },
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": null,
+        "name": "jup-direct-budget16",
+        "opening_setup_lamports": null,
+        "outcome": "expected_downstream_5460_refusal",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "974d83da4e2b60e11bf29c093e45dcd612cbefe16f4bb625bbcf0ed61ecfaec2"
+      },
+      {
+        "actual_snapshot_packets": true,
+        "closing_setup_lamports": null,
+        "name": "ray-direct-budget16",
+        "opening_setup_lamports": null,
+        "outcome": "expected_downstream_5460_refusal",
+        "policy_max_spread_bps": 500,
+        "summary_sha256": "b4f065c7163f9e50308749b386cb9ea69d284c88dae98c4e260f80340aec15c1"
+      }
+    ],
+    "exact_expected_negative_cases": 2,
+    "matrix_sha256": "220b6e160bfd6d99120432259dd65e7568718875e13c532799ade3dc9c731190",
+    "pending": [],
+    "positive_cases": 6,
+    "verified_candidate_account_files": 204,
+    "verified_transaction_logs": 32
+  },
+  "downloaded_artifacts": [
+    {
+      "api_reported_archive_digest": "sha256:5ceff7ec4f51a082d9cee5fe25b2057042d6d2bece5b042dfffd6b906aa4e654",
+      "archive_size_bytes": 35027809,
+      "id": 12851080972,
+      "name": "simple-pooled-fuzz-smoke"
+    },
+    {
+      "api_reported_archive_digest": "sha256:82d87476006b6835828e9256bdb9291e7869fb168f012c9d52ac69bd3a11de37",
+      "archive_size_bytes": 9218672,
+      "id": 12850781541,
+      "name": "simple-current-route-suite"
+    },
+    {
+      "api_reported_archive_digest": "sha256:7d0ee003c39b134b91e34ac432908bc91367bd3df3b19d8c73016c87edcbc370",
+      "archive_size_bytes": 206583,
+      "id": 12849444366,
+      "name": "simple-pooled-validation"
+    }
+  ],
+  "exact_bytes": {
+    "idl_equals_local_and_commit": true,
+    "idl_sha256": "9b262cb8ddfe2d55ada06c31aa11049044515c9a6b85324b6f2167b17c61cc26",
+    "program_bytes": 786864,
+    "program_equals_local": true,
+    "program_sha256": "8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d",
+    "sbf_arch": 3
+  },
+  "fuzz_smoke": {
+    "completed_cases": 32,
+    "coverage": {
+      "actual_cpmm_success_logs": 65,
+      "attempted_fixture_setups": 32,
+      "attempted_transactions": 147,
+      "expected_rejected_transactions": 49,
+      "fixture_setup_transactions_instrumented": false,
+      "operation_counts_attempt_success_reject": {
+        "actual_fill_veto": [
+          3,
+          0,
+          3
+        ],
+        "add_margin": [
+          8,
+          8,
+          0
+        ],
+        "arm": [
+          6,
+          6,
+          0
+        ],
+        "close": [
+          5,
+          5,
+          0
+        ],
+        "cr_force": [
+          3,
+          3,
+          0
+        ],
+        "default": [
+          5,
+          5,
+          0
+        ],
+        "early_cr_force": [
+          3,
+          0,
+          3
+        ],
+        "expiry_force": [
+          5,
+          5,
+          0
+        ],
+        "late_close": [
+          5,
+          0,
+          5
+        ],
+        "late_margin": [
+          5,
+          0,
+          5
+        ],
+        "late_repay": [
+          5,
+          0,
+          5
+        ],
+        "margin_clear": [
+          3,
+          3,
+          0
+        ],
+        "open": [
+          32,
+          32,
+          0
+        ],
+        "publish_reference": [
+          17,
+          17,
+          0
+        ],
+        "rejected_open": [
+          25,
+          0,
+          25
+        ],
+        "repay": [
+          14,
+          14,
+          0
+        ],
+        "underfill": [
+          3,
+          0,
+          3
+        ]
+      },
+      "scenario_counts": {
+        "close": 2,
+        "cr_fill_veto": 3,
+        "cr_market_rise": 3,
+        "default_boundary": 5,
+        "expiry": 5,
+        "margin_repay": 8,
+        "repay": 3,
+        "underfill": 3
+      },
+      "successful_fixture_setups": 32,
+      "successful_transactions": 98
+    },
+    "duration_qualification": false,
+    "log_sha256": "142ffdb4cef8b43337ef38ade3b384f4e4c84c3c1c216ab50752834c328a04bc",
+    "metadata_sha256": "12fd3cb584cb5b9a2e5e5aa32a344e5746eeeba42cc4fea0d9e91fc2b310a91a",
+    "runner_sha256": "5a0735725281d2e5cadc68fae0ed434ace1196e68f5e6dcd19c1c2af35fd1f38",
+    "summary_sha256": "0532c6cba03311fc89b5fcd17fcf606f9ff1f39454b00e870124ee511aedb221",
+    "verified_archived_source_files_against_commit": 40,
+    "verified_frozen_artifact_files": 342,
+    "wall_seconds": 36.847537388,
+    "zero_failures_anomalies_setup_and_invariant_failures": true
+  },
+  "head_sha": "94b8409a787f88567d47c59b0a7ec1d13278ce46",
+  "intentional_skipped_cached_install_steps": [
+    "Install pinned Agave",
+    "Install pinned Anchor CLI"
+  ],
+  "job_id": 123093495796,
+  "limitations": [
+    "A 36-second bounded smoke is not 24-hour qualification.",
+    "Fuzz covers its eight historical-CPMM scenario families; current six-route snapshot replays are separate evidence.",
+    "Route fixtures use synthetic loan allocation, clocks and two-epoch references; they do not prove funded operations or production three-epoch history provenance.",
+    "Captured RPC accounts span slots; no mainnet transaction landing, universal token coverage or future unchanged routing is claimed.",
+    "GitHub API archive digests are retained as reported; decompressed file bytes, manifests and every listed frozen input were independently hashed locally."
+  ],
+  "run_id": 40766940373,
+  "run_url": "https://github.com/TodorBonchev/short.win/actions/runs/40766940373",
+  "schema": 1,
+  "status": "verified",
+  "terminal_conclusion": "success",
+  "verified_at_utc": "2026-10-28T21:02:34.297182+00:00"
+}

@@ -6,6 +6,271 @@
       "bytes": 944
     },
     {
+      "file": "ci-40766940373/SHA256SUMS.json",
+      "sha256": "620199b280842b4dff1b56c9526a73c5fc4e8c4c8dfdd91d51ccb2f56ba88347",
+      "bytes": 6591
+    },
+    {
+      "file": "ci-40766940373/artifacts.json",
+      "sha256": "1a862922cd7f7236d79a061df0b08509c70031694b3952b171ecc26ce10266f2",
+      "bytes": 2192
+    },
+    {
+      "file": "ci-40766940373/current-routes/bonk-production-adaptive/full_buyback.log",
+      "sha256": "b1e5866e36257084b017a1d5af79026f5aae0d03c8a73ffb43eb5b5624683982",
+      "bytes": 3545
+    },
+    {
+      "file": "ci-40766940373/current-routes/bonk-production-adaptive/open_sell.log",
+      "sha256": "3534806af5f24c88754763067457768fe75a8f0ebdd7382a937c1f1c128586ae",
+      "bytes": 4049
+    },
+    {
+      "file": "ci-40766940373/current-routes/bonk-production-adaptive/post_swap_fee_bound_rollback.log",
+      "sha256": "8223622bf1d5d078736bd207c4e55b2b0e9d5c5b035bc6d9fcf544b482f47eaa",
+      "bytes": 3788
+    },
+    {
+      "file": "ci-40766940373/current-routes/bonk-production-adaptive/summary.json",
+      "sha256": "c5d0f9da6e178f4eacdb381b02f305ca6963565402f214fa1fa1ba323996ad77",
+      "bytes": 4107
+    },
+    {
+      "file": "ci-40766940373/current-routes/jup-direct-budget16/post_swap_fee_bound_rollback.log",
+      "sha256": "cbeb97a4937ef9d155fd0c8eea78ae87a2df4652f842957a85ac53f01f10f24a",
+      "bytes": 2518
+    },
+    {
+      "file": "ci-40766940373/current-routes/jup-direct-budget16/summary.json",
+      "sha256": "974d83da4e2b60e11bf29c093e45dcd612cbefe16f4bb625bbcf0ed61ecfaec2",
+      "bytes": 2543
+    },
+    {
+      "file": "ci-40766940373/current-routes/jup-production-adaptive/full_buyback.log",
+      "sha256": "eadab395eda628fb5dedd63957b6e6537fc1c87044996606336d41314e6756bf",
+      "bytes": 3680
+    },
+    {
+      "file": "ci-40766940373/current-routes/jup-production-adaptive/open_sell.log",
+      "sha256": "2b1e5defd5573b5b6845f98a6edc6c220351133f92152cd11779f722a198a672",
+      "bytes": 4049
+    },
+    {
+      "file": "ci-40766940373/current-routes/jup-production-adaptive/post_swap_fee_bound_rollback.log",
+      "sha256": "36039d98e0f67c4784f7495036ba245830043b1a83246895198492c760affd94",
+      "bytes": 3788
+    },
+    {
+      "file": "ci-40766940373/current-routes/jup-production-adaptive/summary.json",
+      "sha256": "181dd668ebfb0c678c9f392970411a5f889038ff350d2cf8457eaded03c2eecb",
+      "bytes": 4097
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/full_buyback.log",
+      "sha256": "21983fde0fce4b9d5a4d969d3e47fbc2c9f98844df2d29177e01165598295fb8",
+      "bytes": 4251
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/open_sell.log",
+      "sha256": "9e6bd8b77ca53db9c50a2f07f8c47c40ae24d60f4494b0c9cdd9ede5f0b2f159",
+      "bytes": 6154
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/post_swap_fee_bound_rollback.log",
+      "sha256": "8339b48c4f09f5560130ad6b802f182497dd501b23dfc9d429d8142e0239c5e3",
+      "bytes": 5786
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/setup_insufficient_budget.log",
+      "sha256": "fdd6beec9a26742b673428a6cc9f3e2e9dcf0b3696ddd49813119dda2a266783",
+      "bytes": 2578
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/setup_over_program_maximum.log",
+      "sha256": "a7a87d567f67df45a8ee4d7f532da2e4bfb5f681dfeb013f207a1fda15b6d5d3",
+      "bytes": 806
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/setup_signed_funding_below_advance.log",
+      "sha256": "664028775d3cf979f88b258825ee1cff294f3e5ede45d7c34ada510d2a522fef",
+      "bytes": 854
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/setup_zero_budget.log",
+      "sha256": "bcd96bf887b34981666fc8bb252576bb9a19008d90d0ef248bae2f3c6155e53d",
+      "bytes": 2477
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-curve-adaptive/summary.json",
+      "sha256": "ae687a65c9e1c3d4d2db5278f5b849492519aa8d6d8e460a117629f894d084da",
+      "bytes": 5729
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/full_buyback.log",
+      "sha256": "79115c6bf0277e7eb9f9f36070fa0613fa12fe3e4477943d55d110b62beba617",
+      "bytes": 4423
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/open_sell.log",
+      "sha256": "ada1d3ceb409c23e2e2249a3f71a4581cefcaeff7076b48f50054fbd9d0c9252",
+      "bytes": 5613
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/post_swap_fee_bound_rollback.log",
+      "sha256": "4d33dc335ea49c536b157a1891353da060fc30cca466db36d9951b22dd315ebc",
+      "bytes": 5245
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/setup_insufficient_budget.log",
+      "sha256": "dca79f41e28fc58f7931f8e787a011b737c9ab20409830e360528d0a8e450aad",
+      "bytes": 2389
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/setup_over_program_maximum.log",
+      "sha256": "9f77ebd619252677dc7b3be22c0315883b70610fa448324c2ea46b8eafcc4985",
+      "bytes": 806
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/setup_signed_funding_below_advance.log",
+      "sha256": "cfd850f549b7096ff9ff595be5fb11b738c4c4395fb9e06557e514b4b8865bae",
+      "bytes": 854
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/setup_zero_budget.log",
+      "sha256": "a0fd0ea4bd0e145694efd05b665205cd6488c65dcace32c9b5923ed779a27eef",
+      "bytes": 2288
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-fresh-native-adaptive/summary.json",
+      "sha256": "085f981431bbc9b18b2b6af2e51d19e695c3e4bf82292e12ee290f8fd733f090",
+      "bytes": 5738
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/full_buyback.log",
+      "sha256": "7bd7a02d285d43ef29a5999eb4430a79dbdc7a9e0a0f4b12d3057f246cd31dee",
+      "bytes": 4511
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/open_sell.log",
+      "sha256": "b0d29c57d07c190129d1afda638ca0dc9d649ca9be9b375163259556eed8bd74",
+      "bytes": 5326
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/post_swap_fee_bound_rollback.log",
+      "sha256": "1791790a3b612b11836741a455c88ac2454c90295f69862bb112e8e80d70fd23",
+      "bytes": 4958
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/setup_insufficient_budget.log",
+      "sha256": "c6b72a7dd07d8f45498a7ead7b00f866640e2e541e7e7ae86dc9ddd3a35de7c1",
+      "bytes": 2575
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/setup_over_program_maximum.log",
+      "sha256": "80ce496826f651cc710ca7c962381614e2ea7bc419c827e726ed3cc7064e3ce8",
+      "bytes": 806
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/setup_signed_funding_below_advance.log",
+      "sha256": "8b36783e3e31a485691b3f74e63b7bcad1cfa52980834a2b74ca5e1cba86197e",
+      "bytes": 854
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/setup_zero_budget.log",
+      "sha256": "34737c4ba8e4e43e5c529105f82023d49ca7b3023aa1fd45b86d92dd8ffbf398",
+      "bytes": 2474
+    },
+    {
+      "file": "ci-40766940373/current-routes/pump-graduated-adaptive-440/summary.json",
+      "sha256": "c33cfd6d048cf165eea5a8ef91aa5750b1aafffb09293e9bd87807e9dc6a925b",
+      "bytes": 5743
+    },
+    {
+      "file": "ci-40766940373/current-routes/ray-direct-budget16/post_swap_fee_bound_rollback.log",
+      "sha256": "73d7195c9673c91dac49c235a8d7b4cbc5465a24cef077977f104a398d7085c1",
+      "bytes": 2518
+    },
+    {
+      "file": "ci-40766940373/current-routes/ray-direct-budget16/summary.json",
+      "sha256": "b4f065c7163f9e50308749b386cb9ea69d284c88dae98c4e260f80340aec15c1",
+      "bytes": 2543
+    },
+    {
+      "file": "ci-40766940373/current-routes/ray-production-exclude-scorch16/full_buyback.log",
+      "sha256": "72b53665f97142cf808906903a2ecadca238c4dcbc2326bf03a71417b103c124",
+      "bytes": 3680
+    },
+    {
+      "file": "ci-40766940373/current-routes/ray-production-exclude-scorch16/open_sell.log",
+      "sha256": "4f285ca6c05544bfb4b30a04e7947935edf0c3655a0620e6a4766c53110e8918",
+      "bytes": 4184
+    },
+    {
+      "file": "ci-40766940373/current-routes/ray-production-exclude-scorch16/post_swap_fee_bound_rollback.log",
+      "sha256": "57114b7063e61f5864a897cdbefa6dce363d611ffe11a621a61e4ac84571c735",
+      "bytes": 3923
+    },
+    {
+      "file": "ci-40766940373/current-routes/ray-production-exclude-scorch16/summary.json",
+      "sha256": "ba81076ad7ba25ec3ec612b23a997fc35f5c3001a779983809a4eb16b6cf13d9",
+      "bytes": 4106
+    },
+    {
+      "file": "ci-40766940373/current-routes/summary.json",
+      "sha256": "1e09f55e79f3ba07fd03c36015e1db227962560fc2e49db4abe7cc22f2fbfcc9",
+      "bytes": 3795
+    },
+    {
+      "file": "ci-40766940373/downloaded-file-sha256.json",
+      "sha256": "15eb9cde4ecfda29f0c246b6ead68b756755b12c3773669e3adf304b28c33fe5",
+      "bytes": 117007
+    },
+    {
+      "file": "ci-40766940373/fuzz-smoke/completion.json",
+      "sha256": "edbfad80df47b81c894cb79e2bfd7468a0cff8c9ada8a25210cfecfeb39fc343",
+      "bytes": 227
+    },
+    {
+      "file": "ci-40766940373/fuzz-smoke/metadata.json",
+      "sha256": "12fd3cb584cb5b9a2e5e5aa32a344e5746eeeba42cc4fea0d9e91fc2b310a91a",
+      "bytes": 53066
+    },
+    {
+      "file": "ci-40766940373/fuzz-smoke/run.log",
+      "sha256": "142ffdb4cef8b43337ef38ade3b384f4e4c84c3c1c216ab50752834c328a04bc",
+      "bytes": 4131
+    },
+    {
+      "file": "ci-40766940373/fuzz-smoke/summary.json",
+      "sha256": "0532c6cba03311fc89b5fcd17fcf606f9ff1f39454b00e870124ee511aedb221",
+      "bytes": 1986
+    },
+    {
+      "file": "ci-40766940373/independent-verification.json",
+      "sha256": "dbcf78771e7c1e7be54c819d6f6e3b4d42a9c76bce3b57eab2206195d43a6b1a",
+      "bytes": 7722
+    },
+    {
+      "file": "ci-40766940373/independent-verifier.py.txt",
+      "sha256": "2ef7b270db2bd96aa5e227d1203e53367ce5af9d85bae89777841031bb6f30b6",
+      "bytes": 12210
+    },
+    {
+      "file": "ci-40766940373/job-api.log",
+      "sha256": "b336fa59fbd41039f353b396af3f2b31b95828c2c0fbd232247b75706ce7dc57",
+      "bytes": 120297
+    },
+    {
+      "file": "ci-40766940373/run-terminal.json",
+      "sha256": "0a24012773100519affe2c61ef9cf36e0fdf59b3bc7930732db8fa4d52fd7499",
+      "bytes": 4713
+    },
+    {
+      "file": "ci-40766940373/sbf-build.log",
+      "sha256": "dd58b568207936ee98e90b1ace712dd0260293dfb70f642221df61e8a9c78433",
+      "bytes": 389
+    },
+    {
       "file": "client-final.log",
       "sha256": "c8796827e5c6993703b2d8a0ba4d9ac881ade38e73d164e591ce9d4f5f7896cf",
       "bytes": 2829
@@ -19,6 +284,16 @@
       "file": "current-suite-independent-predicates.json",
       "sha256": "8ee68e1065095fc09522e1957007252a2647517ea8e827304e4b5e80dac3bb06",
       "bytes": 2172
+    },
+    {
+      "file": "docs-only-equivalence.json",
+      "sha256": "0de36f0e301403cce40e726ccc08029d2f5a9d767e0709b84e693bce33f4eb5f",
+      "bytes": 464
+    },
+    {
+      "file": "git-storage-verification.json",
+      "sha256": "224e5155134f82fe9476ac7dc73b40c2256443610c3d2084efa6d9ce105995d3",
+      "bytes": 301
     },
     {
       "file": "program-smoke-completion.json",

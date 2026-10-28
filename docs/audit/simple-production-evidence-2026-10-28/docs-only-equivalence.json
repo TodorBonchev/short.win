@@ -1,0 +1,12 @@
+{
+  "checked_code_commit": "94b8409a787f88567d47c59b0a7ec1d13278ce46",
+  "changed_tracked_paths": [
+    ".gitattributes",
+    "TODO.md",
+    "docs/audit/simple-production-evidence-2026-10-28/checksums.json",
+    "docs/audit/simple-production-readiness-2026-10-28.md",
+    "simple/config/README.md"
+  ],
+  "runtime_source_policy_idl_workflow_and_route_input_changes": false,
+  "scope": "documentation, exact-byte evidence storage attributes and CI receipts only"
+}

@@ -1,0 +1,113 @@
+from pathlib import Path
+import hashlib,json,re,struct,subprocess,datetime,shutil
+REPO=Path('/root/short.win-simple')
+BASE=REPO/'simple/target/independent-ci-40766940373'
+COMMIT='94b8409a787f88567d47c59b0a7ec1d13278ce46'
+SO='8c4ad9af77afa32ae09ae48f5fdcfce868bd3759c96affac975130c63781a00d'
+IDL='9b262cb8ddfe2d55ada06c31aa11049044515c9a6b85324b6f2167b17c61cc26'
+RUN=40766940373
+
+def ensure(ok,why):
+    if not ok: raise ValueError(why)
+def sha(path):
+    h=hashlib.sha256()
+    with path.open('rb') as f:
+        for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
+    return h.hexdigest()
+def read(path):return json.loads(path.read_text(encoding='utf-8-sig'))
+def safe(folder,name):
+    p=(folder/name).resolve();ensure(p.is_relative_to(folder.resolve()),'unsafe artifact path');return p
+def gitbytes(name):return subprocess.check_output(['git','show',COMMIT+':'+name],cwd=REPO)
+def byte_sha(b):return hashlib.sha256(b).hexdigest()
+run=read(BASE/'run-terminal.json')
+ensure(run['databaseId']==RUN and run['headSha']==COMMIT and run['status']=='completed' and run['conclusion']=='success','run identity/conclusion')
+ensure(len(run['jobs'])==1 and run['jobs'][0]['conclusion']=='success','job conclusion')
+steps=run['jobs'][0]['steps']
+ensure(all(x['status']=='completed' and x['conclusion'] in ['success','skipped'] for x in steps),'nonterminal/failed step')
+skipped=[x['name'] for x in steps if x['conclusion']=='skipped']
+ensure(skipped==['Install pinned Agave','Install pinned Anchor CLI'],'unexpected skipped validation')
+artifacts=read(BASE/'artifacts.json')['artifacts']
+ensure({a['name'] for a in artifacts}=={'simple-pooled-validation','simple-pooled-fuzz-smoke','simple-current-route-suite'},'artifact inventory')
+ensure(all(not a['expired'] for a in artifacts),'expired artifact')
+validation=BASE/'simple-pooled-validation'
+so=validation/'deploy/shortwin_simple.so';idl=validation/'idl/shortwin_simple.json'
+ensure(sha(so)==SO and so.read_bytes()==(REPO/'simple/target/deploy/shortwin_simple.so').read_bytes(),'SBF exact bytes')
+ensure(sha(idl)==IDL and idl.read_bytes()==(REPO/'simple/client/idl/shortwin_simple.json').read_bytes(),'IDL exact bytes')
+ensure(len(so.read_bytes())==786864 and struct.unpack_from('<I',so.read_bytes(),48)[0]==3,'ELF size/arch')
+ensure(idl.read_bytes()==gitbytes('simple/client/idl/shortwin_simple.json'),'IDL exact committed bytes')
+fuzz=BASE/'simple-pooled-fuzz-smoke';m=read(fuzz/'metadata.json');s=read(fuzz/'summary.json');c=read(fuzz/'completion.json')
+ensure(m['case_limit']==32 and m['seed']==103410000 and m['requested_duration_seconds'] is None,'bounded smoke identity')
+ensure(m['command'][1:5]==['--seed','103410000','--cases','32'],'smoke command')
+ensure(c['exit_code']==0 and c['elapsed_seconds']==s['wall_seconds'] and 0<s['wall_seconds']<86400,'smoke completion/duration')
+ensure(s['finished_cleanly'] and s['completed_cases']==32 and s['requested_duration_seconds'] is None,'smoke summary')
+ensure(all(s[x]==0 for x in ['anomalies','failures','invariant_failures','setup_failures']),'nonzero smoke failures')
+ensure(sha(fuzz/'run.log')==c['log_sha256'] and sha(fuzz/'summary.json')==c['summary_sha256'],'final smoke hashes')
+ensure(sha(fuzz/'runner')==m['frozen']['runner_sha256'],'frozen native runner')
+for name,digest in m['frozen']['artifact_hashes'].items():ensure(sha(safe(fuzz/'frozen-root',name))==digest,'frozen artifact '+name)
+for name,digest in m['frozen']['source_hashes'].items():
+    ensure(sha(safe(fuzz/'source',name))==digest,'archived source '+name)
+    ensure(byte_sha(gitbytes(name))==digest,'committed source '+name)
+ensure(m['frozen']['artifact_hashes']['shortwin_simple.so']==SO,'smoke SBF binding')
+ensure(not [x for x in fuzz.iterdir() if 'crash' in x.name.lower() or 'anomaly' in x.name.lower()],'unexpected crash artifact')
+cov=s['coverage'];scenarios=cov['scenario_counts']
+ensure(set(scenarios)=={'close','cr_fill_veto','cr_market_rise','default_boundary','expiry','margin_repay','repay','underfill'} and sum(scenarios.values())==32 and all(v>0 for v in scenarios.values()),'actual scenario coverage')
+ensure((cov['attempted_transactions'],cov['successful_transactions'],cov['expected_rejected_transactions'],cov['actual_cpmm_success_logs'])==(147,98,49,65),'transaction coverage')
+ensure(cov['attempted_fixture_setups']==cov['successful_fixture_setups']==32,'fixture setups')
+ensure(len(re.findall(r'^case_complete ',(fuzz/'run.log').read_text(),re.M))==32,'log completed cases')
+
+suite=BASE/'simple-current-route-suite';suite_summary=read(suite/'summary.json')
+matrix=json.loads(gitbytes('simple/tests/runtime/current-routes.json'))
+ensure(suite_summary['status']=='passed' and suite_summary['pending']==[] and suite_summary['live_transactions_sent']==0,'suite terminal state')
+ensure(suite_summary['own_program_sha256']==SO and suite_summary['matrix_sha256']==byte_sha(gitbytes('simple/tests/runtime/current-routes.json')),'suite source/program binding')
+rows={r['name']:r for r in suite_summary['cases']}
+ensure(len(rows)==8 and len(matrix['expected_pass'])==6 and len(matrix['expected_fail'])==2,'route counts')
+route_results=[];log_count=0;account_count=0
+pump_costs={'pump-curve-adaptive':2199360,'pump-graduated-adaptive-440':1844400,'pump-fresh-native-adaptive':1844400}
+for mode in ['expected_pass','expected_fail']:
+    for case in matrix[mode]:
+        name=case['name'];folder=suite/name;row=rows[name];summary_path=folder/'replay/summary.json';summary=read(summary_path)
+        ensure(row['expected']==mode and row['verified'],'route expected/verified '+name)
+        ensure(sha(summary_path)==row['summary_sha256'] and sha(folder/'stdout.log')==row['stdout_sha256'] and sha(folder/'stderr.log')==row['stderr_sha256'],'suite row hashes '+name)
+        ensure(summary['own_program_sha256']==SO and summary['live_transactions_sent']==0,'case program/scope '+name)
+        ensure(summary['synthetic_reference']['functional_policy_max_spread_bps']==500,'500bps route policy '+name)
+        ensure(summary['synthetic_reference']['spread_bps_ceiling']<=500,'spread bound '+name)
+        candidate_path=folder/'candidate/candidate.json';candidate=read(candidate_path)
+        ensure(sha(candidate_path)==summary['manifest_sha256'] and candidate['own_program_sha256']==SO,'candidate manifest '+name)
+        for entry in candidate['accounts']:
+            ensure(sha(safe(folder/'candidate',entry['file']))==entry['sha256'],'candidate account '+name)
+            account_count+=1
+        for side in ['sell','buy']:
+            ensure(sha(safe(folder/'candidate',candidate[side]['file']))==candidate[side]['sha256'],'candidate response '+name)
+        for entry in candidate['capture_files']:
+            ensure(byte_sha(gitbytes(case['capture']+'/'+entry['file']))==entry['sha256'],'committed capture '+name)
+        for txname,tx in summary['transactions'].items():
+            log=safe(folder/'replay',tx['log_file']);ensure(sha(log)==tx['log_sha256'],'transaction log '+name+'/'+txname);log_count+=1
+            ensure(tx['lookup_mode']=='actual_snapshot_lookup_tables' and tx['wire_bytes']<=1232,'actual ALT packet '+name+'/'+txname)
+        ensure(not summary['packet_fit_failures'],'packet failure '+name)
+        if mode=='expected_pass':
+            ensure(summary['status']=='passed' and summary['functional_execution_passed'] and summary['actual_snapshot_packets_fit'],'positive outcome '+name)
+            ensure(summary['base_token_conservation'] and summary['post_cpi_rollback'],'positive invariants '+name)
+            ensure(summary['full_buyback_net_credit']>=summary['binding']['q'],'whole q '+name)
+            for txname in ['open_sell','full_buyback']:
+                tx=summary['transactions'][txname];ensure(tx['error'] is None,'successful transaction '+name)
+                ensure('Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 success' in (folder/'replay'/tx['log_file']).read_text(),'actual Jupiter success '+name)
+            if name in pump_costs:
+                setup=summary['setup_allowance']
+                ensure(setup['opening_actual_actor_cost']==pump_costs[name] and setup['opening_signed_maximum']==5000000,'opening actor cost '+name)
+                ensure(setup['opening_unused_refunded']==5000000-pump_costs[name],'unused setup refund '+name)
+                ensure(setup['closing_signed_maximum']==setup['closing_actual_actor_cost']==0,'zero close setup '+name)
+                ensure(setup['cost_excluded_from_WSOL_notional_collateral_and_protocol_fees'],'setup economic separation '+name)
+                ensure(len(summary['setup_budget_rejections'])==4 and all(summary['setup_budget_rejections'].values()),'setup negatives '+name)
+            outcome='passed'
+        else:
+            ensure(summary['status']=='failed' and case['error_substring'] in summary['error'],'exact negative error '+name)
+            tx=summary['transactions'][case['transaction']]
+            ensure(case['error_substring'] in tx['error'],'negative transaction outcome '+name)
+            ensure(case['transaction_log_substring'] in (folder/'replay'/tx['log_file']).read_text(),'negative downstream error '+name)
+            outcome='expected_downstream_5460_refusal'
+        route_results.append({'name':name,'outcome':outcome,'policy_max_spread_bps':500,'summary_sha256':sha(summary_path),'actual_snapshot_packets':True,'opening_setup_lamports':summary.get('setup_allowance',{}).get('opening_actual_actor_cost'),'closing_setup_lamports':summary.get('setup_allowance',{}).get('closing_actual_actor_cost')})
+report={'schema':1,'verified_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'status':'verified','run_id':RUN,'head_sha':COMMIT,'run_url':run['url'],'terminal_conclusion':run['conclusion'],'job_id':run['jobs'][0]['databaseId'],'intentional_skipped_cached_install_steps':skipped,'downloaded_artifacts':[{'name':a['name'],'id':a['id'],'api_reported_archive_digest':a['digest'],'archive_size_bytes':a['size_in_bytes']} for a in artifacts],'exact_bytes':{'program_sha256':SO,'program_bytes':so.stat().st_size,'program_equals_local':True,'sbf_arch':3,'idl_sha256':IDL,'idl_equals_local_and_commit':True},'fuzz_smoke':{'completed_cases':32,'wall_seconds':s['wall_seconds'],'duration_qualification':False,'zero_failures_anomalies_setup_and_invariant_failures':True,'summary_sha256':sha(fuzz/'summary.json'),'log_sha256':sha(fuzz/'run.log'),'metadata_sha256':sha(fuzz/'metadata.json'),'runner_sha256':sha(fuzz/'runner'),'verified_frozen_artifact_files':len(m['frozen']['artifact_hashes']),'verified_archived_source_files_against_commit':len(m['frozen']['source_hashes']),'coverage':cov},'current_routes':{'positive_cases':6,'exact_expected_negative_cases':2,'pending':[],'case_results':route_results,'verified_transaction_logs':log_count,'verified_candidate_account_files':account_count,'matrix_sha256':suite_summary['matrix_sha256']},'limitations':['A 36-second bounded smoke is not 24-hour qualification.','Fuzz covers its eight historical-CPMM scenario families; current six-route snapshot replays are separate evidence.','Route fixtures use synthetic loan allocation, clocks and two-epoch references; they do not prove funded operations or production three-epoch history provenance.','Captured RPC accounts span slots; no mainnet transaction landing, universal token coverage or future unchanged routing is claimed.','GitHub API archive digests are retained as reported; decompressed file bytes, manifests and every listed frozen input were independently hashed locally.']}
+(BASE/'independent-verification.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+files={str(f.relative_to(BASE)):sha(f) for f in BASE.rglob('*') if f.is_file() and f.name not in ['downloaded-file-sha256.json']}
+(BASE/'downloaded-file-sha256.json').write_text(json.dumps(files,indent=2,sort_keys=True)+'\n')
+print(json.dumps({'status':'verified','artifacts':len(artifacts),'SBF':SO,'IDL':IDL,'fuzz_seconds':s['wall_seconds'],'frozen_files':len(m['frozen']['artifact_hashes']),'source_files':len(m['frozen']['source_hashes']),'route_logs':log_count,'candidate_account_files':account_count,'report_sha256':sha(BASE/'independent-verification.json')},indent=2))

@@ -7,8 +7,10 @@
 - [x] Pass fresh focused CI and short actual-program fuzz; verify byte-identical program builds across checkout locations. [Checkpoint](docs/audit/simple-pooled-reproducibility-2026-10-28.md).
 - [x] Prepare the [production policy/service/payer proposal](simple/config/README.md), free-key profile, non-executable role setup and bounded on-demand publisher.
 - [ ] Assign and review actual production program/role identities with the proposed policy/model; commission real funding and capacity.
-- [ ] Qualify current external program bytes and additional Jupiter route families on the final inputs.
+- [x] Qualify the [dated current-route matrix](docs/audit/simple-production-readiness-2026-10-28.md): six real-program sell/full-buyback cases, including SPL/Token-2022 Pump curves and PumpSwap, plus two exact incompatible-route refusals; fresh CI passed.
+- [ ] Freeze actual production identity/version and repeat current external loader/route checks on those final inputs.
 - [ ] Complete a fresh independently supervised >=24h campaign; retain duration, coverage, zero-anomaly and frozen-input evidence.
+- [ ] Qualify safe inactive exact-q job retirement/re-admission against active debt and outstanding references; the warm-publication intent TTL does not itself free a durable queue slot.
 - [ ] Commission real funded operator/HTTP/web services with measured quote capacity, payer budgets and tested monitoring/alerts.
 - [ ] Present the concrete stable release/tag and mainnet deployment plan for owner review; no tag or deployment has occurred.
 
