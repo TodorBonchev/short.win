@@ -1721,6 +1721,9 @@ attributed to its original bytes and does not qualify this replacement. No findi
 status, stable tag, deployment approval or external-audit claim is changed by this
 implementation. Mainnet-before-external-audit/bounty funding timing remains the
 owner's policy, subject to fresh technical qualification of the new scope.
+The [pooled implementation/build checkpoint](audit/simple-pooled-reproducibility-2026-10-28.md)
+records the fresh green CI, matching build bytes and short-smoke limits;
+long-run and real operating qualification remain open.
 
 
 **Later owner scope decision, 2026-10-27:** first mainnet is postponed for the

@@ -1,0 +1,14 @@
+{
+  "timestamp_utc": "2026-10-28T17:28:33.778674+00:00",
+  "removed_exact_owned_path": "/home/runner/work/short.win/short.win",
+  "parent_retained": "/home/runner/work/short.win",
+  "logical_bytes_removed": 402055864,
+  "allocated_bytes_estimate": 399765504,
+  "filesystem_free_bytes_delta": 399765504,
+  "retained_elf": "/root/short.win-simple/simple/target/build-identity/571b417-ci-path-shortwin_simple.so",
+  "retained_sha256": "b87598a00c788c30a64b4e232f5f2040c0c8eb333c0cce5fb09403d27159544c",
+  "retained_bytes": 770848,
+  "primary_fork_seed_sha256_before": "96518cdd9950c24b5e27ca5bf361d40a9dc80b6dd2e7debf33ad55c8d7539ef9",
+  "primary_fork_seed_sha256_after": "96518cdd9950c24b5e27ca5bf361d40a9dc80b6dd2e7debf33ad55c8d7539ef9",
+  "scope": "owned temporary CI-path archive/build copy only; original workspaces and parent directories untouched"
+}

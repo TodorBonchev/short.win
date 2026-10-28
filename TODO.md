@@ -1,5 +1,19 @@
 > **2026-10-28 active replacement:** the owner selected a Jupiter-only pooled lending/shorting implementation with a fixed upfront SOL term fee. See [simple/README.md](simple/README.md), [the new specification](simple/docs/SPEC.md) and [operating prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement.
 
+## Active pooled replacement
+
+- [x] Implement Jupiter-only pooled vaults, fixed upfront SOL term fees, whole-position exits and the selected 24h-grace default.
+- [x] Add trusted exact-quantity history, bounded automatic warm-up/publication, keeper/indexer, generated client and wallet UI.
+- [x] Pass fresh focused CI and short actual-program fuzz; verify byte-identical program builds across checkout locations. [Checkpoint](docs/audit/simple-pooled-reproducibility-2026-10-28.md).
+- [ ] Review production program/role identities, financial policy and history settings together.
+- [ ] Qualify current external program bytes and additional Jupiter route families on the final inputs.
+- [ ] Complete a fresh independently supervised >=24h campaign; retain duration, coverage, zero-anomaly and frozen-input evidence.
+- [ ] Commission real funded operator/HTTP/web services with measured quote capacity, payer budgets and tested monitoring/alerts.
+- [ ] Present the concrete stable release/tag and mainnet deployment plan for owner review; no tag or deployment has occurred.
+
+The earlier checklist below is retained for the legacy implementation.
+
+---
 # Pending work
 
 This file lists unfinished work only. Completed audit and release evidence is in

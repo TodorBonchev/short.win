@@ -1,0 +1,161 @@
+{
+  "verified_at": "2026-10-28T17:31:30.480027+00:00",
+  "run_id": 40735699141,
+  "url": "https://github.com/TodorBonchev/short.win/actions/runs/40735699141",
+  "head_sha": "e0223e7e526879c48a856d42599c0edd64972f60",
+  "status": "completed",
+  "conclusion": "success",
+  "artifact_sha256": "b87598a00c788c30a64b4e232f5f2040c0c8eb333c0cce5fb09403d27159544c",
+  "artifact_bytes": 770848,
+  "retained_terminal_sha256": "74baa2f008437ec6010fc1dcb71dfd568d780ee137ebcc0f34f387711e6ed9d5",
+  "retained_job_log_sha256": "35f513b7379e976d240cc3b9b41941c5b4659e832bc1bfa6323acdb7d8bf8962",
+  "fuzz_metadata_sha256": "1a943c443647535697f3bc44d6f2025d0cc0282fad7f1de8c8fe9458837cb576",
+  "fuzz_summary_sha256": "85088a16ecdd07c1d540e67486898a813df801f3b7658ed5c8eb5585abbcf210",
+  "fuzz_completion_sha256": "069b71795bded6e0754f6b29555d5826273c0c380132dd05e8d0bcc23731ae1c",
+  "fuzz_log_sha256": "eebb5f13c6c80f78e4875edf0832012ce56d3531d071097908b4cc71e7e07325",
+  "frozen_artifact_files_verified": 342,
+  "frozen_source_files_verified": 38,
+  "runner_sha256_verified": "332b43bb6e95edfd82d87012cb0ede9f674cfde7a7471972c36de16b3ccfe14c",
+  "summary": {
+    "anomalies": 0,
+    "completed_cases": 32,
+    "coverage": {
+      "actual_cpmm_success_logs": 65,
+      "attempted_fixture_setups": 32,
+      "attempted_transactions": 147,
+      "expected_rejected_transactions": 49,
+      "fixture_setup_transactions_instrumented": false,
+      "operation_counts_attempt_success_reject": {
+        "actual_fill_veto": [
+          3,
+          0,
+          3
+        ],
+        "add_margin": [
+          8,
+          8,
+          0
+        ],
+        "arm": [
+          6,
+          6,
+          0
+        ],
+        "close": [
+          5,
+          5,
+          0
+        ],
+        "cr_force": [
+          3,
+          3,
+          0
+        ],
+        "default": [
+          5,
+          5,
+          0
+        ],
+        "early_cr_force": [
+          3,
+          0,
+          3
+        ],
+        "expiry_force": [
+          5,
+          5,
+          0
+        ],
+        "late_close": [
+          5,
+          0,
+          5
+        ],
+        "late_margin": [
+          5,
+          0,
+          5
+        ],
+        "late_repay": [
+          5,
+          0,
+          5
+        ],
+        "margin_clear": [
+          3,
+          3,
+          0
+        ],
+        "open": [
+          32,
+          32,
+          0
+        ],
+        "publish_reference": [
+          17,
+          17,
+          0
+        ],
+        "rejected_open": [
+          25,
+          0,
+          25
+        ],
+        "repay": [
+          14,
+          14,
+          0
+        ],
+        "underfill": [
+          3,
+          0,
+          3
+        ]
+      },
+      "scenario_counts": {
+        "close": 2,
+        "cr_fill_veto": 3,
+        "cr_market_rise": 3,
+        "default_boundary": 5,
+        "expiry": 5,
+        "margin_repay": 8,
+        "repay": 3,
+        "underfill": 3
+      },
+      "successful_fixture_setups": 32,
+      "successful_transactions": 98
+    },
+    "failures": 0,
+    "finished_cleanly": true,
+    "invariant_failures": 0,
+    "requested_duration_seconds": null,
+    "schema_version": 1,
+    "scope": "actual-new-SBF deterministic scenario runner; setup transactions not counted; no inherited duration",
+    "setup_failures": 0,
+    "wall_seconds": 26.42116248
+  },
+  "annotations": "Non-failing Rust-cache ENOENT annotations reference restored old target/program-fuzz-smoke trees; new smoke output is RUNNER_TEMP, all CI steps concluded success.",
+  "rust_test_groups_passed": [
+    13,
+    16,
+    1,
+    8,
+    1,
+    1,
+    9,
+    5,
+    2,
+    4,
+    0,
+    0,
+    0,
+    0
+  ],
+  "rust_tests_passed": 60,
+  "python_tests_passed": 13,
+  "client_tests_passed": 19,
+  "web_tests_passed": 9,
+  "idl_sha256": "83748440336bcfeb41bcb37ae6d1f7083df3341ab8e0b9199655ca5a436cc60c",
+  "local_artifact_sha256": "b87598a00c788c30a64b4e232f5f2040c0c8eb333c0cce5fb09403d27159544c",
+  "ci_smoke_output_directory": "/home/runner/work/_temp/simple-program-fuzz-smoke"
+}
