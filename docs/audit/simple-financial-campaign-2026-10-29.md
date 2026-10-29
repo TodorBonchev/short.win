@@ -3,7 +3,8 @@
 The owner explicitly authorized completing preflight/freeze/monitoring and starting
 the existing 24-hour runner **if independent review supports using it with separate
 route and queue checks**. The [independent AI scope review](simple-financial-campaign-evidence-2026-10-29/independent-scope-review.json)
-supports that scope, subject to final manifest and host checks. This supersedes the
+supports that scope. Final manifest checks and actual host/process observations
+passed before the start was reported. This supersedes the
 earlier local requirement to finish a combined supervisor before any launch. The
 provider-stopped combined implementation remains isolated and unqualified; none of
 it was read, executed or continued. The original policy requires fresh final-byte
@@ -53,7 +54,7 @@ No program, financial setting, fuzzer implementation or baseline fixture changed
 
 The prepared run directory is
 `/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75`.
-Its final launch manifest will bind the committed source archive, unchanged
+Its [frozen launch manifest](simple-financial-campaign-evidence-2026-10-29/start/launch.json) binds the committed source archive, unchanged
 program/native runner/inputs, seed `103410000`, **86400 seconds without a case
 limit**, exact command/environment and supervision/control hashes. The runner
 copies its own frozen inputs before executing scenarios. Actual Linux PID,
@@ -65,7 +66,8 @@ local folder and releases after supervisor completion; no global power-plan chan
 is needed. It cannot prevent manual shutdown/restart, forced WSL termination,
 manual sleep/lid behavior or power loss. Available host resources were about
 6.1GiB RAM and 893GiB disk with AC power connected. Actual host/helper/process
-status must be observed before reporting the run started.
+status was observed before the run was reported started, with AC connected and
+the system-awake request accepted.
 
 The supervisor starts exactly one existing runner and never restarts it. A quiet
 follow-up monitor verifies process identity, advancing evidence and fixed anchors.
@@ -79,9 +81,34 @@ scope; no per-route duration is invented.
 
 ## Status
 
-Preparation and preflight passed. Final manifest/host observation and actual launch
-are pending; no 24-hour completion is claimed. The later start receipt will record
-actual start/PIDs/anchors and the earliest expected finish in Europe/Kyiv time.
+**RUNNING — not completed or passed.** The supervisor started on **29 October
+2026 at 10:17:10 Europe/Kyiv** (08:17:10 UTC). The runner requests 86,400 seconds
+with no case limit; the earliest expected finish is **30 October at 10:17:15 Kyiv**,
+plus its final in-flight case and supervisor flush. The [immutable start witness](simple-financial-campaign-evidence-2026-10-29/start/launch-observation.json)
+records actual Linux/Windows process identities, executable/command/boot checks,
+fixed hash anchors and advancing case evidence. Linux child PID is `122465` and
+supervisor PID `122456`; PID reuse is checked using start ticks and boot identity.
+
+Frozen source commit: `0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d`.
+Launch manifest SHA256: `82666dd941b302b505995d70cc981e88d3fbffb6eb0ea268d4ea86026cc8231f`.
+Full source archive SHA256: `90bd37e0295031144270159b89ab4c851d6487607471467f9fc535d39d448083`
+(87,467,598 bytes, 5,407 archive entries; private deployment key and stopped WIP excluded).
+A 30-minute heartbeat, `monitor-pooled-1-1-0-financial-fuzz`, is active in this chat,
+with fixed startup anchors and quiet/non-restarting completion/failure handling.
+It will retain the final result and update the audit record only after verification.
+Leave the PC powered on and plugged in, keep the desktop app available for local
+monitoring, and avoid manual sleep/reboot or WSL termination. The standalone
+Windows WSL launcher survives the chat terminal ending; the system-awake request
+releases after supervisor completion.
+
+[Fresh CI 40840794732](https://github.com/TodorBonchev/short.win/actions/runs/40840794732)
+also passed on the exact frozen source commit. Its downloaded validation archive
+matched GitHub's digest and the ELF/IDL bytes [matched independently](simple-financial-campaign-evidence-2026-10-29/ci-40840794732/independent-validation.json).
+This later commit changes documentation/evidence only; the original independently
+verified CI runner/source/fixture package remains unchanged. A later documentation
+commit retaining this launch receipt does not mutate the frozen package.
+
+No 24-hour completion is claimed.
 Production roles, funded payers, measured live provider capacity, delivered
 operating alerts and deployment remain separate mainnet commissioning requirements.
 No tag, mainnet transaction or external-firm audit is authorized or claimed here.

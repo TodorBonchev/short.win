@@ -1,0 +1,43 @@
+{
+  "actual_child_identity": {
+    "boot_id": "4cceeacd-7e4b-442c-aa19-ee990440b802",
+    "cmdline": [
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+      "--seed",
+      "103410000",
+      "--duration-seconds",
+      "86400",
+      "--out",
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results"
+    ],
+    "exe": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+    "exe_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "pid": 122465,
+    "start_ticks": "9230986"
+  },
+  "baseline_sha256": "9e7ec4d00eb38a9a68a2f91bc645306fb93eabb590b28970cbec6b125160458f",
+  "command": [
+    "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+    "--seed",
+    "103410000",
+    "--duration-seconds",
+    "86400",
+    "--out",
+    "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results"
+  ],
+  "launch_sha256": "82666dd941b302b505995d70cc981e88d3fbffb6eb0ea268d4ea86026cc8231f",
+  "schema": 1,
+  "scope": "24h existing actual-SBF financial scenarios on historical CPMM; current route and queue/operator checks separate",
+  "started_at_utc": "2026-10-29T08:17:10.982039+00:00",
+  "supervisor_identity": {
+    "boot_id": "4cceeacd-7e4b-442c-aa19-ee990440b802",
+    "cmdline": [
+      "/usr/bin/python3",
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/supervise.py"
+    ],
+    "exe": "/usr/bin/python3.12",
+    "exe_sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+    "pid": 122456,
+    "start_ticks": "9230878"
+  }
+}

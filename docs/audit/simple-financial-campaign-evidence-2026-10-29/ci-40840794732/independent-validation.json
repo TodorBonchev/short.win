@@ -1,0 +1,12 @@
+{
+  "artifact_id": 12883230416,
+  "artifact_zip_sha256": "07edaac3f62344df1b1c93e392728b0c200d506500ca88275da5ce805026e071",
+  "ci_run": 40840794732,
+  "ci_source_commit": "0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d",
+  "exact_frozen_program_and_committed_idl_bytes_match": true,
+  "github_digest_matched": true,
+  "idl_sha256": "52bdccd8a9f29739885e95a4c4595e70067edf3572e9d60c23aa69741b6abc15",
+  "program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "scope": "fresh scope/preflight documentation CI; independent download of validation artifact only; older completeCI40801471141 source/input/smoke/route checks remain separately retained",
+  "status": "passed"
+}

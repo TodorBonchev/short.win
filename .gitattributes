@@ -28,3 +28,6 @@ docs/audit/simple-final-preparation-evidence-2026-10-29/*.log -diff
 docs/audit/simple-financial-campaign-evidence-2026-10-29/** -text
 docs/audit/simple-financial-campaign-evidence-2026-10-29/**/*.log -diff
 docs/audit/simple-financial-campaign-evidence-2026-10-29/*.log -diff
+
+# Raw Windows process receipts retain their original CRLF bytes.
+docs/audit/simple-financial-campaign-evidence-2026-10-29/start/windows-*.json -diff

@@ -1,0 +1,42 @@
+{
+  "anchor_preflight_sha256": "fe8d9657a94433aea8744e6176656edd62346cf9783441b3b1a16997534c1da4",
+  "baseline_sha256": "9e7ec4d00eb38a9a68a2f91bc645306fb93eabb590b28970cbec6b125160458f",
+  "ci_qualified_code_commit": "8c50fa75e1becd598520fa7e4bd95c84febbd798",
+  "ci_run": 40801471141,
+  "combined_stopped_tooling_used": false,
+  "command": [
+    "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+    "--seed",
+    "103410000",
+    "--duration-seconds",
+    "86400",
+    "--out",
+    "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results"
+  ],
+  "control_sha256": {
+    "keepawake.ps1": "924c1fdb8342d837f4723d7c6ac249b7cead8b62c617ba9b011681f5a8977581",
+    "supervise.py": "01dd7cc52616116ddc5f3aaef9eafd4a6fd869a720e01cf592f07e29c49c4ab6",
+    "verify.py": "5657e979e8dedeb3368f72db2c8be88cb0a0150d8a2101f6b766bc20d4ec3be5"
+  },
+  "created_at_utc": "2026-10-29T08:15:08.708118+00:00",
+  "environment": {
+    "RUST_BACKTRACE": "1",
+    "SHORTWIN_JUPITER_CANDIDATE_DIR": "unset",
+    "SHORTWIN_SIMPLE_FIXTURE_ROOT": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/inputs",
+    "SHORTWIN_SIMPLE_SO": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/inputs/shortwin_simple.so",
+    "SHORTWIN_SIMPLE_SOURCE_ROOT": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/source"
+  },
+  "host": "Ubuntu-24.04 in local Windows WSL2",
+  "mainnet_execution": false,
+  "preflight_verification_sha256": "ea610295c05bd76aa5ec366f451569124f5b98dace513d3b479917b51799cc28",
+  "requested_duration_seconds": 86400,
+  "schema": 1,
+  "scope": "24h existing actual-SBF financial scenarios on historical CPMM; current route and queue/operator checks separate",
+  "separate_queue_operator_verification_sha256": "a0b41b9a6b0611449a268a6cb7b46334867b1db160b7a3cecf5a96dd1d78b26e",
+  "separate_route_summary_sha256": "7d41574a96f9a4824faad4c7e6061a3ab012e6d91acc85d1d566875abe1ed4fd",
+  "source_archive": "source-0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d.tar.gz",
+  "source_archive_bytes": 87467598,
+  "source_archive_sha256": "90bd37e0295031144270159b89ab4c851d6487607471467f9fc535d39d448083",
+  "source_commit": "0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d",
+  "windows_keepawake_directory": "C:\\Users\\todor\\.codex\\runs\\pooled-110-financial-20261029T080421Z-8c50fa75"
+}

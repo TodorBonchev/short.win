@@ -1,0 +1,105 @@
+{
+  "actual_child_identity": {
+    "boot_id": "4cceeacd-7e4b-442c-aa19-ee990440b802",
+    "cmdline": [
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+      "--seed",
+      "103410000",
+      "--duration-seconds",
+      "86400",
+      "--out",
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results"
+    ],
+    "exe": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+    "exe_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "pid": 122465,
+    "start_ticks": "9230986"
+  },
+  "automation_id": "monitor-pooled-1-1-0-financial-fuzz",
+  "candidate_version": "1.1.0 untagged",
+  "case_limit": null,
+  "ci_qualified_code_commit": "8c50fa75e1becd598520fa7e4bd95c84febbd798",
+  "ci_run": 40801471141,
+  "earliest_finish_local": "2026-10-30T10:17:15+02:00",
+  "fixed_anchors": {
+    "baseline_sha256": "9e7ec4d00eb38a9a68a2f91bc645306fb93eabb590b28970cbec6b125160458f",
+    "control_sha256": {
+      "keepawake.ps1": "924c1fdb8342d837f4723d7c6ac249b7cead8b62c617ba9b011681f5a8977581",
+      "supervise.py": "01dd7cc52616116ddc5f3aaef9eafd4a6fd869a720e01cf592f07e29c49c4ab6",
+      "verify.py": "5657e979e8dedeb3368f72db2c8be88cb0a0150d8a2101f6b766bc20d4ec3be5"
+    },
+    "launch_sha256": "82666dd941b302b505995d70cc981e88d3fbffb6eb0ea268d4ea86026cc8231f",
+    "runner_metadata_sha256": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598",
+    "runner_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "source_archive": "source-0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d.tar.gz",
+    "source_archive_bytes": 87467598,
+    "source_archive_sha256": "90bd37e0295031144270159b89ab4c851d6487607471467f9fc535d39d448083",
+    "supervisor_running_sha256": "a4768a3db8701ead36c37a38656d87a652bf942dadd0e2adacb99ec60fc455ab"
+  },
+  "independent_review_final_disposition": "qualified PASS after fixed manifest/archive/control verification; live host and process identities now observed",
+  "input_files_verified": 342,
+  "mainnet_deployed": false,
+  "monitor_cadence_minutes": 30,
+  "no_restart_policy": true,
+  "observed_at_utc": "2026-10-29T08:21:51.821989+00:00",
+  "partial_log_observation": "case_complete completed=394 wall_seconds=276.170209",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "receipt_files_sha256": {
+    "alive-observed.json": "4f56fa4216ea6d57b74df8185884459fe6193e1e59534fe2a0645d2d6d2a9b16",
+    "launch.json": "82666dd941b302b505995d70cc981e88d3fbffb6eb0ea268d4ea86026cc8231f",
+    "runner-metadata.json": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598",
+    "supervisor-running.json": "a4768a3db8701ead36c37a38656d87a652bf942dadd0e2adacb99ec60fc455ab",
+    "windows-keepawake-launch.json": "6dda6e87521f0d3650ca642b8c8bf930180f0123d88eb403b5a14ca091327f4e",
+    "windows-keepawake-observed.json": "942fbb799adeaac245abe884bd2f6decf19b684de2dccca8bc80ad4abea3e638",
+    "windows-wsl-launch.json": "f3d9cd6323ac1a8c47f0605c4f1deac1205e24a221b5c7fc13dcbd095606c1cc"
+  },
+  "requested_duration_seconds": 86400,
+  "run_root": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75",
+  "schema": 1,
+  "scope": "24h existing actual-SBF financial scenarios on historical CPMM; current route and queue/operator checks separate",
+  "seed": 103410000,
+  "separate_checks": {
+    "client_operator": 39,
+    "config": 6,
+    "routes": {
+      "expected_negative": 2,
+      "positive": 6,
+      "summary_sha256": "7d41574a96f9a4824faad4c7e6061a3ab012e6d91acc85d1d566875abe1ed4fd"
+    },
+    "service": 42
+  },
+  "source_commit": "0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d",
+  "source_files_verified": 40,
+  "stable_tag_created": false,
+  "start_local": "2026-10-29T10:17:10.982039+02:00",
+  "start_utc": "2026-10-29T08:17:10.982039+00:00",
+  "status": "running_not_completed_or_passed",
+  "stopped_combined_tooling_used": false,
+  "supervisor_identity": {
+    "boot_id": "4cceeacd-7e4b-442c-aa19-ee990440b802",
+    "cmdline": [
+      "/usr/bin/python3",
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/supervise.py"
+    ],
+    "exe": "/usr/bin/python3.12",
+    "exe_sha256": "e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f",
+    "pid": 122456,
+    "start_ticks": "9230878"
+  },
+  "windows_ac_observed": true,
+  "windows_keepawake": {
+    "executable": "C:\\Users\\todor\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\powershell\\pwsh.exe",
+    "process_id": 17528,
+    "start_time_ticks": "639288585557198463",
+    "started_at_utc": "2026-10-29T08:15:55.7347529+00:00"
+  },
+  "windows_state_directory": "/mnt/c/Users/todor/.codex/runs/pooled-110-financial-20261029T080421Z-8c50fa75",
+  "windows_system_awake_request_observed": true,
+  "windows_wsl_launcher": {
+    "linux_supervisor": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/supervise.py",
+    "process_id": 25324,
+    "schema": 1,
+    "start_time_ticks": "639288586298345563",
+    "started_at_utc": "2026-10-29T08:17:09.8454892+00:00"
+  }
+}

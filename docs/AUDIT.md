@@ -1727,6 +1727,15 @@ qualifying or retrying the stopped work. Retain eight real financial family
 counts, frozen bytes and zero-failure/anomaly completion evidence; do not claim
 24h current-Pump/queue/operator coverage. A start is not a passed long run. Mainnet
 commissioning and accurately attributed review/finding requirements remain open.
+The scoped financial run actually started on 2026-10-29 at 08:17:10 UTC, with
+source commit `0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d` frozen, CI
+[40840794732](https://github.com/TodorBonchev/short.win/actions/runs/40840794732)
+green and exact program/IDL bytes independently matched. A fixed-anchor local
+monitor is active; the [start witness](audit/simple-financial-campaign-evidence-2026-10-29/start/launch-observation.json)
+records real process identities and the command. Completion cannot pass before
+2026-10-30 at about 08:17:15 UTC and remains subject to the full duration,
+zero-error, coverage and hash checks. The run is in progress, not qualified yet.
+
 
 
 **Current replacement decision, 2026-10-28:** the owner selected a separate

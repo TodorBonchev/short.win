@@ -1,0 +1,7 @@
+{
+  "process_id": 25324,
+  "start_time_ticks": "639288586298345563",
+  "started_at_utc": "2026-10-29T08:17:09.8454892+00:00",
+  "schema": 1,
+  "linux_supervisor": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/supervise.py"
+}

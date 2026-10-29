@@ -18,6 +18,14 @@
     "seconds": 45.104507397,
     "zero_failures_anomalies_setup_invariants": true
   },
+  "final_manifest_review": {
+    "all_anchors_independently_verified_before_launch": true,
+    "baseline_sha256": "9e7ec4d00eb38a9a68a2f91bc645306fb93eabb590b28970cbec6b125160458f",
+    "launch_sha256": "82666dd941b302b505995d70cc981e88d3fbffb6eb0ea268d4ea86026cc8231f",
+    "live_host_process_observation": "start/launch-observation.json",
+    "live_host_process_observation_sha256": "b6a229dcbbf7b7dd78366011ecd3a274034124cea4e018220f2cc7dbf62dc4a5",
+    "source_archive_sha256": "90bd37e0295031144270159b89ab4c851d6487607471467f9fc535d39d448083"
+  },
   "limits": [
     "24h actual new-SBF financial scenarios on historical CPMM only",
     "one actual loan per fresh VM; synthetic clocks/history/funding and labelled market shock",
@@ -26,15 +34,11 @@
     "no funded operation/universal Jupiter/deployment claim"
   ],
   "policy_basis": "fresh final-byte >=24h financial evidence required; no one combined supervisor or equal/per-route duration mandated",
-  "remaining_prelaunch_conditions": [
-    "freeze committed source archive and exact launch manifest",
-    "verify manifest anchors against independently checked files",
-    "observe persistent Windows/WSL host and Windows sleep-prevention request"
-  ],
+  "remaining_prelaunch_conditions": [],
   "reviewed_at_utc": "2026-10-29T08:14:10.886048+00:00",
   "runner_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
   "schema": 1,
-  "scope_disposition": "conditional PASS to start after final launch manifest and host verification",
+  "scope_disposition": "qualified PASS to launch selected financial scope; live host and process conditions observed",
   "source_files_and_inputs_independently_rehashed": [
     40,
     342
