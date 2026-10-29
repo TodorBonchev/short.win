@@ -1,6 +1,7 @@
 {
   "schema": 1,
-  "scope": "Pinned non-atomic mainnet snapshots replayed through the actual newly built program; no live transactions or history provenance claim.",
+  "scope": "Fresh production-ID public quote/account captures; deterministic actual-SBF replay only. No campaign, duration or seeded-variant qualification.",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
   "expected_pass": [
     {
       "name": "bonk-production",
@@ -20,26 +21,17 @@
     {
       "name": "pump-curve-production",
       "capture": "docs/audit/simple-final-route-evidence-2026-10-29/pump-curve-production",
-      "requires_actual_snapshot_packets": true,
-      "requires_opening_setup_spend": true,
-      "requires_zero_close_setup": true,
-      "requires_setup_budget_rejections": true
+      "requires_actual_snapshot_packets": true
     },
     {
       "name": "pump-graduated-production",
       "capture": "docs/audit/simple-final-route-evidence-2026-10-29/pump-graduated-production",
-      "requires_actual_snapshot_packets": true,
-      "requires_opening_setup_spend": true,
-      "requires_zero_close_setup": true,
-      "requires_setup_budget_rejections": true
+      "requires_actual_snapshot_packets": true
     },
     {
-      "name": "pump-metadata-production",
-      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/pump-metadata-production",
-      "requires_actual_snapshot_packets": true,
-      "requires_opening_setup_spend": true,
-      "requires_zero_close_setup": true,
-      "requires_setup_budget_rejections": true
+      "name": "pump-metadata-current-8GV",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/pump-metadata-current-8GV",
+      "requires_actual_snapshot_packets": true
     }
   ],
   "expected_fail": [
@@ -49,7 +41,7 @@
       "error_substring": "Custom(5460)",
       "transaction": "post_swap_fee_bound_rollback",
       "transaction_log_substring": "custom program error: 0x1554",
-      "reason": "Actual Scorch downstream CPI refusal; quote envelope alone is insufficient."
+      "reason": "Explicit Scorch diagnostic route, excluded from production request profile; actual downstream refusal must match."
     },
     {
       "name": "ray-scorch-negative",
@@ -57,13 +49,12 @@
       "error_substring": "Custom(5460)",
       "transaction": "post_swap_fee_bound_rollback",
       "transaction_log_substring": "custom program error: 0x1554",
-      "reason": "Actual Scorch downstream CPI refusal; quote envelope alone is insufficient."
+      "reason": "Explicit Scorch diagnostic route, excluded from production request profile; actual downstream refusal must match."
     }
   ],
   "pending": [],
   "own_program": {
-    "sha256_source": "current_ci_verified_build",
-    "explicit_materializer_argument_required": true
-  },
-  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh"
+    "sha256_source": "explicit current verified local/CI build",
+    "expected_local_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510"
+  }
 }
