@@ -179,3 +179,16 @@ from lenders. Commission a separately bounded payer subsidy before enabling a
 nonzero keeper allowance, and reserve its entire maximum as potential permanent
 spending in each dry-run pass. Real setup charges can exceed a small loan's keeper
 reward. No profitability or self-funding claim follows from the upfront fee.
+
+## Owner-selected financial duration campaign — 2026-10-29
+
+The owner explicitly authorized the existing runner with separate current-route
+and queue/operator gates if independent review supports it. The [scope and
+preflight record](../../docs/audit/simple-financial-campaign-2026-10-29.md) supports
+that choice and supersedes the earlier local combined-tooling launch hold. The
+existing actual-SBF financial runner uses historical CPMM fixtures; six current
+positive/two negative routes and service/operator checks remain separately named
+bounded evidence. No continuous Pump/queue duration or live provider history is
+claimed. Keep stopped combined work isolated. Freeze the manifest and verify host
+identity before starting; record actual launch and independently verify >=24h
+exit/duration/coverage/zero-error/frozen-hash evidence before marking this gate done.

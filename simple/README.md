@@ -60,3 +60,9 @@ funding, measured capacity on the real free API account and delivered alerts
 remain pending. The owner's selected policy is borrowing-capped mainnet before
 an external audit and funded bug bounty, with uncapped deposits and market count;
 that disclosure does not satisfy these remaining release prerequisites.
+
+The owner subsequently authorized the [existing financial runner campaign](../docs/audit/simple-financial-campaign-2026-10-29.md)
+with separate current-route and queue/operator checks after independent review.
+That selected scope supersedes the local combined-tooling launch hold above;
+stopped work stays isolated and unqualified. Preflight passed; actual launch and
+verified >=24h completion are separate events and are recorded in that campaign.

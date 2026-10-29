@@ -1,0 +1,37 @@
+
+thread 'main' (122107) panicked at tests/runtime/src/env.rs:99:14:
+load independent new SBF: ProgramLoad("Detected sbpf_version required by the executable which are not enabled")
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:679:5
+   1: core::panicking::panic_fmt
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panicking.rs:80:14
+   2: core::result::unwrap_failed
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1870:5
+   3: <core::result::Result<(), litesvm::error::LiteSVMError>>::expect
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/result.rs:1183:23
+   4: <shortwin_simple_runtime_tests::env::Env>::new
+             at /home/runner/work/short.win/short.win/simple/tests/runtime/src/env.rs:99:14
+   5: <shortwin_simple_runtime_tests::position_case::PositionCase>::new
+             at /home/runner/work/short.win/short.win/simple/tests/runtime/src/position_case.rs:70:23
+   6: program_fuzz::run_case
+             at /home/runner/work/short.win/short.win/simple/tests/runtime/examples/program_fuzz.rs:237:17
+   7: program_fuzz::main::{closure#5}
+             at /home/runner/work/short.win/short.win/simple/tests/runtime/examples/program_fuzz.rs:626:13
+   8: <program_fuzz::main::{closure#5} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+   9: <core::panic::unwind_safe::AssertUnwindSafe<program_fuzz::main::{closure#5}> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/panic/unwind_safe.rs:275:9
+  10: std::panicking::catch_unwind::do_call::<core::panic::unwind_safe::AssertUnwindSafe<program_fuzz::main::{closure#5}>, ()>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:576:43
+  11: __rust_try
+  12: std::panicking::catch_unwind::<(), core::panic::unwind_safe::AssertUnwindSafe<program_fuzz::main::{closure#5}>>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panicking.rs:544:19
+  13: std::panic::catch_unwind::<core::panic::unwind_safe::AssertUnwindSafe<program_fuzz::main::{closure#5}>, ()>
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/std/src/panic.rs:359:14
+  14: program_fuzz::main
+             at /home/runner/work/short.win/short.win/simple/tests/runtime/examples/program_fuzz.rs:625:22
+  15: <fn() as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/48a229ceaefd4985c50990b14116b6d856af0985/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+{"anomalies":1,"completed_cases":0,"coverage":{"actual_cpmm_success_logs":0,"attempted_fixture_setups":1,"attempted_transactions":0,"expected_rejected_transactions":0,"fixture_setup_transactions_instrumented":false,"operation_counts_attempt_success_reject":{},"scenario_counts":{"underfill":1},"successful_fixture_setups":0,"successful_transactions":0},"failures":1,"finished_cleanly":false,"invariant_failures":0,"requested_duration_seconds":null,"schema_version":1,"scope":"actual-new-SBF deterministic scenario runner; setup transactions not counted; no inherited duration","setup_failures":1,"wall_seconds":0.101787049}

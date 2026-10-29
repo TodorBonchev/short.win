@@ -1,0 +1,41 @@
+{
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "services/tests",
+        "-v"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "config",
+        "-p",
+        "test_*.py",
+        "-v"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "pnpm",
+        "--dir",
+        "client",
+        "check"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "status": "passed",
+  "scope": "separate bounded service/config/client/queue/operator regressions, no duration claim"
+}

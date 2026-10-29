@@ -1,5 +1,12 @@
 # Pooled final-identity preparation — 2026-10-29
 
+> **Later owner-authorized scope, 2026-10-29:** use the existing financial duration
+> runner with separate current-route and queue/operator checks after independent
+> review and preflight. See [the selected campaign](simple-financial-campaign-2026-10-29.md).
+> This replaces the local combined-tooling launch hold below; stopped work remains
+> isolated and unqualified, and no continuous Pump/queue duration is claimed.
+
+
 The owner's request was to finish monitoring-capacity reuse and preparation for a
 fresh 24-hour qualification of the Jupiter-only pooled implementation. Engineering
 checks and the current deterministic route matrix pass locally. **The 24-hour

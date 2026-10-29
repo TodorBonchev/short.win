@@ -1,0 +1,109 @@
+COMMAND ['python3', '-m', 'unittest', 'discover', '-s', 'services/tests', '-v']
+test_changed_store_path_or_program_cannot_overwrite_binding_even_via_other_connection (test_operator_binding.OperatorBindingTests.test_changed_store_path_or_program_cannot_overwrite_binding_even_via_other_connection) ... ok
+test_exact_duplicate_binding_is_durable_without_resetting_queue_or_allowances (test_operator_binding.OperatorBindingTests.test_exact_duplicate_binding_is_durable_without_resetting_queue_or_allowances) ... ok
+test_fresh_history_has_stable_distinct_uuid_and_exposes_unbound_state (test_operator_binding.OperatorBindingTests.test_fresh_history_has_stable_distinct_uuid_and_exposes_unbound_state) ... ok
+test_malformed_binding_and_corrupted_identity_are_not_repaired_or_overwritten (test_operator_binding.OperatorBindingTests.test_malformed_binding_and_corrupted_identity_are_not_repaired_or_overwritten) ... ok
+test_missing_uuid_in_existing_modeled_database_fails_without_recreation (test_operator_binding.OperatorBindingTests.test_missing_uuid_in_existing_modeled_database_fails_without_recreation) ... ok
+test_replaced_history_cannot_reproduce_external_identity_anchor (test_operator_binding.OperatorBindingTests.test_replaced_history_cannot_reproduce_external_identity_anchor) ... ok
+test_trusted_cli_accepts_stdin_and_queue_state_returns_identical_binding (test_operator_binding.OperatorBindingTests.test_trusted_cli_accepts_stdin_and_queue_state_returns_identical_binding) ... ok
+test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages (test_price_service.PriceServiceTests.test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages) ... ok
+test_completed_exact_quantity_history_survives_restart (test_price_service.PriceServiceTests.test_completed_exact_quantity_history_survives_restart) ... ok
+test_exact_in_buy_search_requires_guaranteed_full_quantity (test_price_service.PriceServiceTests.test_exact_in_buy_search_requires_guaranteed_full_quantity) ... ok
+test_gap_unknown_stale_and_future_never_become_finite (test_price_service.PriceServiceTests.test_gap_unknown_stale_and_future_never_become_finite) ... ok
+test_keyless_http_omits_api_header_and_keeps_exact_input_contract (test_price_service.PriceServiceTests.test_keyless_http_omits_api_header_and_keeps_exact_input_contract) ... ok
+test_legacy_loan_sync_can_only_add_priority_and_rolls_back_capacity_failure (test_price_service.PriceServiceTests.test_legacy_loan_sync_can_only_add_priority_and_rolls_back_capacity_failure) ... ok
+test_model_change_requires_fresh_history_and_u64_quantities_remain_exact (test_price_service.PriceServiceTests.test_model_change_requires_fresh_history_and_u64_quantities_remain_exact) ... ok
+test_nonadvancing_history_write_rolls_back_without_replacing_evidence (test_price_service.PriceServiceTests.test_nonadvancing_history_write_rolls_back_without_replacing_evidence) ... ok
+test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread (test_price_service.PriceServiceTests.test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread) ... ok
+test_policy_hash_export_and_stdin_cli_match_immutable_terms (test_price_service.PriceServiceTests.test_policy_hash_export_and_stdin_cli_match_immutable_terms) ... ok
+test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them (test_price_service.PriceServiceTests.test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them) ... ok
+test_queue_is_bounded_and_no_entry_is_evicted_without_reconciliation (test_price_service.PriceServiceTests.test_queue_is_bounded_and_no_entry_is_evicted_without_reconciliation) ... ok
+test_quote_domain_and_threshold_are_validated_without_float_amounts (test_price_service.PriceServiceTests.test_quote_domain_and_threshold_are_validated_without_float_amounts) ... ok
+test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model (test_price_service.PriceServiceTests.test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model) ... ok
+test_shared_database_provider_spacing_and_capacity_are_explicit (test_price_service.PriceServiceTests.test_shared_database_provider_spacing_and_capacity_are_explicit) ... ok
+test_shared_or_mismatched_scalar_header_is_not_a_finite_quote (test_price_service.PriceServiceTests.test_shared_or_mismatched_scalar_header_is_not_a_finite_quote) ... ok
+test_tick_preserves_explicit_unknown_on_provider_failure (test_price_service.PriceServiceTests.test_tick_preserves_explicit_unknown_on_provider_failure) ... ok
+test_bounded_cases_have_real_counts_and_exact_durable_hashes (test_queue_fuzz_cli.QueueFuzzCliTests.test_bounded_cases_have_real_counts_and_exact_durable_hashes) ... ok
+test_duration_finishes_inflight_case_without_borrowing_time (test_queue_fuzz_cli.QueueFuzzCliTests.test_duration_finishes_inflight_case_without_borrowing_time) ... ok
+test_failure_preserves_raw_sqlite_bundle_before_connection_close (test_queue_fuzz_cli.QueueFuzzCliTests.test_failure_preserves_raw_sqlite_bundle_before_connection_close) ... ok
+test_supervisor_stop_is_partial_nonzero_with_readable_evidence (test_queue_fuzz_cli.QueueFuzzCliTests.test_supervisor_stop_is_partial_nonzero_with_readable_evidence) ... ok
+test_active_capacity_failure_rolls_back_demotions_and_retirements (test_queue_lifecycle.QueueLifecycleTests.test_active_capacity_failure_rolls_back_demotions_and_retirements) ... ok
+test_both_reference_clocks_must_expire_before_retiring_resolved_debt (test_queue_lifecycle.QueueLifecycleTests.test_both_reference_clocks_must_expire_before_retiring_resolved_debt) ... ok
+test_cached_snapshot_retry_rejects_enqueue_or_record_after_prior_application (test_queue_lifecycle.QueueLifecycleTests.test_cached_snapshot_retry_rejects_enqueue_or_record_after_prior_application) ... ok
+test_exact_reference_freshness_boundaries_are_retained (test_queue_lifecycle.QueueLifecycleTests.test_exact_reference_freshness_boundaries_are_retained) ... ok
+test_full_active_queue_and_pending_intent_cannot_be_replaced (test_queue_lifecycle.QueueLifecycleTests.test_full_active_queue_and_pending_intent_cannot_be_replaced) ... ok
+test_incomplete_unlocked_future_or_stale_snapshot_never_mutates_queue (test_queue_lifecycle.QueueLifecycleTests.test_incomplete_unlocked_future_or_stale_snapshot_never_mutates_queue) ... ok
+test_new_generation_cannot_reuse_old_private_history_or_old_fulfillment (test_queue_lifecycle.QueueLifecycleTests.test_new_generation_cannot_reuse_old_private_history_or_old_fulfillment) ... ok
+test_old_model_database_is_preserved_without_schema_migration (test_queue_lifecycle.QueueLifecycleTests.test_old_model_database_is_preserved_without_schema_migration) ... ok
+test_pending_publication_survives_restart_until_explicitly_reconciled (test_queue_lifecycle.QueueLifecycleTests.test_pending_publication_survives_restart_until_explicitly_reconciled) ... ok
+test_revision_cas_rejects_enqueue_or_observation_races_atomically (test_queue_lifecycle.QueueLifecycleTests.test_revision_cas_rejects_enqueue_or_observation_races_atomically) ... ok
+test_slot_expiry_alone_is_not_enough_and_active_debt_always_wins (test_queue_lifecycle.QueueLifecycleTests.test_slot_expiry_alone_is_not_enough_and_active_debt_always_wins) ... ok
+test_snapshot_order_same_slot_conflict_and_exact_replay_are_durable (test_queue_lifecycle.QueueLifecycleTests.test_snapshot_order_same_slot_conflict_and_exact_replay_are_durable) ... ok
+test_stale_tick_cannot_write_into_readmitted_cohort (test_queue_lifecycle.QueueLifecycleTests.test_stale_tick_cannot_write_into_readmitted_cohort) ... ok
+test_unused_warm_timeout_releases_one_slot_without_touching_financial_metadata (test_queue_lifecycle.QueueLifecycleTests.test_unused_warm_timeout_releases_one_slot_without_touching_financial_metadata) ... ok
+
+----------------------------------------------------------------------
+Ran 42 tests in 5.973s
+
+OK
+COMMAND ['python3', '-m', 'unittest', 'discover', '-s', 'config', '-p', 'test_*.py', '-v']
+test_both_profiles_match_actual_service_and_reject_drift (test_production_proposal.ProductionProposalTests.test_both_profiles_match_actual_service_and_reject_drift) ... ok
+test_execute_cannot_be_enabled_in_review_manifest (test_production_proposal.ProductionProposalTests.test_execute_cannot_be_enabled_in_review_manifest) ... ok
+test_local_placeholder_program_is_not_production_assignment (test_production_proposal.ProductionProposalTests.test_local_placeholder_program_is_not_production_assignment) ... ok
+test_reporter_cannot_be_governance (test_production_proposal.ProductionProposalTests.test_reporter_cannot_be_governance) ... ok
+test_unassigned_proposal_cannot_pass_assignment_gate (test_production_proposal.ProductionProposalTests.test_unassigned_proposal_cannot_pass_assignment_gate) ... ok
+test_zero_or_malformed_public_key_is_rejected (test_production_proposal.ProductionProposalTests.test_zero_or_malformed_public_key_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.003s
+
+OK
+COMMAND ['pnpm', '--dir', 'client', 'check']
+$ tsc --noEmit && node --test test/*.test.ts
+✔ generated client decodes exact Rust account and instruction bytes without precision loss (3.394045ms)
+✔ route uses loan-local scratch, with no outer PDA signature or API setup instructions (11.811652ms)
+✔ route rejects wrong mode, quantity, threshold, and unexpected signer (5.140364ms)
+✔ buy minimum output must cover whole token debt (3.936012ms)
+✔ wallet signatures may change but reviewed message bytes may not (32.692878ms)
+✔ Jupiter request leaves envelope room and still refuses over-budget responses (9.967336ms)
+✔ managed request tries16 then32 for no-route or unsupported shape and stops on rate limits (2010.333973ms)
+✔ native setup allowance is separately signed and marks only loan-local authority writable (9.634651ms)
+✔ direct requests reject provider-widened slippage and excluded venue responses (4010.516305ms)
+✔ mint discovery and HTTP admission accept metadata-only Token2022 and reject changed token behavior (5.775635ms)
+✔ queue state parsing refuses duplicate, ambiguous and unsafe generation data (2.393403ms)
+✔ confirmed or post-snapshot publication holds capacity until finalized state includes it (19.708109ms)
+✔ missing/malformed finalized error fields never become failed-publication proof (7.641097ms)
+✔ finalized success absent from complete snapshot blocks retirement; exact failed proof can release (4.441415ms)
+✔ lifecycle envelope binds complete bank clock and generation-specific fulfillment (3.466591ms)
+✔ publisher OS lock excludes another process and releases after holder exit (257.561052ms)
+✔ operator database cannot silently adopt another program or an unbound existing snapshot (0.927515ms)
+✔ real Python queue frees an expired inactive identity and admits another without API calls (1004.121706ms)
+✔ publisher pairing preserves allowances and rejects operator switches and history replacement (235.718312ms)
+✔ history mirror rejects a replacement operator even if the lock anchor is lost (188.47063ms)
+✔ fresh default-only local pairing can bind its first history later without resetting store identity (154.787067ms)
+✔ competing histories cannot both claim the same operator store (374.296418ms)
+✔ default boundary wins without price, pause, history or route; expiry requires fresh feed (1.229343ms)
+✔ CR actions bind both bad bids, strict sequence, source delays and reporter epoch (0.284555ms)
+✔ service model drift and fee/funding caps fail before signing (0.624615ms)
+✔ confirmed publication continues to a priced action; dry-run never assumes publication (0.3241ms)
+✔ finalized event pagination is resumable and idempotent; failed tx is never projected (5.26713ms)
+✔ empty authoritative loan snapshot reconciles capacity and processes queued warm work (167.001335ms)
+✔ post-tick confirmed clock accepts newer sources than initial finalized snapshot and rejects actual future (0.753789ms)
+✔ an inactive warmed quantity publishes before the first loan without reading a keyfile (211.6966ms)
+✔ bounded rotation advances beyond a persistently failing first identity (4.893176ms)
+✔ healthy private history stays off chain; requests, adverse prices and maturity publish on demand (0.269958ms)
+✔ reference allocation reservations survive unknown outcomes, restarts and duplicate submissions (83.160036ms)
+✔ UTC-day publication fee reservations survive failures and never consume default action budget (0.904021ms)
+✔ fresh local pairing permits deterministic default when price settings/service are unavailable (151.206161ms)
+✔ prewarm validates current policy and enqueues inactive exact-u64 identity only (12.245168ms)
+✔ Unknown or stale reference never becomes Finite and cannot authorize a sale route (8.630789ms)
+✔ route binds new loan nonce/scratch and returns fresh raw build plus verified table contents (16.971891ms)
+✔ CORS/body/IP limits and unsupported RPC overrides reject before provider calls (5.51166ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6435.78916

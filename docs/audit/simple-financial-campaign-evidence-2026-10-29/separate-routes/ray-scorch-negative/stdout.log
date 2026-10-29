@@ -1,0 +1,58 @@
+{
+  "binding": {
+    "execution_authority": "GJN1m9PPgk3g3CeocQaWE252XQc3vZuhRMqMzmUiz5G3",
+    "execution_base": "4fjeJUcVPPZSC1c5nrMAQ3d5JauMDvAwwFxumyfuM5xY",
+    "execution_wsol": "A64FFqgrKtfDPc8Vtvn8bZ7eAzdew3hgvtXZdCCs2atJ",
+    "loan": "CiQP7NQin2j3wxUhFWWvHsBupx6bJqgTXYPdyozUoMdj",
+    "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+    "q": 10000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "error": "rollback did not reach successful real Jupiter CPI and signed-bound refusal: post_swap_fee_bound_rollback: InstructionError(1, Custom(5460)); see exact runtime log",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "ddda2a7692ab733332191361a7d762e7691f6a85e466bf09938c2b59a2192dba",
+  "name": "ray-scorch-negative",
+  "native_runner_sha256": "570bac6b427a6584efa46ed4fd88ce73ef549ee7d8298c1ecdd830f6b96a901f",
+  "own_program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "packet_fit_failures": {},
+  "schema": 1,
+  "setup_budget_rejections": {},
+  "status": "failed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 183531232,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 500,
+    "live_ask_upper": 183531232,
+    "live_bid_lower": 174791650,
+    "spread_bps_ceiling": 500
+  },
+  "transactions": {
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 111141,
+      "error": "InstructionError(1, Custom(5460))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "6a60bb818d0122a94656995d5ce3089ab4fecdafede2fe6a921e4e306c7ea34a",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1097
+    }
+  }
+}

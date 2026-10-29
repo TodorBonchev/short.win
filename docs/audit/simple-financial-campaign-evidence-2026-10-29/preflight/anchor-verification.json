@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "tamper_rejections": {
+    "baseline.json": "fixed startup baseline anchor",
+    "launch.json": "fixed startup launch anchor",
+    "verify.py": "final control hash verify.py",
+    "source.tar.gz": "final source archive hash"
+  },
+  "child_only_final_verification_rejected": true,
+  "verifier_sha256": "5657e979e8dedeb3368f72db2c8be88cb0a0150d8a2101f6b766bc20d4ec3be5",
+  "scope": "read-only verifier tests; no runner or application mutation"
+}

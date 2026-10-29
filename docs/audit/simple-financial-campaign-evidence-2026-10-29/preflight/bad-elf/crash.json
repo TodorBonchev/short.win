@@ -1,0 +1,18 @@
+{
+  "case_index": 0,
+  "case_seed": 110727621669678722,
+  "counts": {
+    "actual_cpmm_success_logs": 0,
+    "attempted_fixture_setups": 1,
+    "attempted_transactions": 0,
+    "expected_rejected_transactions": 0,
+    "fixture_setup_transactions_instrumented": false,
+    "operation_counts_attempt_success_reject": {},
+    "scenario_counts": {
+      "underfill": 1
+    },
+    "successful_fixture_setups": 0,
+    "successful_transactions": 0
+  },
+  "error": "load independent new SBF: ProgramLoad(\"Detected sbpf_version required by the executable which are not enabled\")"
+}

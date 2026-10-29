@@ -1,0 +1,118 @@
+{
+  "anomalies": 0,
+  "completed_cases": 61,
+  "coverage": {
+    "actual_cpmm_success_logs": 136,
+    "attempted_fixture_setups": 61,
+    "attempted_transactions": 316,
+    "expected_rejected_transactions": 107,
+    "fixture_setup_transactions_instrumented": false,
+    "operation_counts_attempt_success_reject": {
+      "actual_fill_veto": [
+        13,
+        0,
+        13
+      ],
+      "add_margin": [
+        10,
+        10,
+        0
+      ],
+      "arm": [
+        19,
+        19,
+        0
+      ],
+      "close": [
+        11,
+        11,
+        0
+      ],
+      "cr_force": [
+        6,
+        6,
+        0
+      ],
+      "default": [
+        9,
+        9,
+        0
+      ],
+      "early_cr_force": [
+        13,
+        0,
+        13
+      ],
+      "expiry_force": [
+        7,
+        7,
+        0
+      ],
+      "late_close": [
+        9,
+        0,
+        9
+      ],
+      "late_margin": [
+        9,
+        0,
+        9
+      ],
+      "late_repay": [
+        9,
+        0,
+        9
+      ],
+      "margin_clear": [
+        13,
+        13,
+        0
+      ],
+      "open": [
+        61,
+        61,
+        0
+      ],
+      "publish_reference": [
+        45,
+        45,
+        0
+      ],
+      "rejected_open": [
+        48,
+        0,
+        48
+      ],
+      "repay": [
+        28,
+        28,
+        0
+      ],
+      "underfill": [
+        6,
+        0,
+        6
+      ]
+    },
+    "scenario_counts": {
+      "close": 5,
+      "cr_fill_veto": 13,
+      "cr_market_rise": 6,
+      "default_boundary": 9,
+      "expiry": 7,
+      "margin_repay": 10,
+      "repay": 5,
+      "underfill": 6
+    },
+    "successful_fixture_setups": 61,
+    "successful_transactions": 209
+  },
+  "failures": 0,
+  "finished_cleanly": true,
+  "invariant_failures": 0,
+  "requested_duration_seconds": 45,
+  "schema_version": 1,
+  "scope": "actual-new-SBF deterministic scenario runner; setup transactions not counted; no inherited duration",
+  "setup_failures": 0,
+  "wall_seconds": 45.104507397
+}

@@ -1718,6 +1718,17 @@ These are where we would look first. They are not limits on the scope.
 
 ## 12. Logistics and change policy
 
+**Later owner-authorized existing-runner scope, 2026-10-29:** the owner expressly
+selected the existing >=24h actual-SBF financial runner with separate route and
+queue/operator checks, conditional on independent review. The [scope/preflight
+record](audit/simple-financial-campaign-2026-10-29.md) records that supported
+choice. It supersedes the earlier local combined-supervisor launch hold, without
+qualifying or retrying the stopped work. Retain eight real financial family
+counts, frozen bytes and zero-failure/anomaly completion evidence; do not claim
+24h current-Pump/queue/operator coverage. A start is not a passed long run. Mainnet
+commissioning and accurately attributed review/finding requirements remain open.
+
+
 **Current replacement decision, 2026-10-28:** the owner selected a separate
 Jupiter-only pooled lending/shorting implementation and a fixed upfront SOL term
 fee with no early-close refund. The [new specification](../simple/docs/SPEC.md)

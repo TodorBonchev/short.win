@@ -1,0 +1,42 @@
+Program ComputeBudget111111111111111111111111111111 invoke [1]
+Program ComputeBudget111111111111111111111111111111 success
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh invoke [1]
+Program log: Instruction: OpenPosition
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 233 of 1337200 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 229 of 1331776 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA invoke [2]
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA consumed 105 of 1329455 compute units
+Program TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 invoke [2]
+Program log: Instruction: RouteV2
+Program pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA invoke [3]
+Program log: Instruction: SellV2
+Program 11111111111111111111111111111111 invoke [4]
+Transfer: insufficient lamports 1, need 1844400
+Program 11111111111111111111111111111111 failed: custom program error: 0x1
+Program pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA consumed 16978 of 1304084 compute units
+Program pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA failed: custom program error: 0x1
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 consumed 21300 of 1308406 compute units
+Program JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4 failed: custom program error: 0x1
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh consumed 112744 of 1399850 compute units
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh failed: custom program error: 0x1

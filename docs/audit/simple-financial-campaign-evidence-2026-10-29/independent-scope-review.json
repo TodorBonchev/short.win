@@ -1,0 +1,44 @@
+{
+  "attribution": "independent AI subagent duration_scope_review; not an official external audit",
+  "controls_review": {
+    "anchor_regressions_passed": true,
+    "control_sha256": {
+      "keepawake.ps1": "924c1fdb8342d837f4723d7c6ac249b7cead8b62c617ba9b011681f5a8977581",
+      "supervise.py": "01dd7cc52616116ddc5f3aaef9eafd4a6fd869a720e01cf592f07e29c49c4ab6",
+      "verify.py": "5657e979e8dedeb3368f72db2c8be88cb0a0150d8a2101f6b766bc20d4ec3be5"
+    },
+    "fixed_startup_anchor_gap_corrected": true,
+    "review_passed_after_corrections": true,
+    "scope": "single existing runner/no restart/read-only completion verifier; no combined profiles",
+    "supervisor_required_for_final_verification": true
+  },
+  "duration_preflight": {
+    "all_eight_scenarios": true,
+    "cases": 61,
+    "seconds": 45.104507397,
+    "zero_failures_anomalies_setup_invariants": true
+  },
+  "limits": [
+    "24h actual new-SBF financial scenarios on historical CPMM only",
+    "one actual loan per fresh VM; synthetic clocks/history/funding and labelled market shock",
+    "current6positive2negative routes and42service39client checks are distinct bounded gates",
+    "no continuous Pump/queue/operator/provider history or arbitrary multi-loan interleavings claim",
+    "no funded operation/universal Jupiter/deployment claim"
+  ],
+  "policy_basis": "fresh final-byte >=24h financial evidence required; no one combined supervisor or equal/per-route duration mandated",
+  "remaining_prelaunch_conditions": [
+    "freeze committed source archive and exact launch manifest",
+    "verify manifest anchors against independently checked files",
+    "observe persistent Windows/WSL host and Windows sleep-prevention request"
+  ],
+  "reviewed_at_utc": "2026-10-29T08:14:10.886048+00:00",
+  "runner_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+  "schema": 1,
+  "scope_disposition": "conditional PASS to start after final launch manifest and host verification",
+  "source_files_and_inputs_independently_rehashed": [
+    40,
+    342
+  ],
+  "stopped_combined_tooling_read_run_or_continued": false,
+  "user_authorization": "2026-10-29 use existing runner with separate route and queue checks if independent review supports scope"
+}

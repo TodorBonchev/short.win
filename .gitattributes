@@ -23,3 +23,8 @@ docs/audit/simple-final-route-evidence-2026-10-29/**/*.log -diff
 docs/audit/simple-final-preparation-evidence-2026-10-29/** -text
 docs/audit/simple-final-preparation-evidence-2026-10-29/**/*.log -diff
 docs/audit/simple-final-preparation-evidence-2026-10-29/*.log -diff
+
+# Existing-runner campaign receipts are byte evidence.
+docs/audit/simple-financial-campaign-evidence-2026-10-29/** -text
+docs/audit/simple-financial-campaign-evidence-2026-10-29/**/*.log -diff
+docs/audit/simple-financial-campaign-evidence-2026-10-29/*.log -diff
