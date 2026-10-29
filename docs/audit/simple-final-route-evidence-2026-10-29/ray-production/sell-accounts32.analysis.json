@@ -1,0 +1,116 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      198,
+      87,
+      77,
+      91,
+      141,
+      69,
+      10,
+      85,
+      191,
+      107,
+      129,
+      81,
+      232,
+      54,
+      237,
+      69,
+      238,
+      239,
+      50,
+      67,
+      148,
+      105,
+      26,
+      154,
+      161,
+      208,
+      7,
+      11,
+      201,
+      200,
+      51,
+      153
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 906657791,
+      "secs_since_epoch": 1793234497
+    },
+    "lastValidBlockHeight": 440706594
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": false,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": false,
+  "expected_output": 175919863,
+  "history_qualified": false,
+  "labels": [
+    "Raydium",
+    "Manifest",
+    "Orca V2"
+  ],
+  "minimum_output": 175040264,
+  "request_amount": 10000000,
+  "request_max_accounts": 32,
+  "response_file": "sell-accounts32.json",
+  "response_sha256": "9c02080ba6c14c8edcdffcd2f26bd2c3a2549f652016e9ab1de9ef384e944eb4",
+  "route_data_bytes": 50,
+  "route_plan": [
+    {
+      "bps": 9704,
+      "percent": 97.04,
+      "swapInfo": {
+        "ammKey": "6gpZ9JkLoYvpA5cwdyPZFsDw6tkbPyyXM5FqRqHxMCny",
+        "inAmount": "9704027",
+        "inputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "label": "Raydium",
+        "outAmount": "120876853",
+        "outputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So"
+      }
+    },
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "AxSHFMAZbY3gEcKzzmweFZHxCAxCFtZruRDdS1WouLDL",
+        "inAmount": "120876853",
+        "inputMint": "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",
+        "label": "Manifest",
+        "outAmount": "170712824",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    },
+    {
+      "bps": 296,
+      "percent": 2.96,
+      "swapInfo": {
+        "ammKey": "3THMPkPmcHJ54JtHRyazhs7UN7HbV5KiNJVLJs6hSPSC",
+        "inAmount": "295973",
+        "inputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "label": "Orca V2",
+        "outAmount": "5207039",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  ],
+  "side": "sell",
+  "total_metas": 45
+}

@@ -1,0 +1,11 @@
+
+running 1 test
+test rust_client_wire_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling shortwin-pooled-core v1.1.0 (/root/short.win-simple/simple/crates/pooled-core)
+   Compiling shortwin-simple v1.1.0 (/root/short.win-simple/simple/programs/shortwin-simple)
+   Compiling shortwin-simple-runtime-tests v1.1.0 (/root/short.win-simple/simple/tests/runtime)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.15s
+     Running tests/client_compat.rs (target/simple-native/debug/deps/client_compat-da7eaee20c0f20f3)

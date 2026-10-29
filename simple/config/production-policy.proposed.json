@@ -21,5 +21,5 @@
   "maxSpreadBps": 500,
   "crConfirmationDelaySeconds": 10,
   "crConfirmationDelaySlots": 10,
-  "pricePolicyHash": "8cfc3b1258a12e2cc9abf5a5ebc8ffd363e034406d2b4465448b8cd6db9c7d96"
+  "pricePolicyHash": "7e282d429cb65694c844f7f321483a1cd9bcdd5c4e1f32d70e8a9942016643b8"
 }

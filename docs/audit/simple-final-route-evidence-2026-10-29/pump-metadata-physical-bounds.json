@@ -1,0 +1,18 @@
+{
+  "mint": "5PjPp8gDLjDsoXyvUtYzWKPYaRbfNaoxW29LTFvVpump",
+  "curve": "8vk2UuJTKKY2yXdq2qTbWdsgqJJBptantaD6dGdgoZYp",
+  "quantity": 4000000000000,
+  "snapshot_slot": 462682877,
+  "mint_supply": 1000000000000000,
+  "virtual_tokens": 1073000000000000,
+  "virtual_quote": 30000000056,
+  "real_tokens": 793100000000000,
+  "real_quote": 56,
+  "curve_total_supply": 1000000000000000,
+  "complete": 0,
+  "curve_token_vault": "DakvgtBC9aWsfUwR21KeDpW5RWgyZMXVHgAtn5XjkAKB",
+  "curve_vault_amount": 1000000000000000,
+  "circulating_outside_curve": 0,
+  "q_within_circulation": false,
+  "ten_q_within_circulation": false
+}

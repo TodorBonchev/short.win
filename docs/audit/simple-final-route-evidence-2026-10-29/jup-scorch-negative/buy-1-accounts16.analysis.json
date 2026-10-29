@@ -1,0 +1,90 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      250,
+      169,
+      28,
+      128,
+      167,
+      193,
+      133,
+      5,
+      66,
+      174,
+      184,
+      75,
+      189,
+      93,
+      25,
+      145,
+      48,
+      12,
+      88,
+      122,
+      175,
+      217,
+      216,
+      254,
+      207,
+      99,
+      208,
+      97,
+      89,
+      176,
+      24,
+      115
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 452110188,
+      "secs_since_epoch": 1793234727
+    },
+    "lastValidBlockHeight": 440707652
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 41723910,
+  "history_qualified": false,
+  "labels": [
+    "Scorch"
+  ],
+  "minimum_output": 41515291,
+  "request_amount": 114891157,
+  "request_max_accounts": 16,
+  "response_file": "buy-1-accounts16.json",
+  "response_sha256": "e65fce10f463129853a4cf0908af14665548793ba04b1b6eacc473a7e810caf0",
+  "route_data_bytes": 55,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "7T5BKFBFLGSgVBKKcBwrrUTHPtpVGvorKfmYuS4TzdfV",
+        "inAmount": "114891157",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Scorch",
+        "outAmount": "41723910",
+        "outputMint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 28
+}

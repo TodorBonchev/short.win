@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "assignmentStatus": "unassigned",
+  "assignmentStatus": "assigned-for-review",
   "network": "mainnet-beta",
-  "programId": null,
+  "programId": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
   "genesisHash": null,
   "rolePublicKeys": {
     "governance": null,

@@ -145,7 +145,7 @@ import {
 } from "../pdas/index.ts";
 
 export const SHORTWIN_SIMPLE_PROGRAM_ADDRESS =
-  "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2" as Address<"kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2">;
+  "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh" as Address<"BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh">;
 
 export const ShortwinSimpleAccount = {
   0: "Config",
@@ -735,7 +735,7 @@ export function identifyShortwinSimpleInstruction(
 }
 
 export type ParsedShortwinSimpleInstruction<
-  TProgram extends string = "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2",
+  TProgram extends string = "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
 > =
   | ({
       instructionType: typeof ShortwinSimpleInstruction.AddMargin;

@@ -5,6 +5,7 @@ on:
     paths:
       - 'simple/**'
       - 'docs/audit/simple-current-route-evidence-2026-10-28/**'
+      - 'docs/audit/simple-final-route-evidence-2026-10-29/**'
       - 'tests/fixtures/**'
       - 'tests/jupiter_exec_probe/fixtures/**'
       - 'scripts/materialize-jupiter-probe.py'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'simple/**'
       - 'docs/audit/simple-current-route-evidence-2026-10-28/**'
+      - 'docs/audit/simple-final-route-evidence-2026-10-29/**'
       - 'tests/fixtures/**'
       - 'tests/jupiter_exec_probe/fixtures/**'
       - 'scripts/materialize-jupiter-probe.py'

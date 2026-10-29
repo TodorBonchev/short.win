@@ -196,15 +196,16 @@ class PriceServiceTests(unittest.TestCase):
         for slot, timestamp in [(821, 720), (720, 751), (719, 720), (720, 719)]:
             self.assertEqual(self.history.reference(job(), 0, slot, timestamp)["status"], "Unknown")
 
-    def test_queue_is_bounded_and_existing_loans_preempt_new_requests(self):
+    def test_queue_is_bounded_and_no_entry_is_evicted_without_reconciliation(self):
         self.assertTrue(self.history.enqueue(job(101), 600))
         self.assertFalse(self.history.enqueue(job(102), 600))
-        self.assertTrue(self.history.enqueue(job(103, True), 600))
+        self.assertFalse(self.history.enqueue(job(103, True), 600))
+        self.assertTrue(self.history.enqueue(job(101, True), 600))
         selected = self.history.plan(600)
         self.assertEqual(len(selected), 2)
         self.assertTrue(selected[0].active_loan)
-        self.assertEqual(selected[0].quantity, 103)
-        self.assertTrue(self.history.enqueue(job(103, False), 600))
+        self.assertEqual(selected[0].quantity, 101)
+        self.assertTrue(self.history.enqueue(job(101, False), 600))
         self.assertTrue(self.history.plan(600)[0].active_loan)
 
     def test_model_change_requires_fresh_history_and_u64_quantities_remain_exact(self):
@@ -226,11 +227,11 @@ class PriceServiceTests(unittest.TestCase):
         self.assertFalse(payload["finite"])
         self.assertEqual(payload["evidence_hash"], "00"*32)
 
-    def test_complete_loan_snapshot_updates_priority_atomically(self):
+    def test_legacy_loan_sync_can_only_add_priority_and_rolls_back_capacity_failure(self):
         self.history.enqueue(job(101, True), 600)
         self.history.sync_loans([job(100)], 600)
         selected = self.history.plan(600)
-        self.assertEqual([(item.quantity, item.active_loan) for item in selected], [(100, True), (101, False)])
+        self.assertEqual([(item.quantity, item.active_loan) for item in selected], [(100, True), (101, True)])
         before = selected
         different_mint = service.Job(MARKET, POLICY, MARKET, 101, True)
         with self.assertRaises(ValueError):

@@ -1,0 +1,306 @@
+{
+  "accounts": [
+    {
+      "context_slot": 462688909,
+      "deploy_slot": 419472000,
+      "elf_padded_sha256": "8190d3f7ceb6cb7a7a8d8924bff89f9f611e15ce1f806f2b6237f3311a98f697",
+      "elf_trimmed_length": 108585,
+      "elf_trimmed_sha256": "435df1e70f1ca6258eb01a4507701688c7f1a22656e3e4ef361db473bf478075",
+      "executable": false,
+      "key": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+      "lamports": 759682820,
+      "length": 108645,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata_length": 108645,
+      "rentEpoch": 18446744073709551615,
+      "sha256": "573971c9baedda479bf4c38537787ae396358009b4920f8a270bd2b31dde5fe3"
+    },
+    {
+      "context_slot": 462688909,
+      "deploy_slot": 460497271,
+      "elf_padded_sha256": "15a2e615a42e20f31714bbaaee43002ae6f1cda2e8d7118243117ab3c1342e2d",
+      "elf_trimmed_length": 611041,
+      "elf_trimmed_sha256": "5e888b294bd1941bfc47107a73d5e40bb24fde0d639f69099e7920ad8b6413d9",
+      "executable": false,
+      "key": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+      "lamports": 7021520120,
+      "length": 1382061,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata_length": 1382061,
+      "rentEpoch": 18446744073709551615,
+      "sha256": "babc437405bea7f9d4083097a7266db84de58330bdc41c2b54f1f4e4c66aaa94"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": true,
+      "key": "11111111111111111111111111111111",
+      "lamports": 1,
+      "length": 21,
+      "missing": false,
+      "owner": "NativeLoader1111111111111111111111111111111",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "c94b792a6d8b25d3e53ea94d8b80111735ed80d6a7dc8deb937cd342707f5f03"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "3oy9ojnsDzqmMNi87Gs7Hn5v3MPVqnWjG9k8BmzKR7yW",
+      "lamports": 71755230,
+      "length": 5464,
+      "missing": false,
+      "owner": "AddressLookupTab1e1111111111111111111111111",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "2e6b63de10f84e7ada0c1bbac4bdf9bb8494b40acda47c0c26623255382bcbfc"
+    },
+    {
+      "context_slot": 462688983,
+      "deploy_slot": 459479624,
+      "elf_padded_sha256": "0394bfa4311fac40dd3d32e431ab2f541227e6c32923715455cfac58e4004d30",
+      "elf_trimmed_length": 2036377,
+      "elf_trimmed_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+      "executable": false,
+      "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+      "lamports": 14693376760,
+      "length": 2892269,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata_length": 2892269,
+      "rentEpoch": 18446744073709551615,
+      "sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "4iPJyvV4PcFtoWHuy6MLo2ynrQ8GkxqvMoehKzVFKhDJ",
+      "lamports": 2651760,
+      "length": 394,
+      "missing": false,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "b1379bbd6c64e3e1b011f3916781721bd2192ff22f3f7a20eaa2db22cedffd25"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "4wTV1YmiEkRvAtNtsSGPtUrqRYQMe5SKy2uB4Jjaxnjf",
+      "lamports": 4089842911,
+      "length": 1088,
+      "missing": false,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "dd2b9fa23e2e80d35a0f33329db5c7deb3e88d5ed73bceb1ffa397225f437f8b"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "5YxQFdt3Tr9zJLvkFccqXVUwhdTWJQc1fFg2YPbxvxeD",
+      "lamports": 3444578044,
+      "length": 208,
+      "missing": false,
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "7fd64ef51a7f6bb9674bcfb370203856261f36254cbfd53d1bf7ebbae1d91b93"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": true,
+      "key": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "lamports": 9910912471,
+      "length": 36,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "8101492b544ce08703d5de95363bf796e7e4cd17d03639cfe603071fb59652eb"
+    },
+    {
+      "context_slot": 462688983,
+      "key": "6Td76ALj3SZdKuobZwVQwX4rUUKGQaYjZXVKB1K8E1tB",
+      "missing": true
+    },
+    {
+      "context_slot": 462688983,
+      "key": "6bxDNUfRRWGVLVDrXavGdPPD6XWJhnKGSdXk6dbHyk6s",
+      "missing": true
+    },
+    {
+      "context_slot": 462688983,
+      "key": "6tPGa6nVs7oBoyHVWLW34J6xDse4hueryC9dGETaXg5K",
+      "missing": true
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "8Wf5TiAheLUqBrKXeYg2JtAFFMWtKdG2BSFgqUcPVwTt",
+      "lamports": 37292293,
+      "length": 4097,
+      "missing": false,
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "3504fae20640e15bd441257ab118aa96fb4e99190defc06a01aae26b307bf204"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "8nXBzvpxx19YneNQ28bAB9kqPHubhRxudTb1fbjdj82K",
+      "lamports": 63148016052,
+      "length": 166,
+      "missing": false,
+      "owner": "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "99a54731f499f6fd7a78dd44a5fa013872801118b0c96bf888d64d8a17da73ca"
+    },
+    {
+      "context_slot": 462688983,
+      "key": "9B21dVNZPXiSw4e6oqSnzGBbtgo8wVbQGVGRw9nZyUTU",
+      "missing": true
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "Ce6TQqeHC9p8KetsN6JsjHK7UTZk7nasjjnr7XxXp9F1",
+      "lamports": 168261611,
+      "length": 0,
+      "missing": false,
+      "owner": "11111111111111111111111111111111",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+      "lamports": 6711053,
+      "length": 0,
+      "missing": false,
+      "owner": "11111111111111111111111111111111",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "DQ6kX8rnjqEq56rpHqpdTXvC97z2SN2WXiNPLFvvg4mc",
+      "lamports": 1513840,
+      "length": 170,
+      "missing": false,
+      "owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "5e951dcddded1a5d81d1b5a29ddcda468092285c95e69d1fed2b6b9832334b3a"
+    },
+    {
+      "context_slot": 462688983,
+      "key": "DQC3uFZkTRzaWKhNro4Jx8Qv9NU29kuuooaetFoG7BtY",
+      "missing": true
+    },
+    {
+      "context_slot": 462688983,
+      "key": "EbQYv7pKByAAiB1NjidPFEnfsgP7mWY6Lsu3ak5dYaeY",
+      "missing": true
+    },
+    {
+      "context_slot": 462688983,
+      "key": "HPXqAAYm1mFpybigyeHeidxKUJReojK3URK3antudbEa",
+      "missing": true
+    },
+    {
+      "context_slot": 462688983,
+      "executable": true,
+      "key": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "lamports": 6970116527,
+      "length": 36,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": false,
+      "key": "So11111111111111111111111111111111111111112",
+      "lamports": 1860854767908,
+      "length": 82,
+      "missing": false,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "b0f919425a529f4971ef8dabd535aec34947d5c8c4885df80dae91635b98c5f3"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": true,
+      "key": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "lamports": 230130698,
+      "length": 36,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "5b31219b7bc4060b1638b933be5f50df3400109acfef12408a196d57ad119748"
+    },
+    {
+      "context_slot": 462688983,
+      "executable": true,
+      "key": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "lamports": 70228638,
+      "length": 36,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+      "rentEpoch": 18446744073709551615,
+      "sha256": "bae3e5d63e30c0c3e6fe788b9e027bf003ca5e5bb46d3a9627e034bb3002ea5c"
+    },
+    {
+      "context_slot": 462688993,
+      "deploy_slot": 458921440,
+      "elf_padded_sha256": "7a19affaa2c6187e04a5fe0ea298cee81fa5eb8c24cfcc30d85f615e89f7b02d",
+      "elf_trimmed_length": 1934785,
+      "elf_trimmed_sha256": "756c04ab1ac76122dcdcf2eeb0073bb139087b23d58d3f0d6c895510ab59d582",
+      "executable": false,
+      "key": "B5MvUwXdiW1NMM6QFFD3ssPKBujD4zMohncbM73Z2BQu",
+      "lamports": 53268311040,
+      "length": 10485760,
+      "missing": false,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "programdata_length": 10485760,
+      "rentEpoch": 18446744073709551615,
+      "sha256": "0b692730f9707139fd86d1c1e3a7d63a3f7cb0702278975fa99df90883aab508"
+    }
+  ],
+  "lookup_table_checks": [
+    {
+      "addresses_count": 169,
+      "api_vector_matches_chain": true,
+      "context_slot": 462688983,
+      "deactivation_slot": 18446744073709551615,
+      "key": "3oy9ojnsDzqmMNi87Gs7Hn5v3MPVqnWjG9k8BmzKR7yW",
+      "last_extended_slot": 421017547,
+      "owner_valid": true,
+      "state_valid": true
+    },
+    {
+      "addresses_count": 169,
+      "api_vector_matches_chain": true,
+      "context_slot": 462688983,
+      "deactivation_slot": 18446744073709551615,
+      "key": "3oy9ojnsDzqmMNi87Gs7Hn5v3MPVqnWjG9k8BmzKR7yW",
+      "last_extended_slot": 421017547,
+      "owner_valid": true,
+      "state_valid": true
+    },
+    {
+      "addresses_count": 169,
+      "api_vector_matches_chain": true,
+      "context_slot": 462688983,
+      "deactivation_slot": 18446744073709551615,
+      "key": "3oy9ojnsDzqmMNi87Gs7Hn5v3MPVqnWjG9k8BmzKR7yW",
+      "last_extended_slot": 421017547,
+      "owner_valid": true,
+      "state_valid": true
+    }
+  ],
+  "snapshot_block_time": 1793235871,
+  "snapshot_slot": 462688993
+}

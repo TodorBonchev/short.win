@@ -1,8 +1,8 @@
 {
-  "address": "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2",
+  "address": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
   "metadata": {
     "name": "shortwin_simple",
-    "version": "0.1.0",
+    "version": "1.1.0",
     "spec": "0.1.0"
   },
   "instructions": [
@@ -1393,7 +1393,7 @@
         },
         {
           "name": "program_account",
-          "address": "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2"
+          "address": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh"
         },
         {
           "name": "program_data"

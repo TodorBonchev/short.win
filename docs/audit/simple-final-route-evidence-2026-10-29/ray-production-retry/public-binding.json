@@ -1,0 +1,14 @@
+{
+  "borrower": "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+  "derivation_script_sha256": "c94d7998c8949af1b919c9d889245dd6a8253a26f32b2c70e9ee3eff9ada2128",
+  "execution_authority": "GJN1m9PPgk3g3CeocQaWE252XQc3vZuhRMqMzmUiz5G3",
+  "execution_base": "4fjeJUcVPPZSC1c5nrMAQ3d5JauMDvAwwFxumyfuM5xY",
+  "execution_wsol": "A64FFqgrKtfDPc8Vtvn8bZ7eAzdew3hgvtXZdCCs2atJ",
+  "loan": "CiQP7NQin2j3wxUhFWWvHsBupx6bJqgTXYPdyozUoMdj",
+  "market": "2fDiUqKTDDSnNJ6NDCnVgPHgYDpSefx5sMfUXPa65YJD",
+  "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+  "nonce": "0",
+  "pool": "DJjehkueWHY89Qg9wscGomeaRKGB829SkFBqkZNuDBMH",
+  "pool_generation": "0",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh"
+}

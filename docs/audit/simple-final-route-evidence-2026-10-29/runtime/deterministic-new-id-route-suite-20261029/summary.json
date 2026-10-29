@@ -1,0 +1,84 @@
+{
+  "cases": [
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "bonk-production",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4fb815ab83c31370714614b3cb8849014546938416bbcf9bfa7ef8b0c5f3167e",
+      "summary_sha256": "407b8d135a55b5bee06d6cfc2d6502fc2097bd64a144ed3672f2e7f9b8fca4cb",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "jup-production",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "5dccb379eede81c126716a04925ddb5275cdb41e85efc81a7aaed674358c8b8f",
+      "summary_sha256": "108b08fe6c3174f4903fb68ec7405459d423614ba09f42d0d69dcbc23e06472c",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "ray-production-retry",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "bef422e654664770c82b01bc41ccc086617de7dd6a5183e66bb09e1003efa1ca",
+      "summary_sha256": "6a261f624769a4720f030012efc5106be7199b6967bd230204560076b02f8aae",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "pump-curve-production",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "1e5100c6899ad57e1cc746901ac46c95369bd8266579c00feac8a0e4ba34b0cc",
+      "summary_sha256": "d3cb1210d7a5aa6aeaf6ad7d270da7007d7cbd2e68608a051a08e45af99a9b08",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "pump-graduated-production",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "253a62ca36e11df88bc102311fe5d4b2eee99696462521f08b0c131456ff1df2",
+      "summary_sha256": "81f3a08c0fc1b384f699bf3d4925d4406680182381d986618294c11b9022ca10",
+      "verified": true
+    },
+    {
+      "actual": "passed",
+      "expected": "expected_pass",
+      "name": "pump-metadata-current-8GV",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9c3e26dfe4077689b4de209703d36720e3b5677a72840338f987a41fae664a2f",
+      "summary_sha256": "db31278f5f04edc6a0da973780d16a1c3a6ae2c169edbc5e2ab046ce55fc5767",
+      "verified": true
+    },
+    {
+      "actual": "failed",
+      "expected": "expected_fail",
+      "name": "jup-scorch-negative",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "317031a0766041cdee8aba3f29f1fbd48f2efa7ec6c73a9bd13f0a802737ae6b",
+      "summary_sha256": "91eec1081140053920d1960799efee4438ff33432fd63fc9ffac83b87a92ae7a",
+      "verified": true
+    },
+    {
+      "actual": "failed",
+      "expected": "expected_fail",
+      "name": "ray-scorch-negative",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "96b0471e6ed11aa52a666cf2d63ea1747772feb46e175653cd3869766b537311",
+      "summary_sha256": "0bd8c0848db3d3112c765c340caa6735011816c9028e727fbb26ea3417db428e",
+      "verified": true
+    }
+  ],
+  "live_transactions_sent": 0,
+  "matrix_sha256": "86e4aac03cde449b491059c77c947e0e788a072863ee958b494885e982f70abf",
+  "native_runner_sha256": "4a7aa049b766cba3d6b9a6a30a92a9726adf47ee9dfb816724bb163a1d04cf72",
+  "own_program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "pending": [],
+  "schema": 1,
+  "scope": "additive non-atomic snapshot compatibility; no live execution, history provenance or 24h qualification",
+  "status": "passed"
+}

@@ -1,0 +1,68 @@
+{
+  "default_outage_scope": "Missing price settings/service need not prevent deterministic default processing if persistent local identity checks succeed. A previously recorded history UUID disappearing/replacing intentionally stops the pass for reviewed recovery.",
+  "findings_addressed": [
+    {
+      "finding": "A later clock paired with an older complete snapshot could prematurely release protection.",
+      "resolution": "Python requires clock_slot == context_slot; Node uses snapshot slot and getBlockTime(snapshot slot)."
+    },
+    {
+      "finding": "Missing err field on a finalized status could be misclassified as failure and drop a publication barrier.",
+      "resolution": "Node requires an explicit valid err field, validates cached finality proof, and atomically writes status and finality evidence."
+    },
+    {
+      "finding": "Replacing an operator or history database could reset publication barriers/budgets while reusing history.",
+      "resolution": "History immutable UUID/binding, operator UUID/program identity, persistent companion anchor and operator mirror reject changed pairings; a shared operator pairing is read and claimed inside BEGIN IMMEDIATE under the publisher OS lock."
+    },
+    {
+      "finding": "Existing modeled history missing its UUID could silently acquire a new identity.",
+      "resolution": "Constructor rejects before schema DDL; no identity repair. A brand-new missing history before any UUID was recorded permits deterministic default-only handling while local operator/anchor identity remains stable."
+    },
+    {
+      "finding": "Same-context reconciliation retry after an enqueue/observation mutation could bypass revision CAS.",
+      "resolution": "Cached exact fingerprint retry requires the current revision to equal cached post-apply revision; other retries fail without mutation."
+    }
+  ],
+  "independently_checked_properties": [
+    "Exclusive SQLite publisher OS lock remains held across the full operator pass; no PID/TTL lock theft.",
+    "Cross-history concurrent pairing claims serialize in the operator store write transaction.",
+    "Persistent identity companion is separate from the held lock database and survives normal close.",
+    "Bound missing/replacement history fails closed; identity checks precede priced actions.",
+    "Unknown, confirmed-but-unfinalized and post-snapshot publications preserve queue identities; finalized success must appear in the complete snapshot.",
+    "Active loans and finite references remain protected; both timestamp and slot expiry must pass before reference protection ends.",
+    "Re-admission uses a new generation and cold history; old observations/acks are not reused.",
+    "Legacy synchronization only adds priority and cannot evict or demote."
+  ],
+  "review_conclusion": "No additional issue found in the final reviewed scope after these fixes. No claim of exhaustive audit.",
+  "reviewed_at": "2026-10-29T01:29:01.438888+00:00",
+  "reviewer_route": "Independent AI code review within this task; no external firm claim",
+  "schema": 1,
+  "scope": [
+    "Node finalized queue reconciliation and exclusive publisher lock",
+    "Persistent operator/history UUID and companion anchor pairing",
+    "Python v3 generation/CAS retirement and reference/publication protection",
+    "Actual deterministic route suite provenance and archive integrity"
+  ],
+  "source_sha256": {
+    "simple/client/idl/shortwin_simple.json": "52bdccd8a9f29739885e95a4c4595e70067edf3572e9d60c23aa69741b6abc15",
+    "simple/client/src/monitoring.ts": "ef5242dc01b649053629ad695fc4eb73d527b9e2925b7ca9baa74a475771128a",
+    "simple/client/src/operator.ts": "77202e8d63b743c0a175f74dc55c29a7e8e3891811a552cbe4a292404b7bce4e",
+    "simple/client/test/monitoring.test.ts": "507379f4d9e15a779fceb0bb048a0f344e988f9738613b16babbabc776ac659c",
+    "simple/client/test/operator.test.ts": "5c8cfb130df146e51ccf5a2b63b86aa9bd823256b4d452431da521189cc3c7f8",
+    "simple/scripts/archive-route-qualification.py": "f1d619ff4f7e2c9e478c8f47d78746e2f7e3c3dc7f5910efba3bbfc1d27a07a0",
+    "simple/scripts/discover-pump-candidates.py": "da65c0e8ba97058f1f2cc05255b00b68432ef0637488b48779722aa9553e96dc",
+    "simple/scripts/materialize-current-route-candidate.py": "f503cd1395d7131c629bd7890d4ce65487a90f0870e1c53055a175b0338232d8",
+    "simple/scripts/qualify-current-route-suite.py": "3951b90e98c0019f3c492b7802bd85ab55bac52a8b129059a2bf4384fe97052b",
+    "simple/scripts/qualify-current-routes.py": "75e2b1ac85d9a18de7d57402b0d2d7ec1b154fcc9081727ec6e6ac72b294dbbb",
+    "simple/services/src/shortwin_price_service.py": "35fe080889ab764b32ad0e9c2b7507180852210b550b9c5e8ff70457bba30778",
+    "simple/services/tests/test_operator_binding.py": "843df6fe791de89a41963c6418c4569630ee1c011255eed074222b7e5a59319a",
+    "simple/services/tests/test_queue_lifecycle.py": "adb5daede9008f9baae2d830650b52873a89c5fc799705bec4a3a3b1005ff235",
+    "simple/tests/runtime/examples/qualify_current_route.rs": "7b8769331a7a3e47415886d0752860db5d609d74ee7ab8cc78771cc143617374"
+  },
+  "unproved_operating_requirements": [
+    "Real three-epoch history under the new v3 model and public production program ID",
+    "Free-provider request/finality throughput within finite reference leases",
+    "Available operator funding, payer top-ups and real alert delivery",
+    "Fresh qualifying duration evidence and complete final source freeze"
+  ],
+  "validation_scope": "Source inspection plus parent/production-agent regression reports, and independently rebuilt deterministic eight-case actual-SBF route replay. No combined/seeded/long-run work continued."
+}

@@ -5,5 +5,6 @@
   "scripts": {
     "check": "pnpm -r check",
     "build": "pnpm -r build"
-  }
+  },
+  "version": "1.1.0"
 }

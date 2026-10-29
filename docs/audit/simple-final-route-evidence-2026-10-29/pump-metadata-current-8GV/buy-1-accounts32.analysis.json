@@ -1,0 +1,90 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      180,
+      100,
+      44,
+      55,
+      7,
+      144,
+      26,
+      32,
+      64,
+      98,
+      246,
+      60,
+      14,
+      178,
+      122,
+      196,
+      205,
+      172,
+      249,
+      120,
+      148,
+      133,
+      51,
+      132,
+      131,
+      167,
+      52,
+      1,
+      51,
+      192,
+      162,
+      183
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 657523764,
+      "secs_since_epoch": 1793236096
+    },
+    "lastValidBlockHeight": 440713978
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 2696214286234,
+  "history_qualified": false,
+  "labels": [
+    "Pump.fun"
+  ],
+  "minimum_output": 2682733214803,
+  "request_amount": 133681334,
+  "request_max_accounts": 32,
+  "response_file": "buy-1-accounts32.json",
+  "response_sha256": "170f9ee2bddffe46c80a19e7d1eab767b705ebd2a0f611db2101b9f5c6384eb4",
+  "route_data_bytes": 41,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "4B1DBR1peDySHiPx37nbopPgxLL8FwXyBgwU19Jbw4Xp",
+        "inAmount": "133681334",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Pump.fun",
+        "outAmount": "2696214286234",
+        "outputMint": "8GVcbvQa1HtLvwH5ZScmrPyf2ByvamqQkoPkpbknpump"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 30
+}

@@ -1,0 +1,17 @@
+{
+  "mint": "8GVcbvQa1HtLvwH5ZScmrPyf2ByvamqQkoPkpbknpump",
+  "curve": "4B1DBR1peDySHiPx37nbopPgxLL8FwXyBgwU19Jbw4Xp",
+  "quantity": 2663583160592,
+  "context_slot": 462690058,
+  "mint_supply": 1000000000000000,
+  "real_quote": 9636840976,
+  "virtual_quote": 39636840976,
+  "virtual_tokens": 812123247405378,
+  "complete": 0,
+  "bid": 127315557,
+  "ask": 133681334,
+  "spread": 500,
+  "vault": "HWgmet7fqx9wCS4WYTNU3SRra4mcYUEx7jQTpCTrfcR1",
+  "outside_circulation": 260876752594622,
+  "ten_q_within_circulation": true
+}

@@ -4,10 +4,19 @@ This is the auditors' entry point to short.win's on-chain code. It says what is 
 to build and test the code, what the code relies on, and what we already know about it.
 
 **Status:**
+- **Active pooled candidate, 2026-10-29:** the owner-selected Jupiter-only pooled
+  replacement is untagged **1.1.0**, with dedicated public program ID
+  `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh`. Its proposed initial policy
+  caps booked opening notional at **5 SOL per market**; deposits, market count
+  and global exposure remain uncapped. The older 25-SOL default below belongs to
+  the legacy program. [Final preparation](audit/simple-final-preparation-2026-10-29.md)
+  records safe monitoring-slot reuse, current deterministic routes and new build
+  identities. Fresh long-run and funded operating qualification remain open;
+  no stable tag, mainnet deployment, external audit or funded bounty is claimed.
 - **Current mainnet launch policy (owner, 2026-10-27):** launch with existing
   per-market borrowing limits before an external security audit and a funded bug
   bounty, accumulating earned protocol fees toward those later engagements. The
-  compiled default is **25 SOL of aggregate opening notional of currently open
+  legacy compiled default is **25 SOL of aggregate opening notional of currently open
   positions per market**; deposits and market count remain uncapped. It is not a
   TVL, borrower-margin, current-marked-exposure or protocol-wide cap. The
   [owner decision](audit/owner-mainnet-decision-1.0.3-2026-10-27.md) and
@@ -18,8 +27,8 @@ to build and test the code, what the code relies on, and what we already know ab
   The later owner decision **postpones first mainnet for the broad Jupiter redesign**,
   selecting in-house Jupiter-derived price reports with concrete reporter/risk
   settings review before deployment. The Token-2022 engineering baseline is preserved;
-  its superseded standalone long run remains unstarted/on hold. No new final
-  version is selected. See the [decision](audit/owner-jupiter-redesign-decision-2026-10-27.md),
+  its superseded standalone long run remains unstarted/on hold. No final
+  redesign version was selected at that checkpoint. See the [decision](audit/owner-jupiter-redesign-decision-2026-10-27.md),
   [implementation plan](design/jupiter/IMPLEMENTATION_PLAN.md) and
   [candidate verifier qualification hold](audit/jupiter-oracle-sdk-review-2026-10-27.md).
   New runtime qualification and funded/monitored mainnet operation remain open.
@@ -1729,6 +1738,18 @@ tracks the free-key proposal, metadata-only Token-2022 support, actual Pump/
 high-volume route tests and separately bounded actor-funded native DEX setup.
 Those changed inputs need fresh CI/fuzz and operating receipts; no legacy finding
 closure or external-audit claim follows from the preparation work.
+The [2026-10-29 final preparation](audit/simple-final-preparation-2026-10-29.md)
+selects the dedicated program identity and untagged 1.1.0 version, rebuilds its
+ELF/IDL/client, repeats the six positive/two negative current-route checks and
+qualifies finalized inactive-slot retirement with cold generations and immutable
+local database pairing. The combined 24-hour campaign implementation was stopped
+by a provider filter and remains isolated/unqualified; no long run was started.
+Existing duration tooling exercises historical CPMM scenarios and cannot be
+relabeled as full current-route/queue coverage. Keep this gate open, retain the
+stopped work without retrying, and preserve all archived review checksums and
+finding dispositions. Real roles, funding, measured coverage and delivered alerts
+remain commissioning prerequisites.
+
 
 
 **Later owner scope decision, 2026-10-27:** first mainnet is postponed for the

@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "scope": "Fresh production-ID public quote/account captures; deterministic actual-SBF replay only. No campaign, duration or seeded-variant qualification.",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "expected_pass": [
+    {
+      "name": "bonk-production",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/bonk-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "jup-production",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/jup-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "ray-production-retry",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/ray-production-retry",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "pump-curve-production",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/pump-curve-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "pump-graduated-production",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/pump-graduated-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "pump-metadata-current-8GV",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/pump-metadata-current-8GV",
+      "requires_actual_snapshot_packets": true
+    }
+  ],
+  "expected_fail": [
+    {
+      "name": "jup-scorch-negative",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/jup-scorch-negative",
+      "error_substring": "Custom(5460)",
+      "transaction": "post_swap_fee_bound_rollback",
+      "transaction_log_substring": "custom program error: 0x1554",
+      "reason": "Explicit Scorch diagnostic route, excluded from production request profile; actual downstream refusal must match."
+    },
+    {
+      "name": "ray-scorch-negative",
+      "capture": "docs/audit/simple-final-route-evidence-2026-10-29/ray-scorch-negative",
+      "error_substring": "Custom(5460)",
+      "transaction": "post_swap_fee_bound_rollback",
+      "transaction_log_substring": "custom program error: 0x1554",
+      "reason": "Explicit Scorch diagnostic route, excluded from production request profile; actual downstream refusal must match."
+    }
+  ],
+  "pending": [],
+  "own_program": {
+    "sha256_source": "explicit current verified local/CI build",
+    "expected_local_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510"
+  }
+}

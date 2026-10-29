@@ -1,0 +1,5 @@
+COMMAND ['python3', 'scripts/audit_scope.py', 'check']
+ok: scope.txt matches git ls-files at HEAD; every watched file is classified
+EXIT 0
+COMMAND ['git', 'diff', '--check']
+EXIT 0

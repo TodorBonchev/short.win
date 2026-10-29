@@ -1,5 +1,5 @@
 /** Node-only operator. Import this subpath explicitly; the browser SDK never imports it. */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -20,6 +20,7 @@ import {
   type Instruction,
 } from "@solana/kit";
 import * as g from "./generated/index.ts";
+import { acquirePublisherLock, parseQueueState, queueReconciliation, fulfillmentKey, parseOperatorBinding } from "./monitoring.ts";
 import {
   PROGRAM,
   SYSTEM,
@@ -107,6 +108,7 @@ const SCRIPT = fileURLToPath(
   new URL("../../services/src/shortwin_price_service.py", import.meta.url),
 );
 const U64 = 0xffffffffffffffffn;
+const isStoreUuid=(value:string)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)&&value!=="00000000-0000-0000-0000-000000000000";
 const EVENT_TAG = Uint8Array.of(228, 69, 165, 46, 81, 203, 154, 29);
 export const stringify = (value: unknown) =>
   JSON.stringify(value, (_key, v) =>
@@ -458,8 +460,10 @@ export function keeperCap(l: g.Loan, p: g.Policy, r: g.PriceReference): bigint {
  * No failed transaction or speculative event mutates the active account snapshot. */
 export class OperatorStore {
   readonly db: DatabaseSync;
+  readonly path: string;
   constructor(path: string) {
-    this.db = new DatabaseSync(path);
+    this.path = path === ":memory:" ? path : resolve(path);
+    this.db = new DatabaseSync(this.path);
     this.db.exec(
       "PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE IF NOT EXISTS accounts(address TEXT PRIMARY KEY,kind INTEGER NOT NULL,slot TEXT NOT NULL,data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS snapshots(slot TEXT PRIMARY KEY,hash TEXT NOT NULL,body TEXT NOT NULL); CREATE TABLE IF NOT EXISTS transactions(signature TEXT PRIMARY KEY,slot TEXT NOT NULL,status TEXT NOT NULL); CREATE TABLE IF NOT EXISTS events(signature TEXT NOT NULL,ordinal INTEGER NOT NULL,slot TEXT NOT NULL,name TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(signature,ordinal)); CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY,loan TEXT NOT NULL,status TEXT NOT NULL,signature TEXT,body TEXT NOT NULL);",
     );
@@ -511,6 +515,24 @@ export class OperatorStore {
       this.db.exec("ROLLBACK");
       throw error;
     }
+  }
+  bindProgram(program: Address): void {
+    this.db.exec("BEGIN IMMEDIATE");
+    try{
+      const prior=this.get("program-id"), instance=this.get("store-instance-id");
+      if(prior!==undefined&&prior!==program)throw new Error("Operator database belongs to another program");
+      if(prior===undefined&&instance===undefined){
+        const row=this.db.prepare("SELECT (SELECT count(*) FROM meta)+(SELECT count(*) FROM accounts)+(SELECT count(*) FROM attempts)+(SELECT count(*) FROM snapshots)+(SELECT count(*) FROM transactions)+(SELECT count(*) FROM events) AS n").get() as {n:number};
+        if(row.n!==0)throw new Error("Unbound existing operator database requires an explicit reviewed recovery");
+        this.set("program-id",program);this.set("store-instance-id",randomUUID());
+      }else if(prior===undefined||instance===undefined||!isStoreUuid(instance))throw new Error("Missing/corrupt operator database identity requires reviewed recovery");
+      this.db.exec("COMMIT");
+    }catch(error){this.db.exec("ROLLBACK");throw error;}
+  }
+  instanceId(): string {
+    const value=this.get("store-instance-id");
+    if(value===undefined||!isStoreUuid(value))throw new Error("Missing/corrupt operator database identity");
+    return value;
   }
   snapshot(s: Snapshot): void {
     this.db.exec("BEGIN IMMEDIATE");
@@ -954,7 +976,12 @@ export async function runOperator(
     throw new Error("Negative operator funding bound");
   await mkdir(dirname(resolve(options.database)), { recursive: true });
   await mkdir(resolve(options.evidenceDirectory), { recursive: true });
-  const store = new OperatorStore(resolve(options.database));
+  const publisherLock = await acquirePublisherLock(options.serviceDatabase);
+  let store:OperatorStore;
+  try {store=new OperatorStore(resolve(options.database));}
+  catch(error){publisherLock.close();throw error;}
+  try {store.bindProgram(PROGRAM);}
+  catch(error){store.close();publisherLock.close();throw error;}
   const rpc = dependencies.rpc ?? rpcTransport(options.rpcUrl);
   const python = options.python ?? "python3";
   const service =
@@ -970,6 +997,8 @@ export async function runOperator(
   const plans: ObjectValue[] = [];
   const alerts: string[] = [];
   try {
+    // Local identity checks use SQLite directly, so defaults do not depend on price settings.
+    await publisherLock.bind(store,PROGRAM);
     const snapshot = await (dependencies.snapshot
       ? dependencies.snapshot()
       : readSnapshot(rpc, maxAccounts));
@@ -1173,9 +1202,20 @@ export async function runOperator(
         alerts.push(row.address + ": " + String(error));
       }
     try {
-      await service(["sync-loans", "-"], activeJobs(snapshot));
+      const state=parseQueueState(JSON.parse(await service(["queue-state"])));
+      const binding=await publisherLock.bind(store,PROGRAM);
+      if(binding.historyInstanceId!==state.historyInstanceId)throw new Error("History database identity changed during the operator pass");
+      if(state.operatorBinding!==null&&JSON.stringify(state.operatorBinding)!==JSON.stringify(binding.operatorBinding))throw new Error("History is bound to another operator database");
+      const bound=JSON.parse(await service(["bind-operator","-"],binding.operatorBinding));
+      if(bound.schema!==1||bound.history_instance_id!==state.historyInstanceId||JSON.stringify(parseOperatorBinding(bound.operator_binding))!==JSON.stringify(binding.operatorBinding))throw new Error("History binding acknowledgement mismatch");
+      const envelope=await queueReconciliation(snapshot,state,store,rpc);
+      const raw=await service(["reconcile-queue","-"],envelope);
+      const path=resolve(options.evidenceDirectory,"queue-reconciliation-"+hash(raw)+".json");
+      await writeFile(path,raw+"\n",{mode:0o600});
+      plans.push({kind:"queue-reconciliation",artifact:path,result:JSON.parse(raw)});
     } catch (error) {
-      alerts.push("Active identity synchronization failed: " + String(error));
+      alerts.push("Monitoring queue reconciliation failed; priced actions remain pending: " + String(error));
+      return {program:PROGRAM,mode:options.execute?"execute":"dry-run",slot:snapshot.slot,loans:snapshot.loans.length,indexed,plans,alerts};
     }
     const pending = snapshot.loans.filter(
       (r) => passClock.timestamp < r.data.defaultAt,
@@ -1205,7 +1245,7 @@ export async function runOperator(
         alerts,
       };
     }
-    const grouped = new Map<string, { job: Job; rows: Row<g.Loan>[]; requestedAt: bigint }>();
+    const grouped = new Map<string, { job: Job; rows: Row<g.Loan>[]; requestedAt: bigint; generation: bigint }>();
     for (const row of pending) {
       const l = row.data,
         id = [l.market, l.policy, l.q].join(":");
@@ -1217,7 +1257,7 @@ export async function runOperator(
         quantity: l.q.toString(),
         active_loan: true,
       };
-      grouped.set(id, { job, rows: [...(found?.rows ?? []), row], requestedAt: 0n });
+      grouped.set(id, { job, rows: [...(found?.rows ?? []), row], requestedAt: 0n, generation: 0n });
     }
     const queue = JSON.parse(await service(["jobs"]));
     if (
@@ -1241,15 +1281,17 @@ export async function runOperator(
       )
         throw new Error("Queued identity is not an indexed market/policy");
       const id = [job.market, job.policy, job.quantity].join(":");
-      const requestedAt = u64(raw.publication_requested_at ?? 0, "publication request time");
+      const requestedAt = u64(raw.publication_requested_at, "publication request time");
+      const generation=u64(raw.generation,"admission generation");
       const existingGroup = grouped.get(id);
       if (existingGroup) {
         if (job.policy === snapshot.config.data.currentPolicy) existingGroup.requestedAt = requestedAt;
+        existingGroup.generation=generation;
         continue;
       }
       if (job.active_loan) continue; // Only the authoritative pending-loan set gives old-policy priority.
       if (job.policy !== snapshot.config.data.currentPolicy) continue;
-      grouped.set(id, { job, rows: [], requestedAt });
+      grouped.set(id, { job, rows: [], requestedAt, generation });
     }
     const identity = (group: { job: Job }) =>
       [group.job.market, group.job.policy, group.job.quantity].join(":");
@@ -1265,7 +1307,7 @@ export async function runOperator(
         identity,
       ),
     ];
-    for (const { job, rows, requestedAt } of groups)
+    for (const { job, rows, requestedAt, generation } of groups)
       try {
         if (count >= maxActions) {
           alerts.push(
@@ -1304,6 +1346,7 @@ export async function runOperator(
           job,
         );
         const output = JSON.parse(outputRaw);
+        if(u64(output.generation,"candidate admission generation")!==generation)throw new Error("Reference candidate belongs to another queue generation");
         const evidencePath = resolve(
           options.evidenceDirectory,
           "reference-" + hash(outputRaw) + ".json",
@@ -1323,7 +1366,7 @@ export async function runOperator(
           old,
           clock,
         );
-        const requestKey = "fulfilled-request:" + identity({ job });
+        const requestKey = fulfillmentKey(job,generation);
         let fulfilledAt = BigInt(store.get(requestKey) ?? "0");
         // A still-usable confirmed snapshot satisfies a new open request for free.
         if (requestedAt > fulfilledAt && referenceReady(old, l as g.Loan, p, snapshot.config.data, clock)) {
@@ -1605,6 +1648,6 @@ export async function runOperator(
       alerts,
     };
   } finally {
-    store.close();
+    try {store.close();} finally {publisherLock.close();}
   }
 }

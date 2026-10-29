@@ -1,6 +1,6 @@
 #![allow(unexpected_cfgs, ambiguous_glob_reexports)]
 use anchor_lang::prelude::*;
-declare_id!("kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2");
+declare_id!("BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh");
 pub mod errors;
 pub mod events;
 pub mod initialization;

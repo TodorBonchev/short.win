@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "checked_at": "2026-10-29T00:45:50.866466+00:00",
+  "comparison": "Oct28qualifiedrouteprograms plus latest pinned Oct12pumpfees",
+  "all_22_program_or_programdata_bytes_unchanged": true,
+  "program_or_programdata_count": 22,
+  "mutable_fee_accounts": [
+    {
+      "address": "EHAAiTxcdDwQ3U4bU6YcMsQGaekdzLS3B5SmYo46kJtL",
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "account_type": "BuybackVault",
+      "old_capture": "pump-curve-adaptive",
+      "old_sha256": "bb23af2c14e83b254f039b89c6c32d854ce101f151ebe85c421d460d71edea53",
+      "current_sha256": "b04bf47e3891be0def6ac9f8a060426e7e52aa9cf062b3951142aae91d75ed7b",
+      "changed_offsets": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        48,
+        49,
+        50,
+        51,
+        52,
+        56,
+        57,
+        58,
+        59,
+        60,
+        64,
+        65
+      ],
+      "authority_unchanged": true,
+      "claim_rate_limit_unchanged": true,
+      "reserved_unchanged": true,
+      "only_claimed_counters_and_last_claimed_changed": true,
+      "public_authority_hex": "3b5f41ccb160f4f014d354436e2d675cb32d8d014313f14fe8fa22e0fdef3fb8",
+      "old_counters": [
+        91478701730958,
+        49328556155075,
+        121229855757777,
+        1793218043,
+        0
+      ],
+      "current_counters": [
+        91583590703766,
+        49368890263464,
+        121768848930846,
+        1793234247,
+        0
+      ]
+    },
+    {
+      "address": "GXPFM2caqTtQYC2cJ5yJRi9VDkpsYZXzYdwYpGnLmtDL",
+      "owner": "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ",
+      "account_type": "BuybackVault",
+      "old_capture": "pump-fresh-native-adaptive",
+      "old_sha256": "31a20a1438cbc0f2f9115cafcab8f94a243558cc2a407f2cfba3309b5cbb86c8",
+      "current_sha256": "0f570303416d1e9b52def6fea5e2e09798f8edd847c16cef89ce2f544b965b42",
+      "changed_offsets": [
+        40,
+        41,
+        42,
+        43,
+        44,
+        48,
+        49,
+        50,
+        51,
+        52,
+        56,
+        57,
+        58,
+        59,
+        60,
+        64,
+        65
+      ],
+      "authority_unchanged": true,
+      "claim_rate_limit_unchanged": true,
+      "reserved_unchanged": true,
+      "only_claimed_counters_and_last_claimed_changed": true,
+      "public_authority_hex": "3b5f41ccb160f4f014d354436e2d675cb32d8d014313f14fe8fa22e0fdef3fb8",
+      "old_counters": [
+        91524962003846,
+        36471738230405,
+        138911581230716,
+        1793218644,
+        0
+      ],
+      "current_counters": [
+        91627981835599,
+        36502431081328,
+        139040355160794,
+        1793234242,
+        0
+      ]
+    }
+  ],
+  "only_expected_mutable_buyback_counter_state_changed": true,
+  "qualification_or_promotion": "none; candidate inputs require independent new-ID replay and source freeze",
+  "source_detail": "comparison-latest-pinned.json corrects the initial comparison against the ancient original pump-fees fixture; latest pinned fixture full bytes match current"
+}

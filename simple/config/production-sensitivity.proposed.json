@@ -202,7 +202,7 @@
     "suggestedInitialLamportsPerOperatingPayer": 100000000,
     "tick": true
   },
-  "price_service_model_version": "shortwin-simple-exact-q-v2-retained-bounded-ask",
+  "price_service_model_version": "shortwin-simple-exact-q-v3-generational-queue",
   "profiles": [
     {
       "all_identity_maximum_observation_spacing_only_round_ms": 6000,
@@ -231,7 +231,7 @@
       "measured_live_coverage": "pending",
       "minimum_completed_history_seconds": 180,
       "minimum_loan_protocol_revenue_lamports": 200000,
-      "model_hash": "8cfc3b1258a12e2cc9abf5a5ebc8ffd363e034406d2b4465448b8cd6db9c7d96",
+      "model_hash": "7e282d429cb65694c844f7f321483a1cd9bcdd5c4e1f32d70e8a9942016643b8",
       "normal_latency_and_rpc_headroom_ms": 13000,
       "normal_spacing_only_round_ms": 2000,
       "normal_two_successful_gets_per_identity_assumption": true,
@@ -270,7 +270,7 @@
       "measured_live_coverage": "pending",
       "minimum_completed_history_seconds": 180,
       "minimum_loan_protocol_revenue_lamports": 200000,
-      "model_hash": "980f7fdfd926d376dccdcaf45b55b2e74b92f7240f2b73cc49ac5ef22f1d40d9",
+      "model_hash": "e610c336a9bdbe1fc155f21f4f655dcb7c6938b04c009c20711097c4db2bede2",
       "normal_latency_and_rpc_headroom_ms": 26000,
       "normal_spacing_only_round_ms": 4000,
       "normal_two_successful_gets_per_identity_assumption": true,
@@ -287,7 +287,6 @@
     "complete_public_identity_assignment": false,
     "execution_enabled": false,
     "missing_public_identity_fields": [
-      "programId",
       "genesisHash",
       "governance",
       "emergency",

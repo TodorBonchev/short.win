@@ -1,0 +1,7 @@
+→ Running script "js" with 1 visitor...
+✔ Executed script "js" with 1 visitor!
+Scope: all 3 workspace projects
+✓ Lockfile at ../pnpm-lock.yaml passes supply-chain policies (verified 8h ago)
+Done in 142ms using pnpm v12.7.0
+$ codama run js --config codama.json
+PDA name collision: "tokenVault" has different seeds across instructions. Renaming to "rollPoolTokenVault".

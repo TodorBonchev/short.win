@@ -1,4 +1,5 @@
 import test from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -24,6 +25,8 @@ import {
   type Snapshot,
   type RpcCall,
 } from "../src/operator.ts";
+const HISTORY="7d17ec71-b15b-4a08-bd8c-bdd2f81b3baf";
+function mockHistory(path:string){const db=new DatabaseSync(path);db.exec("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL)");db.prepare("INSERT INTO metadata VALUES('history_instance_id',?)").run(HISTORY);db.close();}
 const policy = {
   terms: {
     pricePolicyHash: Uint8Array.from(Buffer.from("ab".repeat(32), "hex")),
@@ -284,11 +287,12 @@ test("finalized event pagination is resumable and idempotent; failed tx is never
     store.close();
   }
 });
-test("empty authoritative loan snapshot still clears priority and processes queued warm work", async () => {
+test("empty authoritative loan snapshot reconciles capacity and processes queued warm work", async () => {
   const dir = await mkdtemp(join(tmpdir(), "shortwin-operator-"));
   try {
     const settingsPath = join(dir, "settings.json");
     await writeFile(settingsPath, JSON.stringify(settings));
+    mockHistory(join(dir,"prices.sqlite"));
     const calls: { command: readonly string[]; input: unknown }[] = [];
     const snapshot = {
       slot: 100n,
@@ -319,6 +323,8 @@ test("empty authoritative loan snapshot still clears priority and processes queu
         service: async (command, input) => {
           calls.push({ command, input });
           if (command[0] === "model-hash") return "ab".repeat(32);
+          if (command[0] === "queue-state") return JSON.stringify({schema:1,revision:"0",jobs:[],history_instance_id:HISTORY,operator_binding:null});
+          if (command[0] === "bind-operator") return JSON.stringify({schema:1,history_instance_id:HISTORY,operator_binding:input});
           if (command[0] === "jobs") return "[]";
           return "{}";
         },
@@ -326,7 +332,7 @@ test("empty authoritative loan snapshot still clears priority and processes queu
     );
     assert.equal(result.loans, 0);
     assert.deepEqual(
-      calls.find((c) => c.command[0] === "sync-loans")?.input,
+      (calls.find((c) => c.command[0] === "reconcile-queue")?.input as any)?.active_jobs,
       [],
     );
     assert.ok(
@@ -411,6 +417,7 @@ test("an inactive warmed quantity publishes before the first loan without readin
       quantity: "10",
       active_loan: false,
       publication_requested_at: Number(now),
+      generation: 0,
     };
     const snapshot = {
       slot: 200n,
@@ -425,6 +432,7 @@ test("an inactive warmed quantity publishes before the first loan without readin
       references: new Map(),
       rows: [],
     } as Snapshot;
+    mockHistory(join(dir,"prices.sqlite"));
     let publications = 0;
     const result = await runOperator(
       {
@@ -445,14 +453,17 @@ test("an inactive warmed quantity publishes before the first loan without readin
           if (method === "getBalance") return { value: 100000000 };
           throw new Error("No live RPC " + method);
         },
-        service: async (command) => {
+        service: async (command, input) => {
           if (command[0] === "model-hash") return "ab".repeat(32);
+          if (command[0] === "queue-state") return JSON.stringify({schema:1,revision:"0",jobs:[job],history_instance_id:HISTORY,operator_binding:null});
+          if (command[0] === "bind-operator") return JSON.stringify({schema:1,history_instance_id:HISTORY,operator_binding:input});
           if (command[0] === "jobs") return JSON.stringify([job]);
           if (command[0] === "reference")
             return JSON.stringify({
               market: PROGRAM,
               policy: TOKEN,
               model_hash: "ab".repeat(32),
+              generation: 0,
               status: "Finite",
               args: {
                 quantity: "10",
@@ -560,4 +571,15 @@ test("UTC-day publication fee reservations survive failures and never consume de
   assert.throws(()=>store.checkReferenceAllowance(TOKEN,1,new Set([PROGRAM])),/allowance/);
   assert.equal(store.get("reference-allocation:"+PROGRAM),undefined);
  } finally {store.close();}
+});
+
+test("fresh local pairing permits deterministic default when price settings/service are unavailable", async()=>{
+ const dir=await mkdtemp(join(tmpdir(),"shortwin-default-unavailable-"));
+ try{
+  const now=Math.floor(Date.now()/1000);
+  const s={slot:400n,timestamp:BigInt(now),config:{address:PROGRAM,kind:0,data:{...config,reporter:PROGRAM,pricesPaused:true}},loans:[{address:TOKEN,kind:3,data:loan}],policies:new Map([[TOKEN,policy]]),markets:new Map([[PROGRAM,{mint:PROGRAM,tokenProgram:TOKEN} as g.Market]]),pools:new Map(),references:new Map(),rows:[]} as Snapshot;
+  let defaults=0;
+  const result=await runOperator({rpcUrl:"https://unused.invalid",database:join(dir,"operator.sqlite"),serviceDatabase:join(dir,"history.sqlite"),serviceSettings:join(dir,"missing-settings.json"),evidenceDirectory:join(dir,"evidence")},{snapshot:async()=>s,service:async()=>{throw new Error("price unavailable");},rpc:async method=>{if(method==="getSignaturesForAddress")return [];if(method==="getSlot")return 400;if(method==="getBlockTime")return now;if(method==="getBalance")return {value:1000000};throw new Error(method);},prepare:async(_url,_payer,instructions)=>{assert.equal(g.identifyShortwinSimpleInstruction(instructions[0]!.data!),g.ShortwinSimpleInstruction.DefaultLoan);defaults++;return {bytes:new Uint8Array(),base64:"",lastValidBlockHeight:1n,units:100n,feeLamports:5n,logs:[]};}});
+  assert.equal(defaults,1);assert.ok(result.plans.some((v:{kind:string})=>v.kind==="default"));assert.ok(result.alerts.some((v:string)=>v.includes("price unavailable")));
+ }finally{await rm(dir,{recursive:true,force:true});}
 });

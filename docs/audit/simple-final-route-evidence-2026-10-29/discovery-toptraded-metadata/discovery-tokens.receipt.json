@@ -1,0 +1,19 @@
+{
+  "finished_at": "2026-10-29T01:03:08.955266+00:00",
+  "headers": {
+    "Content-Type": "application/json",
+    "date": "Thu, 29 Oct 2026 01:03:08 GMT",
+    "x-ratelimit-current": "1",
+    "x-ratelimit-remaining": "4",
+    "x-ratelimit-reset": "1793235798"
+  },
+  "length": 250253,
+  "method": "GET",
+  "parameters": {
+    "limit": "100"
+  },
+  "provider": "Jupiter API",
+  "sha256": "b04cdac5aecb4afeee2f6fe1a9e77bc9eacc6047565488544cd132c34c0d7423",
+  "started_at": "2026-10-29T01:03:08.711093+00:00",
+  "status": 200
+}

@@ -1,0 +1,90 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      244,
+      98,
+      1,
+      5,
+      221,
+      33,
+      200,
+      153,
+      104,
+      18,
+      90,
+      198,
+      63,
+      106,
+      148,
+      227,
+      168,
+      198,
+      88,
+      182,
+      36,
+      119,
+      220,
+      159,
+      133,
+      245,
+      87,
+      170,
+      58,
+      225,
+      245,
+      125
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 604858866,
+      "secs_since_epoch": 1793234695
+    },
+    "lastValidBlockHeight": 440707508
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 10437380,
+  "history_qualified": false,
+  "labels": [
+    "Raydium CLMM"
+  ],
+  "minimum_output": 10385194,
+  "request_amount": 183555731,
+  "request_max_accounts": 16,
+  "response_file": "buy-1-accounts16.json",
+  "response_sha256": "f295ca6916ce9f2baa55461da833fa7e055135da1382f71eb8f40b220a86454b",
+  "route_data_bytes": 39,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "2AXXcN6oN9bBT5owwmTH53C7QHUXvhLeu718Kqt8rvY2",
+        "inAmount": "183555731",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Raydium CLMM",
+        "outAmount": "10437380",
+        "outputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 25
+}

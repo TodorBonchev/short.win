@@ -1,0 +1,24 @@
+{
+  "status": "provider_stopped_unqualified",
+  "preserved_at_utc": "2026-10-29T01:13:41.410565+00:00",
+  "scope": "unfinished combined campaign implementation and variants; do not execute or count as qualification",
+  "active_tracked_examples_restored_to": "a53af2fbae75d1e3bbd8895ddb72ae0c4ffd4503",
+  "records": [
+    {
+      "path": "simple/tests/runtime/examples/program_fuzz.rs",
+      "wip_sha256": "213afa2ce71c633a63dc648ee5485d566c60ca74626ce4378c9c69530b4e5a45"
+    },
+    {
+      "path": "simple/tests/runtime/examples/qualify_current_route.rs",
+      "wip_sha256": "a4989e24c30b6d838f39f526d80aa006ff8c2c65d83c50e53bb10bfb7a2ab34c"
+    },
+    {
+      "path": "simple/scripts/final-fuzz-campaign.py",
+      "wip_sha256": "aa8019cac33ea1676342852044969bee2bfffa8ad1fcb02e86e52ae29531912a"
+    },
+    {
+      "path": "simple/scripts/tests/test_final_fuzz_campaign.py",
+      "wip_sha256": "9b7ad36df1ca3de30cc915ab41e3d3a1a040d62fec3b48228f77662b4b065f9d"
+    }
+  ]
+}

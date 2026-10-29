@@ -2438,11 +2438,11 @@ version = "0.1.0"
 
 [[package]]
 name = "shortwin-pooled-core"
-version = "0.1.0"
+version = "1.1.0"
 
 [[package]]
 name = "shortwin-simple"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "anchor-lang",
  "anchor-spl",
@@ -2452,7 +2452,7 @@ dependencies = [
 
 [[package]]
 name = "shortwin-simple-runtime-tests"
-version = "0.1.0"
+version = "1.1.0"
 dependencies = [
  "agave-feature-set",
  "agave-reserved-account-keys",

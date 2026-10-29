@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--source', required=True, type=Path)
     parser.add_argument('--output', required=True, type=Path)
     parser.add_argument('--capture', action='append', default=[])
+    parser.add_argument('--skip-directory', action='append', default=[], help='Separately archived auxiliary evidence directories')
     args = parser.parse_args()
     source, output = args.source.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -57,6 +58,8 @@ def main():
         if path.is_file() and path.suffix in ['.json', '.md', '.txt']:
             archive(path)
         elif path.is_dir():
+            if path.name in args.skip_directory:
+                continue
             if (path/'qualification.json').exists():
                 q = json.loads((path/'qualification.json').read_bytes())
                 index['captures'].append({k: q.get(k) for k in ['captured_at', 'mint', 'quantity',

@@ -1,0 +1,3397 @@
+{
+  "captures": [
+    {
+      "captured_at": "2026-10-29T00:41:15.006360+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": "Scorch",
+      "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "mint_eligible_plain82_rule": true,
+      "name": "bonk-production",
+      "net_bid_lamports": 123451750,
+      "quantity": 400000000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234472,
+      "snapshot_slot": 462682449,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 129624337,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:41:30.992264+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": "Scorch",
+      "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-production",
+      "net_bid_lamports": 109399806,
+      "quantity": 40000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234488,
+      "snapshot_slot": 462682526,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 114869796,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:45:34.246764+00:00",
+      "dexes": "Scorch",
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": null,
+      "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-scorch-negative",
+      "net_bid_lamports": 109420150,
+      "quantity": 40000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234731,
+      "snapshot_slot": 462683670,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 114891157,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:42:00.715665+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": "Scorch",
+      "mint": "8FxewF272LJ7Usov6PZk2gu1JKoR5Dq1v4sDqavJpump",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-curve-production",
+      "net_bid_lamports": 113215010,
+      "quantity": 2500000000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234517,
+      "snapshot_slot": 462682666,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 118875760,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:42:23.429073+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": "Scorch",
+      "mint": "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-graduated-production",
+      "net_bid_lamports": 124143337,
+      "quantity": 3500000000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234540,
+      "snapshot_slot": 462682771,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 130350503,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T01:04:12.009370+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": true,
+      "exclude_dexes": "Scorch",
+      "mint": "2yZyDmMj6PD1LFh8TpeeezHhDcfS4uWsPvNddKh6pump",
+      "mint_eligible_plain82_rule": false,
+      "name": "pump-metadata-current-2yZy",
+      "net_bid_lamports": 127162543,
+      "quantity": 1194404857119,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793235849,
+      "snapshot_slot": 462688886,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 133520670,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T01:04:34.528974+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": true,
+      "exclude_dexes": "Scorch",
+      "mint": "4iPJyvV4PcFtoWHuy6MLo2ynrQ8GkxqvMoehKzVFKhDJ",
+      "mint_eligible_plain82_rule": false,
+      "name": "pump-metadata-current-4iPJ",
+      "net_bid_lamports": 151472460,
+      "quantity": 554745006259,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793235871,
+      "snapshot_slot": 462688993,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 159046083,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T01:08:23.627965+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": true,
+      "exclude_dexes": "Scorch",
+      "mint": "8GVcbvQa1HtLvwH5ZScmrPyf2ByvamqQkoPkpbknpump",
+      "mint_eligible_plain82_rule": false,
+      "name": "pump-metadata-current-8GV",
+      "net_bid_lamports": 127315557,
+      "quantity": 2663583160592,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793236101,
+      "snapshot_slot": 462690069,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 133681334,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:42:46.014453+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": true,
+      "exclude_dexes": "Scorch",
+      "mint": "5PjPp8gDLjDsoXyvUtYzWKPYaRbfNaoxW29LTFvVpump",
+      "mint_eligible_plain82_rule": false,
+      "name": "pump-metadata-production",
+      "net_bid_lamports": 109477716,
+      "quantity": 4000000000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234562,
+      "snapshot_slot": 462682877,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 114951601,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:45:18.463652+00:00",
+      "dexes": "Raydium CLMM",
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": null,
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-clmm-diagnostic",
+      "net_bid_lamports": 174808754,
+      "quantity": 10000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234715,
+      "snapshot_slot": 462683597,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 183549191,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:45:02.633159+00:00",
+      "dexes": null,
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": "Scorch",
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-production-retry",
+      "net_bid_lamports": 174814982,
+      "quantity": 10000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234700,
+      "snapshot_slot": 462683523,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 183555731,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "captured_at": "2026-10-29T00:45:50.280804+00:00",
+      "dexes": "Scorch",
+      "diagnostic_ineligible_capture": false,
+      "exclude_dexes": null,
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-scorch-negative",
+      "net_bid_lamports": 174791650,
+      "quantity": 10000000,
+      "request_account_budgets": [
+        16,
+        32
+      ],
+      "request_max_accounts": 32,
+      "snapshot_block_time": 1793234747,
+      "snapshot_slot": 462683742,
+      "spread_bps_ceil": 500,
+      "whole_q_buy_lamports": 183531232,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    }
+  ],
+  "files": [
+    {
+      "file": "bonk-production/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 11188,
+      "raw_sha256": "c545059d5e4f82eaf7bb5eabf9b9d9157ab44d06f16de2cbfa0c79ee412399cd",
+      "source_file": "bonk-production/accounts.manifest.json",
+      "stored_bytes": 11188,
+      "stored_sha256": "c545059d5e4f82eaf7bb5eabf9b9d9157ab44d06f16de2cbfa0c79ee412399cd"
+    },
+    {
+      "file": "bonk-production/buy-0-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1880,
+      "raw_sha256": "2df2c3bdc6738091eab9689b03f201be5c8d4fc4bf77a1ac270d2eb84008b724",
+      "source_file": "bonk-production/buy-0-accounts16.analysis.json",
+      "stored_bytes": 1880,
+      "stored_sha256": "2df2c3bdc6738091eab9689b03f201be5c8d4fc4bf77a1ac270d2eb84008b724"
+    },
+    {
+      "file": "bonk-production/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16423,
+      "raw_sha256": "22374ec068fef39dafecc2a3ed469a56df4f22091380e4f33de49388906da23f",
+      "source_file": "bonk-production/buy-0-accounts16.json",
+      "stored_bytes": 16423,
+      "stored_sha256": "22374ec068fef39dafecc2a3ed469a56df4f22091380e4f33de49388906da23f"
+    },
+    {
+      "file": "bonk-production/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "4fab4b7dfb42445fe6b3ef751653d1cff2ca2243d01a80b4c945027c6ad1cc3e",
+      "source_file": "bonk-production/buy-0-accounts16.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "4fab4b7dfb42445fe6b3ef751653d1cff2ca2243d01a80b4c945027c6ad1cc3e"
+    },
+    {
+      "file": "bonk-production/buy-1-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1878,
+      "raw_sha256": "ba2e5bbc6f9ba911327ae9491e376535bd829d33c5c707fc46f88b67497c9d4e",
+      "source_file": "bonk-production/buy-1-accounts16.analysis.json",
+      "stored_bytes": 1878,
+      "stored_sha256": "ba2e5bbc6f9ba911327ae9491e376535bd829d33c5c707fc46f88b67497c9d4e"
+    },
+    {
+      "file": "bonk-production/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16421,
+      "raw_sha256": "4eff9f681a048f4425c3f74a33a5ffc34bc197416981f308b6c20e8b8347b9d9",
+      "source_file": "bonk-production/buy-1-accounts16.json",
+      "stored_bytes": 16421,
+      "stored_sha256": "4eff9f681a048f4425c3f74a33a5ffc34bc197416981f308b6c20e8b8347b9d9"
+    },
+    {
+      "file": "bonk-production/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "add2b2d8f11422c684ee8546de25480edcb8d5bb8cdb4458263ecdfed4c3280e",
+      "source_file": "bonk-production/buy-1-accounts16.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "add2b2d8f11422c684ee8546de25480edcb8d5bb8cdb4458263ecdfed4c3280e"
+    },
+    {
+      "file": "bonk-production/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3857802,
+      "raw_sha256": "daf7e2d73dbf673dc561691ee115b66ad03c02df2cb9bd52a5c0d8b8965e09fe",
+      "source_file": "bonk-production/dependency-accounts-1.json",
+      "stored_bytes": 619552,
+      "stored_sha256": "5e1dda6e6d50e47a44b854a57f65aa8bd744ff79041f7fd3254c60d6f39f5e59"
+    },
+    {
+      "file": "bonk-production/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "b25f0b11d801845460d9bf2c926d5e9b7829fce793d7bb95bd0f413dcc6ba1d3",
+      "source_file": "bonk-production/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "b25f0b11d801845460d9bf2c926d5e9b7829fce793d7bb95bd0f413dcc6ba1d3"
+    },
+    {
+      "file": "bonk-production/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 323,
+      "raw_sha256": "041ffd34cb26ad790575666f9a4a07c91e7192adb62c08979da3c5022be7d8a7",
+      "source_file": "bonk-production/mint-eligibility.json",
+      "stored_bytes": 323,
+      "stored_sha256": "041ffd34cb26ad790575666f9a4a07c91e7192adb62c08979da3c5022be7d8a7"
+    },
+    {
+      "file": "bonk-production/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "c06ad15aea5394a7b9670316b3630600dd8c5986bb732d7e4e2ef97e3f479d8f",
+      "source_file": "bonk-production/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "0e98055d8ecc1ce681c49e6d6e13e8b52a860b7d455f2e329f23b57048724ede"
+    },
+    {
+      "file": "bonk-production/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "172696ef39bc6ee3e78037215a045e2327a6f4916106220ed940be7813875ac7",
+      "source_file": "bonk-production/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "172696ef39bc6ee3e78037215a045e2327a6f4916106220ed940be7813875ac7"
+    },
+    {
+      "file": "bonk-production/programdata-accounts-4.json.gz",
+      "gzip": true,
+      "raw_bytes": 13981281,
+      "raw_sha256": "9ffce1dc89ee5a24ea3a29e947fb31f375819dc9d3cb44c0d2adcd51d8e7c3d2",
+      "source_file": "bonk-production/programdata-accounts-4.json",
+      "stored_bytes": 489722,
+      "stored_sha256": "a3f4b34f0a531d7bb47f74e3f979f748af3ac0f763c8e67ba635405a529b9f51"
+    },
+    {
+      "file": "bonk-production/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "6326809feb46031eb54551ce01425f0920529597fc77050b595b3af69e653872",
+      "source_file": "bonk-production/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "6326809feb46031eb54551ce01425f0920529597fc77050b595b3af69e653872"
+    },
+    {
+      "file": "bonk-production/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "476695b79116a430921c50331acdfb1d8c3adc9a2b6857ff5a75b21ebbe4ac12",
+      "source_file": "bonk-production/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "476695b79116a430921c50331acdfb1d8c3adc9a2b6857ff5a75b21ebbe4ac12"
+    },
+    {
+      "file": "bonk-production/qualification.json",
+      "gzip": false,
+      "raw_bytes": 14971,
+      "raw_sha256": "2c58b11d492cca29a18e66ea2f07e79350575f53f7321c0e0e875ddc8b298a3d",
+      "source_file": "bonk-production/qualification.json",
+      "stored_bytes": 14971,
+      "stored_sha256": "2c58b11d492cca29a18e66ea2f07e79350575f53f7321c0e0e875ddc8b298a3d"
+    },
+    {
+      "file": "bonk-production/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3938383,
+      "raw_sha256": "8575e9425ec2d174d5811ef244ced082cb6472112ee992fada2b8df25740ddb1",
+      "source_file": "bonk-production/route-accounts-3.json",
+      "stored_bytes": 629116,
+      "stored_sha256": "c523c28768def0ba2f37fb0da490bbe50d61793fd54ff9937709d3fef313ca73"
+    },
+    {
+      "file": "bonk-production/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1916,
+      "raw_sha256": "f112e57c71607677c5b88c8092a6cffe5d4fd0ddf3061bc1c2e4119f5a9aebcc",
+      "source_file": "bonk-production/route-accounts-3.receipt.json",
+      "stored_bytes": 1916,
+      "stored_sha256": "f112e57c71607677c5b88c8092a6cffe5d4fd0ddf3061bc1c2e4119f5a9aebcc"
+    },
+    {
+      "file": "bonk-production/sell-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1879,
+      "raw_sha256": "80078dadcb2c9e746fa4a93947cbec4aaa224c16d034e90cf40813a56429f158",
+      "source_file": "bonk-production/sell-accounts16.analysis.json",
+      "stored_bytes": 1879,
+      "stored_sha256": "80078dadcb2c9e746fa4a93947cbec4aaa224c16d034e90cf40813a56429f158"
+    },
+    {
+      "file": "bonk-production/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 15786,
+      "raw_sha256": "d790d5484a9483eb6521a47f812e690dd71c6f2efb659cc18e005fee09e549de",
+      "source_file": "bonk-production/sell-accounts16.json",
+      "stored_bytes": 15786,
+      "stored_sha256": "d790d5484a9483eb6521a47f812e690dd71c6f2efb659cc18e005fee09e549de"
+    },
+    {
+      "file": "bonk-production/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 947,
+      "raw_sha256": "daa616d2e6de9b09de5eaa872ee713c5b848ae237a6a90eabc4f9e1a3f9ebd87",
+      "source_file": "bonk-production/sell-accounts16.receipt.json",
+      "stored_bytes": 947,
+      "stored_sha256": "daa616d2e6de9b09de5eaa872ee713c5b848ae237a6a90eabc4f9e1a3f9ebd87"
+    },
+    {
+      "file": "bonk-production/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "13ecf489687cbe91c8733f999c395f600bacefb938bd759f1d7e4a390594e42c",
+      "source_file": "bonk-production/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "13ecf489687cbe91c8733f999c395f600bacefb938bd759f1d7e4a390594e42c"
+    },
+    {
+      "file": "bonk-production/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "514717e5d7a4c74b420acadefe2bcc1529c4c953c928d7f9f11eb8e0ae3a7dc0",
+      "source_file": "bonk-production/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "514717e5d7a4c74b420acadefe2bcc1529c4c953c928d7f9f11eb8e0ae3a7dc0"
+    },
+    {
+      "file": "discovery-mature-metadata/derived-public-addresses.json",
+      "gzip": false,
+      "raw_bytes": 2909,
+      "raw_sha256": "5156be8403c2f1243765d72845a4af49c182872f6fcda2224dc3d98896340075",
+      "source_file": "discovery-mature-metadata/derived-public-addresses.json",
+      "stored_bytes": 2909,
+      "stored_sha256": "5156be8403c2f1243765d72845a4af49c182872f6fcda2224dc3d98896340075"
+    },
+    {
+      "file": "discovery-mature-metadata/mint-curve-vault-1.json",
+      "gzip": false,
+      "raw_bytes": 20723,
+      "raw_sha256": "0e096b71063e496c1c16384a3bc4d3942d8c8080ea1e1e91e8bd04d5a74168f9",
+      "source_file": "discovery-mature-metadata/mint-curve-vault-1.json",
+      "stored_bytes": 20723,
+      "stored_sha256": "0e096b71063e496c1c16384a3bc4d3942d8c8080ea1e1e91e8bd04d5a74168f9"
+    },
+    {
+      "file": "discovery-mature-metadata/mint-curve-vault-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 2982,
+      "raw_sha256": "df5c941d2651b545c2a6b0a6ef3fb08f244a69a0e450bfeef60a57145d10d62b",
+      "source_file": "discovery-mature-metadata/mint-curve-vault-1.receipt.json",
+      "stored_bytes": 2982,
+      "stored_sha256": "df5c941d2651b545c2a6b0a6ef3fb08f244a69a0e450bfeef60a57145d10d62b"
+    },
+    {
+      "file": "discovery-mature-metadata/physical-candidates.json",
+      "gzip": false,
+      "raw_bytes": 22334,
+      "raw_sha256": "2536aa057210f899e5d8909fd932e1dd66caff391d7d81a8dce607ef28912c0e",
+      "source_file": "discovery-mature-metadata/physical-candidates.json",
+      "stored_bytes": 22334,
+      "stored_sha256": "2536aa057210f899e5d8909fd932e1dd66caff391d7d81a8dce607ef28912c0e"
+    },
+    {
+      "file": "discovery-mature-metadata/public-discovery-identifiers.json",
+      "gzip": false,
+      "raw_bytes": 833,
+      "raw_sha256": "aba7f64df1a1d255e000c8ac103a9a47d8a2452129921d2f38667753af0dd149",
+      "source_file": "discovery-mature-metadata/public-discovery-identifiers.json",
+      "stored_bytes": 833,
+      "stored_sha256": "aba7f64df1a1d255e000c8ac103a9a47d8a2452129921d2f38667753af0dd149"
+    },
+    {
+      "file": "discovery-native-metadata/derived-public-addresses.json",
+      "gzip": false,
+      "raw_bytes": 4908,
+      "raw_sha256": "639550516eba10f6f27aa607e34f82d00a23e7f5bf1b12403910cb7e5117ff12",
+      "source_file": "discovery-native-metadata/derived-public-addresses.json",
+      "stored_bytes": 4908,
+      "stored_sha256": "639550516eba10f6f27aa607e34f82d00a23e7f5bf1b12403910cb7e5117ff12"
+    },
+    {
+      "file": "discovery-native-metadata/mint-curve-vault-1.json",
+      "gzip": false,
+      "raw_bytes": 36020,
+      "raw_sha256": "cebb8cc5ffbb3d678ad79a01b999c9519fbd1087c8e0b75ed3d027ef1529a031",
+      "source_file": "discovery-native-metadata/mint-curve-vault-1.json",
+      "stored_bytes": 36020,
+      "stored_sha256": "cebb8cc5ffbb3d678ad79a01b999c9519fbd1087c8e0b75ed3d027ef1529a031"
+    },
+    {
+      "file": "discovery-native-metadata/mint-curve-vault-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 4661,
+      "raw_sha256": "532ca7e8d760f4c42e3c8510dfac207462cefc69d5a7d5bb00e962ad67c57626",
+      "source_file": "discovery-native-metadata/mint-curve-vault-1.receipt.json",
+      "stored_bytes": 4661,
+      "stored_sha256": "532ca7e8d760f4c42e3c8510dfac207462cefc69d5a7d5bb00e962ad67c57626"
+    },
+    {
+      "file": "discovery-native-metadata/physical-candidates.json",
+      "gzip": false,
+      "raw_bytes": 34356,
+      "raw_sha256": "813074770dc0f57eb991c734183ff5d3c5a639adf5104de98dbab3e03a9c772f",
+      "source_file": "discovery-native-metadata/physical-candidates.json",
+      "stored_bytes": 34356,
+      "stored_sha256": "813074770dc0f57eb991c734183ff5d3c5a639adf5104de98dbab3e03a9c772f"
+    },
+    {
+      "file": "discovery-native-metadata/recent-tokens.json",
+      "gzip": false,
+      "raw_bytes": 43523,
+      "raw_sha256": "26f1b6a5d3841b1455e259f701ef4ae9ace6181bf237569c796d9924d6eba9d5",
+      "source_file": "discovery-native-metadata/recent-tokens.json",
+      "stored_bytes": 43523,
+      "stored_sha256": "26f1b6a5d3841b1455e259f701ef4ae9ace6181bf237569c796d9924d6eba9d5"
+    },
+    {
+      "file": "discovery-native-metadata/recent-tokens.receipt.json",
+      "gzip": false,
+      "raw_bytes": 501,
+      "raw_sha256": "a9fb3b79708775b99d97b24528e0c44343aaf10349aa252ffbdf5f4189dddf92",
+      "source_file": "discovery-native-metadata/recent-tokens.receipt.json",
+      "stored_bytes": 501,
+      "stored_sha256": "a9fb3b79708775b99d97b24528e0c44343aaf10349aa252ffbdf5f4189dddf92"
+    },
+    {
+      "file": "discovery-toptraded-metadata/derived-public-addresses.json",
+      "gzip": false,
+      "raw_bytes": 6502,
+      "raw_sha256": "9b9fd55c934a659155c5fa303566e4883a38fbcd2046ac91a08308fd26339ec4",
+      "source_file": "discovery-toptraded-metadata/derived-public-addresses.json",
+      "stored_bytes": 6502,
+      "stored_sha256": "9b9fd55c934a659155c5fa303566e4883a38fbcd2046ac91a08308fd26339ec4"
+    },
+    {
+      "file": "discovery-toptraded-metadata/discovery-tokens.json",
+      "gzip": false,
+      "raw_bytes": 250253,
+      "raw_sha256": "b04cdac5aecb4afeee2f6fe1a9e77bc9eacc6047565488544cd132c34c0d7423",
+      "source_file": "discovery-toptraded-metadata/discovery-tokens.json",
+      "stored_bytes": 250253,
+      "stored_sha256": "b04cdac5aecb4afeee2f6fe1a9e77bc9eacc6047565488544cd132c34c0d7423"
+    },
+    {
+      "file": "discovery-toptraded-metadata/discovery-tokens.receipt.json",
+      "gzip": false,
+      "raw_bytes": 524,
+      "raw_sha256": "30475907d843fd2e82e77b3d90892792bdbee7b40aab35ae063c7007551a31c4",
+      "source_file": "discovery-toptraded-metadata/discovery-tokens.receipt.json",
+      "stored_bytes": 524,
+      "stored_sha256": "30475907d843fd2e82e77b3d90892792bdbee7b40aab35ae063c7007551a31c4"
+    },
+    {
+      "file": "discovery-toptraded-metadata/mint-curve-vault-1.json",
+      "gzip": false,
+      "raw_bytes": 36855,
+      "raw_sha256": "d2b772dd231890d287eab893ea357b429c4a981f3136d31ea3225578f3998ae7",
+      "source_file": "discovery-toptraded-metadata/mint-curve-vault-1.json",
+      "stored_bytes": 36855,
+      "stored_sha256": "d2b772dd231890d287eab893ea357b429c4a981f3136d31ea3225578f3998ae7"
+    },
+    {
+      "file": "discovery-toptraded-metadata/mint-curve-vault-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 4824,
+      "raw_sha256": "a649f33e90c05fca6fa7080a02af0fbf9e6d94805953c9c121f0f841d5b1c915",
+      "source_file": "discovery-toptraded-metadata/mint-curve-vault-1.receipt.json",
+      "stored_bytes": 4824,
+      "stored_sha256": "a649f33e90c05fca6fa7080a02af0fbf9e6d94805953c9c121f0f841d5b1c915"
+    },
+    {
+      "file": "discovery-toptraded-metadata/mint-curve-vault-2.json",
+      "gzip": false,
+      "raw_bytes": 10374,
+      "raw_sha256": "6d7fdaf128bd5ba2807aeb824cf1f172195e89a6f0b34bb081db02dd304800ea",
+      "source_file": "discovery-toptraded-metadata/mint-curve-vault-2.json",
+      "stored_bytes": 10374,
+      "stored_sha256": "6d7fdaf128bd5ba2807aeb824cf1f172195e89a6f0b34bb081db02dd304800ea"
+    },
+    {
+      "file": "discovery-toptraded-metadata/mint-curve-vault-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1806,
+      "raw_sha256": "f0019c6be352721003e98e59140e644aadff6fa5ed469d3046d71f372284fd59",
+      "source_file": "discovery-toptraded-metadata/mint-curve-vault-2.receipt.json",
+      "stored_bytes": 1806,
+      "stored_sha256": "f0019c6be352721003e98e59140e644aadff6fa5ed469d3046d71f372284fd59"
+    },
+    {
+      "file": "discovery-toptraded-metadata/physical-candidates.json",
+      "gzip": false,
+      "raw_bytes": 49066,
+      "raw_sha256": "d3e7890b97c19cf9b6a32058b36dc86e3604b4504b7f668d1be85425a20a3e7e",
+      "source_file": "discovery-toptraded-metadata/physical-candidates.json",
+      "stored_bytes": 49066,
+      "stored_sha256": "d3e7890b97c19cf9b6a32058b36dc86e3604b4504b7f668d1be85425a20a3e7e"
+    },
+    {
+      "file": "jup-production/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 11186,
+      "raw_sha256": "a8ee2b4085b9ae8fd2f09475d65d66ab669fed91bfd89e2a868bfb9d8d532569",
+      "source_file": "jup-production/accounts.manifest.json",
+      "stored_bytes": 11186,
+      "stored_sha256": "a8ee2b4085b9ae8fd2f09475d65d66ab669fed91bfd89e2a868bfb9d8d532569"
+    },
+    {
+      "file": "jup-production/buy-0-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1868,
+      "raw_sha256": "b16b9d7726e185c84ccfcdab549b3edb28ee434e9453499d38b5de7db681a2fa",
+      "source_file": "jup-production/buy-0-accounts16.analysis.json",
+      "stored_bytes": 1868,
+      "stored_sha256": "b16b9d7726e185c84ccfcdab549b3edb28ee434e9453499d38b5de7db681a2fa"
+    },
+    {
+      "file": "jup-production/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16316,
+      "raw_sha256": "79df9579b486df8dfde5b925d1875d0bc7878bc326d322c24616b7eb26139181",
+      "source_file": "jup-production/buy-0-accounts16.json",
+      "stored_bytes": 16316,
+      "stored_sha256": "79df9579b486df8dfde5b925d1875d0bc7878bc326d322c24616b7eb26139181"
+    },
+    {
+      "file": "jup-production/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "342d4e67425f4db9d7f7027e02c858951515ac378a5120c7eb8848ff224dd682",
+      "source_file": "jup-production/buy-0-accounts16.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "342d4e67425f4db9d7f7027e02c858951515ac378a5120c7eb8848ff224dd682"
+    },
+    {
+      "file": "jup-production/buy-1-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1871,
+      "raw_sha256": "2ca417b044d86542c1f90f2e691ba2563968bded57aede9103b9a649de3b5ce2",
+      "source_file": "jup-production/buy-1-accounts16.analysis.json",
+      "stored_bytes": 1871,
+      "stored_sha256": "2ca417b044d86542c1f90f2e691ba2563968bded57aede9103b9a649de3b5ce2"
+    },
+    {
+      "file": "jup-production/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16319,
+      "raw_sha256": "cda8109f924fd8f7bfca032ef0aac20793284c2d007e3835b18d406a01c80799",
+      "source_file": "jup-production/buy-1-accounts16.json",
+      "stored_bytes": 16319,
+      "stored_sha256": "cda8109f924fd8f7bfca032ef0aac20793284c2d007e3835b18d406a01c80799"
+    },
+    {
+      "file": "jup-production/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "486b9dc2619194d3289424bb7f717e7f2f293e2ba18573fac68534bdcc1a17e3",
+      "source_file": "jup-production/buy-1-accounts16.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "486b9dc2619194d3289424bb7f717e7f2f293e2ba18573fac68534bdcc1a17e3"
+    },
+    {
+      "file": "jup-production/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3857800,
+      "raw_sha256": "bdeecd917cb8743cae95bb3b7be4701c9a7b4dc171f86ad46c716f716b17a120",
+      "source_file": "jup-production/dependency-accounts-1.json",
+      "stored_bytes": 619597,
+      "stored_sha256": "78f4ec5aab2b5afed32e545fab2860664331debd1e5a26ca0db880dba99bc8b3"
+    },
+    {
+      "file": "jup-production/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 964,
+      "raw_sha256": "9322a61e79100cdedc113d6db73cbb772e48af275bb6b58217ea8be67e6fecc3",
+      "source_file": "jup-production/dependency-accounts-1.receipt.json",
+      "stored_bytes": 964,
+      "stored_sha256": "9322a61e79100cdedc113d6db73cbb772e48af275bb6b58217ea8be67e6fecc3"
+    },
+    {
+      "file": "jup-production/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 322,
+      "raw_sha256": "666c56896cf9cbd46d8b11a52f8b402698cadf0a273568036d077552162424ba",
+      "source_file": "jup-production/mint-eligibility.json",
+      "stored_bytes": 322,
+      "stored_sha256": "666c56896cf9cbd46d8b11a52f8b402698cadf0a273568036d077552162424ba"
+    },
+    {
+      "file": "jup-production/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "bfc12008f78a7734d865a5a77fb11078419d1039531b199e1691774d3105aebf",
+      "source_file": "jup-production/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "96244902580dc8a6a800d4b9eacbe843fbeb4fd3da14ab17cb7022f22583b108"
+    },
+    {
+      "file": "jup-production/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "583ca880e0153d65f1133d6065405e577ff13e6d30809a3da4e395e2e9e210ff",
+      "source_file": "jup-production/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "583ca880e0153d65f1133d6065405e577ff13e6d30809a3da4e395e2e9e210ff"
+    },
+    {
+      "file": "jup-production/programdata-accounts-4.json.gz",
+      "gzip": true,
+      "raw_bytes": 13981281,
+      "raw_sha256": "173dfc31f45aaca7cb6e169bc4ce33273bf8da1b297f3dd2cedbbffbc4bb12e8",
+      "source_file": "jup-production/programdata-accounts-4.json",
+      "stored_bytes": 489722,
+      "stored_sha256": "c1d1511684b802b802a2e71a179f2d8aaf61ae9ca1dd74fbb18a2b570bacd0cd"
+    },
+    {
+      "file": "jup-production/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "4c99b6843f8430f6e64003cdf24d69176c24ed6d152f7ec78ae48cb04ae1ad4e",
+      "source_file": "jup-production/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "4c99b6843f8430f6e64003cdf24d69176c24ed6d152f7ec78ae48cb04ae1ad4e"
+    },
+    {
+      "file": "jup-production/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 711,
+      "raw_sha256": "c123aa732edd24efecf319e6b175a810023511c57cba5e5f63101d1ff197868b",
+      "source_file": "jup-production/public-binding.json",
+      "stored_bytes": 711,
+      "stored_sha256": "c123aa732edd24efecf319e6b175a810023511c57cba5e5f63101d1ff197868b"
+    },
+    {
+      "file": "jup-production/qualification.json",
+      "gzip": false,
+      "raw_bytes": 14938,
+      "raw_sha256": "8e9fa4358d2b14b17fd5729c5ed51102778a7e0e045aee31db0cfd02ce2f10df",
+      "source_file": "jup-production/qualification.json",
+      "stored_bytes": 14938,
+      "stored_sha256": "8e9fa4358d2b14b17fd5729c5ed51102778a7e0e045aee31db0cfd02ce2f10df"
+    },
+    {
+      "file": "jup-production/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3938298,
+      "raw_sha256": "bb105d8db1b4d6cc98d4ec868d147d60fd5cbadfae5d659da92300399820ed69",
+      "source_file": "jup-production/route-accounts-3.json",
+      "stored_bytes": 636210,
+      "stored_sha256": "0b637fec016d049461aed417c4b5a87fd29b0d19d1ac909d0c042b13270d313c"
+    },
+    {
+      "file": "jup-production/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1915,
+      "raw_sha256": "51ee5916f840660e68bf875929ba364dc457aeff011ca54e7b628b6e30694be3",
+      "source_file": "jup-production/route-accounts-3.receipt.json",
+      "stored_bytes": 1915,
+      "stored_sha256": "51ee5916f840660e68bf875929ba364dc457aeff011ca54e7b628b6e30694be3"
+    },
+    {
+      "file": "jup-production/sell-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1868,
+      "raw_sha256": "d5ec7869b2855d048e04ce010b8c3f078dd7b7c721d562268d397e221cb0b1e9",
+      "source_file": "jup-production/sell-accounts16.analysis.json",
+      "stored_bytes": 1868,
+      "stored_sha256": "d5ec7869b2855d048e04ce010b8c3f078dd7b7c721d562268d397e221cb0b1e9"
+    },
+    {
+      "file": "jup-production/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 15652,
+      "raw_sha256": "b937b6349b46d3765db556700a4ad90c9df62938003ca67e968b4a4964a4a927",
+      "source_file": "jup-production/sell-accounts16.json",
+      "stored_bytes": 15652,
+      "stored_sha256": "b937b6349b46d3765db556700a4ad90c9df62938003ca67e968b4a4964a4a927"
+    },
+    {
+      "file": "jup-production/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 942,
+      "raw_sha256": "d4b989bb2ce5315f679b7003e4ed00797ae706c1d5eb46ddaaa6902d1ec509d2",
+      "source_file": "jup-production/sell-accounts16.receipt.json",
+      "stored_bytes": 942,
+      "stored_sha256": "d4b989bb2ce5315f679b7003e4ed00797ae706c1d5eb46ddaaa6902d1ec509d2"
+    },
+    {
+      "file": "jup-production/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "fc6b22e41f2baa028699d48597f1a9a1005742f5d5af4850ea9b624aaedcba12",
+      "source_file": "jup-production/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "fc6b22e41f2baa028699d48597f1a9a1005742f5d5af4850ea9b624aaedcba12"
+    },
+    {
+      "file": "jup-production/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "fd774aa1d4ea917dd4ec75bd8cc7c920deb10753372e6eb8e5c3a703f973db4f",
+      "source_file": "jup-production/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "fd774aa1d4ea917dd4ec75bd8cc7c920deb10753372e6eb8e5c3a703f973db4f"
+    },
+    {
+      "file": "jup-scorch-negative/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 12322,
+      "raw_sha256": "ee34b4d9a0f66ca1863fabc0f69991a4dee52ee19a392dd9f1001113e0642574",
+      "source_file": "jup-scorch-negative/accounts.manifest.json",
+      "stored_bytes": 12322,
+      "stored_sha256": "ee34b4d9a0f66ca1863fabc0f69991a4dee52ee19a392dd9f1001113e0642574"
+    },
+    {
+      "file": "jup-scorch-negative/buy-0-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1859,
+      "raw_sha256": "1d5ae528bf2c3f52ec36d5fe1709257c4083dc43e996b8720b10edf9e81d294b",
+      "source_file": "jup-scorch-negative/buy-0-accounts16.analysis.json",
+      "stored_bytes": 1859,
+      "stored_sha256": "1d5ae528bf2c3f52ec36d5fe1709257c4083dc43e996b8720b10edf9e81d294b"
+    },
+    {
+      "file": "jup-scorch-negative/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 13212,
+      "raw_sha256": "c6724b6e3a766b2482ca247becd32482baba0b3d5c08af992071e8508079c537",
+      "source_file": "jup-scorch-negative/buy-0-accounts16.json",
+      "stored_bytes": 13212,
+      "stored_sha256": "c6724b6e3a766b2482ca247becd32482baba0b3d5c08af992071e8508079c537"
+    },
+    {
+      "file": "jup-scorch-negative/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 936,
+      "raw_sha256": "d79d779b299e3a2643d774d15168fa3659ed9c0e1d35b30152102c0a5908fd1b",
+      "source_file": "jup-scorch-negative/buy-0-accounts16.receipt.json",
+      "stored_bytes": 936,
+      "stored_sha256": "d79d779b299e3a2643d774d15168fa3659ed9c0e1d35b30152102c0a5908fd1b"
+    },
+    {
+      "file": "jup-scorch-negative/buy-1-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1861,
+      "raw_sha256": "5241b3ff6fd2d386818b01086b5d7d0a3537a019fc3104a57490da86bcda0847",
+      "source_file": "jup-scorch-negative/buy-1-accounts16.analysis.json",
+      "stored_bytes": 1861,
+      "stored_sha256": "5241b3ff6fd2d386818b01086b5d7d0a3537a019fc3104a57490da86bcda0847"
+    },
+    {
+      "file": "jup-scorch-negative/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 13214,
+      "raw_sha256": "e65fce10f463129853a4cf0908af14665548793ba04b1b6eacc473a7e810caf0",
+      "source_file": "jup-scorch-negative/buy-1-accounts16.json",
+      "stored_bytes": 13214,
+      "stored_sha256": "e65fce10f463129853a4cf0908af14665548793ba04b1b6eacc473a7e810caf0"
+    },
+    {
+      "file": "jup-scorch-negative/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 936,
+      "raw_sha256": "3e774a53f9272107149ae2b4f8e8b8be80dfc711848afea96a1c3cad5a9949d1",
+      "source_file": "jup-scorch-negative/buy-1-accounts16.receipt.json",
+      "stored_bytes": 936,
+      "stored_sha256": "3e774a53f9272107149ae2b4f8e8b8be80dfc711848afea96a1c3cad5a9949d1"
+    },
+    {
+      "file": "jup-scorch-negative/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3857800,
+      "raw_sha256": "316e50ee4890b929b0e2e99b7181fc16620f867acfc683727be949905c30611f",
+      "source_file": "jup-scorch-negative/dependency-accounts-1.json",
+      "stored_bytes": 619597,
+      "stored_sha256": "2913a0654e7aecab823e90ec3e135bb810758b4a13af81dedb0cb5729741636b"
+    },
+    {
+      "file": "jup-scorch-negative/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 964,
+      "raw_sha256": "fb798e3263073d437c4d6d6f2265ce823cbf0007275106e8ee637cd50b79f77b",
+      "source_file": "jup-scorch-negative/dependency-accounts-1.receipt.json",
+      "stored_bytes": 964,
+      "stored_sha256": "fb798e3263073d437c4d6d6f2265ce823cbf0007275106e8ee637cd50b79f77b"
+    },
+    {
+      "file": "jup-scorch-negative/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 322,
+      "raw_sha256": "eb2e2cc471c1ba2c59b97ed3cd37a2e72ba96ce6ebf7170b88c406cbb79ca705",
+      "source_file": "jup-scorch-negative/mint-eligibility.json",
+      "stored_bytes": 322,
+      "stored_sha256": "eb2e2cc471c1ba2c59b97ed3cd37a2e72ba96ce6ebf7170b88c406cbb79ca705"
+    },
+    {
+      "file": "jup-scorch-negative/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "335e6cfb870cf3358c9c9ac71fce0f91f86883aeadee5fec4717a331f3d8c539",
+      "source_file": "jup-scorch-negative/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "15cac9dc6b43691b20aea1ad36f8bc35d737b62a1fac2c2032a406aa60f772d4"
+    },
+    {
+      "file": "jup-scorch-negative/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "9a08165966618d84a7873a2d40a8bb613e2765e686d960655a5f61628bc20087",
+      "source_file": "jup-scorch-negative/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "9a08165966618d84a7873a2d40a8bb613e2765e686d960655a5f61628bc20087"
+    },
+    {
+      "file": "jup-scorch-negative/programdata-accounts-4.json",
+      "gzip": false,
+      "raw_bytes": 482459,
+      "raw_sha256": "8768ac0a13d39954197bc7df2fa1358123a690415276b27c0d2476fb1e303d6e",
+      "source_file": "jup-scorch-negative/programdata-accounts-4.json",
+      "stored_bytes": 482459,
+      "stored_sha256": "8768ac0a13d39954197bc7df2fa1358123a690415276b27c0d2476fb1e303d6e"
+    },
+    {
+      "file": "jup-scorch-negative/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 744,
+      "raw_sha256": "19bc3423297b275ff38983cff445b61a5f0fb2d4fc484e93580f6577d8649643",
+      "source_file": "jup-scorch-negative/programdata-accounts-4.receipt.json",
+      "stored_bytes": 744,
+      "stored_sha256": "19bc3423297b275ff38983cff445b61a5f0fb2d4fc484e93580f6577d8649643"
+    },
+    {
+      "file": "jup-scorch-negative/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 711,
+      "raw_sha256": "c123aa732edd24efecf319e6b175a810023511c57cba5e5f63101d1ff197868b",
+      "source_file": "jup-scorch-negative/public-binding.json",
+      "stored_bytes": 711,
+      "stored_sha256": "c123aa732edd24efecf319e6b175a810023511c57cba5e5f63101d1ff197868b"
+    },
+    {
+      "file": "jup-scorch-negative/qualification.json",
+      "gzip": false,
+      "raw_bytes": 15019,
+      "raw_sha256": "3592fb3ac9ffa3e780380528672cc492a598215df6ca23c85ea7eb086100fe89",
+      "source_file": "jup-scorch-negative/qualification.json",
+      "stored_bytes": 15019,
+      "stored_sha256": "3592fb3ac9ffa3e780380528672cc492a598215df6ca23c85ea7eb086100fe89"
+    },
+    {
+      "file": "jup-scorch-negative/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3976574,
+      "raw_sha256": "29678ff28c8c518680532e130f6984ffeb48f1305e0b1eaccc26fda98191c0e2",
+      "source_file": "jup-scorch-negative/route-accounts-3.json",
+      "stored_bytes": 656112,
+      "stored_sha256": "a8ea6868a528d6d947d7ca2ff6a43466e182754173b85687777e84dd160bc2fb"
+    },
+    {
+      "file": "jup-scorch-negative/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1968,
+      "raw_sha256": "a00c98aa1b8b5c6e4ba7bd26fc747f7deebfb5590eb7b487a1d4b6dd1e73d991",
+      "source_file": "jup-scorch-negative/route-accounts-3.receipt.json",
+      "stored_bytes": 1968,
+      "stored_sha256": "a00c98aa1b8b5c6e4ba7bd26fc747f7deebfb5590eb7b487a1d4b6dd1e73d991"
+    },
+    {
+      "file": "jup-scorch-negative/sell-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1865,
+      "raw_sha256": "89cdba2271bb3c2051b4472890f8c3c665bb1d15baa2545606e314de76ae7400",
+      "source_file": "jup-scorch-negative/sell-accounts16.analysis.json",
+      "stored_bytes": 1865,
+      "stored_sha256": "89cdba2271bb3c2051b4472890f8c3c665bb1d15baa2545606e314de76ae7400"
+    },
+    {
+      "file": "jup-scorch-negative/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 12612,
+      "raw_sha256": "c12dddf7833cd9a9f47126a263dd6664f1bc7a58f9f0bdf71cba66140340fa39",
+      "source_file": "jup-scorch-negative/sell-accounts16.json",
+      "stored_bytes": 12612,
+      "stored_sha256": "c12dddf7833cd9a9f47126a263dd6664f1bc7a58f9f0bdf71cba66140340fa39"
+    },
+    {
+      "file": "jup-scorch-negative/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 935,
+      "raw_sha256": "48dcce0d9d02b624098d01bad7b1c18b92a08633455b4de2d4b4393a163e283b",
+      "source_file": "jup-scorch-negative/sell-accounts16.receipt.json",
+      "stored_bytes": 935,
+      "stored_sha256": "48dcce0d9d02b624098d01bad7b1c18b92a08633455b4de2d4b4393a163e283b"
+    },
+    {
+      "file": "jup-scorch-negative/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "77dcfd718fdcbefb19fb8416a1d249595f6e32c0282374c3fd1090e8dbb9e92a",
+      "source_file": "jup-scorch-negative/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "77dcfd718fdcbefb19fb8416a1d249595f6e32c0282374c3fd1090e8dbb9e92a"
+    },
+    {
+      "file": "jup-scorch-negative/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "2fa95922fd35f4cfb276157ce740815bcc1f1ed4d723063220c280a5469f9256",
+      "source_file": "jup-scorch-negative/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "2fa95922fd35f4cfb276157ce740815bcc1f1ed4d723063220c280a5469f9256"
+    },
+    {
+      "file": "previous-native-metadata-mints.json",
+      "gzip": false,
+      "raw_bytes": 703,
+      "raw_sha256": "bc37c353a2a95e0e858806e9150da9a1c76d7507ed0a4c0670e2d430e2b777b8",
+      "source_file": "previous-native-metadata-mints.json",
+      "stored_bytes": 703,
+      "stored_sha256": "bc37c353a2a95e0e858806e9150da9a1c76d7507ed0a4c0670e2d430e2b777b8"
+    },
+    {
+      "file": "pump-curve-production/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 10887,
+      "raw_sha256": "532523d12541d5dfcd54a9a55e6252db479e2f0689d7c7cd0696ab3b49880dc1",
+      "source_file": "pump-curve-production/accounts.manifest.json",
+      "stored_bytes": 10887,
+      "stored_sha256": "532523d12541d5dfcd54a9a55e6252db479e2f0689d7c7cd0696ab3b49880dc1"
+    },
+    {
+      "file": "pump-curve-production/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-curve-production/buy-0-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-curve-production/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "889f9103d0671030bdd29e5c83f23189139ad81445750d0b7e9816e3b939bfc9",
+      "source_file": "pump-curve-production/buy-0-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "889f9103d0671030bdd29e5c83f23189139ad81445750d0b7e9816e3b939bfc9"
+    },
+    {
+      "file": "pump-curve-production/buy-0-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1888,
+      "raw_sha256": "eade808a1b58e04ba2a73d34b17b29b5dab13ab277cc21bec9014588ede0c706",
+      "source_file": "pump-curve-production/buy-0-accounts32.analysis.json",
+      "stored_bytes": 1888,
+      "stored_sha256": "eade808a1b58e04ba2a73d34b17b29b5dab13ab277cc21bec9014588ede0c706"
+    },
+    {
+      "file": "pump-curve-production/buy-0-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13280,
+      "raw_sha256": "1888bf89823fa36aaae8357b137a28937bf9b96849d1e01adab63683da42ae05",
+      "source_file": "pump-curve-production/buy-0-accounts32.json",
+      "stored_bytes": 13280,
+      "stored_sha256": "1888bf89823fa36aaae8357b137a28937bf9b96849d1e01adab63683da42ae05"
+    },
+    {
+      "file": "pump-curve-production/buy-0-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "6e6f97ced2a7a723db7d83e33aeb6f5975fbd82433d714265a468d52cd4f7e3a",
+      "source_file": "pump-curve-production/buy-0-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "6e6f97ced2a7a723db7d83e33aeb6f5975fbd82433d714265a468d52cd4f7e3a"
+    },
+    {
+      "file": "pump-curve-production/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-curve-production/buy-1-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-curve-production/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "b48daa9c507d67a04c7094da80078d31433fd89e612c6639f9dcddc5705e5bb8",
+      "source_file": "pump-curve-production/buy-1-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "b48daa9c507d67a04c7094da80078d31433fd89e612c6639f9dcddc5705e5bb8"
+    },
+    {
+      "file": "pump-curve-production/buy-1-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1880,
+      "raw_sha256": "432b2933189922962c4076a0b2f0ae61860ff882fd4a1c97f6a7b86c8b33d3c7",
+      "source_file": "pump-curve-production/buy-1-accounts32.analysis.json",
+      "stored_bytes": 1880,
+      "stored_sha256": "432b2933189922962c4076a0b2f0ae61860ff882fd4a1c97f6a7b86c8b33d3c7"
+    },
+    {
+      "file": "pump-curve-production/buy-1-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13272,
+      "raw_sha256": "99448c8349f05fe322123b8e94e65b78efb4558331067dd6f5fc908d6d2bc275",
+      "source_file": "pump-curve-production/buy-1-accounts32.json",
+      "stored_bytes": 13272,
+      "stored_sha256": "99448c8349f05fe322123b8e94e65b78efb4558331067dd6f5fc908d6d2bc275"
+    },
+    {
+      "file": "pump-curve-production/buy-1-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "d4b5a0948ce5b7e12f3b0eeca9b145372defabd5225a60b371bceb474470bdfa",
+      "source_file": "pump-curve-production/buy-1-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "d4b5a0948ce5b7e12f3b0eeca9b145372defabd5225a60b371bceb474470bdfa"
+    },
+    {
+      "file": "pump-curve-production/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3857796,
+      "raw_sha256": "b815e8e3e2baa6501b592b55af9e786d957e2c11475d6ff468e5cf5a5fef4f5c",
+      "source_file": "pump-curve-production/dependency-accounts-1.json",
+      "stored_bytes": 619542,
+      "stored_sha256": "2736c7397125214ceed7b2b74187a8b19226f83902f496e20e9cf259b77e4ee1"
+    },
+    {
+      "file": "pump-curve-production/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "2af0055e1c7a5d5c1c0d970bfefebffe0bcf107d89435fdbd1ce6ba85a43a153",
+      "source_file": "pump-curve-production/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "2af0055e1c7a5d5c1c0d970bfefebffe0bcf107d89435fdbd1ce6ba85a43a153"
+    },
+    {
+      "file": "pump-curve-production/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 323,
+      "raw_sha256": "accf6744737b40af3f9d05839460bec719f05641dde9ef9cd07ab32d7764d358",
+      "source_file": "pump-curve-production/mint-eligibility.json",
+      "stored_bytes": 323,
+      "stored_sha256": "accf6744737b40af3f9d05839460bec719f05641dde9ef9cd07ab32d7764d358"
+    },
+    {
+      "file": "pump-curve-production/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "69c7159f6426096a9a0b610fac58b20f533b6a1b62d5b68422b8127e6a7b60ca",
+      "source_file": "pump-curve-production/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "f2b70015d04c276da7c0d9434bc61686384a011437c506a45a6bc57e74b5fc28"
+    },
+    {
+      "file": "pump-curve-production/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "3f7b5ef9c9452181443dd935147955072945f90ab50e373ae99c9520baa9cc04",
+      "source_file": "pump-curve-production/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "3f7b5ef9c9452181443dd935147955072945f90ab50e373ae99c9520baa9cc04"
+    },
+    {
+      "file": "pump-curve-production/programdata-accounts-4.json.gz",
+      "gzip": true,
+      "raw_bytes": 13981281,
+      "raw_sha256": "5c67c3c8751dff3ca3a1fb95110a82b1270ee08ffaa353eb384d433a2c09a1bb",
+      "source_file": "pump-curve-production/programdata-accounts-4.json",
+      "stored_bytes": 597170,
+      "stored_sha256": "93373760c1cb377b1064f40c2f4afb0e577f4d0a2772085f0781fd8e9f43c4c4"
+    },
+    {
+      "file": "pump-curve-production/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "da40233287ad2b0596f49d570aa5588050d1e6fd7d778fd397ac7e06ebcdd059",
+      "source_file": "pump-curve-production/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "da40233287ad2b0596f49d570aa5588050d1e6fd7d778fd397ac7e06ebcdd059"
+    },
+    {
+      "file": "pump-curve-production/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 710,
+      "raw_sha256": "d17c0f5b1dfe7749d7798410c89225c4f85f2eb916ecd77b4e6cdf0892e68199",
+      "source_file": "pump-curve-production/public-binding.json",
+      "stored_bytes": 710,
+      "stored_sha256": "d17c0f5b1dfe7749d7798410c89225c4f85f2eb916ecd77b4e6cdf0892e68199"
+    },
+    {
+      "file": "pump-curve-production/qualification.json",
+      "gzip": false,
+      "raw_bytes": 17594,
+      "raw_sha256": "4730c2df2158325753dba29a08183819ffaa098a106df07c93d82f85534ee8cc",
+      "source_file": "pump-curve-production/qualification.json",
+      "stored_bytes": 17594,
+      "stored_sha256": "4730c2df2158325753dba29a08183819ffaa098a106df07c93d82f85534ee8cc"
+    },
+    {
+      "file": "pump-curve-production/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3874350,
+      "raw_sha256": "77cb1cd7fef4f394c8cac81d319208d5fb4a4d03f5d25157d1d225e297dca66d",
+      "source_file": "pump-curve-production/route-accounts-3.json",
+      "stored_bytes": 628462,
+      "stored_sha256": "f255fcc9cb848a2aae711830533e5a36e403c554ba14c4051c84875402cefcda"
+    },
+    {
+      "file": "pump-curve-production/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1904,
+      "raw_sha256": "3dd217f8af03a6a248902748adba9c284f78b5f84f62a2cc782db57c366ea14a",
+      "source_file": "pump-curve-production/route-accounts-3.receipt.json",
+      "stored_bytes": 1904,
+      "stored_sha256": "3dd217f8af03a6a248902748adba9c284f78b5f84f62a2cc782db57c366ea14a"
+    },
+    {
+      "file": "pump-curve-production/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-curve-production/sell-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-curve-production/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 753,
+      "raw_sha256": "c82faac04e9de5a95b0f1a7da3a485c4c607415d4ca6ab10036cc7ffd714b2a0",
+      "source_file": "pump-curve-production/sell-accounts16.receipt.json",
+      "stored_bytes": 753,
+      "stored_sha256": "c82faac04e9de5a95b0f1a7da3a485c4c607415d4ca6ab10036cc7ffd714b2a0"
+    },
+    {
+      "file": "pump-curve-production/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1878,
+      "raw_sha256": "1779c4ce66b582bc8251d5e5be6efbbddb4abc8523ece4bbb0bfb2649ec808a4",
+      "source_file": "pump-curve-production/sell-accounts32.analysis.json",
+      "stored_bytes": 1878,
+      "stored_sha256": "1779c4ce66b582bc8251d5e5be6efbbddb4abc8523ece4bbb0bfb2649ec808a4"
+    },
+    {
+      "file": "pump-curve-production/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 12634,
+      "raw_sha256": "13704340c8aca6430d01e8ce03a2e71e540232179feabdc3f5fc487d0a3e8fc3",
+      "source_file": "pump-curve-production/sell-accounts32.json",
+      "stored_bytes": 12634,
+      "stored_sha256": "13704340c8aca6430d01e8ce03a2e71e540232179feabdc3f5fc487d0a3e8fc3"
+    },
+    {
+      "file": "pump-curve-production/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 948,
+      "raw_sha256": "a1849dade27829ca856b30efe7b0832f423cc39f46783d522be5557a6879fd27",
+      "source_file": "pump-curve-production/sell-accounts32.receipt.json",
+      "stored_bytes": 948,
+      "stored_sha256": "a1849dade27829ca856b30efe7b0832f423cc39f46783d522be5557a6879fd27"
+    },
+    {
+      "file": "pump-curve-production/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "36953aaebe45de1d9e3a097bd2ab70f82c3c81d7e08f52136d685e1c366c9415",
+      "source_file": "pump-curve-production/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "36953aaebe45de1d9e3a097bd2ab70f82c3c81d7e08f52136d685e1c366c9415"
+    },
+    {
+      "file": "pump-curve-production/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "46a7453b471dc6d67e0370a4aabb18a6e130e7a1a57b02a390cc36059190344e",
+      "source_file": "pump-curve-production/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "46a7453b471dc6d67e0370a4aabb18a6e130e7a1a57b02a390cc36059190344e"
+    },
+    {
+      "file": "pump-graduated-production/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 11146,
+      "raw_sha256": "fa665bfcee9ae483f464ff00c15e422892bd8cff241e8acfd3b72a864a916a82",
+      "source_file": "pump-graduated-production/accounts.manifest.json",
+      "stored_bytes": 11146,
+      "stored_sha256": "fa665bfcee9ae483f464ff00c15e422892bd8cff241e8acfd3b72a864a916a82"
+    },
+    {
+      "file": "pump-graduated-production/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-graduated-production/buy-0-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-graduated-production/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 748,
+      "raw_sha256": "57f25e35a78b1a1b1f08125b35949a1fa5150fcf66aac88fc729ae35e53ca6ea",
+      "source_file": "pump-graduated-production/buy-0-accounts16.receipt.json",
+      "stored_bytes": 748,
+      "stored_sha256": "57f25e35a78b1a1b1f08125b35949a1fa5150fcf66aac88fc729ae35e53ca6ea"
+    },
+    {
+      "file": "pump-graduated-production/buy-0-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1892,
+      "raw_sha256": "3ec6333a078c8e051af5c5129dc33f08638a7f446788d216a3ec88bb5760d9f2",
+      "source_file": "pump-graduated-production/buy-0-accounts32.analysis.json",
+      "stored_bytes": 1892,
+      "stored_sha256": "3ec6333a078c8e051af5c5129dc33f08638a7f446788d216a3ec88bb5760d9f2"
+    },
+    {
+      "file": "pump-graduated-production/buy-0-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 17281,
+      "raw_sha256": "a2bce1ad9c57794f7998eeeb3b20afececc7e78b1226c69021126d6a5d74bae4",
+      "source_file": "pump-graduated-production/buy-0-accounts32.json",
+      "stored_bytes": 17281,
+      "stored_sha256": "a2bce1ad9c57794f7998eeeb3b20afececc7e78b1226c69021126d6a5d74bae4"
+    },
+    {
+      "file": "pump-graduated-production/buy-0-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "c232d583763b5429a8391e65e79712c54c346e9c44bdb43360a5de339c31b67e",
+      "source_file": "pump-graduated-production/buy-0-accounts32.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "c232d583763b5429a8391e65e79712c54c346e9c44bdb43360a5de339c31b67e"
+    },
+    {
+      "file": "pump-graduated-production/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-graduated-production/buy-1-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-graduated-production/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 748,
+      "raw_sha256": "fd2ae0dfb6e34e9ae9903c96e39e96315124dcf799bff348e75538440ea07734",
+      "source_file": "pump-graduated-production/buy-1-accounts16.receipt.json",
+      "stored_bytes": 748,
+      "stored_sha256": "fd2ae0dfb6e34e9ae9903c96e39e96315124dcf799bff348e75538440ea07734"
+    },
+    {
+      "file": "pump-graduated-production/buy-1-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1893,
+      "raw_sha256": "4d4ee34e9e29a8ee2e603c2e1bd2c722cd88ed450efde09edd3cadb778ce32a8",
+      "source_file": "pump-graduated-production/buy-1-accounts32.analysis.json",
+      "stored_bytes": 1893,
+      "stored_sha256": "4d4ee34e9e29a8ee2e603c2e1bd2c722cd88ed450efde09edd3cadb778ce32a8"
+    },
+    {
+      "file": "pump-graduated-production/buy-1-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 17282,
+      "raw_sha256": "d73d5adaee16badcd31cbd8fd4fe300cf4ce2210361a2ac4d52e0f14e881d8db",
+      "source_file": "pump-graduated-production/buy-1-accounts32.json",
+      "stored_bytes": 17282,
+      "stored_sha256": "d73d5adaee16badcd31cbd8fd4fe300cf4ce2210361a2ac4d52e0f14e881d8db"
+    },
+    {
+      "file": "pump-graduated-production/buy-1-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "caa2a8ee5a5f8154a59aa5af4a466dd8c0aa3fb361611cf05398e687b2461a0e",
+      "source_file": "pump-graduated-production/buy-1-accounts32.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "caa2a8ee5a5f8154a59aa5af4a466dd8c0aa3fb361611cf05398e687b2461a0e"
+    },
+    {
+      "file": "pump-graduated-production/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3857798,
+      "raw_sha256": "05e061099425f5a72258d2d6a64c0266aaf74336749ee5fbae1b1528d2722850",
+      "source_file": "pump-graduated-production/dependency-accounts-1.json",
+      "stored_bytes": 619547,
+      "stored_sha256": "b2bfbdfa3683874cf5453e65526b7c36813263fc7e08e47806f2f67a3f16b074"
+    },
+    {
+      "file": "pump-graduated-production/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "afbb91d9ff9ca3a4a3240ff94c26c67bdb217f8be1da6499a00db296c1323ae6",
+      "source_file": "pump-graduated-production/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "afbb91d9ff9ca3a4a3240ff94c26c67bdb217f8be1da6499a00db296c1323ae6"
+    },
+    {
+      "file": "pump-graduated-production/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 323,
+      "raw_sha256": "165c6a7b9e1e676e5a305b2571aa224f46772cac1b5da0cdb53d248a78c35f61",
+      "source_file": "pump-graduated-production/mint-eligibility.json",
+      "stored_bytes": 323,
+      "stored_sha256": "165c6a7b9e1e676e5a305b2571aa224f46772cac1b5da0cdb53d248a78c35f61"
+    },
+    {
+      "file": "pump-graduated-production/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "5627c2b4629abcb26c3ed7dbdbbef2d27d0bab1b244f928542d29205c5e35844",
+      "source_file": "pump-graduated-production/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "b1d6c0814261f86f117d340ea38473546dd44e6d26415a528bceeff62da7958a"
+    },
+    {
+      "file": "pump-graduated-production/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "9c140d9b345db43dd4113ffd9586cfb72138be8c399c7a6cc37554b26d3d690d",
+      "source_file": "pump-graduated-production/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "9c140d9b345db43dd4113ffd9586cfb72138be8c399c7a6cc37554b26d3d690d"
+    },
+    {
+      "file": "pump-graduated-production/programdata-accounts-4.json.gz",
+      "gzip": true,
+      "raw_bytes": 13981281,
+      "raw_sha256": "c685465221140b6f7fbe012fe6b3bad5e1a4897652978e7c112e3cb601405c1d",
+      "source_file": "pump-graduated-production/programdata-accounts-4.json",
+      "stored_bytes": 400248,
+      "stored_sha256": "2c897c8d9917c8200e0d3956de38f701b3155085309bb319fc1384072dee2bd9"
+    },
+    {
+      "file": "pump-graduated-production/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "a437d5839948504b473f9071f93f7d0c34cfcb60d0ffee2cabebd1384a89e8b7",
+      "source_file": "pump-graduated-production/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "a437d5839948504b473f9071f93f7d0c34cfcb60d0ffee2cabebd1384a89e8b7"
+    },
+    {
+      "file": "pump-graduated-production/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 711,
+      "raw_sha256": "b1933fea0fab5340038670c4f0d0313813394e4565daa898611ff0f758b36c00",
+      "source_file": "pump-graduated-production/public-binding.json",
+      "stored_bytes": 711,
+      "stored_sha256": "b1933fea0fab5340038670c4f0d0313813394e4565daa898611ff0f758b36c00"
+    },
+    {
+      "file": "pump-graduated-production/qualification.json",
+      "gzip": false,
+      "raw_bytes": 17607,
+      "raw_sha256": "92b75b0110a277a2fd18eb1cbafef86fee63b915f561a46c2e1516a99d05ba79",
+      "source_file": "pump-graduated-production/qualification.json",
+      "stored_bytes": 17607,
+      "stored_sha256": "92b75b0110a277a2fd18eb1cbafef86fee63b915f561a46c2e1516a99d05ba79"
+    },
+    {
+      "file": "pump-graduated-production/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3878390,
+      "raw_sha256": "3c90abb775ac14f957d2f6f45b4dde02920dff51fd42b80e784c271c21bb8b79",
+      "source_file": "pump-graduated-production/route-accounts-3.json",
+      "stored_bytes": 629007,
+      "stored_sha256": "ae9fa816d96bb68e3a6b02ba0bfed88d2af21c1ebe6b66cb890eb7996653a775"
+    },
+    {
+      "file": "pump-graduated-production/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1903,
+      "raw_sha256": "02cb02db145e80e55403bd44d18418bdc03bfaf4090aed4764cdb75a1b5e96bd",
+      "source_file": "pump-graduated-production/route-accounts-3.receipt.json",
+      "stored_bytes": 1903,
+      "stored_sha256": "02cb02db145e80e55403bd44d18418bdc03bfaf4090aed4764cdb75a1b5e96bd"
+    },
+    {
+      "file": "pump-graduated-production/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-graduated-production/sell-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-graduated-production/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 752,
+      "raw_sha256": "442fa404e8c5ac1b952daedac29c52582c6cb79118b5a347ee4147481a6158a9",
+      "source_file": "pump-graduated-production/sell-accounts16.receipt.json",
+      "stored_bytes": 752,
+      "stored_sha256": "442fa404e8c5ac1b952daedac29c52582c6cb79118b5a347ee4147481a6158a9"
+    },
+    {
+      "file": "pump-graduated-production/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1884,
+      "raw_sha256": "32bda52cc63821543fa7a2353cf73aead56cb96833cfb96ab394676bc3442899",
+      "source_file": "pump-graduated-production/sell-accounts32.analysis.json",
+      "stored_bytes": 1884,
+      "stored_sha256": "32bda52cc63821543fa7a2353cf73aead56cb96833cfb96ab394676bc3442899"
+    },
+    {
+      "file": "pump-graduated-production/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 16668,
+      "raw_sha256": "ad855132d5b7d0eff6992d0f7a63196956559c770fdeda4aa35f31e425e70898",
+      "source_file": "pump-graduated-production/sell-accounts32.json",
+      "stored_bytes": 16668,
+      "stored_sha256": "ad855132d5b7d0eff6992d0f7a63196956559c770fdeda4aa35f31e425e70898"
+    },
+    {
+      "file": "pump-graduated-production/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 947,
+      "raw_sha256": "e337ece89ae907bd2e76f9c229de7a83341e211a3f501186607cf72fea5603b4",
+      "source_file": "pump-graduated-production/sell-accounts32.receipt.json",
+      "stored_bytes": 947,
+      "stored_sha256": "e337ece89ae907bd2e76f9c229de7a83341e211a3f501186607cf72fea5603b4"
+    },
+    {
+      "file": "pump-graduated-production/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "404bba09894613786947790f4b0165aa7034c840ae8a1c32fe94178b4029a0fb",
+      "source_file": "pump-graduated-production/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "404bba09894613786947790f4b0165aa7034c840ae8a1c32fe94178b4029a0fb"
+    },
+    {
+      "file": "pump-graduated-production/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "44805e64c3ee1c89fd5e07a180c6680811b990dff462cf959897128a601eac4a",
+      "source_file": "pump-graduated-production/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "44805e64c3ee1c89fd5e07a180c6680811b990dff462cf959897128a601eac4a"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 10889,
+      "raw_sha256": "1e648e5bb7762e268009f4dbba258ff86b15fe0b1904bc42f28da8aef8de03b4",
+      "source_file": "pump-metadata-current-2yZy/accounts.manifest.json",
+      "stored_bytes": 10889,
+      "stored_sha256": "1e648e5bb7762e268009f4dbba258ff86b15fe0b1904bc42f28da8aef8de03b4"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-2yZy/buy-0-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "c0a3074694d7bea574f29445308a8e997d2baeac4fc21c57c62edd341aa9067e",
+      "source_file": "pump-metadata-current-2yZy/buy-0-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "c0a3074694d7bea574f29445308a8e997d2baeac4fc21c57c62edd341aa9067e"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-0-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1879,
+      "raw_sha256": "0e0ccc15219ff577b44d7e29b5bafdcb0def0b1decd9cd115c4bffacf50a63d9",
+      "source_file": "pump-metadata-current-2yZy/buy-0-accounts32.analysis.json",
+      "stored_bytes": 1879,
+      "stored_sha256": "0e0ccc15219ff577b44d7e29b5bafdcb0def0b1decd9cd115c4bffacf50a63d9"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-0-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13300,
+      "raw_sha256": "f2d102a7e7b4e762c91fc6ac2e7dc592b50e44d45c723c484cd4e5150b0c2110",
+      "source_file": "pump-metadata-current-2yZy/buy-0-accounts32.json",
+      "stored_bytes": 13300,
+      "stored_sha256": "f2d102a7e7b4e762c91fc6ac2e7dc592b50e44d45c723c484cd4e5150b0c2110"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-0-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "c9e6b034fb2ad78784d3ef97acb96355c307daa4855bde214f2d41f4d93a1eeb",
+      "source_file": "pump-metadata-current-2yZy/buy-0-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "c9e6b034fb2ad78784d3ef97acb96355c307daa4855bde214f2d41f4d93a1eeb"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-2yZy/buy-1-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "988cfcdd5bfa974afa5d6700d58502771e06ac5896ff91083cb1023d01875906",
+      "source_file": "pump-metadata-current-2yZy/buy-1-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "988cfcdd5bfa974afa5d6700d58502771e06ac5896ff91083cb1023d01875906"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-1-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1883,
+      "raw_sha256": "372ad999893b7d9ee0269b1d2294c65af151d43960bdb24534cd4e52a2a629c2",
+      "source_file": "pump-metadata-current-2yZy/buy-1-accounts32.analysis.json",
+      "stored_bytes": 1883,
+      "stored_sha256": "372ad999893b7d9ee0269b1d2294c65af151d43960bdb24534cd4e52a2a629c2"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-1-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13275,
+      "raw_sha256": "1ba9cd41056a477bd7540b5439302d462253e1f19baecf3bd1cc4df6f1a04983",
+      "source_file": "pump-metadata-current-2yZy/buy-1-accounts32.json",
+      "stored_bytes": 13275,
+      "stored_sha256": "1ba9cd41056a477bd7540b5439302d462253e1f19baecf3bd1cc4df6f1a04983"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/buy-1-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "b3634216b506a81254304daea862b32434cb05e6ad3bbef0cb7fa69fbe0468e5",
+      "source_file": "pump-metadata-current-2yZy/buy-1-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "b3634216b506a81254304daea862b32434cb05e6ad3bbef0cb7fa69fbe0468e5"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "c3f0bdbb6c50a5d8551de23385f1db0cf60eb5bbff11ed8591c86dd70b6b1695",
+      "source_file": "pump-metadata-current-2yZy/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "c3f0bdbb6c50a5d8551de23385f1db0cf60eb5bbff11ed8591c86dd70b6b1695"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 334,
+      "raw_sha256": "b9ad38c257a2f6f78e02cff5c57e5f196d7a64b78d245bcd48ae023bb74e50d6",
+      "source_file": "pump-metadata-current-2yZy/mint-eligibility.json",
+      "stored_bytes": 334,
+      "stored_sha256": "b9ad38c257a2f6f78e02cff5c57e5f196d7a64b78d245bcd48ae023bb74e50d6"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/physical-bounds.json",
+      "gzip": false,
+      "raw_bytes": 533,
+      "raw_sha256": "053e3b46b855eb421d02d129f7ce7778497f2d3efece2ef7b8d5c14bea1ce5c7",
+      "source_file": "pump-metadata-current-2yZy/physical-bounds.json",
+      "stored_bytes": 533,
+      "stored_sha256": "053e3b46b855eb421d02d129f7ce7778497f2d3efece2ef7b8d5c14bea1ce5c7"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "5d953c44f5e554489876f7688d899d7c7a5f26fb372eebd656122dc75f2a7414",
+      "source_file": "pump-metadata-current-2yZy/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "5d953c44f5e554489876f7688d899d7c7a5f26fb372eebd656122dc75f2a7414"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "8e6d44726398b0fec8ae8faebbc19d5493cbb43a1183c245dfba7ae998003d6b",
+      "source_file": "pump-metadata-current-2yZy/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "8e6d44726398b0fec8ae8faebbc19d5493cbb43a1183c245dfba7ae998003d6b"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 711,
+      "raw_sha256": "77bd412f4628c03c4fd730c0a37e39c4ccaa5d202331c74d04ba3468d3d30d76",
+      "source_file": "pump-metadata-current-2yZy/public-binding.json",
+      "stored_bytes": 711,
+      "stored_sha256": "77bd412f4628c03c4fd730c0a37e39c4ccaa5d202331c74d04ba3468d3d30d76"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/qualification.json",
+      "gzip": false,
+      "raw_bytes": 17603,
+      "raw_sha256": "54f94dfa7a39b08e7b6bc6dcd773a3f0d00f1c1bdceba88cc7117916b23781c2",
+      "source_file": "pump-metadata-current-2yZy/qualification.json",
+      "stored_bytes": 17603,
+      "stored_sha256": "54f94dfa7a39b08e7b6bc6dcd773a3f0d00f1c1bdceba88cc7117916b23781c2"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1904,
+      "raw_sha256": "1c3f1a668fb56a2d4695532ef998bed66b55fd633ecbaab42013949886c2a150",
+      "source_file": "pump-metadata-current-2yZy/route-accounts-3.receipt.json",
+      "stored_bytes": 1904,
+      "stored_sha256": "1c3f1a668fb56a2d4695532ef998bed66b55fd633ecbaab42013949886c2a150"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-2yZy/sell-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 753,
+      "raw_sha256": "47c9cabe86b01cf79b4e75d0a6799b8b623185084e882809f03d4d53781736ca",
+      "source_file": "pump-metadata-current-2yZy/sell-accounts16.receipt.json",
+      "stored_bytes": 753,
+      "stored_sha256": "47c9cabe86b01cf79b4e75d0a6799b8b623185084e882809f03d4d53781736ca"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1883,
+      "raw_sha256": "63432d01da852b99694ae19a59350246dbebf64a9f4624368d3a0152313aa99b",
+      "source_file": "pump-metadata-current-2yZy/sell-accounts32.analysis.json",
+      "stored_bytes": 1883,
+      "stored_sha256": "63432d01da852b99694ae19a59350246dbebf64a9f4624368d3a0152313aa99b"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 12667,
+      "raw_sha256": "762227bdf150d5d57db97145d9b051326bd9140137cc995a4fe2541ccdae1be0",
+      "source_file": "pump-metadata-current-2yZy/sell-accounts32.json",
+      "stored_bytes": 12667,
+      "stored_sha256": "762227bdf150d5d57db97145d9b051326bd9140137cc995a4fe2541ccdae1be0"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 948,
+      "raw_sha256": "f5e5f1b7ea6fb0946919c6c3eb62bde43014183ecce2ef6037a601c032096222",
+      "source_file": "pump-metadata-current-2yZy/sell-accounts32.receipt.json",
+      "stored_bytes": 948,
+      "stored_sha256": "f5e5f1b7ea6fb0946919c6c3eb62bde43014183ecce2ef6037a601c032096222"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "93f048c89ee33b82ee8218faa93080b2b5746cb62da15bcd9d88bcc23d93baca",
+      "source_file": "pump-metadata-current-2yZy/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "93f048c89ee33b82ee8218faa93080b2b5746cb62da15bcd9d88bcc23d93baca"
+    },
+    {
+      "file": "pump-metadata-current-2yZy/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "fd4c343be8bdeadbea70c1b875df28459f24ec8be50f1072c50182ec06a266e0",
+      "source_file": "pump-metadata-current-2yZy/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "fd4c343be8bdeadbea70c1b875df28459f24ec8be50f1072c50182ec06a266e0"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 10889,
+      "raw_sha256": "48839d87d7fd4c34e1eddbee8f2fce6e2be49bef5e27e7f28b73b7e6f5b6a00f",
+      "source_file": "pump-metadata-current-4iPJ/accounts.manifest.json",
+      "stored_bytes": 10889,
+      "stored_sha256": "48839d87d7fd4c34e1eddbee8f2fce6e2be49bef5e27e7f28b73b7e6f5b6a00f"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-4iPJ/buy-0-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "58610c1464b84a65d48ce032eeb79a524d38d8d61cd01c6c019269e6bd763d00",
+      "source_file": "pump-metadata-current-4iPJ/buy-0-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "58610c1464b84a65d48ce032eeb79a524d38d8d61cd01c6c019269e6bd763d00"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-0-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1880,
+      "raw_sha256": "e3a10b8bc84c061441316fa8e1cd4cea395360213ee41fd2ba8bb44320b971c0",
+      "source_file": "pump-metadata-current-4iPJ/buy-0-accounts32.analysis.json",
+      "stored_bytes": 1880,
+      "stored_sha256": "e3a10b8bc84c061441316fa8e1cd4cea395360213ee41fd2ba8bb44320b971c0"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-0-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13301,
+      "raw_sha256": "72dfa8033bea79c25d5a4e6a05025fd7192a4270f642a4ff9c2fa880a87a471f",
+      "source_file": "pump-metadata-current-4iPJ/buy-0-accounts32.json",
+      "stored_bytes": 13301,
+      "stored_sha256": "72dfa8033bea79c25d5a4e6a05025fd7192a4270f642a4ff9c2fa880a87a471f"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-0-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "92a2fd80d1ba996084163c75129796069cf05bddceaedc42ad4e6c44fbefc386",
+      "source_file": "pump-metadata-current-4iPJ/buy-0-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "92a2fd80d1ba996084163c75129796069cf05bddceaedc42ad4e6c44fbefc386"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-4iPJ/buy-1-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "a9fdb750bfd435f4cd9754dd810a418192551dc7c3549d37ea429138352551d2",
+      "source_file": "pump-metadata-current-4iPJ/buy-1-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "a9fdb750bfd435f4cd9754dd810a418192551dc7c3549d37ea429138352551d2"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-1-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1878,
+      "raw_sha256": "66cb40964868ca64485f2c90fbe76dd233c6da0ab86e08c3adec7064abfb9424",
+      "source_file": "pump-metadata-current-4iPJ/buy-1-accounts32.analysis.json",
+      "stored_bytes": 1878,
+      "stored_sha256": "66cb40964868ca64485f2c90fbe76dd233c6da0ab86e08c3adec7064abfb9424"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-1-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13299,
+      "raw_sha256": "de3297d445fa5a92e2820f1ea87a88fe222c83fe2f57ef62b46f827e6e8425fc",
+      "source_file": "pump-metadata-current-4iPJ/buy-1-accounts32.json",
+      "stored_bytes": 13299,
+      "stored_sha256": "de3297d445fa5a92e2820f1ea87a88fe222c83fe2f57ef62b46f827e6e8425fc"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/buy-1-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "304b28cca6afcdfe898ffb6bf47561920606230a0cb08ef4ca24f87275312eeb",
+      "source_file": "pump-metadata-current-4iPJ/buy-1-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "304b28cca6afcdfe898ffb6bf47561920606230a0cb08ef4ca24f87275312eeb"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "0b41042d33cddc89f39e50c6ce03e3eb4138cbf33db84227cb6df1ddcdb8548f",
+      "source_file": "pump-metadata-current-4iPJ/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "0b41042d33cddc89f39e50c6ce03e3eb4138cbf33db84227cb6df1ddcdb8548f"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 334,
+      "raw_sha256": "74f9340529d4d38ab2cb361c57453a4d724d20fecb0603aa399298de9b453904",
+      "source_file": "pump-metadata-current-4iPJ/mint-eligibility.json",
+      "stored_bytes": 334,
+      "stored_sha256": "74f9340529d4d38ab2cb361c57453a4d724d20fecb0603aa399298de9b453904"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/physical-bounds.json",
+      "gzip": false,
+      "raw_bytes": 532,
+      "raw_sha256": "8a3d2f238197d3659636ba63c003314ae98f64f822a0ab193470f3de01ada7fa",
+      "source_file": "pump-metadata-current-4iPJ/physical-bounds.json",
+      "stored_bytes": 532,
+      "stored_sha256": "8a3d2f238197d3659636ba63c003314ae98f64f822a0ab193470f3de01ada7fa"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "b887f0b919aaf3ea029d35b11028ae40e5f828f867db514d82349f6c1703b103",
+      "source_file": "pump-metadata-current-4iPJ/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "b887f0b919aaf3ea029d35b11028ae40e5f828f867db514d82349f6c1703b103"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "24ed33dbea4d4db7cf6d231243835d69287fbd197cadebe61f25cab73383fc95",
+      "source_file": "pump-metadata-current-4iPJ/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "24ed33dbea4d4db7cf6d231243835d69287fbd197cadebe61f25cab73383fc95"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "c51cb3838f5835b2c7b1598f5f5844f01b559e123b3d86a0445a3bfc6aa60173",
+      "source_file": "pump-metadata-current-4iPJ/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "c51cb3838f5835b2c7b1598f5f5844f01b559e123b3d86a0445a3bfc6aa60173"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/qualification.json",
+      "gzip": false,
+      "raw_bytes": 17585,
+      "raw_sha256": "f5fd180c4b5870d9b8480fc74019571713eaa3626b56aeb142ff4daa25d505d8",
+      "source_file": "pump-metadata-current-4iPJ/qualification.json",
+      "stored_bytes": 17585,
+      "stored_sha256": "f5fd180c4b5870d9b8480fc74019571713eaa3626b56aeb142ff4daa25d505d8"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1904,
+      "raw_sha256": "440582386baddf4ef60d4fad5298ce8970c22cb5d07acd2ff3578c3736077ebc",
+      "source_file": "pump-metadata-current-4iPJ/route-accounts-3.receipt.json",
+      "stored_bytes": 1904,
+      "stored_sha256": "440582386baddf4ef60d4fad5298ce8970c22cb5d07acd2ff3578c3736077ebc"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-4iPJ/sell-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 752,
+      "raw_sha256": "976327363b321b46e6261e51d1644b6fc122e055ab027154e458d7cf4417e397",
+      "source_file": "pump-metadata-current-4iPJ/sell-accounts16.receipt.json",
+      "stored_bytes": 752,
+      "stored_sha256": "976327363b321b46e6261e51d1644b6fc122e055ab027154e458d7cf4417e397"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1872,
+      "raw_sha256": "2d9ed5d3a503c1f6f65569031b6c459afd184b99181930a25faa007916a34671",
+      "source_file": "pump-metadata-current-4iPJ/sell-accounts32.analysis.json",
+      "stored_bytes": 1872,
+      "stored_sha256": "2d9ed5d3a503c1f6f65569031b6c459afd184b99181930a25faa007916a34671"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 12657,
+      "raw_sha256": "f7c201e66d71c0e395ed72b8d470c4aba75c062d44441485d00d71d1cc76c66f",
+      "source_file": "pump-metadata-current-4iPJ/sell-accounts32.json",
+      "stored_bytes": 12657,
+      "stored_sha256": "f7c201e66d71c0e395ed72b8d470c4aba75c062d44441485d00d71d1cc76c66f"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 947,
+      "raw_sha256": "a278d318ec678584d1e8ff5772fb69d9a893a71d064f4db75152e6490f6d8263",
+      "source_file": "pump-metadata-current-4iPJ/sell-accounts32.receipt.json",
+      "stored_bytes": 947,
+      "stored_sha256": "a278d318ec678584d1e8ff5772fb69d9a893a71d064f4db75152e6490f6d8263"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "b22871fa070dd6ceee1f50075595298a772c6680b39e78d3a7753559ccdc80b5",
+      "source_file": "pump-metadata-current-4iPJ/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "b22871fa070dd6ceee1f50075595298a772c6680b39e78d3a7753559ccdc80b5"
+    },
+    {
+      "file": "pump-metadata-current-4iPJ/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "efc6307aa81cc8ca4884d2604915bfce9dc99ae17b7a38ef89069d04c62b975e",
+      "source_file": "pump-metadata-current-4iPJ/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "efc6307aa81cc8ca4884d2604915bfce9dc99ae17b7a38ef89069d04c62b975e"
+    },
+    {
+      "file": "pump-metadata-current-8GV/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 10886,
+      "raw_sha256": "dffe2a6b859e639471f0b7fa94ec728e6b12fbe17cc72ea1871ad063b5ba78fd",
+      "source_file": "pump-metadata-current-8GV/accounts.manifest.json",
+      "stored_bytes": 10886,
+      "stored_sha256": "dffe2a6b859e639471f0b7fa94ec728e6b12fbe17cc72ea1871ad063b5ba78fd"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-8GV/buy-0-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "3403da3a502f79ecb9e730fae13a8817e491e14df9e40b3bb070fce206ee180c",
+      "source_file": "pump-metadata-current-8GV/buy-0-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "3403da3a502f79ecb9e730fae13a8817e491e14df9e40b3bb070fce206ee180c"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-0-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1880,
+      "raw_sha256": "56e62b0a48402196bbd6c034a0155119adfa3b2d3a0c0e5652ea4d4977009281",
+      "source_file": "pump-metadata-current-8GV/buy-0-accounts32.analysis.json",
+      "stored_bytes": 1880,
+      "stored_sha256": "56e62b0a48402196bbd6c034a0155119adfa3b2d3a0c0e5652ea4d4977009281"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-0-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13301,
+      "raw_sha256": "76251f26e005f7bec47b3bcd2fcab7f8fdd5ad6a270c10b71e4370555c0b2e6c",
+      "source_file": "pump-metadata-current-8GV/buy-0-accounts32.json",
+      "stored_bytes": 13301,
+      "stored_sha256": "76251f26e005f7bec47b3bcd2fcab7f8fdd5ad6a270c10b71e4370555c0b2e6c"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-0-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "aa038762ddfac741c88bb593296cf9a584fb7772d69043ad4db88c5853b4dd00",
+      "source_file": "pump-metadata-current-8GV/buy-0-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "aa038762ddfac741c88bb593296cf9a584fb7772d69043ad4db88c5853b4dd00"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-8GV/buy-1-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "4b57401282071d9023b433bf6f1d5aade03c9c1b38deecc05087a2fd65b5cb16",
+      "source_file": "pump-metadata-current-8GV/buy-1-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "4b57401282071d9023b433bf6f1d5aade03c9c1b38deecc05087a2fd65b5cb16"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-1-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1880,
+      "raw_sha256": "8ac70a72dad31f2581437f6e370050345cb9650f274ec8a9a0c19a12290e99c4",
+      "source_file": "pump-metadata-current-8GV/buy-1-accounts32.analysis.json",
+      "stored_bytes": 1880,
+      "stored_sha256": "8ac70a72dad31f2581437f6e370050345cb9650f274ec8a9a0c19a12290e99c4"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-1-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13301,
+      "raw_sha256": "170f9ee2bddffe46c80a19e7d1eab767b705ebd2a0f611db2101b9f5c6384eb4",
+      "source_file": "pump-metadata-current-8GV/buy-1-accounts32.json",
+      "stored_bytes": 13301,
+      "stored_sha256": "170f9ee2bddffe46c80a19e7d1eab767b705ebd2a0f611db2101b9f5c6384eb4"
+    },
+    {
+      "file": "pump-metadata-current-8GV/buy-1-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "1eb1417645cde1d29b42a5fbbca0f9c582bf01ad259aa97b016bdfc5e2c5631f",
+      "source_file": "pump-metadata-current-8GV/buy-1-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "1eb1417645cde1d29b42a5fbbca0f9c582bf01ad259aa97b016bdfc5e2c5631f"
+    },
+    {
+      "file": "pump-metadata-current-8GV/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3858225,
+      "raw_sha256": "9415dadd8b9d2e252f4847534c5508c7f0c0ce43ce3e142254edbfa5e97c7e16",
+      "source_file": "pump-metadata-current-8GV/dependency-accounts-1.json",
+      "stored_bytes": 619760,
+      "stored_sha256": "1913275fe073a56f65000bd1fd5b6158758db0a5bbcb0df0009e2d48658972c1"
+    },
+    {
+      "file": "pump-metadata-current-8GV/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "1806215dc0949997d2422e18d4478d77a3f09adc5d5ff5cf305ac9de8ae43bca",
+      "source_file": "pump-metadata-current-8GV/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "1806215dc0949997d2422e18d4478d77a3f09adc5d5ff5cf305ac9de8ae43bca"
+    },
+    {
+      "file": "pump-metadata-current-8GV/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 334,
+      "raw_sha256": "9063f697963d01a0a0ccce86b060015c1b54aaae3b721bc739d0c102b7ad1abe",
+      "source_file": "pump-metadata-current-8GV/mint-eligibility.json",
+      "stored_bytes": 334,
+      "stored_sha256": "9063f697963d01a0a0ccce86b060015c1b54aaae3b721bc739d0c102b7ad1abe"
+    },
+    {
+      "file": "pump-metadata-current-8GV/physical-bounds.json",
+      "gzip": false,
+      "raw_bytes": 521,
+      "raw_sha256": "6c7a558992c5cb8fa045286f8d7d50bb63cc5833df6ec3e09de613cd591c17eb",
+      "source_file": "pump-metadata-current-8GV/physical-bounds.json",
+      "stored_bytes": 521,
+      "stored_sha256": "6c7a558992c5cb8fa045286f8d7d50bb63cc5833df6ec3e09de613cd591c17eb"
+    },
+    {
+      "file": "pump-metadata-current-8GV/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "94caff9bfdb661ea2b3e5e6ed598acf9a040d991127830ec25f4e0088d70f67a",
+      "source_file": "pump-metadata-current-8GV/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "e1b884e070ce2bf4b4c46c5d70bf9f511fffb976097297caba9b30db4024fcc8"
+    },
+    {
+      "file": "pump-metadata-current-8GV/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "e4d212b05fa9adc9e220d39cb5ea22e4367f811bc5b24e32ba4b0139dd942aca",
+      "source_file": "pump-metadata-current-8GV/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "e4d212b05fa9adc9e220d39cb5ea22e4367f811bc5b24e32ba4b0139dd942aca"
+    },
+    {
+      "file": "pump-metadata-current-8GV/programdata-accounts-4.json.gz",
+      "gzip": true,
+      "raw_bytes": 13981281,
+      "raw_sha256": "320d68e17311f47566a1ed1a957f4fde0b5893b90dd97dadf98d265606990f01",
+      "source_file": "pump-metadata-current-8GV/programdata-accounts-4.json",
+      "stored_bytes": 597170,
+      "stored_sha256": "17ece9e3b58d07087e3b091e28ee5fba126c4c7aebd8606d73d701f401dca444"
+    },
+    {
+      "file": "pump-metadata-current-8GV/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "7b3e89c81f32760d26f9bb1022a761a0b5b076551f2fef002aabd53de54db7f9",
+      "source_file": "pump-metadata-current-8GV/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "7b3e89c81f32760d26f9bb1022a761a0b5b076551f2fef002aabd53de54db7f9"
+    },
+    {
+      "file": "pump-metadata-current-8GV/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 710,
+      "raw_sha256": "177024a34280ce012976d6fdcb610ab228162cc0c9165ca7f4c34d5eb33b2f66",
+      "source_file": "pump-metadata-current-8GV/public-binding.json",
+      "stored_bytes": 710,
+      "stored_sha256": "177024a34280ce012976d6fdcb610ab228162cc0c9165ca7f4c34d5eb33b2f66"
+    },
+    {
+      "file": "pump-metadata-current-8GV/qualification.json",
+      "gzip": false,
+      "raw_bytes": 17594,
+      "raw_sha256": "fdeafb2acb717238c9cdef6d8be138737657929f63de7e6903ceee3963860ca4",
+      "source_file": "pump-metadata-current-8GV/qualification.json",
+      "stored_bytes": 17594,
+      "stored_sha256": "fdeafb2acb717238c9cdef6d8be138737657929f63de7e6903ceee3963860ca4"
+    },
+    {
+      "file": "pump-metadata-current-8GV/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3874854,
+      "raw_sha256": "9c8fe62c7f690755a5011ca297b8ed258a3849d67af649b98310a37e34a60a4f",
+      "source_file": "pump-metadata-current-8GV/route-accounts-3.json",
+      "stored_bytes": 628686,
+      "stored_sha256": "615fa0a85e59e0cd1690ddcf3cb609169476dcde53b573f3d27de1d37381621c"
+    },
+    {
+      "file": "pump-metadata-current-8GV/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1903,
+      "raw_sha256": "528bb038da0d412be21626632f3b84832e204a2543561599423cbe93d45991bd",
+      "source_file": "pump-metadata-current-8GV/route-accounts-3.receipt.json",
+      "stored_bytes": 1903,
+      "stored_sha256": "528bb038da0d412be21626632f3b84832e204a2543561599423cbe93d45991bd"
+    },
+    {
+      "file": "pump-metadata-current-8GV/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-8GV/sell-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-8GV/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 752,
+      "raw_sha256": "eac3ddb08a02b53beee4af52c8d92df7a7d39434e032ce9d05cb5ac30a2cbb8d",
+      "source_file": "pump-metadata-current-8GV/sell-accounts16.receipt.json",
+      "stored_bytes": 752,
+      "stored_sha256": "eac3ddb08a02b53beee4af52c8d92df7a7d39434e032ce9d05cb5ac30a2cbb8d"
+    },
+    {
+      "file": "pump-metadata-current-8GV/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1881,
+      "raw_sha256": "bfdd03877850b9525add7da810655d13938804a1ce3bef4b58d91f47f4b66dd7",
+      "source_file": "pump-metadata-current-8GV/sell-accounts32.analysis.json",
+      "stored_bytes": 1881,
+      "stored_sha256": "bfdd03877850b9525add7da810655d13938804a1ce3bef4b58d91f47f4b66dd7"
+    },
+    {
+      "file": "pump-metadata-current-8GV/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 12636,
+      "raw_sha256": "9f9a38a331615ef1f275ae92de7cec065f6059e171e2778a35b1d6a4c494845d",
+      "source_file": "pump-metadata-current-8GV/sell-accounts32.json",
+      "stored_bytes": 12636,
+      "stored_sha256": "9f9a38a331615ef1f275ae92de7cec065f6059e171e2778a35b1d6a4c494845d"
+    },
+    {
+      "file": "pump-metadata-current-8GV/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 947,
+      "raw_sha256": "67239d525b62e4d40299cf292da849dec01942a92bb4f3210604d22dbf522bf4",
+      "source_file": "pump-metadata-current-8GV/sell-accounts32.receipt.json",
+      "stored_bytes": 947,
+      "stored_sha256": "67239d525b62e4d40299cf292da849dec01942a92bb4f3210604d22dbf522bf4"
+    },
+    {
+      "file": "pump-metadata-current-8GV/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "8b18732112abb84ce23cdd593cd3e427871778c30cf0e3849c3eadc40cd0620b",
+      "source_file": "pump-metadata-current-8GV/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "8b18732112abb84ce23cdd593cd3e427871778c30cf0e3849c3eadc40cd0620b"
+    },
+    {
+      "file": "pump-metadata-current-8GV/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "8808d32f5e46f676fdfeee7a0306430f9eef85924b4d730221d05380590fe7af",
+      "source_file": "pump-metadata-current-8GV/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "8808d32f5e46f676fdfeee7a0306430f9eef85924b4d730221d05380590fe7af"
+    },
+    {
+      "file": "pump-metadata-current-Em4/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-Em4/buy-0-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-Em4/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 748,
+      "raw_sha256": "533cc234452abc78f77d485cea800b9d7714be5463ee75fe7ec8647ae4f940e0",
+      "source_file": "pump-metadata-current-Em4/buy-0-accounts16.receipt.json",
+      "stored_bytes": 748,
+      "stored_sha256": "533cc234452abc78f77d485cea800b9d7714be5463ee75fe7ec8647ae4f940e0"
+    },
+    {
+      "file": "pump-metadata-current-Em4/buy-0-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 103,
+      "raw_sha256": "e0012305bbe488f858f0cf9c5b4bbe1a874725cff7bd068607cd396434d9a2a1",
+      "source_file": "pump-metadata-current-Em4/buy-0-accounts32.json",
+      "stored_bytes": 103,
+      "stored_sha256": "e0012305bbe488f858f0cf9c5b4bbe1a874725cff7bd068607cd396434d9a2a1"
+    },
+    {
+      "file": "pump-metadata-current-Em4/buy-0-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "d2ef1f6ac6642e8069e902cf661ef69c0f0f34d7dc1dbeaaed77dc9d046bc33d",
+      "source_file": "pump-metadata-current-Em4/buy-0-accounts32.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "d2ef1f6ac6642e8069e902cf661ef69c0f0f34d7dc1dbeaaed77dc9d046bc33d"
+    },
+    {
+      "file": "pump-metadata-current-Em4/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "56366da2aa05cc4b60e8e37fd2584e1e7e9250ea1cdd44ac49b91af6d43a5dcb",
+      "source_file": "pump-metadata-current-Em4/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "56366da2aa05cc4b60e8e37fd2584e1e7e9250ea1cdd44ac49b91af6d43a5dcb"
+    },
+    {
+      "file": "pump-metadata-current-Em4/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 334,
+      "raw_sha256": "693fb3b1a6e53a4dee3372ff59242a35cf743d9ec0ab5fc3939853116886ca83",
+      "source_file": "pump-metadata-current-Em4/mint-eligibility.json",
+      "stored_bytes": 334,
+      "stored_sha256": "693fb3b1a6e53a4dee3372ff59242a35cf743d9ec0ab5fc3939853116886ca83"
+    },
+    {
+      "file": "pump-metadata-current-Em4/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "d2d58f8fb2089181ca9d133907bcdc27eb9c4c94af92e4e117cbc39239ae5c88",
+      "source_file": "pump-metadata-current-Em4/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "d2d58f8fb2089181ca9d133907bcdc27eb9c4c94af92e4e117cbc39239ae5c88"
+    },
+    {
+      "file": "pump-metadata-current-Em4/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "d74e85e4a4a352558a9b0798ef995ab2bb19b39cbc4dad47bca780895bf25717",
+      "source_file": "pump-metadata-current-Em4/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "d74e85e4a4a352558a9b0798ef995ab2bb19b39cbc4dad47bca780895bf25717"
+    },
+    {
+      "file": "pump-metadata-current-Em4/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-current-Em4/sell-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-current-Em4/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 753,
+      "raw_sha256": "cdc3eae1acaeefb8d3a81c4a99fa32b241804dfc2951fc2ea5bd8637c11d404c",
+      "source_file": "pump-metadata-current-Em4/sell-accounts16.receipt.json",
+      "stored_bytes": 753,
+      "stored_sha256": "cdc3eae1acaeefb8d3a81c4a99fa32b241804dfc2951fc2ea5bd8637c11d404c"
+    },
+    {
+      "file": "pump-metadata-current-Em4/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1881,
+      "raw_sha256": "69f0b5dfb74e7f6917ee190df313e7bdfa2e6a296abd74c65688391843910534",
+      "source_file": "pump-metadata-current-Em4/sell-accounts32.analysis.json",
+      "stored_bytes": 1881,
+      "stored_sha256": "69f0b5dfb74e7f6917ee190df313e7bdfa2e6a296abd74c65688391843910534"
+    },
+    {
+      "file": "pump-metadata-current-Em4/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 12666,
+      "raw_sha256": "ecc42ba34d280aff773b9d2a160593d3481d7bb88f30e902e3c48153961a6a8a",
+      "source_file": "pump-metadata-current-Em4/sell-accounts32.json",
+      "stored_bytes": 12666,
+      "stored_sha256": "ecc42ba34d280aff773b9d2a160593d3481d7bb88f30e902e3c48153961a6a8a"
+    },
+    {
+      "file": "pump-metadata-current-Em4/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 948,
+      "raw_sha256": "519e7f91a802f126aa8a84b9f35f58c45d5492ee8e74f0511a3d952e059ef745",
+      "source_file": "pump-metadata-current-Em4/sell-accounts32.receipt.json",
+      "stored_bytes": 948,
+      "stored_sha256": "519e7f91a802f126aa8a84b9f35f58c45d5492ee8e74f0511a3d952e059ef745"
+    },
+    {
+      "file": "pump-metadata-production/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 10884,
+      "raw_sha256": "137d6dc7882bac0835b7774311e033402c3f7538a481a51ed266ca3ed6a709bb",
+      "source_file": "pump-metadata-production/accounts.manifest.json",
+      "stored_bytes": 10884,
+      "stored_sha256": "137d6dc7882bac0835b7774311e033402c3f7538a481a51ed266ca3ed6a709bb"
+    },
+    {
+      "file": "pump-metadata-production/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-production/buy-0-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-production/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "7335ad363b1f32265b6f2ee8e8673c331e1771ed43ce063231060031fafd5a7c",
+      "source_file": "pump-metadata-production/buy-0-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "7335ad363b1f32265b6f2ee8e8673c331e1771ed43ce063231060031fafd5a7c"
+    },
+    {
+      "file": "pump-metadata-production/buy-0-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1883,
+      "raw_sha256": "d70f671bf054084ad027770a5f0e55852adb8acf29072dff75d2a15e8ed24c61",
+      "source_file": "pump-metadata-production/buy-0-accounts32.analysis.json",
+      "stored_bytes": 1883,
+      "stored_sha256": "d70f671bf054084ad027770a5f0e55852adb8acf29072dff75d2a15e8ed24c61"
+    },
+    {
+      "file": "pump-metadata-production/buy-0-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13303,
+      "raw_sha256": "7f118415d53449a3a866ade6cd71c7deb177227d2db9580030c63e1c22265c70",
+      "source_file": "pump-metadata-production/buy-0-accounts32.json",
+      "stored_bytes": 13303,
+      "stored_sha256": "7f118415d53449a3a866ade6cd71c7deb177227d2db9580030c63e1c22265c70"
+    },
+    {
+      "file": "pump-metadata-production/buy-0-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "d4ea2443c88fde93a655f027f2d5c959270ce499cf05e8177cc6be19068e5674",
+      "source_file": "pump-metadata-production/buy-0-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "d4ea2443c88fde93a655f027f2d5c959270ce499cf05e8177cc6be19068e5674"
+    },
+    {
+      "file": "pump-metadata-production/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-production/buy-1-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-production/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 749,
+      "raw_sha256": "959ec8706935da9e025b0b68209afce1a778eeb490a14b39d2db20d4539adf8c",
+      "source_file": "pump-metadata-production/buy-1-accounts16.receipt.json",
+      "stored_bytes": 749,
+      "stored_sha256": "959ec8706935da9e025b0b68209afce1a778eeb490a14b39d2db20d4539adf8c"
+    },
+    {
+      "file": "pump-metadata-production/buy-1-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1884,
+      "raw_sha256": "ffda02bfab2ea8d5c913ca73a5c82005081b9716ac84dc66015e3c1cd62739ef",
+      "source_file": "pump-metadata-production/buy-1-accounts32.analysis.json",
+      "stored_bytes": 1884,
+      "stored_sha256": "ffda02bfab2ea8d5c913ca73a5c82005081b9716ac84dc66015e3c1cd62739ef"
+    },
+    {
+      "file": "pump-metadata-production/buy-1-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 13304,
+      "raw_sha256": "79d7676cb9ed4fb3778d68edf6d22288bb8299a0631bd1cf2e17ba086eb32a24",
+      "source_file": "pump-metadata-production/buy-1-accounts32.json",
+      "stored_bytes": 13304,
+      "stored_sha256": "79d7676cb9ed4fb3778d68edf6d22288bb8299a0631bd1cf2e17ba086eb32a24"
+    },
+    {
+      "file": "pump-metadata-production/buy-1-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "00bfc9508eb4ee131d7c52ae3c4f5f0729c17a9968225c74b2aec1585def7ce8",
+      "source_file": "pump-metadata-production/buy-1-accounts32.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "00bfc9508eb4ee131d7c52ae3c4f5f0729c17a9968225c74b2aec1585def7ce8"
+    },
+    {
+      "file": "pump-metadata-production/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3858225,
+      "raw_sha256": "59b483d58b375956dad898e3603638dce4c892ef802b06334441cafc82ccfb10",
+      "source_file": "pump-metadata-production/dependency-accounts-1.json",
+      "stored_bytes": 619763,
+      "stored_sha256": "5ac6eabbd0f8c23cb9d9856e61c84ca128da0862f7f50470d94d22c59c57193a"
+    },
+    {
+      "file": "pump-metadata-production/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "b2fac411d0ef1ea997e30cbcf4bbafdb53764da578b82e94744f52c1c661fbea",
+      "source_file": "pump-metadata-production/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "b2fac411d0ef1ea997e30cbcf4bbafdb53764da578b82e94744f52c1c661fbea"
+    },
+    {
+      "file": "pump-metadata-production/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 334,
+      "raw_sha256": "686208b307153b557b2a619e3a96de6794677714023aa2d7cb569af509ea4fb0",
+      "source_file": "pump-metadata-production/mint-eligibility.json",
+      "stored_bytes": 334,
+      "stored_sha256": "686208b307153b557b2a619e3a96de6794677714023aa2d7cb569af509ea4fb0"
+    },
+    {
+      "file": "pump-metadata-production/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "f2febb76cd0d52be36a876731f62d669df4b68e65c23ab18a5aa43ec35f8846f",
+      "source_file": "pump-metadata-production/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "d4e150e526920cd0ffd78693678e844cd7751dd94a0bf619bdc2ef22ca449ec0"
+    },
+    {
+      "file": "pump-metadata-production/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "5049ac30df476c9c4887f9724b690dbe92a62dee97cd499b6d3ae6f53fdab683",
+      "source_file": "pump-metadata-production/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "5049ac30df476c9c4887f9724b690dbe92a62dee97cd499b6d3ae6f53fdab683"
+    },
+    {
+      "file": "pump-metadata-production/programdata-accounts-4.json.gz",
+      "gzip": true,
+      "raw_bytes": 13981281,
+      "raw_sha256": "bcd761a0a6bb5a56693e47c3c097e027acccd133824e2d9019d2ebb2b9f372c6",
+      "source_file": "pump-metadata-production/programdata-accounts-4.json",
+      "stored_bytes": 597170,
+      "stored_sha256": "8334ce84cb02b6f37cd844130886e996d69609658db611a947b7de079411d82d"
+    },
+    {
+      "file": "pump-metadata-production/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 690,
+      "raw_sha256": "69f2dc80665b7610e9dbcb4d86b314afca09e29ddf5cf9f16529ecbdc0bcec69",
+      "source_file": "pump-metadata-production/programdata-accounts-4.receipt.json",
+      "stored_bytes": 690,
+      "stored_sha256": "69f2dc80665b7610e9dbcb4d86b314afca09e29ddf5cf9f16529ecbdc0bcec69"
+    },
+    {
+      "file": "pump-metadata-production/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "f298d13f3cd78b0df211a6b47b978f4ffc287555252416898ecd868b0b16a1bb",
+      "source_file": "pump-metadata-production/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "f298d13f3cd78b0df211a6b47b978f4ffc287555252416898ecd868b0b16a1bb"
+    },
+    {
+      "file": "pump-metadata-production/qualification.json",
+      "gzip": false,
+      "raw_bytes": 17596,
+      "raw_sha256": "2c3d4dea68b6be68ac406aa0c24919f83128a9e6126a24bcf3b512d23130b705",
+      "source_file": "pump-metadata-production/qualification.json",
+      "stored_bytes": 17596,
+      "stored_sha256": "2c3d4dea68b6be68ac406aa0c24919f83128a9e6126a24bcf3b512d23130b705"
+    },
+    {
+      "file": "pump-metadata-production/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3874852,
+      "raw_sha256": "4c833af80f5673ff7c5cb0bf6f69f22c60e579aa97d532b82dd35a1e4bc86d78",
+      "source_file": "pump-metadata-production/route-accounts-3.json",
+      "stored_bytes": 628621,
+      "stored_sha256": "8059c15e3eee8949ac0f8632a4eb35ec525884929242ab45be2506bd835e6d95"
+    },
+    {
+      "file": "pump-metadata-production/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1903,
+      "raw_sha256": "0cd95f8b50d0d0aa3f36f631f292a814b1135c550a969eab98661b00649afe9b",
+      "source_file": "pump-metadata-production/route-accounts-3.receipt.json",
+      "stored_bytes": 1903,
+      "stored_sha256": "0cd95f8b50d0d0aa3f36f631f292a814b1135c550a969eab98661b00649afe9b"
+    },
+    {
+      "file": "pump-metadata-production/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27,
+      "raw_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685",
+      "source_file": "pump-metadata-production/sell-accounts16.json",
+      "stored_bytes": 27,
+      "stored_sha256": "b5b9d3c7197aa4036a4770857f8592faf8ff76bd911fc751aba78e00b38fd685"
+    },
+    {
+      "file": "pump-metadata-production/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 753,
+      "raw_sha256": "9fd372a5ec389b55c3c7c69c5034dadf1e80804df33e8538ba91097a8465d2c3",
+      "source_file": "pump-metadata-production/sell-accounts16.receipt.json",
+      "stored_bytes": 753,
+      "stored_sha256": "9fd372a5ec389b55c3c7c69c5034dadf1e80804df33e8538ba91097a8465d2c3"
+    },
+    {
+      "file": "pump-metadata-production/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1875,
+      "raw_sha256": "647ca595b2da40baa34ebe843411d25555ec6940c1ebdc0cd4888806661e3c2c",
+      "source_file": "pump-metadata-production/sell-accounts32.analysis.json",
+      "stored_bytes": 1875,
+      "stored_sha256": "647ca595b2da40baa34ebe843411d25555ec6940c1ebdc0cd4888806661e3c2c"
+    },
+    {
+      "file": "pump-metadata-production/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 12659,
+      "raw_sha256": "61cf759a172bae392db215febf00bc6d295b5bcc7882ccca6479ce121b2b55ff",
+      "source_file": "pump-metadata-production/sell-accounts32.json",
+      "stored_bytes": 12659,
+      "stored_sha256": "61cf759a172bae392db215febf00bc6d295b5bcc7882ccca6479ce121b2b55ff"
+    },
+    {
+      "file": "pump-metadata-production/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 948,
+      "raw_sha256": "8e14b8577ad3a32c45871f0b7159002f4fe9762a11a4bc6f4d09e0c1ec0562e6",
+      "source_file": "pump-metadata-production/sell-accounts32.receipt.json",
+      "stored_bytes": 948,
+      "stored_sha256": "8e14b8577ad3a32c45871f0b7159002f4fe9762a11a4bc6f4d09e0c1ec0562e6"
+    },
+    {
+      "file": "pump-metadata-production/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "07e450f65218c7df097575245ffe32239b1580526cf9b0416d6c4aa2d61901ef",
+      "source_file": "pump-metadata-production/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "07e450f65218c7df097575245ffe32239b1580526cf9b0416d6c4aa2d61901ef"
+    },
+    {
+      "file": "pump-metadata-production/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "d542939400fb4dcf037163f8934a78a658ed5401838ae7d2d4f34404bc54ce35",
+      "source_file": "pump-metadata-production/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "d542939400fb4dcf037163f8934a78a658ed5401838ae7d2d4f34404bc54ce35"
+    },
+    {
+      "file": "ray-clmm-diagnostic/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 12251,
+      "raw_sha256": "802eb42116fcac0fa26dc9c321a593736b56e009ce385ad22ec188e30731d55b",
+      "source_file": "ray-clmm-diagnostic/accounts.manifest.json",
+      "stored_bytes": 12251,
+      "stored_sha256": "802eb42116fcac0fa26dc9c321a593736b56e009ce385ad22ec188e30731d55b"
+    },
+    {
+      "file": "ray-clmm-diagnostic/buy-0-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1876,
+      "raw_sha256": "74d42c376a2e6a402f13f91f784b83c46fe492a2fee83ff1472c757b89a93f2e",
+      "source_file": "ray-clmm-diagnostic/buy-0-accounts16.analysis.json",
+      "stored_bytes": 1876,
+      "stored_sha256": "74d42c376a2e6a402f13f91f784b83c46fe492a2fee83ff1472c757b89a93f2e"
+    },
+    {
+      "file": "ray-clmm-diagnostic/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16510,
+      "raw_sha256": "10bb544b4398db3be759d58bc67512aca3b1fcbff3e4978b2397a9ee081ab0e8",
+      "source_file": "ray-clmm-diagnostic/buy-0-accounts16.json",
+      "stored_bytes": 16510,
+      "stored_sha256": "10bb544b4398db3be759d58bc67512aca3b1fcbff3e4978b2397a9ee081ab0e8"
+    },
+    {
+      "file": "ray-clmm-diagnostic/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "6b0552969823750f2d4ec478bdbc6c8616969669e990060e72e0f5b9473b23de",
+      "source_file": "ray-clmm-diagnostic/buy-0-accounts16.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "6b0552969823750f2d4ec478bdbc6c8616969669e990060e72e0f5b9473b23de"
+    },
+    {
+      "file": "ray-clmm-diagnostic/buy-1-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1873,
+      "raw_sha256": "840135240c7ebccb6f3bf0f8f1d6f4d2cc37ced5ff916aa7e3cb01a1bf4a852e",
+      "source_file": "ray-clmm-diagnostic/buy-1-accounts16.analysis.json",
+      "stored_bytes": 1873,
+      "stored_sha256": "840135240c7ebccb6f3bf0f8f1d6f4d2cc37ced5ff916aa7e3cb01a1bf4a852e"
+    },
+    {
+      "file": "ray-clmm-diagnostic/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16507,
+      "raw_sha256": "826db502634b133999b2e12215ebf4ed82ca5722d0037f6e34d9211b022f26d3",
+      "source_file": "ray-clmm-diagnostic/buy-1-accounts16.json",
+      "stored_bytes": 16507,
+      "stored_sha256": "826db502634b133999b2e12215ebf4ed82ca5722d0037f6e34d9211b022f26d3"
+    },
+    {
+      "file": "ray-clmm-diagnostic/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "dd90b018f373c4b55d791c121837741be55c19b9b89a7bcb876135558bd221b5",
+      "source_file": "ray-clmm-diagnostic/buy-1-accounts16.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "dd90b018f373c4b55d791c121837741be55c19b9b89a7bcb876135558bd221b5"
+    },
+    {
+      "file": "ray-clmm-diagnostic/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "d11e99a85eadffbb5dbe72450c59e5a4d8cb30ade3362a59c856601851dea68a",
+      "source_file": "ray-clmm-diagnostic/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "d11e99a85eadffbb5dbe72450c59e5a4d8cb30ade3362a59c856601851dea68a"
+    },
+    {
+      "file": "ray-clmm-diagnostic/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 323,
+      "raw_sha256": "e023cea088c8c171381fa308ee2c7f3a8ee24aaa9d46fa688f46c61c954a6ba6",
+      "source_file": "ray-clmm-diagnostic/mint-eligibility.json",
+      "stored_bytes": 323,
+      "stored_sha256": "e023cea088c8c171381fa308ee2c7f3a8ee24aaa9d46fa688f46c61c954a6ba6"
+    },
+    {
+      "file": "ray-clmm-diagnostic/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "3d10e8bc32dd4e624b5908e51221bea6b56719575d370751e29b6896c130b79f",
+      "source_file": "ray-clmm-diagnostic/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "3d10e8bc32dd4e624b5908e51221bea6b56719575d370751e29b6896c130b79f"
+    },
+    {
+      "file": "ray-clmm-diagnostic/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 688,
+      "raw_sha256": "c874de6ce3141803e75f50f092e981dd44efad00c4bf2f04530d6084ad4f61b6",
+      "source_file": "ray-clmm-diagnostic/programdata-accounts-4.receipt.json",
+      "stored_bytes": 688,
+      "stored_sha256": "c874de6ce3141803e75f50f092e981dd44efad00c4bf2f04530d6084ad4f61b6"
+    },
+    {
+      "file": "ray-clmm-diagnostic/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce",
+      "source_file": "ray-clmm-diagnostic/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce"
+    },
+    {
+      "file": "ray-clmm-diagnostic/qualification.json",
+      "gzip": false,
+      "raw_bytes": 15072,
+      "raw_sha256": "f2b950eaf90ca43b5cf60b00bf4239083b35db454bf13cc0b3a5d0358881dc3c",
+      "source_file": "ray-clmm-diagnostic/qualification.json",
+      "stored_bytes": 15072,
+      "stored_sha256": "f2b950eaf90ca43b5cf60b00bf4239083b35db454bf13cc0b3a5d0358881dc3c"
+    },
+    {
+      "file": "ray-clmm-diagnostic/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 2028,
+      "raw_sha256": "58d2fb64acc4ebba2fdd407416692cd8b2b64dabf806eb610b95af0e4314ead8",
+      "source_file": "ray-clmm-diagnostic/route-accounts-3.receipt.json",
+      "stored_bytes": 2028,
+      "stored_sha256": "58d2fb64acc4ebba2fdd407416692cd8b2b64dabf806eb610b95af0e4314ead8"
+    },
+    {
+      "file": "ray-clmm-diagnostic/sell-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1872,
+      "raw_sha256": "679f955796dea3205da50d0703ceececd08637259cb11cbd89680743fb3383fc",
+      "source_file": "ray-clmm-diagnostic/sell-accounts16.analysis.json",
+      "stored_bytes": 1872,
+      "stored_sha256": "679f955796dea3205da50d0703ceececd08637259cb11cbd89680743fb3383fc"
+    },
+    {
+      "file": "ray-clmm-diagnostic/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 15899,
+      "raw_sha256": "80d9cacb6a299464a25a803258a6780360cf1055dea6911a6ae1bc68daf642d2",
+      "source_file": "ray-clmm-diagnostic/sell-accounts16.json",
+      "stored_bytes": 15899,
+      "stored_sha256": "80d9cacb6a299464a25a803258a6780360cf1055dea6911a6ae1bc68daf642d2"
+    },
+    {
+      "file": "ray-clmm-diagnostic/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 942,
+      "raw_sha256": "618087bfa4266241850cbaa862b9ae2ba5b26a4fb026d4d2410e202d9cbd2e7b",
+      "source_file": "ray-clmm-diagnostic/sell-accounts16.receipt.json",
+      "stored_bytes": 942,
+      "stored_sha256": "618087bfa4266241850cbaa862b9ae2ba5b26a4fb026d4d2410e202d9cbd2e7b"
+    },
+    {
+      "file": "ray-clmm-diagnostic/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "29eb6a910f4ed8dfca182783115d9f4dee98a679c00c7d6c4b367802e883a817",
+      "source_file": "ray-clmm-diagnostic/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "29eb6a910f4ed8dfca182783115d9f4dee98a679c00c7d6c4b367802e883a817"
+    },
+    {
+      "file": "ray-clmm-diagnostic/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "c232e53fbb0bb14e4b748a045bab4f64736d2014bf436cef6a2077b260ba6688",
+      "source_file": "ray-clmm-diagnostic/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "c232e53fbb0bb14e4b748a045bab4f64736d2014bf436cef6a2077b260ba6688"
+    },
+    {
+      "file": "ray-production/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "1bf86520917ef0028915586c0ea4d228b988248e57b4696afda007666848c9a1",
+      "source_file": "ray-production/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "1bf86520917ef0028915586c0ea4d228b988248e57b4696afda007666848c9a1"
+    },
+    {
+      "file": "ray-production/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 323,
+      "raw_sha256": "182fd6f40790e7c7a41712ea14948e78cab71b1db05f389e15fd9d99325580dc",
+      "source_file": "ray-production/mint-eligibility.json",
+      "stored_bytes": 323,
+      "stored_sha256": "182fd6f40790e7c7a41712ea14948e78cab71b1db05f389e15fd9d99325580dc"
+    },
+    {
+      "file": "ray-production/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "d4d69c7f9a7332d8490d3c81d89401c17c875e2eb810581538ed65e07b53aa19",
+      "source_file": "ray-production/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "d4d69c7f9a7332d8490d3c81d89401c17c875e2eb810581538ed65e07b53aa19"
+    },
+    {
+      "file": "ray-production/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce",
+      "source_file": "ray-production/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce"
+    },
+    {
+      "file": "ray-production/sell-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 2271,
+      "raw_sha256": "86d792b220d9049f96e8176ea74cef259e51d3f5683a1cee3ae4933d3e023902",
+      "source_file": "ray-production/sell-accounts16.analysis.json",
+      "stored_bytes": 2271,
+      "stored_sha256": "86d792b220d9049f96e8176ea74cef259e51d3f5683a1cee3ae4933d3e023902"
+    },
+    {
+      "file": "ray-production/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 27927,
+      "raw_sha256": "09a1e7b5f09362af1dd9d435c41b0c7dd05349d8053e6879a79a741a027c225d",
+      "source_file": "ray-production/sell-accounts16.json",
+      "stored_bytes": 27927,
+      "stored_sha256": "09a1e7b5f09362af1dd9d435c41b0c7dd05349d8053e6879a79a741a027c225d"
+    },
+    {
+      "file": "ray-production/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "05175b8561a6d8d6f7c7571f349d3cb7f4374f9e18abbe03c7cdbb927e0c0866",
+      "source_file": "ray-production/sell-accounts16.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "05175b8561a6d8d6f7c7571f349d3cb7f4374f9e18abbe03c7cdbb927e0c0866"
+    },
+    {
+      "file": "ray-production/sell-accounts32.analysis.json",
+      "gzip": false,
+      "raw_bytes": 2652,
+      "raw_sha256": "6635c49cb93779524a9927ac6a132d7261d207c180e16438bf73c60791459f5b",
+      "source_file": "ray-production/sell-accounts32.analysis.json",
+      "stored_bytes": 2652,
+      "stored_sha256": "6635c49cb93779524a9927ac6a132d7261d207c180e16438bf73c60791459f5b"
+    },
+    {
+      "file": "ray-production/sell-accounts32.json",
+      "gzip": false,
+      "raw_bytes": 34976,
+      "raw_sha256": "9c02080ba6c14c8edcdffcd2f26bd2c3a2549f652016e9ab1de9ef384e944eb4",
+      "source_file": "ray-production/sell-accounts32.json",
+      "stored_bytes": 34976,
+      "stored_sha256": "9c02080ba6c14c8edcdffcd2f26bd2c3a2549f652016e9ab1de9ef384e944eb4"
+    },
+    {
+      "file": "ray-production/sell-accounts32.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "c02fba92ac783c253df363b20a39bcd7f6797b513147e70361a7eba032623ac2",
+      "source_file": "ray-production/sell-accounts32.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "c02fba92ac783c253df363b20a39bcd7f6797b513147e70361a7eba032623ac2"
+    },
+    {
+      "file": "ray-production-retry/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 15503,
+      "raw_sha256": "3b3d32b12ae1301569ff206dc9d3c6a16690f346e07846323658d0ec5d15dda9",
+      "source_file": "ray-production-retry/accounts.manifest.json",
+      "stored_bytes": 15503,
+      "stored_sha256": "3b3d32b12ae1301569ff206dc9d3c6a16690f346e07846323658d0ec5d15dda9"
+    },
+    {
+      "file": "ray-production-retry/buy-0-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1869,
+      "raw_sha256": "b601ca10a65c45db687f3f5423046fb28c16c391d5640cb1f61a0e23d863f040",
+      "source_file": "ray-production-retry/buy-0-accounts16.analysis.json",
+      "stored_bytes": 1869,
+      "stored_sha256": "b601ca10a65c45db687f3f5423046fb28c16c391d5640cb1f61a0e23d863f040"
+    },
+    {
+      "file": "ray-production-retry/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16503,
+      "raw_sha256": "053b8145ee15f8b55a6afc13d9a395e27856845dad77f158f3f4d3e6e693aada",
+      "source_file": "ray-production-retry/buy-0-accounts16.json",
+      "stored_bytes": 16503,
+      "stored_sha256": "053b8145ee15f8b55a6afc13d9a395e27856845dad77f158f3f4d3e6e693aada"
+    },
+    {
+      "file": "ray-production-retry/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "4ed321fb181258f9c30d3d7460298f1d0b7e06f0104936ceea847e203767e6ed",
+      "source_file": "ray-production-retry/buy-0-accounts16.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "4ed321fb181258f9c30d3d7460298f1d0b7e06f0104936ceea847e203767e6ed"
+    },
+    {
+      "file": "ray-production-retry/buy-1-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1875,
+      "raw_sha256": "d65dfa0d4484f9f7e4e0f4d71a8d3065b49acb0625e71d33b8acbea085f1f644",
+      "source_file": "ray-production-retry/buy-1-accounts16.analysis.json",
+      "stored_bytes": 1875,
+      "stored_sha256": "d65dfa0d4484f9f7e4e0f4d71a8d3065b49acb0625e71d33b8acbea085f1f644"
+    },
+    {
+      "file": "ray-production-retry/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16509,
+      "raw_sha256": "f295ca6916ce9f2baa55461da833fa7e055135da1382f71eb8f40b220a86454b",
+      "source_file": "ray-production-retry/buy-1-accounts16.json",
+      "stored_bytes": 16509,
+      "stored_sha256": "f295ca6916ce9f2baa55461da833fa7e055135da1382f71eb8f40b220a86454b"
+    },
+    {
+      "file": "ray-production-retry/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 944,
+      "raw_sha256": "d31fc74e625377fd0a0ffde3412e17bfe45eedb633f755d3eda56c82b6d5e992",
+      "source_file": "ray-production-retry/buy-1-accounts16.receipt.json",
+      "stored_bytes": 944,
+      "stored_sha256": "d31fc74e625377fd0a0ffde3412e17bfe45eedb633f755d3eda56c82b6d5e992"
+    },
+    {
+      "file": "ray-production-retry/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3857801,
+      "raw_sha256": "aaf6dda0b1fb9042337bf3a6cd890b40252fed63c72a09777a68b113ce848c80",
+      "source_file": "ray-production-retry/dependency-accounts-1.json",
+      "stored_bytes": 619550,
+      "stored_sha256": "1eede6b9e8469db0fe3222cbd96f104a7e768344fb13126868adcd8aa91d7f7c"
+    },
+    {
+      "file": "ray-production-retry/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "06828bef3fd14d264918eef51f337e3371bb5cdb39e03d6962dc156b1805dc85",
+      "source_file": "ray-production-retry/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "06828bef3fd14d264918eef51f337e3371bb5cdb39e03d6962dc156b1805dc85"
+    },
+    {
+      "file": "ray-production-retry/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 323,
+      "raw_sha256": "f69b4f80729a7ecb7c092b2782ddb2f245f405fb81453130dfe33f65fd9a5768",
+      "source_file": "ray-production-retry/mint-eligibility.json",
+      "stored_bytes": 323,
+      "stored_sha256": "f69b4f80729a7ecb7c092b2782ddb2f245f405fb81453130dfe33f65fd9a5768"
+    },
+    {
+      "file": "ray-production-retry/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "d2209d998432b864bcf998db3f3b90915555d44821849bb900a775a63141cef9",
+      "source_file": "ray-production-retry/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "45b2ca338869c25bcc36a7a4712bd8663671a8d1a643f29613b36da318f62c12"
+    },
+    {
+      "file": "ray-production-retry/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "e087cfdafbfc6d67558e5399ad54a8fa6655e4059a1d5efce19d43903f47ad7d",
+      "source_file": "ray-production-retry/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "e087cfdafbfc6d67558e5399ad54a8fa6655e4059a1d5efce19d43903f47ad7d"
+    },
+    {
+      "file": "ray-production-retry/programdata-accounts-4.json.gz",
+      "gzip": true,
+      "raw_bytes": 16248388,
+      "raw_sha256": "633dfaa789a29db39136d378360593d5f1394eed6fcbfade261baa53bb564563",
+      "source_file": "ray-production-retry/programdata-accounts-4.json",
+      "stored_bytes": 961536,
+      "stored_sha256": "fe0c0322a752150a4bec40e0f71f6df8fd0cfd85e83a7c511d172e79d0d14d04"
+    },
+    {
+      "file": "ray-production-retry/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "8175deffe458f12cdabd7837c1f39e22873025eb0c43e86ccbd3eef9648d2442",
+      "source_file": "ray-production-retry/programdata-accounts-4.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "8175deffe458f12cdabd7837c1f39e22873025eb0c43e86ccbd3eef9648d2442"
+    },
+    {
+      "file": "ray-production-retry/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce",
+      "source_file": "ray-production-retry/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce"
+    },
+    {
+      "file": "ray-production-retry/qualification.json",
+      "gzip": false,
+      "raw_bytes": 15544,
+      "raw_sha256": "fe50d12d664ff4ac1f04d53d3fbe98809a128b7a57b8beadd49ae6f46717828a",
+      "source_file": "ray-production-retry/qualification.json",
+      "stored_bytes": 15544,
+      "stored_sha256": "fe50d12d664ff4ac1f04d53d3fbe98809a128b7a57b8beadd49ae6f46717828a"
+    },
+    {
+      "file": "ray-production-retry/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3975579,
+      "raw_sha256": "c42400d779a1e3b527ee4941b0d772f1c2093f8b03733799d34ea536c351ad1a",
+      "source_file": "ray-production-retry/route-accounts-3.json",
+      "stored_bytes": 650013,
+      "stored_sha256": "631c211fad22f7d7468f73a60baf4102c7ea7b5c12006faa6d73aa469def45c9"
+    },
+    {
+      "file": "ray-production-retry/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 2418,
+      "raw_sha256": "6fed25264e84aaf0053f758027c736e9cbf0f7508dce663ad6c33561d4f1916d",
+      "source_file": "ray-production-retry/route-accounts-3.receipt.json",
+      "stored_bytes": 2418,
+      "stored_sha256": "6fed25264e84aaf0053f758027c736e9cbf0f7508dce663ad6c33561d4f1916d"
+    },
+    {
+      "file": "ray-production-retry/sell-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1866,
+      "raw_sha256": "523abb94780d3f3584d87e25753d8219508ba95a71bc89450cf34b250e1e4869",
+      "source_file": "ray-production-retry/sell-accounts16.analysis.json",
+      "stored_bytes": 1866,
+      "stored_sha256": "523abb94780d3f3584d87e25753d8219508ba95a71bc89450cf34b250e1e4869"
+    },
+    {
+      "file": "ray-production-retry/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 15352,
+      "raw_sha256": "a86c0836ebf520d9ee8dbed137cbdd5c7a9ed703297170c6880959e3423b449f",
+      "source_file": "ray-production-retry/sell-accounts16.json",
+      "stored_bytes": 15352,
+      "stored_sha256": "a86c0836ebf520d9ee8dbed137cbdd5c7a9ed703297170c6880959e3423b449f"
+    },
+    {
+      "file": "ray-production-retry/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 943,
+      "raw_sha256": "93a6526d7ba5da3a8a63b3c2da46601f8fb4621f70ee73dea086972026368cf4",
+      "source_file": "ray-production-retry/sell-accounts16.receipt.json",
+      "stored_bytes": 943,
+      "stored_sha256": "93a6526d7ba5da3a8a63b3c2da46601f8fb4621f70ee73dea086972026368cf4"
+    },
+    {
+      "file": "ray-production-retry/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "ed4d4f0c55f870e7d4fbb693596e50e04863c41934baa6533c05b52edf6127b5",
+      "source_file": "ray-production-retry/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "ed4d4f0c55f870e7d4fbb693596e50e04863c41934baa6533c05b52edf6127b5"
+    },
+    {
+      "file": "ray-production-retry/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "6d1a21b46cbbb8b526f8d045b64b9f0ab081924a223b8db12e552aa91364515d",
+      "source_file": "ray-production-retry/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "6d1a21b46cbbb8b526f8d045b64b9f0ab081924a223b8db12e552aa91364515d"
+    },
+    {
+      "file": "ray-scorch-negative/accounts.manifest.json",
+      "gzip": false,
+      "raw_bytes": 12324,
+      "raw_sha256": "68ec0d426ed6a43b2758741bceebdab574d8f56cf56c93bee49be0e385e34a7d",
+      "source_file": "ray-scorch-negative/accounts.manifest.json",
+      "stored_bytes": 12324,
+      "stored_sha256": "68ec0d426ed6a43b2758741bceebdab574d8f56cf56c93bee49be0e385e34a7d"
+    },
+    {
+      "file": "ray-scorch-negative/buy-0-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1856,
+      "raw_sha256": "d2060477626a05b3b4488554b2c7d8847dd6b7e8613879989f43ed5d15a3506d",
+      "source_file": "ray-scorch-negative/buy-0-accounts16.analysis.json",
+      "stored_bytes": 1856,
+      "stored_sha256": "d2060477626a05b3b4488554b2c7d8847dd6b7e8613879989f43ed5d15a3506d"
+    },
+    {
+      "file": "ray-scorch-negative/buy-0-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16410,
+      "raw_sha256": "14d9b4e68e72f5cf546c456972ee4923f9007806d1f433e90d9d75add9fada8f",
+      "source_file": "ray-scorch-negative/buy-0-accounts16.json",
+      "stored_bytes": 16410,
+      "stored_sha256": "14d9b4e68e72f5cf546c456972ee4923f9007806d1f433e90d9d75add9fada8f"
+    },
+    {
+      "file": "ray-scorch-negative/buy-0-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 937,
+      "raw_sha256": "c4a659146366cb0095e8e0202d1d8675469b412b62aa148b3391d9d5a0b31a15",
+      "source_file": "ray-scorch-negative/buy-0-accounts16.receipt.json",
+      "stored_bytes": 937,
+      "stored_sha256": "c4a659146366cb0095e8e0202d1d8675469b412b62aa148b3391d9d5a0b31a15"
+    },
+    {
+      "file": "ray-scorch-negative/buy-1-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1864,
+      "raw_sha256": "bd91ec51e682fe8d5ff0479ee59bc1fb70b229ca2f77000646eb06ea4d164db9",
+      "source_file": "ray-scorch-negative/buy-1-accounts16.analysis.json",
+      "stored_bytes": 1864,
+      "stored_sha256": "bd91ec51e682fe8d5ff0479ee59bc1fb70b229ca2f77000646eb06ea4d164db9"
+    },
+    {
+      "file": "ray-scorch-negative/buy-1-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 16447,
+      "raw_sha256": "743aac0e1a9811a6eb1f90acf97605a75fe1e1e6032c440d1c1dff1e1010724b",
+      "source_file": "ray-scorch-negative/buy-1-accounts16.json",
+      "stored_bytes": 16447,
+      "stored_sha256": "743aac0e1a9811a6eb1f90acf97605a75fe1e1e6032c440d1c1dff1e1010724b"
+    },
+    {
+      "file": "ray-scorch-negative/buy-1-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 937,
+      "raw_sha256": "a0cc5b186dcb4f2076ca4abe41832747ec9128a35f00a370a4a1a37f4d36469c",
+      "source_file": "ray-scorch-negative/buy-1-accounts16.receipt.json",
+      "stored_bytes": 937,
+      "stored_sha256": "a0cc5b186dcb4f2076ca4abe41832747ec9128a35f00a370a4a1a37f4d36469c"
+    },
+    {
+      "file": "ray-scorch-negative/dependency-accounts-1.json.gz",
+      "gzip": true,
+      "raw_bytes": 3857801,
+      "raw_sha256": "52088a2047d992dcb300593bac6ec3a5b1ba4968ab14ebe912695c8a35eb12f8",
+      "source_file": "ray-scorch-negative/dependency-accounts-1.json",
+      "stored_bytes": 619550,
+      "stored_sha256": "abecbde15663b3c7620beb85bf7ebf739c9247338b4e8d9aa1631cd5c3eb5919"
+    },
+    {
+      "file": "ray-scorch-negative/dependency-accounts-1.receipt.json",
+      "gzip": false,
+      "raw_bytes": 965,
+      "raw_sha256": "a2000c52267244b7710b75489ec04b04ce31aebde3cb28537b3aa8a29a454547",
+      "source_file": "ray-scorch-negative/dependency-accounts-1.receipt.json",
+      "stored_bytes": 965,
+      "stored_sha256": "a2000c52267244b7710b75489ec04b04ce31aebde3cb28537b3aa8a29a454547"
+    },
+    {
+      "file": "ray-scorch-negative/mint-eligibility.json",
+      "gzip": false,
+      "raw_bytes": 323,
+      "raw_sha256": "0821bf63a3770225acb999f2919520fc117a7384ce0b5a844b233a1754b9b326",
+      "source_file": "ray-scorch-negative/mint-eligibility.json",
+      "stored_bytes": 323,
+      "stored_sha256": "0821bf63a3770225acb999f2919520fc117a7384ce0b5a844b233a1754b9b326"
+    },
+    {
+      "file": "ray-scorch-negative/programdata-accounts-2.json.gz",
+      "gzip": true,
+      "raw_bytes": 1988036,
+      "raw_sha256": "15d72e31b4be569c83afe64e372892a1f896b91d0be25d9348879ded5af91f43",
+      "source_file": "ray-scorch-negative/programdata-accounts-2.json",
+      "stored_bytes": 262939,
+      "stored_sha256": "8743e4b25cf743462009da66f383d02d26c05adbfa47e5094d3db81bde4c60b5"
+    },
+    {
+      "file": "ray-scorch-negative/programdata-accounts-2.receipt.json",
+      "gzip": false,
+      "raw_bytes": 745,
+      "raw_sha256": "09093c51cb53304596f96cd2ee6ad3f271813399505041dd09ed5a5bed3fac18",
+      "source_file": "ray-scorch-negative/programdata-accounts-2.receipt.json",
+      "stored_bytes": 745,
+      "stored_sha256": "09093c51cb53304596f96cd2ee6ad3f271813399505041dd09ed5a5bed3fac18"
+    },
+    {
+      "file": "ray-scorch-negative/programdata-accounts-4.json",
+      "gzip": false,
+      "raw_bytes": 482459,
+      "raw_sha256": "d276bbad420ef41ac9498a2e41dd4cc3836bd4339bcdf9c5eb6ed352481626b8",
+      "source_file": "ray-scorch-negative/programdata-accounts-4.json",
+      "stored_bytes": 482459,
+      "stored_sha256": "d276bbad420ef41ac9498a2e41dd4cc3836bd4339bcdf9c5eb6ed352481626b8"
+    },
+    {
+      "file": "ray-scorch-negative/programdata-accounts-4.receipt.json",
+      "gzip": false,
+      "raw_bytes": 744,
+      "raw_sha256": "560a7c217590c7103274c6e1c2b888aa528789089d5be8a324fe7d9b82884f60",
+      "source_file": "ray-scorch-negative/programdata-accounts-4.receipt.json",
+      "stored_bytes": 744,
+      "stored_sha256": "560a7c217590c7103274c6e1c2b888aa528789089d5be8a324fe7d9b82884f60"
+    },
+    {
+      "file": "ray-scorch-negative/public-binding.json",
+      "gzip": false,
+      "raw_bytes": 712,
+      "raw_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce",
+      "source_file": "ray-scorch-negative/public-binding.json",
+      "stored_bytes": 712,
+      "stored_sha256": "c134b971466c938eeccfc68ad2304645597cb474f91ba936291f44916143dfce"
+    },
+    {
+      "file": "ray-scorch-negative/qualification.json",
+      "gzip": false,
+      "raw_bytes": 15030,
+      "raw_sha256": "342c88c1f553fbc294031249ac3a2043b9c5cc846079ce2cac1eb64f7a9dc29a",
+      "source_file": "ray-scorch-negative/qualification.json",
+      "stored_bytes": 15030,
+      "stored_sha256": "342c88c1f553fbc294031249ac3a2043b9c5cc846079ce2cac1eb64f7a9dc29a"
+    },
+    {
+      "file": "ray-scorch-negative/route-accounts-3.json.gz",
+      "gzip": true,
+      "raw_bytes": 3979475,
+      "raw_sha256": "30ea1f463b24d1c1652f74dbc1720cfb603eac218f55c16dc37ce47454de319a",
+      "source_file": "ray-scorch-negative/route-accounts-3.json",
+      "stored_bytes": 656573,
+      "stored_sha256": "3a9903187da42c49ce7cffa0b874c1287ce8978cd7b355bc9bf8dd808735249e"
+    },
+    {
+      "file": "ray-scorch-negative/route-accounts-3.receipt.json",
+      "gzip": false,
+      "raw_bytes": 1969,
+      "raw_sha256": "b1027097f38d10a4dca4c49ea10c2f010b545d1312c3914a3081a857bdabc0a9",
+      "source_file": "ray-scorch-negative/route-accounts-3.receipt.json",
+      "stored_bytes": 1969,
+      "stored_sha256": "b1027097f38d10a4dca4c49ea10c2f010b545d1312c3914a3081a857bdabc0a9"
+    },
+    {
+      "file": "ray-scorch-negative/sell-accounts16.analysis.json",
+      "gzip": false,
+      "raw_bytes": 1866,
+      "raw_sha256": "06f987f12184efb46393f1231937efd5055318c649a4a44decb822815b24ef78",
+      "source_file": "ray-scorch-negative/sell-accounts16.analysis.json",
+      "stored_bytes": 1866,
+      "stored_sha256": "06f987f12184efb46393f1231937efd5055318c649a4a44decb822815b24ef78"
+    },
+    {
+      "file": "ray-scorch-negative/sell-accounts16.json",
+      "gzip": false,
+      "raw_bytes": 15813,
+      "raw_sha256": "242040b0429ceedd1118c51b7ca3cb7a466836552b4de07e5ca1437bb824c303",
+      "source_file": "ray-scorch-negative/sell-accounts16.json",
+      "stored_bytes": 15813,
+      "stored_sha256": "242040b0429ceedd1118c51b7ca3cb7a466836552b4de07e5ca1437bb824c303"
+    },
+    {
+      "file": "ray-scorch-negative/sell-accounts16.receipt.json",
+      "gzip": false,
+      "raw_bytes": 936,
+      "raw_sha256": "dd06960aebd0b9678d05fbea146c0d04c8922eea493d32fca385f18f85102b0f",
+      "source_file": "ray-scorch-negative/sell-accounts16.receipt.json",
+      "stored_bytes": 936,
+      "stored_sha256": "dd06960aebd0b9678d05fbea146c0d04c8922eea493d32fca385f18f85102b0f"
+    },
+    {
+      "file": "ray-scorch-negative/snapshot-blocktime.json",
+      "gzip": false,
+      "raw_bytes": 45,
+      "raw_sha256": "869235cc5699d1d42f800d747962051b2129e3cb974d02f368d451aaf5e1dc27",
+      "source_file": "ray-scorch-negative/snapshot-blocktime.json",
+      "stored_bytes": 45,
+      "stored_sha256": "869235cc5699d1d42f800d747962051b2129e3cb974d02f368d451aaf5e1dc27"
+    },
+    {
+      "file": "ray-scorch-negative/snapshot-blocktime.receipt.json",
+      "gzip": false,
+      "raw_bytes": 534,
+      "raw_sha256": "243538fac8e0e216651a37ecfe471c67bfec40d727aa439bfaaa2df67bfadc29",
+      "source_file": "ray-scorch-negative/snapshot-blocktime.receipt.json",
+      "stored_bytes": 534,
+      "stored_sha256": "243538fac8e0e216651a37ecfe471c67bfec40d727aa439bfaaa2df67bfadc29"
+    }
+  ],
+  "full_rpc_captures": [
+    "bonk-production",
+    "jup-production",
+    "ray-production-retry",
+    "pump-curve-production",
+    "pump-graduated-production",
+    "pump-metadata-current-8GV",
+    "jup-scorch-negative",
+    "ray-scorch-negative",
+    "pump-metadata-production"
+  ],
+  "schema": 1,
+  "scope": "Candidate evidence, never fixture promotion or live funded-operation approval"
+}

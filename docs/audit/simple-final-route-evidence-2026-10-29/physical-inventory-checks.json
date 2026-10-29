@@ -1,0 +1,164 @@
+{
+  "checks": [
+    {
+      "capture": "bonk-production",
+      "captured_balance_total": 6909807351951579,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "4dmvFGeQH2eqa3ktNHMgm4wZ8vuTukBiK9M7gxW5oR9F",
+          "amount": 6909807351951579,
+          "context_slot": 462682439
+        }
+      ],
+      "lender_test_allocation_10q": 4000000000000,
+      "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "mint_supply": 8799430969418947727,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 400000000000,
+      "unobserved_supply_upper_bound": 8792521162066996148
+    },
+    {
+      "capture": "jup-production",
+      "captured_balance_total": 1435358384206,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "HVJuVW2dRbZ2fynWEY2JK6Ak2YTfVpji73sHZMCqiXSb",
+          "amount": 1435358384206,
+          "context_slot": 462682515
+        }
+      ],
+      "lender_test_allocation_10q": 400000000,
+      "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "mint_supply": 6861485879430104,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 40000000,
+      "unobserved_supply_upper_bound": 6860050521045898
+    },
+    {
+      "capture": "ray-production-retry",
+      "captured_balance_total": 603738617180,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "6FtsFfC7s4d8KY91PSv152CEC8FwF5koFpZctfT1axyt",
+          "amount": 28715036248,
+          "context_slot": 462683509
+        },
+        {
+          "address": "Be1CFyoPAr8aBGxpvCPD2LD21hdz2vjYNq8EcypnmgGD",
+          "amount": 575023580932,
+          "context_slot": 462683509
+        }
+      ],
+      "lender_test_allocation_10q": 100000000,
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "mint_supply": 554997329430370,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 10000000,
+      "unobserved_supply_upper_bound": 554393590813190
+    },
+    {
+      "capture": "pump-curve-production",
+      "captured_balance_total": 762735160409369,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "2dHtbFcx1XBXiJAYHagpAFd5mYH3iurAdsc7RoFS8omi",
+          "amount": 762735160409369,
+          "context_slot": 462682656
+        }
+      ],
+      "lender_test_allocation_10q": 25000000000000,
+      "mint": "8FxewF272LJ7Usov6PZk2gu1JKoR5Dq1v4sDqavJpump",
+      "mint_supply": 999998538431374,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 2500000000000,
+      "unobserved_supply_upper_bound": 237263378022005
+    },
+    {
+      "capture": "pump-graduated-production",
+      "captured_balance_total": 711302323620520,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "EFaHFb1y6tvYAend74ajCgQz7QxNJhWPRViFkevyGu3K",
+          "amount": 711302323620520,
+          "context_slot": 462682761
+        }
+      ],
+      "lender_test_allocation_10q": 35000000000000,
+      "mint": "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+      "mint_supply": 999235283734541,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 3500000000000,
+      "unobserved_supply_upper_bound": 287932960114021
+    },
+    {
+      "capture": "pump-metadata-current-8GV",
+      "captured_balance_total": 739123247405378,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "HWgmet7fqx9wCS4WYTNU3SRra4mcYUEx7jQTpCTrfcR1",
+          "amount": 739123247405378,
+          "context_slot": 462690058
+        }
+      ],
+      "lender_test_allocation_10q": 26635831605920,
+      "mint": "8GVcbvQa1HtLvwH5ZScmrPyf2ByvamqQkoPkpbknpump",
+      "mint_supply": 1000000000000000,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 2663583160592,
+      "unobserved_supply_upper_bound": 260876752594622
+    },
+    {
+      "capture": "jup-scorch-negative",
+      "captured_balance_total": 354592799561,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "5tPeeFqecG9jccbY7H4uzDDXSvwhdYszg5XLPfyQtcJV",
+          "amount": 354592799561,
+          "context_slot": 462683661
+        }
+      ],
+      "lender_test_allocation_10q": 400000000,
+      "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "mint_supply": 6861485879430104,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 40000000,
+      "unobserved_supply_upper_bound": 6861131286630543
+    },
+    {
+      "capture": "ray-scorch-negative",
+      "captured_balance_total": 13975805964,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "2duFtcnTY6HZpzJ3rxrYHVaQ6pp7tdK1xtup9X5NGLBr",
+          "amount": 13975805964,
+          "context_slot": 462683731
+        }
+      ],
+      "lender_test_allocation_10q": 100000000,
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "mint_supply": 554997329430370,
+      "physical_allocation_upper_bound_passes": true,
+      "quantity": 10000000,
+      "unobserved_supply_upper_bound": 554983353624406
+    },
+    {
+      "capture": "pump-metadata-production",
+      "captured_balance_total": 1000000000000000,
+      "distinct_captured_base_token_balances": [
+        {
+          "address": "DakvgtBC9aWsfUwR21KeDpW5RWgyZMXVHgAtn5XjkAKB",
+          "amount": 1000000000000000,
+          "context_slot": 462682868
+        }
+      ],
+      "lender_test_allocation_10q": 40000000000000,
+      "mint": "5PjPp8gDLjDsoXyvUtYzWKPYaRbfNaoxW29LTFvVpump",
+      "mint_supply": 1000000000000000,
+      "physical_allocation_upper_bound_passes": false,
+      "quantity": 4000000000000,
+      "unobserved_supply_upper_bound": 0
+    }
+  ],
+  "schema": 1,
+  "scope": "Necessary physical bound for synthetic lender allocation, from distinct captured base-token accounts and actual mint supply. It does not prove real funded mainnet LP availability. Read-only snapshots can span slots; no DEX balances are rewritten."
+}

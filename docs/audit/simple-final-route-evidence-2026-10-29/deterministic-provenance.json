@@ -1,0 +1,30 @@
+{
+  "approved_replayer_source_commit": "a53af2fbae75d1e3bbd8895ddb72ae0c4ffd4503",
+  "approved_replayer_source_sha256": "7b8769331a7a3e47415886d0752860db5d609d74ee7ab8cc78771cc143617374",
+  "idl_sha256": "52bdccd8a9f29739885e95a4c4595e70067edf3572e9d60c23aa69741b6abc15",
+  "matrix_sha256": "86e4aac03cde449b491059c77c947e0e788a072863ee958b494885e982f70abf",
+  "native_runner_sha256": "4a7aa049b766cba3d6b9a6a30a92a9726adf47ee9dfb816724bb163a1d04cf72",
+  "normal_two_argument_replayer_only": true,
+  "own_program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "schema": 1,
+  "seeded_variant_or_longrun_work": false,
+  "source_sha256": {
+    "simple/client/idl/shortwin_simple.json": "52bdccd8a9f29739885e95a4c4595e70067edf3572e9d60c23aa69741b6abc15",
+    "simple/client/src/monitoring.ts": "ef5242dc01b649053629ad695fc4eb73d527b9e2925b7ca9baa74a475771128a",
+    "simple/client/src/operator.ts": "77202e8d63b743c0a175f74dc55c29a7e8e3891811a552cbe4a292404b7bce4e",
+    "simple/client/test/monitoring.test.ts": "507379f4d9e15a779fceb0bb048a0f344e988f9738613b16babbabc776ac659c",
+    "simple/client/test/operator.test.ts": "5c8cfb130df146e51ccf5a2b63b86aa9bd823256b4d452431da521189cc3c7f8",
+    "simple/scripts/archive-route-qualification.py": "f1d619ff4f7e2c9e478c8f47d78746e2f7e3c3dc7f5910efba3bbfc1d27a07a0",
+    "simple/scripts/discover-pump-candidates.py": "da65c0e8ba97058f1f2cc05255b00b68432ef0637488b48779722aa9553e96dc",
+    "simple/scripts/materialize-current-route-candidate.py": "f503cd1395d7131c629bd7890d4ce65487a90f0870e1c53055a175b0338232d8",
+    "simple/scripts/qualify-current-route-suite.py": "3951b90e98c0019f3c492b7802bd85ab55bac52a8b129059a2bf4384fe97052b",
+    "simple/scripts/qualify-current-routes.py": "75e2b1ac85d9a18de7d57402b0d2d7ec1b154fcc9081727ec6e6ac72b294dbbb",
+    "simple/services/src/shortwin_price_service.py": "35fe080889ab764b32ad0e9c2b7507180852210b550b9c5e8ff70457bba30778",
+    "simple/services/tests/test_operator_binding.py": "843df6fe791de89a41963c6418c4569630ee1c011255eed074222b7e5a59319a",
+    "simple/services/tests/test_queue_lifecycle.py": "adb5daede9008f9baae2d830650b52873a89c5fc799705bec4a3a3b1005ff235",
+    "simple/tests/runtime/examples/qualify_current_route.rs": "7b8769331a7a3e47415886d0752860db5d609d74ee7ab8cc78771cc143617374"
+  },
+  "suite_summary_sha256": "dacc2083f4aaec49e15e7f9cb9337b98245cb4f352e3e88a8b4f6b622f3c9004",
+  "version": "1.1.0"
+}

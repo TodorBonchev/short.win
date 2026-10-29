@@ -1,0 +1,82 @@
+COMMAND ['pnpm', '--dir', 'client', 'check']
+$ tsc --noEmit && node --test test/*.test.ts
+✔ generated client decodes exact Rust account and instruction bytes without precision loss (4.879964ms)
+✔ route uses loan-local scratch, with no outer PDA signature or API setup instructions (11.082759ms)
+✔ route rejects wrong mode, quantity, threshold, and unexpected signer (5.236304ms)
+✔ buy minimum output must cover whole token debt (5.036905ms)
+✔ wallet signatures may change but reviewed message bytes may not (9.87252ms)
+✔ Jupiter request leaves envelope room and still refuses over-budget responses (6.406281ms)
+✔ managed request tries16 then32 for no-route or unsupported shape and stops on rate limits (2007.203057ms)
+✔ native setup allowance is separately signed and marks only loan-local authority writable (6.243787ms)
+✔ direct requests reject provider-widened slippage and excluded venue responses (4014.440019ms)
+✔ mint discovery and HTTP admission accept metadata-only Token2022 and reject changed token behavior (3.040412ms)
+✔ queue state parsing refuses duplicate, ambiguous and unsafe generation data (1.701366ms)
+✔ confirmed or post-snapshot publication holds capacity until finalized state includes it (11.373034ms)
+✔ missing/malformed finalized error fields never become failed-publication proof (7.782141ms)
+✔ finalized success absent from complete snapshot blocks retirement; exact failed proof can release (3.179638ms)
+✔ lifecycle envelope binds complete bank clock and generation-specific fulfillment (2.267598ms)
+✔ publisher OS lock excludes another process and releases after holder exit (237.501846ms)
+✔ operator database cannot silently adopt another program or an unbound existing snapshot (0.805418ms)
+✔ real Python queue frees an expired inactive identity and admits another without API calls (923.463803ms)
+✔ publisher pairing preserves allowances and rejects operator switches and history replacement (217.335138ms)
+✔ history mirror rejects a replacement operator even if the lock anchor is lost (169.798643ms)
+✔ fresh default-only local pairing can bind its first history later without resetting store identity (143.756583ms)
+✔ competing histories cannot both claim the same operator store (339.829613ms)
+✔ default boundary wins without price, pause, history or route; expiry requires fresh feed (0.839082ms)
+✔ CR actions bind both bad bids, strict sequence, source delays and reporter epoch (0.166228ms)
+✔ service model drift and fee/funding caps fail before signing (0.415405ms)
+✔ confirmed publication continues to a priced action; dry-run never assumes publication (0.225275ms)
+✔ finalized event pagination is resumable and idempotent; failed tx is never projected (4.220881ms)
+✔ empty authoritative loan snapshot reconciles capacity and processes queued warm work (165.669176ms)
+✔ post-tick confirmed clock accepts newer sources than initial finalized snapshot and rejects actual future (0.715329ms)
+✔ an inactive warmed quantity publishes before the first loan without reading a keyfile (177.622315ms)
+✔ bounded rotation advances beyond a persistently failing first identity (4.521134ms)
+✔ healthy private history stays off chain; requests, adverse prices and maturity publish on demand (0.263709ms)
+✔ reference allocation reservations survive unknown outcomes, restarts and duplicate submissions (84.772535ms)
+✔ UTC-day publication fee reservations survive failures and never consume default action budget (0.742581ms)
+✔ fresh local pairing permits deterministic default when price settings/service are unavailable (146.164122ms)
+✔ prewarm validates current policy and enqueues inactive exact-u64 identity only (9.700692ms)
+✔ Unknown or stale reference never becomes Finite and cannot authorize a sale route (7.147712ms)
+✔ route binds new loan nonce/scratch and returns fresh raw build plus verified table contents (14.430899ms)
+✔ CORS/body/IP limits and unsupported RPC overrides reject before provider calls (5.063234ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6340.811446
+COMMAND ['pnpm', '--dir', 'web', 'check']
+$ tsc --noEmit && node --test test/*.test.ts
+✔ amount entry is exact beyond Number precision and refuses truncation (1.098682ms)
+✔ preview follows floor principal and actually paid income without time accrual (0.283883ms)
+✔ editing or cancelling while route preparation is pending revokes later review (0.778572ms)
+✔ wallet account or feature changes while signing prevent broadcast and clean old subscriptions (0.661267ms)
+✔ wallets without change events are rechecked after their async reply, including chain support (0.354894ms)
+✔ cancel during the final blockheight check prevents even the broadcast RPC call (11.461291ms)
+✔ managed service preserves exact quantities and uses fixed endpoints (18.399539ms)
+✔ managed service rejects insecure hosted URLs and reports capacity refusals (0.573406ms)
+✔ managed buy input can shrink but cannot exceed or reinterpret the signed user budget (0.293608ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 223.4603
+COMMAND ['pnpm', '--dir', 'web', 'build']
+$ tsc --noEmit && vite build
+vite v8.3.1 building client environment for production...
+transforming...
+✓ 116 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.40 kB │ gzip:  0.29 kB
+dist/assets/index-BWPJxP0o.css    3.59 kB │ gzip:  1.33 kB
+dist/assets/index-P3kNBAKo.js   155.26 kB │ gzip: 40.60 kB
+
+[33m[INEFFECTIVE_DYNAMIC_IMPORT] [0m../node_modules/.pnpm/@solana+kit@8.3.0_typescript@5.9.3/node_modules/@solana/kit/dist/index.browser.mjs is dynamically imported by ../client/src/transactions.ts but also statically imported by ../client/src/chain.ts, ../client/src/generated/accounts/config.ts, ../client/src/generated/accounts/exposure.ts, ../client/src/generated/accounts/lenderReceipt.ts, ../client/src/generated/accounts/loan.ts, ..., dynamic import will not move module into another chunk.
+
+✓ built in 112ms

@@ -1,4 +1,4 @@
-> **2026-10-28 active replacement:** the owner selected a Jupiter-only pooled lending/shorting implementation with a fixed upfront SOL term fee. See [simple/README.md](simple/README.md), [the new specification](simple/docs/SPEC.md) and [operating prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement.
+> **2026-10-29 active replacement:** the owner selected a Jupiter-only pooled lending/shorting implementation with a fixed upfront SOL term fee. See [simple/README.md](simple/README.md), [the new specification](simple/docs/SPEC.md) and [operating prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement.
 
 ## Active pooled replacement
 
@@ -6,11 +6,13 @@
 - [x] Add trusted exact-quantity history, bounded automatic warm-up/publication, keeper/indexer, generated client and wallet UI.
 - [x] Pass fresh focused CI and short actual-program fuzz; verify byte-identical program builds across checkout locations. [Checkpoint](docs/audit/simple-pooled-reproducibility-2026-10-28.md).
 - [x] Prepare the [production policy/service/payer proposal](simple/config/README.md), free-key profile, non-executable role setup and bounded on-demand publisher.
-- [ ] Assign and review actual production program/role identities with the proposed policy/model; commission real funding and capacity.
+- [x] Generate and privately custody the dedicated program key; rebuild the untagged 1.1.0 candidate and generated clients for its public identity.
+- [ ] Assign and review the other production roles and live loader/genesis configuration; commission real funding and capacity.
 - [x] Qualify the [dated current-route matrix](docs/audit/simple-production-readiness-2026-10-28.md): six real-program sell/full-buyback cases, including SPL/Token-2022 Pump curves and PumpSwap, plus two exact incompatible-route refusals; fresh CI passed.
-- [ ] Freeze actual production identity/version and repeat current external loader/route checks on those final inputs.
-- [ ] Complete a fresh independently supervised >=24h campaign; retain duration, coverage, zero-anomaly and frozen-input evidence.
-- [ ] Qualify safe inactive exact-q job retirement/re-admission against active debt and outstanding references; the warm-publication intent TTL does not itself free a durable queue slot.
+- [x] Select the actual production program identity/version and repeat current external loader/route checks on those inputs. [Final preparation](docs/audit/simple-final-preparation-2026-10-29.md).
+- [ ] Obtain green current CI and retain independent ELF/IDL comparison before freezing a final candidate.
+- [ ] Complete a fresh independently supervised >=24h campaign; retain duration, coverage, zero-anomaly and frozen-input evidence. **OPEN:** the provider stopped unfinished combined campaign tooling; it is isolated and unqualified. No 24h run has started and no old duration is transferred.
+- [x] Qualify safe inactive exact-q retirement/re-admission against finalized active debt, finite references and pending publications; preserve cold generations, same-bank clocks, CAS/replay guards and local database identities/budgets. [Checks and limits](docs/audit/simple-final-preparation-2026-10-29.md).
 - [ ] Commission real funded operator/HTTP/web services with measured quote capacity, payer budgets and tested monitoring/alerts.
 - [ ] Present the concrete stable release/tag and mainnet deployment plan for owner review; no tag or deployment has occurred.
 

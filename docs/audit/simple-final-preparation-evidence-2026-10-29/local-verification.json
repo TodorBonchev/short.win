@@ -1,0 +1,72 @@
+{
+  "artifacts": {
+    "idl": {
+      "sha256": "52bdccd8a9f29739885e95a4c4595e70067edf3572e9d60c23aa69741b6abc15"
+    },
+    "program": {
+      "bytes": 786864,
+      "sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510"
+    }
+  },
+  "candidate_version": "1.1.0-untagged",
+  "long_run": {
+    "no_duration_transferred_from_previous_runs": true,
+    "preserved_local_directory": "simple/target/provider-stopped-final-campaign-20261029",
+    "started": false,
+    "status": "open_provider_stopped_combined_tooling_unqualified"
+  },
+  "parent_commit": "a53af2fbae75d1e3bbd8895ddb72ae0c4ffd4503",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "recorded_at_utc": "2026-10-29T01:27:51.615989+00:00",
+  "retained_logs_sha256": {
+    "client-web-final.log": "0ed075c4d11eb4acb2e9b579efcf22f8783ac44caf4c011508c97bf39ef0ab60",
+    "generate.log": "2fc28080725e7f9ee180812ce62dd1c5f9d42628b1a8fa1ecf74dcfc40a2b153",
+    "idl.log": "adacc376c82c0c8f2d528c870ba3eed008201004ec095179ed561e3191b0d9dd",
+    "lock.log": "2e727ca6b71f3b72154d09c6fad4cd74b6e19552527834f1328166d792d205c3",
+    "native.log": "5fc2835a86d06510f9784d687426345b11cd57a8f96e555ab075a31ddea156bc",
+    "pairing-concurrency.log": "49f3efb3e6e66fb02e3dd7d7ca61024474428821f94f67652eb326e9d95ab7a1",
+    "provider-stopped-status.json": "2e355c20df19bbd03568a130319588751f81d4b71eaf6548b248a7774973f81a",
+    "sbf.log": "010883a5627b56cfb14c29f92be7234628f72ee11ab4b9fd8ff23fa337dc5dc9",
+    "scope-diff.log": "61a9b73d74cb5380f89fd9c017907fe33631eb9e62f7e587239d707d242531cc",
+    "services-config.log": "8f0c0ab5a5e2a863697fc98a48a4df38e540754b4e4366671f3eee04318eaadc",
+    "wire.log": "ca54e2a65f7385e1155c324b21bb467ba5639a7bcdb2b8d86b59477fe82e5d60"
+  },
+  "schema": 1,
+  "scope_notes": [
+    "deterministic current-route suite is a separate six-positive/two-negative gate",
+    "original existing program_fuzz scenario smoke remains historical CPMM scope",
+    "no private key material included",
+    "no tag deployment financial transaction or service commissioning"
+  ],
+  "source_sha256": {
+    ".github/workflows/simple-pooled.yml": "948c2ec737e58170fa78709579f5b3a6b9500d460012fc75fd24eaa1ef66fc1a",
+    "simple/Anchor.toml": "5d202c67436817391e8a4dc9978371b9edd62b43e060c236172e6be0a46d6927",
+    "simple/Cargo.lock": "466b4227e364fa0f6d83421ab8b138880f242d28ea936af2f247fdf994cec161",
+    "simple/client/src/monitoring.ts": "ef5242dc01b649053629ad695fc4eb73d527b9e2925b7ca9baa74a475771128a",
+    "simple/client/src/operator.ts": "77202e8d63b743c0a175f74dc55c29a7e8e3891811a552cbe4a292404b7bce4e",
+    "simple/client/test/monitoring.test.ts": "507379f4d9e15a779fceb0bb048a0f344e988f9738613b16babbabc776ac659c",
+    "simple/client/test/operator.test.ts": "5c8cfb130df146e51ccf5a2b63b86aa9bd823256b4d452431da521189cc3c7f8",
+    "simple/config/keyless-policy.proposed.json": "f63bf5019d422fffc0bcb920e85726daf6c6740fea0eca2db5bd85494123372a",
+    "simple/config/keyless-service.proposed.json": "97edd1227e2133282818c58e5fc87220ce64c2f34596cbc76171a7b20ff496e6",
+    "simple/config/production-policy.proposed.json": "72359777488b5b1924b027c7f028ff08f4f158759484e4eca2bdfd503dc4d5ee",
+    "simple/config/production-service.proposed.json": "a4d163e39b7f914818df05ded80734eabf7acb385395231660c055a806883610",
+    "simple/programs/shortwin-simple/Cargo.toml": "88604f41e167a8ebd7c2484bacf6e9611e4dc8c77a7f6afd0d7094761f5ca047",
+    "simple/programs/shortwin-simple/src/lib.rs": "633ec11a2a3d04a22cfe1e6246289b3678778a2c8616de2e6eca2eef6d820b96",
+    "simple/services/queue_lifecycle_fuzz.py": "f7d12b906ebfbd57383cd27da36ccaf9687802a27d7cfe540930c12a760d4f3e",
+    "simple/services/src/shortwin_price_service.py": "35fe080889ab764b32ad0e9c2b7507180852210b550b9c5e8ff70457bba30778",
+    "simple/services/tests/test_operator_binding.py": "843df6fe791de89a41963c6418c4569630ee1c011255eed074222b7e5a59319a",
+    "simple/services/tests/test_queue_lifecycle.py": "adb5daede9008f9baae2d830650b52873a89c5fc799705bec4a3a3b1005ff235",
+    "simple/tests/runtime/current-routes.json": "f4f6fdd2978d4b0d1576f0106d9c462c6fdec0205aeb9d7719b7849ed66af2a9",
+    "simple/tests/runtime/examples/program_fuzz.rs": "88653e369077f9dca4232fb8f404f15c97d04e640770cd36c16fcb26b0734099",
+    "simple/tests/runtime/examples/qualify_current_route.rs": "7b8769331a7a3e47415886d0752860db5d609d74ee7ab8cc78771cc143617374"
+  },
+  "status": "engineering_checks_passed_long_run_gate_open",
+  "tests": {
+    "additional_synchronized_pair_claim": 1,
+    "client_operator_http": 39,
+    "configuration": 6,
+    "price_service": 42,
+    "rust": 70,
+    "web": 9
+  }
+}

@@ -70,7 +70,7 @@ export type InitializeInstruction<
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountPolicy extends string | AccountMeta<string> = string,
   TAccountProgramAccount extends string | AccountMeta<string> =
-    "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2",
+    "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
   TAccountProgramData extends string | AccountMeta<string> = string,
   TAccountJupiter extends string | AccountMeta<string> = string,
   TAccountJupiterProgramData extends string | AccountMeta<string> = string,
@@ -380,7 +380,7 @@ export async function getInitializeInstructionAsync<
   }
   if (!accounts.programAccount.value) {
     accounts.programAccount.value =
-      "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2" as Address<"kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2">;
+      "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh" as Address<"BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
@@ -622,7 +622,7 @@ export function getInitializeInstruction<
   // Resolve default values.
   if (!accounts.programAccount.value) {
     accounts.programAccount.value =
-      "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2" as Address<"kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2">;
+      "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh" as Address<"BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh">;
   }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =

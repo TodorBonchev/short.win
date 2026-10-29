@@ -20,6 +20,7 @@ from typing import Callable
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 
 WSOL = "So11111111111111111111111111111111111111112"
 BUILD_URL = "https://api.jup.ag/swap/v2/build"
@@ -30,7 +31,7 @@ MAX_ROUTE_ACCOUNTS = 40
 MAX_ROUTE_DATA_BYTES = 768
 EXCLUDED_DEXES = "Scorch"
 ROUTE_V2 = bytes([187, 100, 250, 204, 49, 196, 175, 20])
-MODEL_VERSION = "shortwin-simple-exact-q-v2-retained-bounded-ask"
+MODEL_VERSION = "shortwin-simple-exact-q-v3-generational-queue"
 U64_MAX = (1 << 64) - 1
 
 
@@ -51,6 +52,31 @@ def integer(value: object, name: str, minimum: int = 0, maximum: int = U64_MAX) 
     if not minimum <= number <= maximum:
         raise ValueError(f"{name} outside [{minimum}, {maximum}]")
     return number
+
+
+def public_key(value: object, name: str) -> str:
+    ordered = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+    if not isinstance(value, str) or not 32 <= len(value) <= 44 or not set(value) <= set(ordered):
+        raise ValueError(f"{name} must be a base58 public key string")
+    number = 0
+    for character in value:
+        number = number * 58 + ordered.index(character)
+    decoded_length = (number.bit_length() + 7) // 8 + len(value) - len(value.lstrip("1"))
+    if decoded_length != 32:
+        raise ValueError(f"{name} must decode to exactly 32 bytes")
+    return value
+
+
+def stable_uuid(value: object, name: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be a canonical non-nil UUID")
+    try:
+        parsed = uuid.UUID(value)
+    except (ValueError, AttributeError) as error:
+        raise ValueError(f"{name} must be a canonical non-nil UUID") from error
+    if str(parsed) != value or parsed.int == 0:
+        raise ValueError(f"{name} must be a canonical non-nil UUID")
+    return value
 
 
 @dataclass(frozen=True)
@@ -131,17 +157,8 @@ class Job:
     active_loan: bool = False
 
     def __post_init__(self) -> None:
-        alphabet = set("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
-        for key in (self.market, self.policy, self.mint):
-            if not isinstance(key, str) or not 32 <= len(key) <= 44 or not set(key) <= alphabet:
-                raise ValueError("market, policy, mint must be base58 public key strings")
-            number = 0
-            ordered = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-            for character in key:
-                number = number * 58 + ordered.index(character)
-            decoded_length = (number.bit_length() + 7) // 8 + len(key) - len(key.lstrip("1"))
-            if decoded_length != 32:
-                raise ValueError("public key must decode to exactly 32 bytes")
+        for name in ("market", "policy", "mint"):
+            public_key(getattr(self, name), name)
         object.__setattr__(self, "quantity", integer(self.quantity, "quantity", 1))
         if not isinstance(self.active_loan, bool):
             raise ValueError("active_loan must be boolean")
@@ -358,23 +375,103 @@ class History:
         self.db = sqlite3.connect(path)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
+        exists = self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").fetchone()
+        prior = self.db.execute("SELECT value FROM metadata WHERE key='model_hash'").fetchone() if exists else None
+        if prior and prior[0] != settings.model_hash:
+            self.db.close()
+            raise ValueError("history model changed: preserve the old database; use a new database and requalify history")
+        if prior and self.db.execute("SELECT 1 FROM metadata WHERE key='history_instance_id'").fetchone() is None:
+            self.db.close()
+            raise ValueError("existing history instance identity is missing; preserve this database for diagnosis")
         self.db.executescript("""
         CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS jobs(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
           mint TEXT NOT NULL,active INTEGER NOT NULL,due INTEGER NOT NULL,failures INTEGER NOT NULL DEFAULT 0,
-          PRIMARY KEY(market,policy,q));
+          generation INTEGER NOT NULL,PRIMARY KEY(market,policy,q));
+        CREATE TABLE IF NOT EXISTS identities(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
+          mint TEXT NOT NULL,generation INTEGER NOT NULL,admitted_at INTEGER NOT NULL,PRIMARY KEY(market,policy,q));
         CREATE TABLE IF NOT EXISTS publication_requests(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
           requested_at INTEGER NOT NULL,PRIMARY KEY(market,policy,q));
         CREATE TABLE IF NOT EXISTS observations(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
-          ts INTEGER NOT NULL,slot TEXT NOT NULL,bid TEXT NOT NULL,ask TEXT NOT NULL,finite INTEGER NOT NULL,
-          evidence TEXT NOT NULL,reason TEXT NOT NULL,PRIMARY KEY(market,policy,q,ts));
+          generation INTEGER NOT NULL,ts INTEGER NOT NULL,slot TEXT NOT NULL,bid TEXT NOT NULL,ask TEXT NOT NULL,finite INTEGER NOT NULL,
+          evidence TEXT NOT NULL,reason TEXT NOT NULL,PRIMARY KEY(market,policy,q,generation,ts));
+        CREATE TABLE IF NOT EXISTS retirements(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
+          generation INTEGER NOT NULL,context_slot TEXT NOT NULL,clock_slot TEXT NOT NULL,clock_ts INTEGER NOT NULL,
+          snapshot_hash TEXT NOT NULL,body TEXT NOT NULL,PRIMARY KEY(market,policy,q,generation));
         """)
-        prior = self.db.execute("SELECT value FROM metadata WHERE key='model_hash'").fetchone()
-        if prior and prior[0] != settings.model_hash:
-            self.db.close()
-            raise ValueError("history model changed: use a new database and requalify its history")
         with self.db:
             self.db.execute("INSERT OR IGNORE INTO metadata VALUES('model_hash',?)", (settings.model_hash,))
+            self.db.execute("INSERT OR IGNORE INTO metadata VALUES('queue_revision','0')")
+            self.db.execute("INSERT OR IGNORE INTO metadata VALUES('history_instance_id',?)", (str(uuid.uuid4()),))
+
+    def history_instance_id(self) -> str:
+        row = self.db.execute("SELECT value FROM metadata WHERE key='history_instance_id'").fetchone()
+        if row is None:
+            raise ValueError("history instance identity is missing; preserve this database for diagnosis")
+        return stable_uuid(row[0], "history instance identity")
+
+    def operator_binding(self) -> dict | None:
+        row = self.db.execute("SELECT value FROM metadata WHERE key='operator_binding'").fetchone()
+        return self._validate_operator_binding(json.loads(row[0])) if row else None
+
+    @staticmethod
+    def _validate_operator_binding(payload: object) -> dict:
+        fields = {"schema", "program_id", "operator_store_id", "operator_database"}
+        if not isinstance(payload, dict) or set(payload) != fields or type(payload.get("schema")) is not int or payload["schema"] != 1:
+            raise ValueError("exact schema-1 operator binding required")
+        public_key(payload["program_id"], "binding program_id")
+        stable_uuid(payload["operator_store_id"], "binding operator_store_id")
+        path = payload["operator_database"]
+        if not isinstance(path, str) or not path.startswith("/") or len(path) > 4096 or "\0" in path or os.path.normpath(path) != path:
+            raise ValueError("binding operator_database must be an absolute normalized path")
+        return dict(payload)
+
+    def bind_operator(self, payload: object) -> dict:
+        """Trusted local immutable identity binding; neither signs nor moves funds."""
+        binding = self._validate_operator_binding(payload)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            identity = self.history_instance_id()
+            prior = self.operator_binding()
+            if prior is not None and prior != binding:
+                raise ValueError("operator binding differs from the persistent history binding; preserve both databases")
+            if prior is None:
+                self.db.execute("INSERT INTO metadata VALUES('operator_binding',?)", (canonical(binding).decode(),))
+            self.db.commit()
+            return {"schema": 1, "history_instance_id": identity, "operator_binding": binding}
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def revision(self) -> int:
+        return int(self.db.execute("SELECT value FROM metadata WHERE key='queue_revision'").fetchone()[0])
+
+    def _bump_revision(self) -> None:
+        value = integer(self.revision()+1, "queue revision", 1, U64_MAX)
+        self.db.execute("UPDATE metadata SET value=? WHERE key='queue_revision'", (str(value),))
+
+    def generation(self, job: Job) -> int | None:
+        row = self.db.execute("SELECT mint,generation FROM jobs WHERE market=? AND policy=? AND q=?", job.key).fetchone()
+        if row and row[0] != job.mint:
+            raise ValueError("a market-policy-quantity identity cannot change mint")
+        return int(row[1]) if row else None
+
+    def queue_state(self) -> dict:
+        self.db.execute("BEGIN")
+        try:
+            result = {"schema": 1, "revision": str(self.revision()), "jobs": self.job_rows(),
+                      "history_instance_id": self.history_instance_id(), "operator_binding": self.operator_binding()}
+            last = self.db.execute("SELECT value FROM metadata WHERE key='last_reconcile_context'").fetchone()
+            result["last_context_slot"] = last[0] if last else "0"
+            self.db.commit()
+            return result
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def job_rows(self) -> list[dict]:
+        return [dict(asdict(job), quantity=str(job.quantity), generation=self.generation(job),
+                     publication_requested_at=self.publication_requested_at(job)) for job in self.jobs()]
 
     def close(self) -> None:
         self.db.close()
@@ -397,11 +494,18 @@ class History:
         sleeper(max(0, scheduled-now))
 
     def enqueue(self, job: Job, now: int) -> bool:
-        with self.db:
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
             accepted = self._enqueue(job, now)
-            if accepted and not job.active_loan:
-                self.db.execute("INSERT OR REPLACE INTO publication_requests VALUES(?,?,?,?)", (*job.key, now))
+            if accepted:
+                if not job.active_loan:
+                    self.db.execute("INSERT OR REPLACE INTO publication_requests VALUES(?,?,?,?)", (*job.key, now))
+                self._bump_revision()
+            self.db.commit()
             return accepted
+        except BaseException:
+            self.db.rollback()
+            raise
 
     def _enqueue(self, job: Job, now: int) -> bool:
         integer(now, "now", 1, (1 << 63) - 1)
@@ -409,23 +513,16 @@ class History:
         if existing:
             if existing[0] != job.mint:
                 raise ValueError("a market-policy-quantity identity cannot change mint")
-            # Duplicate discovery cannot demote existing debt. A complete
-            # trusted indexer refresh is required to remove debt priority.
-            self.db.execute("UPDATE jobs SET active=MAX(active,?) WHERE market=? AND policy=? AND q=?",
-                            (int(job.active_loan), *job.key))
+            self.db.execute("UPDATE jobs SET active=MAX(active,?) WHERE market=? AND policy=? AND q=?", (int(job.active_loan), *job.key))
             return True
-        count = self.db.execute("SELECT count(*) FROM jobs").fetchone()[0]
-        if count >= self.settings.max_jobs:
-            if not job.active_loan:
-                return False
-            victim = self.db.execute("SELECT market,policy,q FROM jobs WHERE active=0 ORDER BY due DESC,market,policy,q LIMIT 1").fetchone()
-            if victim is None:
-                return False
-            self.db.execute("DELETE FROM jobs WHERE market=? AND policy=? AND q=?", victim)
-            self.db.execute("DELETE FROM observations WHERE market=? AND policy=? AND q=?", victim)
-            self.db.execute("DELETE FROM publication_requests WHERE market=? AND policy=? AND q=?", victim)
-        self.db.execute("INSERT INTO jobs(market,policy,q,mint,active,due) VALUES(?,?,?,?,?,?)",
-                        (*job.key, job.mint, int(job.active_loan), now))
+        if self.db.execute("SELECT count(*) FROM jobs").fetchone()[0] >= self.settings.max_jobs:
+            return False
+        identity = self.db.execute("SELECT mint,generation FROM identities WHERE market=? AND policy=? AND q=?", job.key).fetchone()
+        if identity and identity[0] != job.mint:
+            raise ValueError("a retired market-policy-quantity identity cannot change mint")
+        generation = integer(int(identity[1])+1 if identity else 0, "generation", 0, (1 << 63)-1)
+        self.db.execute("INSERT OR REPLACE INTO identities VALUES(?,?,?,?,?,?)", (*job.key, job.mint, generation, now))
+        self.db.execute("INSERT INTO jobs(market,policy,q,mint,active,due,generation) VALUES(?,?,?,?,?,?,?)", (*job.key, job.mint, int(job.active_loan), now, generation))
         return True
 
     def plan(self, now: int) -> list[Job]:
@@ -443,47 +540,196 @@ class History:
         return int(row[0]) if row else 0
 
     def sync_loans(self, jobs: list[Job], now: int) -> None:
-        """Trusted complete indexer snapshot only; never accept a public payload."""
+        """Legacy trusted priority addition only; cannot demote, retire or evict."""
         if len(jobs) > self.settings.max_jobs or len({job.key for job in jobs}) != len(jobs):
             raise ValueError("active-loan snapshot exceeds capacity or has duplicate identities")
-        with self.db:
-            self.db.execute("UPDATE jobs SET active=0")
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
             for job in jobs:
                 if not self._enqueue(Job(job.market, job.policy, job.mint, job.quantity, True), now):
-                    raise ValueError("active-loan queue capacity exhausted")
+                    raise ValueError("active-loan queue capacity exhausted; trusted reconciliation required")
+            self._bump_revision()
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
+
+    def reconcile_queue(self, payload: dict, now: int) -> dict:
+        """Trusted finalized complete snapshot under the operator publisher lock.
+
+        This local contract is not an RPC proof. A public request cannot retire
+        anything, and a mismatched queue revision or snapshot fails atomically.
+        """
+        required = {"schema", "complete", "commitment", "publisher_lock", "context_slot", "clock_slot", "clock_ts", "expected_queue_revision", "active_jobs", "references", "pending_publications", "fulfilled_requests"}
+        if not isinstance(payload, dict) or set(payload) != required:
+            raise ValueError("complete versioned queue snapshot field set required")
+        if type(payload["schema"]) is not int or payload["schema"] != 1 or payload["complete"] is not True or payload["commitment"] != "finalized" or payload["publisher_lock"] is not True:
+            raise ValueError("trusted complete finalized snapshot under publisher lock required")
+        context = integer(payload["context_slot"], "snapshot context slot", 1)
+        clock_slot = integer(payload["clock_slot"], "snapshot final clock slot", context, context)
+        clock_ts = integer(payload["clock_ts"], "snapshot final clock timestamp", 1, (1 << 63)-1)
+        integer(now, "local wall time", 1, (1 << 63)-1)
+        if abs(now-clock_ts) > self.settings.reference_max_age_seconds:
+            raise ValueError("snapshot clock is stale relative to local wall time")
+        expected_revision = integer(payload["expected_queue_revision"], "expected queue revision")
+
+        def snapshot_job(value: object) -> Job:
+            if not isinstance(value, dict):
+                raise ValueError("snapshot job must be an object")
+            try:
+                return Job(**value)
+            except TypeError as error:
+                raise ValueError("snapshot job field set is invalid") from error
+
+        def jobs(values: object, name: str, maximum: int) -> dict:
+            if not isinstance(values, list) or len(values) > maximum:
+                raise ValueError(name+" must be a bounded complete list")
+            result = {}
+            for value in values:
+                if not isinstance(value, dict):
+                    raise ValueError(name+" contains an invalid job")
+                item = snapshot_job(value)
+                if item.key in result:
+                    raise ValueError(name+" contains duplicate identities")
+                result[item.key] = item
+            return result
+        active = jobs(payload["active_jobs"], "active jobs", self.settings.max_jobs)
+        pending = jobs(payload["pending_publications"], "pending publications", 4096)
+        refs = {}
+        values = payload["references"]
+        if not isinstance(values, list) or len(values) > 10000:
+            raise ValueError("complete bounded finite reference list required")
+        for value in values:
+            if not isinstance(value, dict) or set(value) != {"job", "source_slot", "source_ts", "max_age_seconds", "max_age_slots"}:
+                raise ValueError("finite reference fields required")
+            item = snapshot_job(value["job"])
+            if item.key in refs:
+                raise ValueError("duplicate finite reference identity")
+            source_slot = integer(value["source_slot"], "reference source slot", 1, context)
+            source_ts = integer(value["source_ts"], "reference source timestamp", 1, clock_ts)
+            age_seconds = integer(value["max_age_seconds"], "reference max age seconds", 1, 60)
+            age_slots = integer(value["max_age_slots"], "reference max age slots", 1, 1000)
+            refs[item.key] = (item, clock_ts-source_ts > age_seconds and clock_slot-source_slot > age_slots)
+        acknowledgments = {}
+        values = payload["fulfilled_requests"]
+        if not isinstance(values, list) or len(values) > 4096:
+            raise ValueError("bounded fulfilled request list required")
+        for value in values:
+            if not isinstance(value, dict) or set(value) != {"job", "generation", "requested_at"}:
+                raise ValueError("generation-bound fulfillment fields required")
+            item = snapshot_job(value["job"])
+            generation = integer(value["generation"], "acknowledged generation", 0, (1 << 63)-1)
+            timestamp = integer(value["requested_at"], "acknowledged request", 0, (1 << 63)-1)
+            key = (*item.key, generation)
+            if key in acknowledgments:
+                raise ValueError("duplicate fulfilled request identity")
+            acknowledgments[key] = (item, timestamp)
+        fingerprint = digest(payload)
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            def meta(name: str, default: str = "0") -> str:
+                row = self.db.execute("SELECT value FROM metadata WHERE key=?", (name,)).fetchone()
+                return row[0] if row else default
+            previous = int(meta("last_reconcile_context"))
+            if context == previous and fingerprint == meta("last_reconcile_hash", ""):
+                result = json.loads(meta("last_reconcile_result"))
+                if self.revision() != int(result["revision"]):
+                    raise ValueError("queue revision changed since prior snapshot application")
+                result.update(idempotent=True)
+                self.db.commit()
+                return result
+            if context <= previous or clock_slot < int(meta("last_reconcile_clock_slot")) or clock_ts < int(meta("last_reconcile_clock_ts")):
+                raise ValueError("snapshot is stale, out of order or conflicts at the same context slot")
+            if self.revision() != expected_revision:
+                raise ValueError("queue revision changed while snapshot was collected")
+            for collection in [active, pending, {key: value[0] for key, value in refs.items()}]:
+                for item in collection.values():
+                    existing = self.db.execute("SELECT mint FROM identities WHERE market=? AND policy=? AND q=?", item.key).fetchone()
+                    if existing and existing[0] != item.mint:
+                        raise ValueError("trusted snapshot mint differs from admitted identity")
+            retired, blocked = [], []
+            ttl = (self.settings.history_epochs+2)*self.settings.epoch_seconds+self.settings.reference_max_age_seconds
+            for item in self.jobs():
+                generation = self.generation(item)
+                if item.key in active:
+                    self.db.execute("UPDATE jobs SET active=1 WHERE market=? AND policy=? AND q=?", item.key)
+                    blocked.append({"job": asdict(item), "reason": "active_debt"})
+                    continue
+                self.db.execute("UPDATE jobs SET active=0 WHERE market=? AND policy=? AND q=?", item.key)
+                reason = "pending_publication" if item.key in pending else None
+                if reason is None and item.key in refs and not refs[item.key][1]:
+                    reason = "finite_reference_not_expired_in_both_clocks"
+                requested = self.publication_requested_at(item)
+                acknowledged = acknowledgments.get((*item.key, generation))
+                fulfilled = acknowledged is not None and acknowledged[0].mint == item.mint and acknowledged[1] >= requested
+                if reason is None and requested and not fulfilled and (requested > clock_ts or clock_ts-requested <= ttl):
+                    reason = "unfulfilled_warm_intent"
+                if reason:
+                    blocked.append({"job": asdict(item), "reason": reason})
+                    continue
+                rows = self.db.execute("SELECT ts,slot,bid,ask,finite,evidence,reason FROM observations WHERE market=? AND policy=? AND q=? AND generation=? ORDER BY ts", (*item.key, generation)).fetchall()
+                body = {"job": asdict(item), "generation": generation, "requested_at": requested,
+                        "retained_observation_count": len(rows), "retained_observations_digest": digest(rows)}
+                self.db.execute("INSERT INTO retirements VALUES(?,?,?,?,?,?,?,?,?)", (*item.key, generation, str(context), str(clock_slot), clock_ts, fingerprint, json.dumps(body, sort_keys=True)))
+                self.db.execute("DELETE FROM jobs WHERE market=? AND policy=? AND q=?", item.key)
+                retired.append(body)
+            for item in active.values():
+                if not self._enqueue(Job(item.market, item.policy, item.mint, item.quantity, True), now):
+                    raise ValueError("complete active-debt set cannot fit without evicting a protected identity")
+            self._bump_revision()
+            result = {"schema": 1, "revision": str(self.revision()), "context_slot": str(context),
+                      "clock_slot": str(clock_slot), "clock_ts": clock_ts, "snapshot_hash": fingerprint,
+                      "retired": retired, "blocked": blocked, "active_identities": len(active),
+                      "scheduled_identities": len(self.jobs()), "idempotent": False}
+            for key, value in {"last_reconcile_context": str(context), "last_reconcile_clock_slot": str(clock_slot),
+                               "last_reconcile_clock_ts": str(clock_ts), "last_reconcile_hash": fingerprint,
+                               "last_reconcile_result": json.dumps(result, sort_keys=True)}.items():
+                self.db.execute("INSERT OR REPLACE INTO metadata VALUES(?,?)", (key, value))
+            self.db.commit()
+            return result
+        except BaseException:
+            self.db.rollback()
+            raise
 
     def record(self, job: Job, timestamp: int, slot: int, bid: int, ask: int,
-               evidence: dict | None = None, reason: str = "") -> bool:
+               evidence: dict | None = None, reason: str = "", expected_generation: int | None = None) -> bool:
         integer(timestamp, "timestamp", 1, (1 << 63) - 1); integer(slot, "slot")
-        identity = self.db.execute("SELECT mint FROM jobs WHERE market=? AND policy=? AND q=?", job.key).fetchone()
-        if not identity or identity[0] != job.mint:
-            raise ValueError("observation identity is not in the bounded queue")
         finite = bid > 0 and ask >= bid and slot > 0
         if finite and (ask - bid) * 10000 > bid * self.settings.max_spread_bps:
             finite, reason = False, "spread exceeds reviewed policy"
         bid, ask = (integer(bid, "bid", 1), integer(ask, "ask", 1)) if finite else (0, 0)
-        with self.db:
-            previous = self.db.execute("SELECT ts,slot FROM observations WHERE market=? AND policy=? AND q=? ORDER BY ts DESC LIMIT 1", job.key).fetchone()
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            generation = self.generation(job)
+            if generation is None or (expected_generation is not None and generation != expected_generation):
+                raise ValueError("observation identity is retired or its admission generation changed")
+            previous = self.db.execute("SELECT ts,slot FROM observations WHERE market=? AND policy=? AND q=? AND generation=? ORDER BY ts DESC LIMIT 1", (*job.key, generation)).fetchone()
             if previous and (timestamp <= previous[0] or slot <= int(previous[1])):
                 raise ValueError("observations must advance source timestamp and slot")
-            self.db.execute("INSERT INTO observations VALUES(?,?,?,?,?,?,?,?,?,?)",
-                            (*job.key, timestamp, str(slot), str(bid), str(ask), int(finite),
-                             json.dumps(evidence or {}, sort_keys=True), reason[:200]))
-            self.db.execute("UPDATE jobs SET due=?,failures=CASE WHEN ? THEN 0 ELSE failures+1 END WHERE market=? AND policy=? AND q=?",
-                            (timestamp + max(1, self.settings.max_sample_gap_seconds//2), int(finite), *job.key))
+            self.db.execute("INSERT INTO observations VALUES(?,?,?,?,?,?,?,?,?,?,?)", (*job.key, generation, timestamp, str(slot), str(bid), str(ask), int(finite), json.dumps(evidence or {}, sort_keys=True), reason[:200]))
+            self.db.execute("UPDATE jobs SET due=?,failures=CASE WHEN ? THEN 0 ELSE failures+1 END WHERE market=? AND policy=? AND q=? AND generation=?", (timestamp + max(1, self.settings.max_sample_gap_seconds//2), int(finite), *job.key, generation))
             cutoff = timestamp - (self.settings.history_epochs + 2) * self.settings.epoch_seconds
-            self.db.execute("DELETE FROM observations WHERE market=? AND policy=? AND q=? AND ts<?", (*job.key, cutoff))
-        return finite
+            self.db.execute("DELETE FROM observations WHERE market=? AND policy=? AND q=? AND generation=? AND ts<?", (*job.key, generation, cutoff))
+            self._bump_revision()
+            self.db.commit()
+            return finite
+        except BaseException:
+            self.db.rollback()
+            raise
 
     def previous_ask(self, job: Job) -> int | None:
-        row = self.db.execute("SELECT ask FROM observations WHERE market=? AND policy=? AND q=? AND finite=1 ORDER BY ts DESC LIMIT 1", job.key).fetchone()
+        generation = self.generation(job)
+        if generation is None:
+            return None
+        row = self.db.execute("SELECT ask FROM observations WHERE market=? AND policy=? AND q=? AND generation=? AND finite=1 ORDER BY ts DESC LIMIT 1", (*job.key, generation)).fetchone()
         return int(row[0]) if row else None
 
     def reference(self, job: Job, onchain_sequence: int, current_slot: int, current_ts: int) -> dict:
         integer(onchain_sequence, "onchain sequence", 0, U64_MAX-1)
         integer(current_slot, "current slot", 1); integer(current_ts, "current timestamp", 1, (1 << 63)-1)
         s = self.settings
-        latest = self.db.execute("SELECT ts,slot,bid,ask,finite,evidence FROM observations WHERE market=? AND policy=? AND q=? ORDER BY ts DESC LIMIT 1", job.key).fetchone()
+        generation = self.generation(job)
+        latest = self.db.execute("SELECT ts,slot,bid,ask,finite,evidence FROM observations WHERE market=? AND policy=? AND q=? AND generation=? ORDER BY ts DESC LIMIT 1", (*job.key, generation)).fetchone() if generation is not None else None
         empty = {"quantity": str(job.quantity), "sequence": str(onchain_sequence + 1), "source_slot": str(current_slot),
                  "source_ts": current_ts, "finite": False, "live_bid_lower": "0", "live_ask_upper": "0",
                  "history_ask_upper_max": "0", "history_bid_lower_max": "0", "acquisition_reference": "0",
@@ -491,7 +737,7 @@ class History:
 
         def unknown(reason: str) -> dict:
             return {"market": job.market, "policy": job.policy, "model_hash": s.model_hash,
-                    "status": "Unknown", "reason": reason, "args": empty}
+                    "generation": generation, "status": "Unknown", "reason": reason, "args": empty}
 
         if not latest or not latest[4]:
             return unknown("missing or unsuccessful latest observation")
@@ -500,7 +746,7 @@ class History:
             return unknown("latest observation is stale or ahead of current clock")
         epoch_start = ts // s.epoch_seconds * s.epoch_seconds
         start, end = epoch_start - s.history_epochs*s.epoch_seconds, epoch_start-1
-        rows = self.db.execute("SELECT ts,slot,bid,ask,finite,evidence FROM observations WHERE market=? AND policy=? AND q=? AND ts>=? AND ts<=? ORDER BY ts", (*job.key, start, end)).fetchall()
+        rows = self.db.execute("SELECT ts,slot,bid,ask,finite,evidence FROM observations WHERE market=? AND policy=? AND q=? AND generation=? AND ts>=? AND ts<=? ORDER BY ts", (*job.key, generation, start, end)).fetchall()
         if start < 0 or not rows or any(not row[4] for row in rows):
             return unknown("completed history is missing or contains Unknown")
         gap = s.max_sample_gap_seconds
@@ -511,7 +757,7 @@ class History:
             if not samples or samples[0][0]-first > gap or first+s.epoch_seconds-1-samples[-1][0] > gap:
                 return unknown("a completed epoch lacks boundary coverage")
         history_ask, history_bid = max(int(row[3]) for row in rows), max(int(row[2]) for row in rows)
-        witness = {"model": MODEL_VERSION, "model_hash": s.model_hash, "job": asdict(job),
+        witness = {"model": MODEL_VERSION, "model_hash": s.model_hash, "generation": generation, "job": asdict(job),
                    "source": [ts,slot,bid,ask,json.loads(latest[5])], "history": rows}
         payload = dict(empty, source_slot=str(slot), source_ts=ts, finite=True, live_bid_lower=str(bid),
                        live_ask_upper=str(ask), history_ask_upper_max=str(history_ask),
@@ -519,7 +765,7 @@ class History:
                        completed_epochs=s.history_epochs, history_start_ts=start, history_end_ts=end,
                        evidence_hash=digest(witness))
         return {"market": job.market, "policy": job.policy, "model_hash": s.model_hash,
-                "status": "Finite", "evidence": witness, "args": payload}
+                "generation": generation, "status": "Finite", "evidence": witness, "args": payload}
 
 
 def tick(history: History, jupiter: Jupiter, clock: Callable[[], tuple[int, int]], now: int,
@@ -528,6 +774,9 @@ def tick(history: History, jupiter: Jupiter, clock: Callable[[], tuple[int, int]
     for job in history.plan(now):
         # If a usable RPC clock is unavailable, stop without fabricating source
         # time. Previously published references naturally expire on-chain.
+        generation = history.generation(job)
+        if generation is None:
+            continue
         slot, timestamp = clock()
         try:
             if abs(wall_clock()-timestamp) > history.settings.reference_max_age_seconds:
@@ -537,10 +786,10 @@ def tick(history: History, jupiter: Jupiter, clock: Callable[[], tuple[int, int]
             if not (0 <= after_ts-timestamp <= history.settings.reference_max_age_seconds
                     and 0 <= after_slot-slot <= history.settings.reference_max_age_slots):
                 raise Unavailable("quote request outlived reference freshness limits")
-            finite = history.record(job, timestamp, slot, bid, ask, evidence)
+            finite = history.record(job, timestamp, slot, bid, ask, evidence, expected_generation=generation)
             output.append({"job": asdict(job), "finite": finite})
         except Unavailable as error:
-            history.record(job, timestamp, slot, 0, 0, reason=str(error))
+            history.record(job, timestamp, slot, 0, 0, reason=str(error), expected_generation=generation)
             output.append({"job": asdict(job), "finite": False, "reason": str(error)})
     return output
 
@@ -578,6 +827,9 @@ def main(argv: list[str] | None = None) -> int:
     sync = sub.add_parser("sync-loans"); sync.add_argument("jobs", type=Path)
     sub.add_parser("plan")
     sub.add_parser("jobs")
+    sub.add_parser("queue-state")
+    bind = sub.add_parser("bind-operator"); bind.add_argument("binding", type=Path)
+    reconcile = sub.add_parser("reconcile-queue"); reconcile.add_argument("snapshot", type=Path)
     observe = sub.add_parser("tick"); observe.add_argument("--taker", required=True)
     buy = sub.add_parser("build-buy"); buy.add_argument("job", type=Path)
     buy.add_argument("--taker", required=True); buy.add_argument("--maximum-input", required=True, type=int)
@@ -611,9 +863,15 @@ def main(argv: list[str] | None = None) -> int:
                 result = {"active_identities": len(jobs)}
             else:
                 result = [{"job": item, "accepted": history.enqueue(Job(**item), now)} for item in jobs]
+        elif args.command == "bind-operator":
+            result = history.bind_operator(read_json(args.binding))
+        elif args.command == "queue-state":
+            result = history.queue_state()
+        elif args.command == "reconcile-queue":
+            result = history.reconcile_queue(read_json(args.snapshot), now)
         elif args.command in ("plan", "jobs"):
             selected = history.plan(now) if args.command == "plan" else history.jobs()
-            result = [dict(asdict(job), quantity=str(job.quantity),
+            result = [dict(asdict(job), quantity=str(job.quantity), generation=history.generation(job),
                            publication_requested_at=history.publication_requested_at(job)) for job in selected]
         elif args.command == "tick":
             rpc, key = os.environ.get("SOLANA_RPC_URL"), os.environ.get("JUPITER_API_KEY", "")

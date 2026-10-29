@@ -14,3 +14,12 @@ docs/audit/simple-production-evidence-2026-10-28/*.log -diff
 docs/audit/simple-production-evidence-2026-10-28/**/*.log -diff
 docs/audit/simple-production-evidence-2026-10-28/ci-40766940373/artifacts.json -diff
 docs/audit/simple-production-evidence-2026-10-28/ci-40766940373/run-terminal.json -diff
+
+# Final-identity route captures preserve exact raw response and replay bytes.
+docs/audit/simple-final-route-evidence-2026-10-29/** -text
+docs/audit/simple-final-route-evidence-2026-10-29/**/*.log -diff
+
+# Final preparation command receipts retain exact bytes.
+docs/audit/simple-final-preparation-evidence-2026-10-29/** -text
+docs/audit/simple-final-preparation-evidence-2026-10-29/**/*.log -diff
+docs/audit/simple-final-preparation-evidence-2026-10-29/*.log -diff

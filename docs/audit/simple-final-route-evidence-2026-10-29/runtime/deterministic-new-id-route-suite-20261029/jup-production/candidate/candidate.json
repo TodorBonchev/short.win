@@ -1,0 +1,233 @@
+{
+  "accounts": [
+    {
+      "address": "3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2",
+      "context_slot": 462682474,
+      "executable": false,
+      "file": "accounts/3gvYRKWyXRR9xKWe1ZjPhLY5ZJRN7KDB4rFZFGoJfFk2.bin",
+      "lamports": 759682820,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "573971c9baedda479bf4c38537787ae396358009b4920f8a270bd2b31dde5fe3"
+    },
+    {
+      "address": "DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY",
+      "context_slot": 462682474,
+      "executable": false,
+      "file": "accounts/DoU57AYuPFu2QU514RktNPG22QhApEjnKxnBcu4BHDTY.bin",
+      "lamports": 7021520120,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "babc437405bea7f9d4083097a7266db84de58330bdc41c2b54f1f4e4c66aaa94"
+    },
+    {
+      "address": "3rQ2MqfAMrAeLRZ34ij55EXRXSoPEUhkZT3Rbvp6vFT1",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/3rQ2MqfAMrAeLRZ34ij55EXRXSoPEUhkZT3Rbvp6vFT1.bin",
+      "lamports": 70407360,
+      "owner": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "08c58ef0e8c5027315ae50ab55b1d3011e25c1bbde4a9fd820b8ff7ee07660b7"
+    },
+    {
+      "address": "48nZ6A9pnAsEtUqBUgG8DwGqDNu5GhZKofdVMSYGvPtd",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/48nZ6A9pnAsEtUqBUgG8DwGqDNu5GhZKofdVMSYGvPtd.bin",
+      "lamports": 70407360,
+      "owner": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "1be2cf4ee94e9b69b13bc314bfdbd384186e40b5791a83a7510a430c7da65aed"
+    },
+    {
+      "address": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT.bin",
+      "lamports": 14693376760,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b"
+    },
+    {
+      "address": "4MZ6TtpQLBRUnfkL42ibxtgNcrUmdt8zBGGWL2sWYiyq",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/4MZ6TtpQLBRUnfkL42ibxtgNcrUmdt8zBGGWL2sWYiyq.bin",
+      "lamports": 70407360,
+      "owner": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "bc70382ca1dbfc5229816f020db941ff0d0420b9bc9fd1e0f93206d2277ec010"
+    },
+    {
+      "address": "8MFbZEaXp8Ky8ufhZRgphgMgKVwsjhDhZtNqmEPcxvQK",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/8MFbZEaXp8Ky8ufhZRgphgMgKVwsjhDhZtNqmEPcxvQK.bin",
+      "lamports": 2415279655229,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "c6f84b1d7056d5f2d863941607ff5548977171cd7b961831afa36bffa55788be"
+    },
+    {
+      "address": "BMNUGJFFSSoEXZm2DtAswHaTFEFNyGV1LGi2y5ZsoVT7",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/BMNUGJFFSSoEXZm2DtAswHaTFEFNyGV1LGi2y5ZsoVT7.bin",
+      "lamports": 70407360,
+      "owner": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "227d5e74212208b8a357ce10479eeec652e9cb09f08466036bf549573b7d66ef"
+    },
+    {
+      "address": "C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/C1MgLojNLWBKADvu9BHdtgzz1oZX4dZ5zGdGcgvvW8Wz.bin",
+      "lamports": 9905807,
+      "owner": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "37762127ccf3c5bdb54c75d850ec251c5c912e63bdeef37e51ae96aba7df00b0"
+    },
+    {
+      "address": "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf.bin",
+      "lamports": 6711053,
+      "owner": "11111111111111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "address": "GdbG1eUc9NJLPspQDN7qqPxatBLSm9YUmbw33kvcv1dw",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/GdbG1eUc9NJLPspQDN7qqPxatBLSm9YUmbw33kvcv1dw.bin",
+      "lamports": 70407360,
+      "owner": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "ff80b0f58da8a040fbffe4e8f7be5fac2423e75752284496cabcfba51880e5ae"
+    },
+    {
+      "address": "HVJuVW2dRbZ2fynWEY2JK6Ak2YTfVpji73sHZMCqiXSb",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/HVJuVW2dRbZ2fynWEY2JK6Ak2YTfVpji73sHZMCqiXSb.bin",
+      "lamports": 2039292,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "5dadb64fac048fac0e2d4b66635c0c4e9739176738db0b1c33215ff30c7724cd"
+    },
+    {
+      "address": "J7znuMyVHurxwjL19Rbtq2CSbjPEhqWvwEcgdWajEtnc",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/J7znuMyVHurxwjL19Rbtq2CSbjPEhqWvwEcgdWajEtnc.bin",
+      "lamports": 56960640,
+      "owner": "AddressLookupTab1e1111111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "8cd71705966690feb83e5bba19136cfb261b52fb6ef824c59a3d62296c201587"
+    },
+    {
+      "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+      "context_slot": 462682515,
+      "executable": true,
+      "file": "accounts/JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4.bin",
+      "lamports": 6970116527,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e"
+    },
+    {
+      "address": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN.bin",
+      "lamports": 74276338103,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "3f0fc6a3c72c69c13c38787bfdb307a64c29f55553f4e9d74a8f1c77dadfd753"
+    },
+    {
+      "address": "So11111111111111111111111111111111111111112",
+      "context_slot": 462682515,
+      "executable": false,
+      "file": "accounts/So11111111111111111111111111111111111111112.bin",
+      "lamports": 1860854767908,
+      "owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "b0f919425a529f4971ef8dabd535aec34947d5c8c4885df80dae91635b98c5f3"
+    },
+    {
+      "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      "context_slot": 462682515,
+      "executable": true,
+      "file": "accounts/TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA.bin",
+      "lamports": 230130698,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "5b31219b7bc4060b1638b933be5f50df3400109acfef12408a196d57ad119748"
+    },
+    {
+      "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+      "context_slot": 462682515,
+      "executable": true,
+      "file": "accounts/TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb.bin",
+      "lamports": 70228638,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "bae3e5d63e30c0c3e6fe788b9e027bf003ca5e5bb46d3a9627e034bb3002ea5c"
+    },
+    {
+      "address": "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc",
+      "context_slot": 462682515,
+      "executable": true,
+      "file": "accounts/whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc.bin",
+      "lamports": 66851581,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "5ba0ae1569444542b67322d0f333b289d738efead363c02436c7869cf33c2928"
+    },
+    {
+      "address": "CtXfPzz36dH5Ws4UYKZvrQ1Xqzn42ecDW6y8NKuiN8nD",
+      "context_slot": 462682526,
+      "executable": false,
+      "file": "accounts/CtXfPzz36dH5Ws4UYKZvrQ1Xqzn42ecDW6y8NKuiN8nD.bin",
+      "lamports": 53268311040,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "rent_epoch": 18446744073709551615,
+      "sha256": "a49ebc534880f4aaf525b5fd1504aed6223928bdbbea6c83d40473eb17abd04e"
+    }
+  ],
+  "base_mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+  "block_time": 1793234488,
+  "buy": {
+    "file": "buy.json",
+    "sha256": "cda8109f924fd8f7bfca032ef0aac20793284c2d007e3835b18d406a01c80799"
+  },
+  "capture_files": [
+    {
+      "file": "qualification.json",
+      "sha256": "8e9fa4358d2b14b17fd5729c5ed51102778a7e0e045aee31db0cfd02ce2f10df"
+    },
+    {
+      "file": "accounts.manifest.json",
+      "sha256": "a8ee2b4085b9ae8fd2f09475d65d66ab669fed91bfd89e2a868bfb9d8d532569"
+    }
+  ],
+  "context_slot": 462682526,
+  "lookup_tables": [
+    "J7znuMyVHurxwjL19Rbtq2CSbjPEhqWvwEcgdWajEtnc"
+  ],
+  "name": "jup-production",
+  "own_program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "quantity": 40000000,
+  "schema": 1,
+  "scope": "non-atomic current mainnet snapshot candidate, no baseline promotion",
+  "sell": {
+    "file": "sell.json",
+    "sha256": "b937b6349b46d3765db556700a4ad90c9df62938003ca67e968b4a4964a4a927"
+  }
+}

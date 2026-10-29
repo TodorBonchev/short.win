@@ -1,0 +1,28 @@
+{
+  "finished_at": "2026-10-29T00:45:07.354066+00:00",
+  "headers": {
+    "Content-Type": "application/json",
+    "date": "Thu, 29 Oct 2026 00:45:07 GMT",
+    "x-ratelimit-current": "1",
+    "x-ratelimit-remaining": "4",
+    "x-ratelimit-reset": "1793234717"
+  },
+  "length": 15899,
+  "method": "GET",
+  "parameters": {
+    "amount": "10000000",
+    "destinationTokenAccount": "A64FFqgrKtfDPc8Vtvn8bZ7eAzdew3hgvtXZdCCs2atJ",
+    "dexes": "Raydium CLMM",
+    "inputMint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+    "maxAccounts": "16",
+    "outputMint": "So11111111111111111111111111111111111111112",
+    "slippageBps": "50",
+    "taker": "GJN1m9PPgk3g3CeocQaWE252XQc3vZuhRMqMzmUiz5G3",
+    "transactionVersion": "0",
+    "wrapAndUnwrapSol": "false"
+  },
+  "provider": "Jupiter API",
+  "sha256": "80d9cacb6a299464a25a803258a6780360cf1055dea6911a6ae1bc68daf642d2",
+  "started_at": "2026-10-29T00:45:07.254086+00:00",
+  "status": 200
+}
