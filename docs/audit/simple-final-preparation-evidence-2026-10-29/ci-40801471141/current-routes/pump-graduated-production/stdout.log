@@ -1,0 +1,133 @@
+{
+  "actual_snapshot_packets_fit": true,
+  "base_token_conservation": true,
+  "binding": {
+    "execution_authority": "ztxx7G9nJV5ogHGEFCh5dW7bijkj7qFLv9VQ3JhK8Kf",
+    "execution_base": "CzQmZJRTsobHW1Zh8pBYG4hdxT8KCj4PsFLMKitQsCnX",
+    "execution_wsol": "G5GCihztbQQWMBU8np9PTS2dSApZvD7HpQiGU1rFYoMy",
+    "loan": "EZRdBxxM2ChGbwDViozsDTok8CTuHLTs7QvQcpB5yBz4",
+    "mint": "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+    "q": 3500000000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "buyback_spend": 130350503,
+  "closing_setup_policy": "zero allowance after actual borrower-funded opening setup",
+  "error": null,
+  "external_liquidity_account_count": 21,
+  "external_native_and_wrapped_lamports_delta": "7427731",
+  "full_buyback_net_credit": 3566003387275,
+  "functional_execution_passed": true,
+  "invariants": "principal/exposure, whole-q net vault credit, actual paid fees, collateral, rent/scratch closure, immutable real mint bytes, full post-CPI rollback",
+  "jupiter": {
+    "deploy_slot": 459479624,
+    "programdata_len": 2892269,
+    "programdata_sha256": "21e28c59e3b0a5536e48d31a1ca7346514a2bc61d70dc1388c920d7e3be35c1b",
+    "trimmed_elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "liquidity_conservation_scope": "All captured raw and both-route outer account keys, including initially absent PDAs; native curve/fee/rent plus WSOL vault lamports, excluding protocol financial actors/accounts and scratch; WSOL data delta retained separately without double counting.",
+  "live_transactions_sent": 0,
+  "manifest_sha256": "3546b016fb1a33ebb19e7f049fe2aaaeb4f0ada9f600db45bc369f4393843ff3",
+  "name": "pump-graduated-production",
+  "native_runner_sha256": "b72b1483a2ae48eb06ed3a9b708738559dbe3f17616d09b623190f706e57456e",
+  "own_program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "packet_fit_failures": {},
+  "post_cpi_rollback": true,
+  "schema": 1,
+  "sell_proceeds": 124767172,
+  "setup_allowance": {
+    "closing_actual_actor_cost": 0,
+    "closing_signed_maximum": 0,
+    "closing_unused_refunded": 0,
+    "cost_excluded_from_WSOL_notional_collateral_and_protocol_fees": true,
+    "opening_actual_actor_cost": 1844400,
+    "opening_signed_maximum": 5000000,
+    "opening_unused_refunded": 3155600
+  },
+  "setup_budget_rejections": {
+    "setup_insufficient_budget": true,
+    "setup_over_program_maximum": true,
+    "setup_signed_funding_below_advance": true,
+    "setup_zero_budget": true
+  },
+  "status": "passed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 130350503,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 500,
+    "live_ask_upper": 130350503,
+    "live_bid_lower": 124143337,
+    "spread_bps_ceiling": 500
+  },
+  "transactions": {
+    "full_buyback": {
+      "compute_units": 149670,
+      "error": null,
+      "log_file": "full_buyback.log",
+      "log_sha256": "5c4f9bae785cad913a689b304c68eb3a2ae0cf1e17835cc7428a58cb729bf55f",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1061
+    },
+    "open_sell": {
+      "compute_units": 178316,
+      "error": null,
+      "log_file": "open_sell.log",
+      "log_sha256": "5a4550e1f50a6cefc7c0e0a11ab5ae1d5d681a6040d6430430ad91548b694713",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1175
+    },
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 160945,
+      "error": "InstructionError(1, Custom(6024))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "d1ca90d25f0fa6e18e40918959f8f4078be44da18c17bd51bdd93f59b919e958",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1175
+    },
+    "setup_insufficient_budget": {
+      "compute_units": 112894,
+      "error": "InstructionError(1, Custom(1))",
+      "log_file": "setup_insufficient_budget.log",
+      "log_sha256": "d8a95e45cb02c86a3230a4100d2aa226e1b54db80d142a9206b457a358240402",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1175
+    },
+    "setup_over_program_maximum": {
+      "compute_units": 48820,
+      "error": "InstructionError(1, Custom(6032))",
+      "log_file": "setup_over_program_maximum.log",
+      "log_sha256": "7190b3251b9f4d6db0db524ceb7ef22f15d6cea7ab85a6890c24c7063c8095f4",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1175
+    },
+    "setup_signed_funding_below_advance": {
+      "compute_units": 50320,
+      "error": "InstructionError(1, Custom(6032))",
+      "log_file": "setup_signed_funding_below_advance.log",
+      "log_sha256": "33671b263c7925bfe0c7878191f8a275c4f7cabf84379fc3837a7a4101379de0",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1175
+    },
+    "setup_zero_budget": {
+      "compute_units": 111238,
+      "error": "InstructionError(1, Custom(1))",
+      "log_file": "setup_zero_budget.log",
+      "log_sha256": "8ed1f2554b7eae836f020e6642247ba562f926611eb32a149731dc0cb3998bf0",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1175
+    }
+  },
+  "wsol_delta_lamports": "5583331"
+}

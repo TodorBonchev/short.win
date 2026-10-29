@@ -1,0 +1,288 @@
+{
+  "artifact_zip_digests": [
+    {
+      "downloaded_zip_bytes": 206578,
+      "downloaded_zip_sha256": "9abe7f8122651ff9afbde4e6102ecf4e28a360e4295354bbddf0811c68153da6",
+      "github_digest_matches": true,
+      "id": 12865729046,
+      "name": "simple-pooled-validation"
+    },
+    {
+      "downloaded_zip_bytes": 35015687,
+      "downloaded_zip_sha256": "e44c8e53881a9c6bf5efde0f5efb7dd517156e0a4d890cb5679a69f5f4290c74",
+      "github_digest_matches": true,
+      "id": 12865679449,
+      "name": "simple-pooled-fuzz-smoke"
+    },
+    {
+      "downloaded_zip_bytes": 8494910,
+      "downloaded_zip_sha256": "2f2ed8432bb4d007eb5382b29bd70522ecb413adbbbdb3e9165b35752f16a8fc",
+      "github_digest_matches": true,
+      "id": 12865604902,
+      "name": "simple-current-route-suite"
+    }
+  ],
+  "ci_run": 40801471141,
+  "ci_runner_sha256_verified": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+  "ci_url": "https://github.com/TodorBonchev/short.win/actions/runs/40801471141",
+  "exact_local_program_and_idl_bytes_match": true,
+  "idl_sha256": "52bdccd8a9f29739885e95a4c4595e70067edf3572e9d60c23aa69741b6abc15",
+  "input_files_verified_local_and_downloaded": 342,
+  "limitations": [
+    "No long run started; combined preparation remains provider-stopped and unqualified",
+    "Synthetic functional history is not real three-epoch provider coverage",
+    "No funding/alert-delivery/throughput/deployment claim",
+    "Native runner source and frozen bytes checked; native binary need not match another checkout location"
+  ],
+  "matrix_sha256": "86e4aac03cde449b491059c77c947e0e788a072863ee958b494885e982f70abf",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "retained_files_sha256": {
+    "artifacts.json": "ba48765d7952590edca8cde09441e8a2c9b6a7be08832023809274741e9d6fc6",
+    "ci.log": "f627f24b285bc0a2cae41eaadc1788d99060207a608da3dd3af295cae6282bb7",
+    "current-routes/bonk-production/replay/full_buyback.log": "7dae90ccca466c2c3e67a72eb58c8f1210227b7ea66bb59df6f63e6f4f8a7e5e",
+    "current-routes/bonk-production/replay/open_sell.log": "2af70093afbddd2ab2068852cd36e5ad3cb961389d6aceee30c4e788e8f6b9af",
+    "current-routes/bonk-production/replay/post_swap_fee_bound_rollback.log": "4e364d1a046e6c9814a2d2625483534517dc538bb460a19786d1f31b3e44744e",
+    "current-routes/bonk-production/replay/summary.json": "5bc6997be86a0c136ef2ca48ad84345302e804608ec021510abc870e3ff84cf0",
+    "current-routes/bonk-production/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/bonk-production/stdout.log": "dbb2f9896684b723678a0f7ec0e0b8d215e49fad1c6d835ae25ab85dec3b0217",
+    "current-routes/jup-production/replay/full_buyback.log": "da3b11aa65b598955a7907d32f44c8c891b310a4c55799a9e1752e944415d239",
+    "current-routes/jup-production/replay/open_sell.log": "a2ae2a620a0679f2717695ba95a0128dda12b5653bf786c72b35c3695d1ff052",
+    "current-routes/jup-production/replay/post_swap_fee_bound_rollback.log": "e19461358ecf9f7df1f95c3552934ae21204737211856a29cfeb291891ecd0cb",
+    "current-routes/jup-production/replay/summary.json": "5ee0b52d40bac101e0de04e94d3ca19b5c2a264994c0eb6bab02174bb61cf94d",
+    "current-routes/jup-production/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/jup-production/stdout.log": "627c22b1a36685751fe74821413c4253ad15dec15febc7f4d96fe4902298e9fc",
+    "current-routes/jup-scorch-negative/replay/post_swap_fee_bound_rollback.log": "5ad7ed8c6a90f1f1af982afe659488f97c18486d5acf53ff4e4b29c469fb5368",
+    "current-routes/jup-scorch-negative/replay/summary.json": "ea90836c5b2d18f0a982c673b51fe77769d9c31d1ac2c33408afd49bf3414f95",
+    "current-routes/jup-scorch-negative/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/jup-scorch-negative/stdout.log": "8ed1f035a1834f0ad2be8728fd2854f44f8187d20bd10ab7413eb82492a2356f",
+    "current-routes/pump-curve-production/replay/full_buyback.log": "c1fae34bec668c4bdcd66590cab21b286a6b7e323467850aa5dcf846c39d2d74",
+    "current-routes/pump-curve-production/replay/open_sell.log": "0952df4e604ab20c39e4f5cbf887f63b436abf884246e1959fbd0453415b1c7a",
+    "current-routes/pump-curve-production/replay/post_swap_fee_bound_rollback.log": "5dc6315b26f6b2cf2955e22e04e2259ad1abca94ab08c96743eae3eef13b1d39",
+    "current-routes/pump-curve-production/replay/setup_insufficient_budget.log": "65364d2be58c9a9cf9efc9da061ef18f768538f528138adaf63a64c6364170dd",
+    "current-routes/pump-curve-production/replay/setup_over_program_maximum.log": "82ceba91a1ee9f1b4f4c46abbd462b349e6a9ec0b119379eb96d156ca67a686b",
+    "current-routes/pump-curve-production/replay/setup_signed_funding_below_advance.log": "7ef6346b89b78ebf2e45b33e2092cb3e318023b69f8b6b18a0c5c0234d47412d",
+    "current-routes/pump-curve-production/replay/setup_zero_budget.log": "bedddbd44803e5db6f2a0af218dfda55249ff7e1d277729a65d5c770d951459b",
+    "current-routes/pump-curve-production/replay/summary.json": "f80222139d00c37822f62e91e88f94dab5fe76fb3cdfd839b2942f63c75c7c29",
+    "current-routes/pump-curve-production/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/pump-curve-production/stdout.log": "464da7de80448f7924799f572ca9c58ea7d73c6085e427ca527ec8bf74d6907b",
+    "current-routes/pump-graduated-production/replay/full_buyback.log": "5c4f9bae785cad913a689b304c68eb3a2ae0cf1e17835cc7428a58cb729bf55f",
+    "current-routes/pump-graduated-production/replay/open_sell.log": "5a4550e1f50a6cefc7c0e0a11ab5ae1d5d681a6040d6430430ad91548b694713",
+    "current-routes/pump-graduated-production/replay/post_swap_fee_bound_rollback.log": "d1ca90d25f0fa6e18e40918959f8f4078be44da18c17bd51bdd93f59b919e958",
+    "current-routes/pump-graduated-production/replay/setup_insufficient_budget.log": "d8a95e45cb02c86a3230a4100d2aa226e1b54db80d142a9206b457a358240402",
+    "current-routes/pump-graduated-production/replay/setup_over_program_maximum.log": "7190b3251b9f4d6db0db524ceb7ef22f15d6cea7ab85a6890c24c7063c8095f4",
+    "current-routes/pump-graduated-production/replay/setup_signed_funding_below_advance.log": "33671b263c7925bfe0c7878191f8a275c4f7cabf84379fc3837a7a4101379de0",
+    "current-routes/pump-graduated-production/replay/setup_zero_budget.log": "8ed1f2554b7eae836f020e6642247ba562f926611eb32a149731dc0cb3998bf0",
+    "current-routes/pump-graduated-production/replay/summary.json": "c9a1ad4c8f6f1b56e7c238bc8ff9283e1ae805513a62f3e26c7200e474560556",
+    "current-routes/pump-graduated-production/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/pump-graduated-production/stdout.log": "bec544d0fdf8ba039e2b7bf5b17e8d06e900486f0cf72eb497e83667b7850181",
+    "current-routes/pump-metadata-current-8GV/replay/full_buyback.log": "0df708572100e54edf21dd78b90942c0dd0a87f19fd3a416893f65ed91f10cd6",
+    "current-routes/pump-metadata-current-8GV/replay/open_sell.log": "a4a54f35e4f2f1ee1c04b4237ddddc4f1eaa297007457377cdd1d117ac9f9bae",
+    "current-routes/pump-metadata-current-8GV/replay/post_swap_fee_bound_rollback.log": "dc563de3b2a840e85760e1f8d797a4e30f1ba9dedfe1ef32d5181a1e4614b531",
+    "current-routes/pump-metadata-current-8GV/replay/setup_insufficient_budget.log": "42952432bc0acfdb1d46d2ab6a025b3925c95624cb5aa2e6e365dc46b07e26b7",
+    "current-routes/pump-metadata-current-8GV/replay/setup_over_program_maximum.log": "fd0d098e9119118e81ed63af4a933106b33b35257ede74dc67edfce0044acf0b",
+    "current-routes/pump-metadata-current-8GV/replay/setup_signed_funding_below_advance.log": "7f2bf33921924cd4fe3af9d94a8e9667aed6b775046d8c0cf0562d45eba20b85",
+    "current-routes/pump-metadata-current-8GV/replay/setup_zero_budget.log": "76970d03fd9d83d1b38a34e2832f65c858b809a6237851e5e2115741b758555f",
+    "current-routes/pump-metadata-current-8GV/replay/summary.json": "434efdacb68f6c414533930cb66b24ec799663ebfe5a47c472d54e18a79d436f",
+    "current-routes/pump-metadata-current-8GV/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/pump-metadata-current-8GV/stdout.log": "88c8ef668daabd51b82222da6eee5579bd94d728f4fe513f111638672b77c3e2",
+    "current-routes/ray-production-retry/replay/full_buyback.log": "24a05c7c332d1155366aef2bbb0a87796e2434e91a57df9a32c8d2a1f7d9fe81",
+    "current-routes/ray-production-retry/replay/open_sell.log": "893f7f5125a451ce48b5a83bd6ece454833e136820bd40ca78f08c4a25f2c233",
+    "current-routes/ray-production-retry/replay/post_swap_fee_bound_rollback.log": "c6dc21ade50d677f1663ced0d8fcfd4605d816726f421212e6dcc91f6b18f02d",
+    "current-routes/ray-production-retry/replay/summary.json": "fac3c2de8e8c5f4586b04ddf79fbe7c638f218de91f3ba2d9aeaa999a79124a0",
+    "current-routes/ray-production-retry/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/ray-production-retry/stdout.log": "5cc20826c3fc10b9131472adc7f8fbf6207236619eaffde187be7b010d403459",
+    "current-routes/ray-scorch-negative/replay/post_swap_fee_bound_rollback.log": "6a60bb818d0122a94656995d5ce3089ab4fecdafede2fe6a921e4e306c7ea34a",
+    "current-routes/ray-scorch-negative/replay/summary.json": "b95a7e7b70f612643a4a155cd5457fb3a0bb49cfbd106e60b695b5346027004f",
+    "current-routes/ray-scorch-negative/stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-routes/ray-scorch-negative/stdout.log": "95697a0de2de1ed4e9fb4e0054b91065d45d0c3f0ea37e7c3f6e500bce4f8144",
+    "current-routes/summary.json": "6aba07f0a79d6f1adf8b7057632204c1e367870571c8e64f869702c938cbe309",
+    "download-verification.json": "de102567aad91505585bf2e4a9cebab96baa6298e491fde26f46612c34c876b7",
+    "fuzz-smoke/completion.json": "ddeac1e28c22edeb2f9b7f6df0105f107508ea740710fee646074363a0767434",
+    "fuzz-smoke/metadata.json": "348a614b7a3157be9cbf35176df257faa523dc9d6b54fae402e9abf0c4ae1b3e",
+    "fuzz-smoke/run.log": "702c92d7fa27c590b816e267fc6423c966c6298e8481011009268665186af64d",
+    "fuzz-smoke/summary.json": "d87b203e31fdef89043e660cfe5e57bb9f09e4dc26b66a9c354508f3c78caeba",
+    "run-terminal.json": "a84d4c347587e154cee8e8d4f0a00265f4ea0794c5d26799f7426ebb3d8b6fdd",
+    "sbf-build.log": "3051dae6e00d63dd4bce598d2889c119b3840530a92489624a862902bbf5bd34"
+  },
+  "route_cases": [
+    {
+      "actual": "passed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_pass",
+      "name": "bonk-production",
+      "summary_sha256": "5bc6997be86a0c136ef2ca48ad84345302e804608ec021510abc870e3ff84cf0"
+    },
+    {
+      "actual": "passed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_pass",
+      "name": "jup-production",
+      "summary_sha256": "5ee0b52d40bac101e0de04e94d3ca19b5c2a264994c0eb6bab02174bb61cf94d"
+    },
+    {
+      "actual": "passed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_pass",
+      "name": "ray-production-retry",
+      "summary_sha256": "fac3c2de8e8c5f4586b04ddf79fbe7c638f218de91f3ba2d9aeaa999a79124a0"
+    },
+    {
+      "actual": "passed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_pass",
+      "name": "pump-curve-production",
+      "summary_sha256": "f80222139d00c37822f62e91e88f94dab5fe76fb3cdfd839b2942f63c75c7c29"
+    },
+    {
+      "actual": "passed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_pass",
+      "name": "pump-graduated-production",
+      "summary_sha256": "c9a1ad4c8f6f1b56e7c238bc8ff9283e1ae805513a62f3e26c7200e474560556"
+    },
+    {
+      "actual": "passed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_pass",
+      "name": "pump-metadata-current-8GV",
+      "summary_sha256": "434efdacb68f6c414533930cb66b24ec799663ebfe5a47c472d54e18a79d436f"
+    },
+    {
+      "actual": "failed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_fail",
+      "name": "jup-scorch-negative",
+      "summary_sha256": "ea90836c5b2d18f0a982c673b51fe77769d9c31d1ac2c33408afd49bf3414f95"
+    },
+    {
+      "actual": "failed",
+      "all_transaction_log_hashes_checked": true,
+      "expected": "expected_fail",
+      "name": "ray-scorch-negative",
+      "summary_sha256": "b95a7e7b70f612643a4a155cd5457fb3a0bb49cfbd106e60b695b5346027004f"
+    }
+  ],
+  "schema": 1,
+  "smoke": {
+    "actual_coverage": {
+      "actual_cpmm_success_logs": 65,
+      "attempted_fixture_setups": 32,
+      "attempted_transactions": 147,
+      "expected_rejected_transactions": 49,
+      "fixture_setup_transactions_instrumented": false,
+      "operation_counts_attempt_success_reject": {
+        "actual_fill_veto": [
+          3,
+          0,
+          3
+        ],
+        "add_margin": [
+          8,
+          8,
+          0
+        ],
+        "arm": [
+          6,
+          6,
+          0
+        ],
+        "close": [
+          5,
+          5,
+          0
+        ],
+        "cr_force": [
+          3,
+          3,
+          0
+        ],
+        "default": [
+          5,
+          5,
+          0
+        ],
+        "early_cr_force": [
+          3,
+          0,
+          3
+        ],
+        "expiry_force": [
+          5,
+          5,
+          0
+        ],
+        "late_close": [
+          5,
+          0,
+          5
+        ],
+        "late_margin": [
+          5,
+          0,
+          5
+        ],
+        "late_repay": [
+          5,
+          0,
+          5
+        ],
+        "margin_clear": [
+          3,
+          3,
+          0
+        ],
+        "open": [
+          32,
+          32,
+          0
+        ],
+        "publish_reference": [
+          17,
+          17,
+          0
+        ],
+        "rejected_open": [
+          25,
+          0,
+          25
+        ],
+        "repay": [
+          14,
+          14,
+          0
+        ],
+        "underfill": [
+          3,
+          0,
+          3
+        ]
+      },
+      "scenario_counts": {
+        "close": 2,
+        "cr_fill_veto": 3,
+        "cr_market_rise": 3,
+        "default_boundary": 5,
+        "expiry": 5,
+        "margin_repay": 8,
+        "repay": 3,
+        "underfill": 3
+      },
+      "successful_fixture_setups": 32,
+      "successful_transactions": 98
+    },
+    "anomalies": 0,
+    "completed_cases": 32,
+    "failures": 0,
+    "invariant_failures": 0,
+    "log_sha256": "702c92d7fa27c590b816e267fc6423c966c6298e8481011009268665186af64d",
+    "scope": "short historical-CPMM actual-SBF scenario smoke; not 24h or current-Pump stochastic coverage",
+    "setup_failures": 0,
+    "summary_sha256": "d87b203e31fdef89043e660cfe5e57bb9f09e4dc26b66a9c354508f3c78caeba",
+    "wall_seconds": 20.197177267
+  },
+  "source_commit": "8c50fa75e1becd598520fa7e4bd95c84febbd798",
+  "source_files_verified_local_and_downloaded": 40,
+  "status": "passed_independently_downloaded_and_compared",
+  "verified_at_utc": "2026-10-29T01:42:48.936961+00:00"
+}

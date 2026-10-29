@@ -10,7 +10,7 @@
 - [ ] Assign and review the other production roles and live loader/genesis configuration; commission real funding and capacity.
 - [x] Qualify the [dated current-route matrix](docs/audit/simple-production-readiness-2026-10-28.md): six real-program sell/full-buyback cases, including SPL/Token-2022 Pump curves and PumpSwap, plus two exact incompatible-route refusals; fresh CI passed.
 - [x] Select the actual production program identity/version and repeat current external loader/route checks on those inputs. [Final preparation](docs/audit/simple-final-preparation-2026-10-29.md).
-- [ ] Obtain green current CI and retain independent ELF/IDL comparison before freezing a final candidate.
+- [x] Obtain [green current CI 40801471141](https://github.com/TodorBonchev/short.win/actions/runs/40801471141) and retain independent ELF/IDL/source/input/route-result comparison for candidate `8c50fa75`; keep the whole-system long-run freeze open.
 - [ ] Complete a fresh independently supervised >=24h campaign; retain duration, coverage, zero-anomaly and frozen-input evidence. **OPEN:** the provider stopped unfinished combined campaign tooling; it is isolated and unqualified. No 24h run has started and no old duration is transferred.
 - [x] Qualify safe inactive exact-q retirement/re-admission against finalized active debt, finite references and pending publications; preserve cold generations, same-bank clocks, CAS/replay guards and local database identities/budgets. [Checks and limits](docs/audit/simple-final-preparation-2026-10-29.md).
 - [ ] Commission real funded operator/HTTP/web services with measured quote capacity, payer budgets and tested monitoring/alerts.

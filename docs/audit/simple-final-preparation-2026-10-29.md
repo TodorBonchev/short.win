@@ -125,8 +125,27 @@ web build. An additional synchronized pairing-race regression passed. The SBF/ID
 were rebuilt with the pinned tools; generated client and wire checks agree.
 `audit_scope.py check` and `git diff --check` pass. Independent AI review found and
 rechecked the database-claim and lock-release fixes; no official external-firm
-review is claimed. Hosted CI and independent artifact comparison are pending
-until the candidate commit is published and its run completes.
+review is claimed. [Hosted CI 40801471141](https://github.com/TodorBonchev/short.win/actions/runs/40801471141)
+passed on `8c50fa75e1becd598520fa7e4bd95c84febbd798`, including the same test
+counts, 200,000 pure-model operations, the scoped actual-SBF smoke and all eight
+current-route outcomes. Independent downloaded-artifact [verification](simple-final-preparation-evidence-2026-10-29/ci-40801471141/independent-verification.json)
+checked all three archive digests against GitHub, exact local/CI ELF and IDL bytes,
+40 frozen source files, 342 frozen inputs, runner identity, readable summary,
+completion/log hashes and every route transaction log hash. The 32-case smoke
+lasted **20.197177267 seconds**, with zero failures/anomalies/setup/invariant
+failures, 147 attempted driver transactions (98 successful and 49 expected
+refusals), 65 successful actual CPMM invocation logs and all eight scenario
+families. These seconds are not long-run qualification.
+
+The [initial failed CI and disposition](simple-final-preparation-evidence-2026-10-29/ci-40801068358/disposition.json)
+are preserved. Commit `1be11dac` still pointed the default CI matrix at excluded
+5Pj even though the archived independently passed matrix selected 8GV. CI correctly
+refused it. Commit `8c50fa75` copies the already qualified matrix byte-for-byte
+into the default path (SHA256 `86e4aac03cde449b491059c77c947e0e788a072863ee958b494885e982f70abf`).
+Independent review rechecked that equality and all retained case/log hashes; the
+fresh full CI then passed. No program, client, service, raw capture or archived
+registry bytes changed in that correction. The earlier local-verification receipt
+retains its original pre-correction matrix hash rather than being rewritten.
 
 The [provider-stop receipt](simple-final-preparation-evidence-2026-10-29/provider-stopped-status.json)
 retains hashes of the unfinished combined campaign work. Its local copies and
@@ -140,8 +159,9 @@ substitute long run or tagging the candidate as stable.
 
 The remaining route to release is concrete:
 
-1. Obtain green CI for this candidate and independently compare the produced ELF,
-   IDL and deterministic route results. Retain any further changes and their scope.
+1. Preserve the completed green CI and independent artifact comparison above.
+   Documentation-only follow-up does not change the checked runtime; any later
+   program, service, client, policy or fixture change needs appropriate new evidence.
 2. Keep the incomplete 24-hour campaign gate open; any qualifying record must
    truthfully identify its reviewed scope, frozen source/artifacts, elapsed time,
    readable zero-failure/anomaly summary and actual coverage. Resolve the unfinished

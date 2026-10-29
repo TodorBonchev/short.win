@@ -1,0 +1,91 @@
+replacement	Current route compatibility from pinned mainnet snapshots	﻿2026-10-29T01:35:15.7295974Z ##[group]Run python3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/simple-current-route-suite"
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7296879Z ^[[36;1mpython3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/simple-current-route-suite"^[[0m
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7318020Z shell: /usr/bin/bash -e {0}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7318310Z env:
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7318530Z   CARGO_BUILD_JOBS: 2
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7318777Z   CARGO_INCREMENTAL: 0
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7319030Z   AGAVE_VERSION: 4.1.2
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7319448Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7320081Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7320568Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7321086Z   CACHE_ON_FAILURE: false
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7321335Z   MISE_LOG_LEVEL: info
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7324107Z   MISE_GITHUB_TOKEN: ***
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7324483Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7324903Z   MISE_YES: 1
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:15.7325136Z ##[endgroup]
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:16.0293292Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.22s
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:16.5463927Z {"account_count": 20, "candidate": "/home/runner/work/_temp/simple-current-route-suite/bonk-production/candidate/candidate.json", "sha256": "dc9c90e756465c2b3cddbb896b94843037301b2b28c6d18dd630263daabdbbff"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:22.2689115Z {"account_count": 20, "candidate": "/home/runner/work/_temp/simple-current-route-suite/jup-production/candidate/candidate.json", "sha256": "7e8f8035035205a6043b6fe000114cb1eb5fd68fdddbc21ffd62c80b64efdce1"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:28.0186377Z {"account_count": 30, "candidate": "/home/runner/work/_temp/simple-current-route-suite/ray-production-retry/candidate/candidate.json", "sha256": "f6225032527d55ebeab980be5e5fe8a05295341578156ed00751193da5341021"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:33.9532579Z {"account_count": 19, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-curve-production/candidate/candidate.json", "sha256": "c6da1403f895817480e1dc435e5bfb8e3b02452aceff0a4aed88e2cef53cfd62"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:39.8480249Z {"account_count": 20, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-graduated-production/candidate/candidate.json", "sha256": "3546b016fb1a33ebb19e7f049fe2aaaeb4f0ada9f600db45bc369f4393843ff3"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:45.6695529Z {"account_count": 19, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-metadata-production/candidate/candidate.json", "sha256": "acd43db3764203de7b098585a93f1b33eb35af62514fa865fc4aabd3d69bd7b6"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1535682Z {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1536134Z   "cases": [
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1536470Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1536839Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1537273Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1537735Z       "name": "bonk-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1538539Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1539632Z       "stdout_sha256": "dbb2f9896684b723678a0f7ec0e0b8d215e49fad1c6d835ae25ab85dec3b0217",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1540650Z       "summary_sha256": "5bc6997be86a0c136ef2ca48ad84345302e804608ec021510abc870e3ff84cf0",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1541408Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1541972Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1542316Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1542681Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1543107Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1543576Z       "name": "jup-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1544271Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1545204Z       "stdout_sha256": "627c22b1a36685751fe74821413c4253ad15dec15febc7f4d96fe4902298e9fc",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1546192Z       "summary_sha256": "5ee0b52d40bac101e0de04e94d3ca19b5c2a264994c0eb6bab02174bb61cf94d",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1546996Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1547761Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1548090Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1548436Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1548969Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1549471Z       "name": "ray-production-retry",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1550256Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1551244Z       "stdout_sha256": "5cc20826c3fc10b9131472adc7f8fbf6207236619eaffde187be7b010d403459",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1552434Z       "summary_sha256": "fac3c2de8e8c5f4586b04ddf79fbe7c638f218de91f3ba2d9aeaa999a79124a0",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1553144Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1553512Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1553858Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1554195Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1554889Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1555401Z       "name": "pump-curve-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1556188Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1557255Z       "stdout_sha256": "464da7de80448f7924799f572ca9c58ea7d73c6085e427ca527ec8bf74d6907b",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1558318Z       "summary_sha256": "f80222139d00c37822f62e91e88f94dab5fe76fb3cdfd839b2942f63c75c7c29",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1559094Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1559458Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1559771Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1560124Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1560568Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1561076Z       "name": "pump-graduated-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1562020Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1562985Z       "stdout_sha256": "bec544d0fdf8ba039e2b7bf5b17e8d06e900486f0cf72eb497e83667b7850181",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1564052Z       "summary_sha256": "c9a1ad4c8f6f1b56e7c238bc8ff9283e1ae805513a62f3e26c7200e474560556",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1564864Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1565255Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1565600Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1565913Z       "actual": "failed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1566306Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1566772Z       "name": "pump-metadata-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1567528Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1568544Z       "stdout_sha256": "7e9599b1a9cd0dab7fd8064f42f9f4dd8a70f4a5d7074325ae39f510a1107d76",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1569590Z       "summary_sha256": "da90c99f23aff1ffd84b83edba97e6d8a3a953fea1e7c4a5735bbeea0041bfbd",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1570394Z       "verified": false
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1570763Z     }
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1571076Z   ],
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1571860Z   "error": "route outcome differs from pinned matrix: pump-metadata-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1572598Z   "live_transactions_sent": 0,
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1573307Z   "matrix_sha256": "f4f6fdd2978d4b0d1576f0106d9c462c6fdec0205aeb9d7719b7849ed66af2a9",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1574357Z   "native_runner_sha256": "b72b1483a2ae48eb06ed3a9b708738559dbe3f17616d09b623190f706e57456e",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1575431Z   "own_program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1576210Z   "pending": [],
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1576564Z   "schema": 1,
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1577376Z   "scope": "additive non-atomic snapshot compatibility; no live execution, history provenance or 24h qualification",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1578339Z   "status": "failed"
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1578719Z }
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:35:51.1623297Z ##[error]Process completed with exit code 1.

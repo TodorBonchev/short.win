@@ -11,7 +11,8 @@ to build and test the code, what the code relies on, and what we already know ab
   and global exposure remain uncapped. The older 25-SOL default below belongs to
   the legacy program. [Final preparation](audit/simple-final-preparation-2026-10-29.md)
   records safe monitoring-slot reuse, current deterministic routes and new build
-  identities. Fresh long-run and funded operating qualification remain open;
+  identities. [CI 40801471141](https://github.com/TodorBonchev/short.win/actions/runs/40801471141)
+  passed; independent downloaded ELF/IDL and frozen-input checks matched. Fresh long-run and funded operating qualification remain open;
   no stable tag, mainnet deployment, external audit or funded bounty is claimed.
 - **Current mainnet launch policy (owner, 2026-10-27):** launch with existing
   per-market borrowing limits before an external security audit and a funded bug

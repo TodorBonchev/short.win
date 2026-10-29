@@ -1,0 +1,24 @@
+{
+  "corrected_matrix_sha256": "86e4aac03cde449b491059c77c947e0e788a072863ee958b494885e982f70abf",
+  "correction": "default matrix copied byte-for-byte from independently passed archived matrix; frozen archive and program/service/client bytes unchanged",
+  "correction_commit": "8c50fa75e1becd598520fa7e4bd95c84febbd798",
+  "failed_commit": "1be11dac24aa44099d9e783a7b14a429ee7ee2c6",
+  "failed_default_matrix_sha256": "f4f6fdd2978d4b0d1576f0106d9c462c6fdec0205aeb9d7719b7849ed66af2a9",
+  "failed_run": 40801068358,
+  "failure": "default matrix still selected preserved rejected pump-metadata-production capture; independent passed archive matrix already selected pump-metadata-current-8GV",
+  "fresh_ci_run": 40801471141,
+  "fresh_ci_source_commit": "8c50fa75e1becd598520fa7e4bd95c84febbd798",
+  "independent_pointer_review": {
+    "active_matches_archived_matrix": true,
+    "all_route_case_log_hashes_reverified": true,
+    "archived_registry_unchanged": true,
+    "attribution": "independent AI subagent review; not an external-firm audit",
+    "retained_suite_matrix_and_program_match": true
+  },
+  "retained_files_sha256": {
+    "artifacts.json": "b80a457bf6404c5624d4da8460ae4356341e303238d551e661a2d08d563f32f1",
+    "ci-40801068358-failed.log": "563cdb36800fe93219c684e819cb8be76d7897bb287ea0df376811fa956056be",
+    "run-terminal.json": "e27fa3ccb97ab22478308db242f46bce3868e6b1b00eed0e949e371142a6442b"
+  },
+  "status": "corrected_matrix_passed_fresh_full_ci"
+}

@@ -1,0 +1,1377 @@
+replacement	Set up job	﻿2026-10-29T01:36:55.8674998Z Current runner version: '2.338.0'
+replacement	Set up job	2026-10-29T01:36:55.8695846Z ##[group]Runner Image Provisioner
+replacement	Set up job	2026-10-29T01:36:55.8696448Z Hosted Compute Agent
+replacement	Set up job	2026-10-29T01:36:55.8696825Z Version: 20261021.618
+replacement	Set up job	2026-10-29T01:36:55.8697301Z Commit: 21505ad2541d5be6135ed84fc33697146cf75b8e
+replacement	Set up job	2026-10-29T01:36:55.8697724Z Build Date: 2026-10-21T00:45:21Z
+replacement	Set up job	2026-10-29T01:36:55.8698217Z Worker ID: {452e4146-ecad-45df-9d9a-601e719bb59f}
+replacement	Set up job	2026-10-29T01:36:55.8698695Z Region: centralus
+replacement	Set up job	2026-10-29T01:36:55.8699059Z Cloud: Azure
+replacement	Set up job	2026-10-29T01:36:55.8699508Z ##[endgroup]
+replacement	Set up job	2026-10-29T01:36:55.8700348Z ##[group]Operating System
+replacement	Set up job	2026-10-29T01:36:55.8700742Z Ubuntu
+replacement	Set up job	2026-10-29T01:36:55.8701132Z 24.04.5
+replacement	Set up job	2026-10-29T01:36:55.8701471Z LTS
+replacement	Set up job	2026-10-29T01:36:55.8701874Z ##[endgroup]
+replacement	Set up job	2026-10-29T01:36:55.8702199Z ##[group]Runner Image
+replacement	Set up job	2026-10-29T01:36:55.8702588Z Image: ubuntu-24.04
+replacement	Set up job	2026-10-29T01:36:55.8702998Z Version: 20261025.353.1
+replacement	Set up job	2026-10-29T01:36:55.8703893Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261025.353/images/ubuntu/Ubuntu2404-Readme.md
+replacement	Set up job	2026-10-29T01:36:55.8705116Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261025.353
+replacement	Set up job	2026-10-29T01:36:55.8705889Z ##[endgroup]
+replacement	Set up job	2026-10-29T01:36:55.8706846Z ##[group]GITHUB_TOKEN Permissions
+replacement	Set up job	2026-10-29T01:36:55.8708351Z Contents: read
+replacement	Set up job	2026-10-29T01:36:55.8708945Z Metadata: read
+replacement	Set up job	2026-10-29T01:36:55.8709390Z ##[endgroup]
+replacement	Set up job	2026-10-29T01:36:55.8710964Z Secret source: Actions
+replacement	Set up job	2026-10-29T01:36:55.8711624Z Cache mode: write
+replacement	Set up job	2026-10-29T01:36:55.8712058Z Prepare workflow directory
+replacement	Set up job	2026-10-29T01:36:55.8970125Z Prepare all required actions
+replacement	Set up job	2026-10-29T01:36:55.8999308Z Getting action download info
+replacement	Set up job	2026-10-29T01:36:56.1408312Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+replacement	Set up job	2026-10-29T01:36:56.2116401Z Download action repository 'Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6' (SHA:6323deb102c322ba6fcbdcafc7e3dddab59af2b6)
+replacement	Set up job	2026-10-29T01:36:56.6032350Z Download action repository 'jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c' (SHA:c2a87611a18de5b3828c5652fe268e992400cb5c)
+replacement	Set up job	2026-10-29T01:36:57.1582017Z Download action repository 'actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9' (SHA:55cc8345863c7cc4c66a329aec7e433d2d1c52a9)
+replacement	Set up job	2026-10-29T01:36:57.5038792Z Download action repository 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' (SHA:043fb46d1a93c77aae656e7c1c64a875d1fc6a0a)
+replacement	Set up job	2026-10-29T01:36:57.6582177Z Complete job name: replacement
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-10-29T01:36:57.7142716Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7143115Z with:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7143278Z   repository: TodorBonchev/short.win
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7145049Z   token: ***
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7145204Z   ssh-strict: true
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7145352Z   ssh-user: git
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7145508Z   persist-credentials: true
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7145677Z   clean: true
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7145832Z   sparse-checkout-cone-mode: true
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7146021Z   fetch-depth: 1
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7146168Z   fetch-tags: false
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7146319Z   show-progress: true
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7146479Z   lfs: false
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7146616Z   submodules: false
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7146770Z   set-safe-directory: true
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7146942Z   allow-unsafe-pr-checkout: false
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7147190Z env:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7147326Z   CARGO_BUILD_JOBS: 2
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7147477Z   CARGO_INCREMENTAL: 0
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7147627Z   AGAVE_VERSION: 4.1.2
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7147917Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7148276Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7148559Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.7148758Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9071923Z Syncing repository: TodorBonchev/short.win
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9073159Z ##[group]Getting Git version info
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9073850Z Working directory is '/home/runner/work/short.win/short.win'
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9074274Z [command]/usr/bin/git version
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9159331Z git version 2.56.0
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9177435Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9194048Z Temporarily overriding HOME='/home/runner/work/_temp/3fb14950-5dba-4683-baa0-51d854a3a4f3' before making global git config changes
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9195091Z Adding repository directory to the temporary git global config as a safe directory
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9201858Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/short.win/short.win
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9262280Z Deleting the contents of '/home/runner/work/short.win/short.win'
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9275545Z ##[group]Determining repository object format
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9277523Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9295044Z ##[group]Initializing the repository
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9295774Z [command]/usr/bin/git init /home/runner/work/short.win/short.win
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9381207Z hint: Using 'master' as the name for the initial branch. This default branch name
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9382044Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9382561Z hint: to use in all of your new repositories, which will suppress this warning,
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9382969Z hint: call:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9383211Z hint:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9383545Z hint: 	git config --global init.defaultBranch <name>
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9384000Z hint:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9384367Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9384866Z hint: 'development'. The just-created branch can be renamed via this command:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9385249Z hint:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9385482Z hint: 	git branch -m <name>
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9385737Z hint:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9386078Z hint: Disable this message with "git config set advice.defaultBranchName false"
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9388234Z Initialized empty Git repository in /home/runner/work/short.win/short.win/.git/
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9397181Z [command]/usr/bin/git remote add origin https://github.com/TodorBonchev/short.win
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9449862Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9450653Z ##[group]Disabling automatic garbage collection
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9452876Z [command]/usr/bin/git config --local gc.auto 0
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9489107Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9490132Z ##[group]Setting up auth
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9490638Z Removing SSH command configuration
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9495606Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9533913Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9828479Z Removing HTTP extra header
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9832822Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:57.9870224Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0055916Z Removing includeIf entries pointing to credentials config files
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0059339Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0095921Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0284098Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0323279Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/short.win/short.win/.git.path /home/runner/work/_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0359239Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0395762Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0431856Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0466555Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0470653Z ##[group]Fetching the repository
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:36:58.0471146Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +8c50fa75e1becd598520fa7e4bd95c84febbd798:refs/remotes/origin/codex/jupiter-only-pooled
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7425855Z From https://github.com/TodorBonchev/short.win
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7426979Z  * [new ref]         8c50fa75e1becd598520fa7e4bd95c84febbd798 -> origin/codex/jupiter-only-pooled
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7433947Z [command]/usr/bin/git branch --list --remote origin/codex/jupiter-only-pooled
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7467897Z   origin/codex/jupiter-only-pooled
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7473284Z [command]/usr/bin/git rev-parse refs/remotes/origin/codex/jupiter-only-pooled
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7504064Z 8c50fa75e1becd598520fa7e4bd95c84febbd798
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7507241Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7507681Z ##[group]Determining the checkout info
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7508139Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7510773Z [command]/usr/bin/git sparse-checkout disable
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7561628Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7597998Z ##[group]Checking out the ref
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:03.7601163Z [command]/usr/bin/git checkout --progress --force -B codex/jupiter-only-pooled refs/remotes/origin/codex/jupiter-only-pooled
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:04.2759653Z Switched to a new branch 'codex/jupiter-only-pooled'
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:04.2775040Z branch 'codex/jupiter-only-pooled' set up to track 'origin/codex/jupiter-only-pooled'.
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:04.2802415Z ##[endgroup]
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:04.2874513Z [command]/usr/bin/git log -1 --format=%H
+replacement	Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:37:04.2893324Z 8c50fa75e1becd598520fa7e4bd95c84febbd798
+replacement	Run rustup toolchain install || rustup show	﻿2026-10-29T01:37:04.3057247Z ##[group]Run rustup toolchain install || rustup show
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3057521Z ^[[36;1mrustup toolchain install || rustup show^[[0m
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3074895Z shell: /usr/bin/bash -e {0}
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3075044Z env:
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3075152Z   CARGO_BUILD_JOBS: 2
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3075286Z   CARGO_INCREMENTAL: 0
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3075404Z   AGAVE_VERSION: 4.1.2
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3075620Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3075942Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3076195Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3076359Z ##[endgroup]
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.3455092Z info: syncing channel updates for 1.98.1-x86_64-unknown-linux-gnu
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.5928100Z info: latest update on 2026-09-03 for version 1.98.1 (48a229cea 2026-09-01)
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:04.5932525Z info: downloading 6 components
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:12.4566961Z info: the active toolchain `1.98.1-x86_64-unknown-linux-gnu` has been installed
+replacement	Run rustup toolchain install || rustup show	2026-10-29T01:37:12.4567560Z info: it's active because: overridden by '/home/runner/work/short.win/short.win/rust-toolchain.toml'
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	﻿2026-10-29T01:37:12.4790769Z ##[group]Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4791005Z with:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4791128Z   workspaces: simple
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4791254Z   key: simple-pooled-v1
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4791381Z   prefix-key: v0-rust
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4791501Z   add-job-id-key: true
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4791668Z   add-rust-environment-hash-key: true
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4791960Z   cache-targets: true
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792082Z   cache-all-crates: false
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792221Z   cache-workspace-crates: false
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792356Z   save-if: true
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792470Z   cache-provider: github
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792593Z   cache-bin: true
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792705Z   lookup-only: false
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792819Z   cmd-format: {0}
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4792931Z env:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4793036Z   CARGO_BUILD_JOBS: 2
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4793174Z   CARGO_INCREMENTAL: 0
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4793291Z   AGAVE_VERSION: 4.1.2
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4793508Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4794034Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4794286Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.4794450Z ##[endgroup]
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8752038Z ##[group]Cache Configuration
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8752374Z Cache Provider:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8752576Z     github
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8752763Z Workspaces:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8752973Z     /home/runner/work/short.win/short.win/simple
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8753209Z Cache Paths:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8753340Z     /home/runner/.cargo/bin
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8753515Z     /home/runner/.cargo/.crates.toml
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8753679Z     /home/runner/.cargo/.crates2.json
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8754041Z     /home/runner/.cargo/registry
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8754195Z     /home/runner/.cargo/git
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8754364Z     /home/runner/work/short.win/short.win/simple/target
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8754596Z Restore Key:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8754761Z     v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8754961Z Cache Key:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8755145Z     v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942-4852fe6c
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8755358Z .. Prefix:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8755530Z   - v0-rust-simple-pooled-v1-replacement-Linux-x64
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8755734Z .. Environment considered:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8755875Z   - Rust Versions:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8756074Z     - 1.98.1 x86_64-unknown-linux-gnu 48a229ceaefd4985c50990b14116b6d856af0985
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8756338Z     - 1.99.1 x86_64-unknown-linux-gnu 58cf8f9c35b355199727627d07ae34a4e2846d67
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8756637Z   - CARGO_BUILD_JOBS
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8756757Z   - CARGO_INCREMENTAL
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8756878Z .. Lockfiles considered:
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8757047Z   - /home/runner/work/short.win/short.win/rust-toolchain.toml
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8757263Z   - /home/runner/work/short.win/short.win/simple/Cargo.lock
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8757513Z   - /home/runner/work/short.win/short.win/simple/crates/jupiter-route/Cargo.toml
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8757804Z   - /home/runner/work/short.win/short.win/simple/crates/pooled-core/Cargo.toml
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8758104Z   - /home/runner/work/short.win/short.win/simple/programs/shortwin-simple/Cargo.toml
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8758408Z   - /home/runner/work/short.win/short.win/simple/tests/runtime/Cargo.toml
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8758731Z ##[endgroup]
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8758803Z 
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:12.8758862Z ... Restoring cache ...
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:13.0221434Z Cache hit for: v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942-4852fe6c
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:14.1911993Z Received 83886080 of 683574585 (12.3%), 80.0 MBs/sec
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:15.1964795Z Received 260046848 of 683574585 (38.0%), 123.8 MBs/sec
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:16.1975359Z Received 385875968 of 683574585 (56.4%), 122.5 MBs/sec
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:17.1952230Z Received 536870912 of 683574585 (78.5%), 127.8 MBs/sec
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:18.0655489Z Received 683574585 of 683574585 (100.0%), 133.8 MBs/sec
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:18.0670837Z Cache Size: ~652 MB (683574585 B)
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:18.0709910Z [command]/usr/bin/tar -xf /home/runner/work/_temp/b81feb42-c10e-4409-bdde-fba697853149/cache.tzst -P -C /home/runner/work/short.win/short.win --use-compress-program unzstd
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:27.4551377Z Cache restored successfully
+replacement	Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:37:27.4838210Z Restored from cache key "v0-rust-simple-pooled-v1-replacement-Linux-x64-d1f26942-4852fe6c" full match: true.
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	﻿2026-10-29T01:37:27.6388573Z ##[group]Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6388797Z with:
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6388907Z   install: true
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389021Z   bootstrap: false
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389131Z   cache: true
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389238Z   cache_save: true
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389361Z   cache_key_prefix: mise-v1
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389494Z   experimental: false
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389612Z   log_level: info
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389723Z   reshim: false
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6389846Z   add_shims_to_path: true
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6391304Z   github_token: ***
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6391421Z   fetch_from_github: true
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6391541Z   env: true
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6391643Z   export_path: true
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6391758Z   wings_enabled: false
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6391892Z env:
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6391998Z   CARGO_BUILD_JOBS: 2
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6392118Z   CARGO_INCREMENTAL: 0
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6392240Z   AGAVE_VERSION: 4.1.2
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6392451Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6392791Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6393036Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6393203Z   CACHE_ON_FAILURE: false
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.6393332Z ##[endgroup]
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.7283565Z ##[group]Restoring mise cache
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.7311565Z [command]/usr/bin/ldd --version
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.7395080Z ldd (Ubuntu GLIBC 2.39-0ubuntu8.9) 2.39
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.7397378Z Copyright (C) 2024 Free Software Foundation, Inc.
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.7398139Z This is free software; see the source for copying conditions.  There is NO
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.7399003Z warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:27.7399663Z Written by Roland McGrath and Ulrich Drepper.
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:28.9013630Z Cache hit for: mise-v1-linux-x64-ubuntu24-40c159f0ba28c92c480a840a29754a2b437c693ae445f52eaf84eadfc97c89be
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:29.8275040Z Received 118161541 of 118161541 (100.0%), 139.8 MBs/sec
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:29.8275487Z Cache Size: ~113 MB (118161541 B)
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:29.8299289Z [command]/usr/bin/tar -xf /home/runner/work/_temp/ec7124af-b094-4d77-b5ce-e7db8286f375/cache.tzst -P -C /home/runner/work/short.win/short.win --use-compress-program unzstd
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3719838Z Cache restored successfully
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3774051Z mise cache restored from key: mise-v1-linux-x64-ubuntu24-40c159f0ba28c92c480a840a29754a2b437c693ae445f52eaf84eadfc97c89be
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3779424Z ##[group]Setting env vars
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3779576Z Setting MISE_LOG_LEVEL=info
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3782343Z Setting MISE_GITHUB_TOKEN=***
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3782631Z Setting MISE_TRUSTED_CONFIG_PATHS=/home/runner/work/short.win/short.win
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3782876Z Setting MISE_YES=1
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3783037Z Adding /home/runner/.local/share/mise/shims to PATH
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3783338Z ##[group]Running mise --version
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3794261Z [command]/home/runner/.local/share/mise/bin/mise --version
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3921100Z 2026.10.0 linux-x64 (2026-10-02)
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.3930298Z ##[endgroup]
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4071261Z ##[group]Running mise install
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4078760Z [command]/home/runner/.local/share/mise/bin/mise install
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4231160Z ^[[2mmise^[[0m ^[[2mby @jdx^[[0m – installing 2 tools
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4232415Z ^[[2mmise^[[0m ^[[38;5;11m⇢^[[0m node@24.21.0  0ms · already installed
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4232960Z ^[[2mmise^[[0m ^[[38;5;11m⇢^[[0m pnpm@12.7.0   0ms · already installed
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4233581Z ^[[2mmise^[[0m ^[[36m████████████████^[[0m^[[31m^[[0m^[[2m^[[0m 2/2 · installed 0 tools · 2 already installed in 1ms
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4234792Z ^[[2mmise^[[0m all tools are installed
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4282274Z ##[endgroup]
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4282941Z ##[group]Running mise ls
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4293404Z [command]/home/runner/.local/share/mise/bin/mise ls
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4441731Z node  24.21.0  ~/work/short.win/short.win/mise.toml  24.21.0
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4442361Z pnpm  12.7.0   ~/work/short.win/short.win/mise.toml  12.7.0
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4454944Z ##[endgroup]
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4457248Z ##[group]Exporting mise environment variables
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4641998Z [command]/home/runner/.local/share/mise/bin/mise env --json
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4795237Z {
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4796502Z   "PATH": "/home/runner/.local/share/mise/installs/pnpm/12.7.0:/home/runner/.local/share/mise/installs/node/24.21.0/bin:/home/runner/.local/share/mise/shims:/home/runner/.local/share/mise/bin:/snap/bin:/home/runner/.local/bin:/opt/pipx_bin:/home/runner/.cargo/bin:/home/runner/.config/composer/vendor/bin:/usr/local/.ghcup/bin:/home/runner/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games"
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4797544Z }
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4827340Z Adding /home/runner/.local/share/mise/installs/node/24.21.0/bin to PATH
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4846052Z Adding /home/runner/.local/share/mise/installs/pnpm/12.7.0 to PATH
+replacement	Run jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c	2026-10-29T01:37:30.4854927Z ##[endgroup]
+replacement	Cache pinned SBF tools and Anchor CLI	﻿2026-10-29T01:37:30.7104009Z ##[group]Run actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7104826Z with:
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7105129Z   path: ~/.local/share/solana/install
+replacement	Cache pinned SBF tools and Anchor CLI	~/.cache/solana/v1.57
+replacement	Cache pinned SBF tools and Anchor CLI	~/.cargo/bin/anchor
+replacement	Cache pinned SBF tools and Anchor CLI	
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7105895Z   key: sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7106585Z   enableCrossOsArchive: false
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7106817Z   fail-on-cache-miss: false
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7107033Z   lookup-only: false
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7107222Z   save-always: false
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7107430Z env:
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7107599Z   CARGO_BUILD_JOBS: 2
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7107795Z   CARGO_INCREMENTAL: 0
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7107987Z   AGAVE_VERSION: 4.1.2
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7108336Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7108857Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7109307Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7109576Z   CACHE_ON_FAILURE: false
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7109777Z   MISE_LOG_LEVEL: info
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7112519Z   MISE_GITHUB_TOKEN: ***
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7112805Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7113110Z   MISE_YES: 1
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.7113287Z ##[endgroup]
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:30.9286844Z Cache hit for: sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:32.0693186Z Received 109051904 of 785884067 (13.9%), 103.9 MBs/sec
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:33.0733958Z Received 268435456 of 785884067 (34.2%), 127.4 MBs/sec
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:34.0729117Z Received 490733568 of 785884067 (62.4%), 155.6 MBs/sec
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:35.0737368Z Received 671088640 of 785884067 (85.4%), 159.6 MBs/sec
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:35.8078237Z Received 785884067 of 785884067 (100.0%), 158.0 MBs/sec
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:35.8079797Z Cache Size: ~749 MB (785884067 B)
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:35.8106063Z [command]/usr/bin/tar -xf /home/runner/work/_temp/5fc17586-ed12-488c-a6b5-2694b53b81aa/cache.tzst -P -C /home/runner/work/short.win/short.win --use-compress-program unzstd
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:42.8014178Z Cache restored successfully
+replacement	Cache pinned SBF tools and Anchor CLI	2026-10-29T01:37:42.8388798Z Cache restored from key: sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux
+replacement	Select Agave	﻿2026-10-29T01:37:42.8739311Z ##[group]Run echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+replacement	Select Agave	2026-10-29T01:37:42.8740084Z ^[[36;1mecho "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"^[[0m
+replacement	Select Agave	2026-10-29T01:37:42.8761598Z shell: /usr/bin/bash -e {0}
+replacement	Select Agave	2026-10-29T01:37:42.8761836Z env:
+replacement	Select Agave	2026-10-29T01:37:42.8762012Z   CARGO_BUILD_JOBS: 2
+replacement	Select Agave	2026-10-29T01:37:42.8762218Z   CARGO_INCREMENTAL: 0
+replacement	Select Agave	2026-10-29T01:37:42.8762425Z   AGAVE_VERSION: 4.1.2
+replacement	Select Agave	2026-10-29T01:37:42.8762718Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Select Agave	2026-10-29T01:37:42.8763059Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Select Agave	2026-10-29T01:37:42.8763323Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Select Agave	2026-10-29T01:37:42.8763507Z   CACHE_ON_FAILURE: false
+replacement	Select Agave	2026-10-29T01:37:42.8763644Z   MISE_LOG_LEVEL: info
+replacement	Select Agave	2026-10-29T01:37:42.8765553Z   MISE_GITHUB_TOKEN: ***
+replacement	Select Agave	2026-10-29T01:37:42.8765750Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Select Agave	2026-10-29T01:37:42.8765987Z   MISE_YES: 1
+replacement	Select Agave	2026-10-29T01:37:42.8766117Z ##[endgroup]
+replacement	Materialize hash-pinned historical Jupiter witness	﻿2026-10-29T01:37:43.1821703Z ##[group]Run python3 scripts/materialize-jupiter-probe.py
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1822026Z ^[[36;1mpython3 scripts/materialize-jupiter-probe.py^[[0m
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1839169Z shell: /usr/bin/bash -e {0}
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1839337Z env:
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1839462Z   CARGO_BUILD_JOBS: 2
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1839604Z   CARGO_INCREMENTAL: 0
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1839738Z   AGAVE_VERSION: 4.1.2
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1839993Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1840360Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1840651Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1840840Z   CACHE_ON_FAILURE: false
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1840974Z   MISE_LOG_LEVEL: info
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1842685Z   MISE_GITHUB_TOKEN: ***
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1842886Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1843112Z   MISE_YES: 1
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.1843272Z ##[endgroup]
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3926067Z {
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3926756Z   "scope": "candidate-only frozen runtime input; not a live route or production qualification",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3927215Z   "context_slot": 461997164,
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3927492Z   "deploy_slot": 459479624,
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3927870Z   "raw_rpc_sha256": "c611ab92f91fd6bf4ce415054a1e72cad3a3abe1bef5c2bb22f1e574d7a3c3ff",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3928381Z   "elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3928872Z   "accounts": [
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3929076Z     {
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3929268Z       "name": "program",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3929569Z       "key": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3929978Z       "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3930343Z       "lamports": 6969116527,
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3930604Z       "executable": true,
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3930887Z       "rentEpoch": 18446744073709551615
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3931158Z     },
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3931335Z     {
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3931523Z       "name": "programdata",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3931866Z       "key": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3932312Z       "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3932638Z       "lamports": 14693376760,
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3932888Z       "executable": false,
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3933158Z       "rentEpoch": 18446744073709551615
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3933409Z     }
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3933584Z   ]
+replacement	Materialize hash-pinned historical Jupiter witness	2026-10-29T01:37:43.3933881Z }
+replacement	Native checks	﻿2026-10-29T01:37:43.5028142Z ##[group]Run cargo fmt --all --check
+replacement	Native checks	2026-10-29T01:37:43.5028383Z ^[[36;1mcargo fmt --all --check^[[0m
+replacement	Native checks	2026-10-29T01:37:43.5028610Z ^[[36;1mcargo clippy --workspace --all-targets --locked -- -D warnings^[[0m
+replacement	Native checks	2026-10-29T01:37:43.5028873Z ^[[36;1mpython3 -m unittest discover -s services/tests -v^[[0m
+replacement	Native checks	2026-10-29T01:37:43.5029125Z ^[[36;1mpython3 -m unittest discover -s config -p 'test_*.py' -v^[[0m
+replacement	Native checks	2026-10-29T01:37:43.5029527Z ^[[36;1mpython3 config/verify-production-proposal.py^[[0m
+replacement	Native checks	2026-10-29T01:37:43.5046989Z shell: /usr/bin/bash -e {0}
+replacement	Native checks	2026-10-29T01:37:43.5047144Z env:
+replacement	Native checks	2026-10-29T01:37:43.5047272Z   CARGO_BUILD_JOBS: 2
+replacement	Native checks	2026-10-29T01:37:43.5047407Z   CARGO_INCREMENTAL: 0
+replacement	Native checks	2026-10-29T01:37:43.5047542Z   AGAVE_VERSION: 4.1.2
+replacement	Native checks	2026-10-29T01:37:43.5047775Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Native checks	2026-10-29T01:37:43.5048122Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Native checks	2026-10-29T01:37:43.5048399Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Native checks	2026-10-29T01:37:43.5048622Z   CACHE_ON_FAILURE: false
+replacement	Native checks	2026-10-29T01:37:43.5048762Z   MISE_LOG_LEVEL: info
+replacement	Native checks	2026-10-29T01:37:43.5050430Z   MISE_GITHUB_TOKEN: ***
+replacement	Native checks	2026-10-29T01:37:43.5050630Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Native checks	2026-10-29T01:37:43.5050837Z   MISE_YES: 1
+replacement	Native checks	2026-10-29T01:37:43.5050972Z ##[endgroup]
+replacement	Native checks	2026-10-29T01:37:43.8358915Z     Updating crates.io index
+replacement	Native checks	2026-10-29T01:37:45.5280061Z     Checking shortwin-pooled-core v1.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+replacement	Native checks	2026-10-29T01:37:45.5322482Z     Checking shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+replacement	Native checks	2026-10-29T01:37:45.5987535Z     Checking shortwin-simple v1.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+replacement	Native checks	2026-10-29T01:37:46.8577226Z     Checking shortwin-simple-runtime-tests v1.1.0 (/home/runner/work/short.win/short.win/simple/tests/runtime)
+replacement	Native checks	2026-10-29T01:37:47.6038314Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.79s
+replacement	Native checks	2026-10-29T01:37:47.9369900Z test_changed_store_path_or_program_cannot_overwrite_binding_even_via_other_connection (test_operator_binding.OperatorBindingTests.test_changed_store_path_or_program_cannot_overwrite_binding_even_via_other_connection) ... ok
+replacement	Native checks	2026-10-29T01:37:47.9434586Z test_exact_duplicate_binding_is_durable_without_resetting_queue_or_allowances (test_operator_binding.OperatorBindingTests.test_exact_duplicate_binding_is_durable_without_resetting_queue_or_allowances) ... ok
+replacement	Native checks	2026-10-29T01:37:47.9543048Z test_fresh_history_has_stable_distinct_uuid_and_exposes_unbound_state (test_operator_binding.OperatorBindingTests.test_fresh_history_has_stable_distinct_uuid_and_exposes_unbound_state) ... ok
+replacement	Native checks	2026-10-29T01:37:47.9606272Z test_malformed_binding_and_corrupted_identity_are_not_repaired_or_overwritten (test_operator_binding.OperatorBindingTests.test_malformed_binding_and_corrupted_identity_are_not_repaired_or_overwritten) ... ok
+replacement	Native checks	2026-10-29T01:37:47.9669961Z test_missing_uuid_in_existing_modeled_database_fails_without_recreation (test_operator_binding.OperatorBindingTests.test_missing_uuid_in_existing_modeled_database_fails_without_recreation) ... ok
+replacement	Native checks	2026-10-29T01:37:47.9777141Z test_replaced_history_cannot_reproduce_external_identity_anchor (test_operator_binding.OperatorBindingTests.test_replaced_history_cannot_reproduce_external_identity_anchor) ... ok
+replacement	Native checks	2026-10-29T01:37:47.9870815Z test_trusted_cli_accepts_stdin_and_queue_state_returns_identical_binding (test_operator_binding.OperatorBindingTests.test_trusted_cli_accepts_stdin_and_queue_state_returns_identical_binding) ... ok
+replacement	Native checks	2026-10-29T01:37:47.9929425Z test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages (test_price_service.PriceServiceTests.test_bounded_account_fallback_supports_larger_ordinary_routes_without_retrying_outages) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0089751Z test_completed_exact_quantity_history_survives_restart (test_price_service.PriceServiceTests.test_completed_exact_quantity_history_survives_restart) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0148662Z test_exact_in_buy_search_requires_guaranteed_full_quantity (test_price_service.PriceServiceTests.test_exact_in_buy_search_requires_guaranteed_full_quantity) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0642968Z test_gap_unknown_stale_and_future_never_become_finite (test_price_service.PriceServiceTests.test_gap_unknown_stale_and_future_never_become_finite) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0703974Z test_keyless_http_omits_api_header_and_keeps_exact_input_contract (test_price_service.PriceServiceTests.test_keyless_http_omits_api_header_and_keeps_exact_input_contract) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0766436Z test_legacy_loan_sync_can_only_add_priority_and_rolls_back_capacity_failure (test_price_service.PriceServiceTests.test_legacy_loan_sync_can_only_add_priority_and_rolls_back_capacity_failure) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0828956Z test_model_change_requires_fresh_history_and_u64_quantities_remain_exact (test_price_service.PriceServiceTests.test_model_change_requires_fresh_history_and_u64_quantities_remain_exact) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0885648Z test_nonadvancing_history_write_rolls_back_without_replacing_evidence (test_price_service.PriceServiceTests.test_nonadvancing_history_write_rolls_back_without_replacing_evidence) ... ok
+replacement	Native checks	2026-10-29T01:37:48.0938953Z test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread (test_price_service.PriceServiceTests.test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread) ... ok
+replacement	Native checks	2026-10-29T01:37:48.1617017Z test_policy_hash_export_and_stdin_cli_match_immutable_terms (test_price_service.PriceServiceTests.test_policy_hash_export_and_stdin_cli_match_immutable_terms) ... ok
+replacement	Native checks	2026-10-29T01:37:48.1681797Z test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them (test_price_service.PriceServiceTests.test_publication_requests_are_explicit_and_loan_sync_does_not_refresh_them) ... ok
+replacement	Native checks	2026-10-29T01:37:48.1751317Z test_queue_is_bounded_and_no_entry_is_evicted_without_reconciliation (test_price_service.PriceServiceTests.test_queue_is_bounded_and_no_entry_is_evicted_without_reconciliation) ... ok
+replacement	Native checks	2026-10-29T01:37:48.1809100Z test_quote_domain_and_threshold_are_validated_without_float_amounts (test_price_service.PriceServiceTests.test_quote_domain_and_threshold_are_validated_without_float_amounts) ... ok
+replacement	Native checks	2026-10-29T01:37:48.1862497Z test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model (test_price_service.PriceServiceTests.test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model) ... ok
+replacement	Native checks	2026-10-29T01:37:48.1924667Z test_shared_database_provider_spacing_and_capacity_are_explicit (test_price_service.PriceServiceTests.test_shared_database_provider_spacing_and_capacity_are_explicit) ... ok
+replacement	Native checks	2026-10-29T01:37:48.1978514Z test_shared_or_mismatched_scalar_header_is_not_a_finite_quote (test_price_service.PriceServiceTests.test_shared_or_mismatched_scalar_header_is_not_a_finite_quote) ... ok
+replacement	Native checks	2026-10-29T01:37:48.2034847Z test_tick_preserves_explicit_unknown_on_provider_failure (test_price_service.PriceServiceTests.test_tick_preserves_explicit_unknown_on_provider_failure) ... ok
+replacement	Native checks	2026-10-29T01:37:48.4487068Z test_bounded_cases_have_real_counts_and_exact_durable_hashes (test_queue_fuzz_cli.QueueFuzzCliTests.test_bounded_cases_have_real_counts_and_exact_durable_hashes) ... ok
+replacement	Native checks	2026-10-29T01:37:49.5260645Z test_duration_finishes_inflight_case_without_borrowing_time (test_queue_fuzz_cli.QueueFuzzCliTests.test_duration_finishes_inflight_case_without_borrowing_time) ... ok
+replacement	Native checks	2026-10-29T01:37:49.5510159Z test_failure_preserves_raw_sqlite_bundle_before_connection_close (test_queue_fuzz_cli.QueueFuzzCliTests.test_failure_preserves_raw_sqlite_bundle_before_connection_close) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6136293Z test_supervisor_stop_is_partial_nonzero_with_readable_evidence (test_queue_fuzz_cli.QueueFuzzCliTests.test_supervisor_stop_is_partial_nonzero_with_readable_evidence) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6203683Z test_active_capacity_failure_rolls_back_demotions_and_retirements (test_queue_lifecycle.QueueLifecycleTests.test_active_capacity_failure_rolls_back_demotions_and_retirements) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6271400Z test_both_reference_clocks_must_expire_before_retiring_resolved_debt (test_queue_lifecycle.QueueLifecycleTests.test_both_reference_clocks_must_expire_before_retiring_resolved_debt) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6539713Z test_cached_snapshot_retry_rejects_enqueue_or_record_after_prior_application (test_queue_lifecycle.QueueLifecycleTests.test_cached_snapshot_retry_rejects_enqueue_or_record_after_prior_application) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6600222Z test_exact_reference_freshness_boundaries_are_retained (test_queue_lifecycle.QueueLifecycleTests.test_exact_reference_freshness_boundaries_are_retained) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6690529Z test_full_active_queue_and_pending_intent_cannot_be_replaced (test_queue_lifecycle.QueueLifecycleTests.test_full_active_queue_and_pending_intent_cannot_be_replaced) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6754907Z test_incomplete_unlocked_future_or_stale_snapshot_never_mutates_queue (test_queue_lifecycle.QueueLifecycleTests.test_incomplete_unlocked_future_or_stale_snapshot_never_mutates_queue) ... ok
+replacement	Native checks	2026-10-29T01:37:49.6933024Z test_new_generation_cannot_reuse_old_private_history_or_old_fulfillment (test_queue_lifecycle.QueueLifecycleTests.test_new_generation_cannot_reuse_old_private_history_or_old_fulfillment) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7019536Z test_old_model_database_is_preserved_without_schema_migration (test_queue_lifecycle.QueueLifecycleTests.test_old_model_database_is_preserved_without_schema_migration) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7093508Z test_pending_publication_survives_restart_until_explicitly_reconciled (test_queue_lifecycle.QueueLifecycleTests.test_pending_publication_survives_restart_until_explicitly_reconciled) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7160759Z test_revision_cas_rejects_enqueue_or_observation_races_atomically (test_queue_lifecycle.QueueLifecycleTests.test_revision_cas_rejects_enqueue_or_observation_races_atomically) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7222340Z test_slot_expiry_alone_is_not_enough_and_active_debt_always_wins (test_queue_lifecycle.QueueLifecycleTests.test_slot_expiry_alone_is_not_enough_and_active_debt_always_wins) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7284904Z test_snapshot_order_same_slot_conflict_and_exact_replay_are_durable (test_queue_lifecycle.QueueLifecycleTests.test_snapshot_order_same_slot_conflict_and_exact_replay_are_durable) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7347543Z test_stale_tick_cannot_write_into_readmitted_cohort (test_queue_lifecycle.QueueLifecycleTests.test_stale_tick_cannot_write_into_readmitted_cohort) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7415291Z test_unused_warm_timeout_releases_one_slot_without_touching_financial_metadata (test_queue_lifecycle.QueueLifecycleTests.test_unused_warm_timeout_releases_one_slot_without_touching_financial_metadata) ... ok
+replacement	Native checks	2026-10-29T01:37:49.7415730Z 
+replacement	Native checks	2026-10-29T01:37:49.7415837Z ----------------------------------------------------------------------
+replacement	Native checks	2026-10-29T01:37:49.7416050Z Ran 42 tests in 1.824s
+replacement	Native checks	2026-10-29T01:37:49.7416138Z 
+replacement	Native checks	2026-10-29T01:37:49.7416204Z OK
+replacement	Native checks	2026-10-29T01:37:49.8105822Z test_both_profiles_match_actual_service_and_reject_drift (test_production_proposal.ProductionProposalTests.test_both_profiles_match_actual_service_and_reject_drift) ... ok
+replacement	Native checks	2026-10-29T01:37:49.8106634Z test_execute_cannot_be_enabled_in_review_manifest (test_production_proposal.ProductionProposalTests.test_execute_cannot_be_enabled_in_review_manifest) ... ok
+replacement	Native checks	2026-10-29T01:37:49.8107426Z test_local_placeholder_program_is_not_production_assignment (test_production_proposal.ProductionProposalTests.test_local_placeholder_program_is_not_production_assignment) ... ok
+replacement	Native checks	2026-10-29T01:37:49.8108290Z test_reporter_cannot_be_governance (test_production_proposal.ProductionProposalTests.test_reporter_cannot_be_governance) ... ok
+replacement	Native checks	2026-10-29T01:37:49.8109431Z test_unassigned_proposal_cannot_pass_assignment_gate (test_production_proposal.ProductionProposalTests.test_unassigned_proposal_cannot_pass_assignment_gate) ... ok
+replacement	Native checks	2026-10-29T01:37:49.8111563Z test_zero_or_malformed_public_key_is_rejected (test_production_proposal.ProductionProposalTests.test_zero_or_malformed_public_key_is_rejected) ... ok
+replacement	Native checks	2026-10-29T01:37:49.8112649Z 
+replacement	Native checks	2026-10-29T01:37:49.8112792Z ----------------------------------------------------------------------
+replacement	Native checks	2026-10-29T01:37:49.8113106Z Ran 6 tests in 0.001s
+replacement	Native checks	2026-10-29T01:37:49.8113392Z 
+replacement	Native checks	2026-10-29T01:37:49.8113468Z OK
+replacement	Native checks	2026-10-29T01:37:49.8676376Z {
+replacement	Native checks	2026-10-29T01:37:49.8676763Z   "captured_reference_deposit": {
+replacement	Native checks	2026-10-29T01:37:49.8677046Z     "allocation_bytes": 205,
+replacement	Native checks	2026-10-29T01:37:49.8677277Z     "deposit_lamports": 1691640,
+replacement	Native checks	2026-10-29T01:37:49.8677670Z     "minimum_size_loan_protocol_fee_shares_to_cover_deposit_before_other_costs": 9,
+replacement	Native checks	2026-10-29T01:37:49.8678345Z     "note": "Storage deposit is locked capital, not a funded-operation receipt or a current price guarantee; no reference close instruction exists.",
+replacement	Native checks	2026-10-29T01:37:49.8678907Z     "observed_utc": "2026-10-28T19:57:48.450888+00:00",
+replacement	Native checks	2026-10-29T01:37:49.8679326Z     "response_sha256": "e3533cddf22cdac9e1b41a7fdedf4d0ed7d82734fbb42c4d0ef0c188a16e2499",
+replacement	Native checks	2026-10-29T01:37:49.8679780Z     "status": "dated_read_only_rpc_observation"
+replacement	Native checks	2026-10-29T01:37:49.8680041Z   },
+replacement	Native checks	2026-10-29T01:37:49.8680205Z   "financial_model": {
+replacement	Native checks	2026-10-29T01:37:49.8680493Z     "bid_trigger_factor_bps_of_opening_notional_at_equal_sale_ask": 12500,
+replacement	Native checks	2026-10-29T01:37:49.8680840Z     "conditional_bounds": [
+replacement	Native checks	2026-10-29T01:37:49.8681381Z       "The 25% bid-rise trigger assumes unchanged collateral and initial bid equals N; max historical bid must also qualify and confirmation must complete.",
+replacement	Native checks	2026-10-29T01:37:49.8682296Z       "Finite ask upper is one successful exact-input guaranteed-output quote, not fair value, global cheapest price, monotonicity, or a future executable guarantee.",
+replacement	Native checks	2026-10-29T01:37:49.8683150Z       "Default distributes SOL, not a guarantee of recovering the lent token quantity. No economic payout goes to the borrower after grace.",
+replacement	Native checks	2026-10-29T01:37:49.8684010Z       "Fee examples omit network fees and refundable account/scratch deposits. No accrued fee or rate refund exists.",
+replacement	Native checks	2026-10-29T01:37:49.8684836Z       "Utilization and booked SOL caps are checked on opening; withdrawals, current prices, sybil wallets and uncapped market creation defeat any claimed global or permanent cash reserve."
+replacement	Native checks	2026-10-29T01:37:49.8685444Z     ],
+replacement	Native checks	2026-10-29T01:37:49.8685677Z     "example_1000_token_cash_opening_borrow_limit_raw_tokens": 600,
+replacement	Native checks	2026-10-29T01:37:49.8686024Z     "example_three_transactions_at_25000_lamports_each": 75000,
+replacement	Native checks	2026-10-29T01:37:49.8686334Z     "maximum_size_positions_at_market_booked_cap": 5,
+replacement	Native checks	2026-10-29T01:37:49.8686720Z     "minimum_fee_protocol_revenue_covers_25000_lamport_transactions_before_other_costs": 8,
+replacement	Native checks	2026-10-29T01:37:49.8687089Z     "minimum_notional_stress_examples": [
+replacement	Native checks	2026-10-29T01:37:49.8687310Z       {
+replacement	Native checks	2026-10-29T01:37:49.8687510Z         "ask_upper_at_maximum_spread_lamports": 105000000,
+replacement	Native checks	2026-10-29T01:37:49.8687794Z         "bid_factor_bps_of_opening_notional": 10000,
+replacement	Native checks	2026-10-29T01:37:49.8688075Z         "bid_health_unhealthy_strict_boundary": false,
+replacement	Native checks	2026-10-29T01:37:49.8688340Z         "bid_lower_lamports": 100000000,
+replacement	Native checks	2026-10-29T01:37:49.8688596Z         "default_borrower_economic_sol_lamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8688860Z         "default_lender_sol_lamports": 248650000,
+replacement	Native checks	2026-10-29T01:37:49.8689139Z         "default_sol_as_bps_of_current_tested_ask": 23680,
+replacement	Native checks	2026-10-29T01:37:49.8689434Z         "illustrative_forced_budget_lamports": 110250000,
+replacement	Native checks	2026-10-29T01:37:49.8689753Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 625000,
+replacement	Native checks	2026-10-29T01:37:49.8690045Z         "this_tested_ask_fits_budget": true
+replacement	Native checks	2026-10-29T01:37:49.8690271Z       },
+replacement	Native checks	2026-10-29T01:37:49.8690418Z       {
+replacement	Native checks	2026-10-29T01:37:49.8690613Z         "ask_upper_at_maximum_spread_lamports": 131250000,
+replacement	Native checks	2026-10-29T01:37:49.8690894Z         "bid_factor_bps_of_opening_notional": 12500,
+replacement	Native checks	2026-10-29T01:37:49.8691175Z         "bid_health_unhealthy_strict_boundary": false,
+replacement	Native checks	2026-10-29T01:37:49.8691431Z         "bid_lower_lamports": 125000000,
+replacement	Native checks	2026-10-29T01:37:49.8692143Z         "default_borrower_economic_sol_lamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8692488Z         "default_lender_sol_lamports": 248650000,
+replacement	Native checks	2026-10-29T01:37:49.8692807Z         "default_sol_as_bps_of_current_tested_ask": 18944,
+replacement	Native checks	2026-10-29T01:37:49.8693109Z         "illustrative_forced_budget_lamports": 137812500,
+replacement	Native checks	2026-10-29T01:37:49.8693570Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 756250,
+replacement	Native checks	2026-10-29T01:37:49.8694002Z         "this_tested_ask_fits_budget": true
+replacement	Native checks	2026-10-29T01:37:49.8694226Z       },
+replacement	Native checks	2026-10-29T01:37:49.8694385Z       {
+replacement	Native checks	2026-10-29T01:37:49.8694597Z         "ask_upper_at_maximum_spread_lamports": 131260500,
+replacement	Native checks	2026-10-29T01:37:49.8694884Z         "bid_factor_bps_of_opening_notional": 12501,
+replacement	Native checks	2026-10-29T01:37:49.8695164Z         "bid_health_unhealthy_strict_boundary": true,
+replacement	Native checks	2026-10-29T01:37:49.8695415Z         "bid_lower_lamports": 125010000,
+replacement	Native checks	2026-10-29T01:37:49.8695667Z         "default_borrower_economic_sol_lamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8695940Z         "default_lender_sol_lamports": 248650000,
+replacement	Native checks	2026-10-29T01:37:49.8696228Z         "default_sol_as_bps_of_current_tested_ask": 18943,
+replacement	Native checks	2026-10-29T01:37:49.8696516Z         "illustrative_forced_budget_lamports": 137823525,
+replacement	Native checks	2026-10-29T01:37:49.8696923Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 756302,
+replacement	Native checks	2026-10-29T01:37:49.8697235Z         "this_tested_ask_fits_budget": true
+replacement	Native checks	2026-10-29T01:37:49.8697474Z       },
+replacement	Native checks	2026-10-29T01:37:49.8697634Z       {
+replacement	Native checks	2026-10-29T01:37:49.8697843Z         "ask_upper_at_maximum_spread_lamports": 157500000,
+replacement	Native checks	2026-10-29T01:37:49.8698153Z         "bid_factor_bps_of_opening_notional": 15000,
+replacement	Native checks	2026-10-29T01:37:49.8698442Z         "bid_health_unhealthy_strict_boundary": true,
+replacement	Native checks	2026-10-29T01:37:49.8698698Z         "bid_lower_lamports": 150000000,
+replacement	Native checks	2026-10-29T01:37:49.8698964Z         "default_borrower_economic_sol_lamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8699237Z         "default_lender_sol_lamports": 248650000,
+replacement	Native checks	2026-10-29T01:37:49.8699518Z         "default_sol_as_bps_of_current_tested_ask": 15787,
+replacement	Native checks	2026-10-29T01:37:49.8699821Z         "illustrative_forced_budget_lamports": 165375000,
+replacement	Native checks	2026-10-29T01:37:49.8700142Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 887500,
+replacement	Native checks	2026-10-29T01:37:49.8700440Z         "this_tested_ask_fits_budget": true
+replacement	Native checks	2026-10-29T01:37:49.8700673Z       },
+replacement	Native checks	2026-10-29T01:37:49.8700825Z       {
+replacement	Native checks	2026-10-29T01:37:49.8701021Z         "ask_upper_at_maximum_spread_lamports": 210000000,
+replacement	Native checks	2026-10-29T01:37:49.8701300Z         "bid_factor_bps_of_opening_notional": 20000,
+replacement	Native checks	2026-10-29T01:37:49.8701573Z         "bid_health_unhealthy_strict_boundary": true,
+replacement	Native checks	2026-10-29T01:37:49.8701821Z         "bid_lower_lamports": 200000000,
+replacement	Native checks	2026-10-29T01:37:49.8702070Z         "default_borrower_economic_sol_lamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8702344Z         "default_lender_sol_lamports": 248650000,
+replacement	Native checks	2026-10-29T01:37:49.8702615Z         "default_sol_as_bps_of_current_tested_ask": 11840,
+replacement	Native checks	2026-10-29T01:37:49.8702909Z         "illustrative_forced_budget_lamports": 220500000,
+replacement	Native checks	2026-10-29T01:37:49.8703232Z         "maturity_keeper_reward_if_this_ask_spent_lamports": 1150000,
+replacement	Native checks	2026-10-29T01:37:49.8703540Z         "this_tested_ask_fits_budget": true
+replacement	Native checks	2026-10-29T01:37:49.8703861Z       },
+replacement	Native checks	2026-10-29T01:37:49.8704017Z       {
+replacement	Native checks	2026-10-29T01:37:49.8704208Z         "ask_upper_at_maximum_spread_lamports": 262500000,
+replacement	Native checks	2026-10-29T01:37:49.8704491Z         "bid_factor_bps_of_opening_notional": 25000,
+replacement	Native checks	2026-10-29T01:37:49.8704761Z         "bid_health_unhealthy_strict_boundary": true,
+replacement	Native checks	2026-10-29T01:37:49.8705016Z         "bid_lower_lamports": 250000000,
+replacement	Native checks	2026-10-29T01:37:49.8705266Z         "default_borrower_economic_sol_lamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8705525Z         "default_lender_sol_lamports": 248650000,
+replacement	Native checks	2026-10-29T01:37:49.8705801Z         "default_sol_as_bps_of_current_tested_ask": 9472,
+replacement	Native checks	2026-10-29T01:37:49.8706088Z         "illustrative_forced_budget_lamports": 248000000,
+replacement	Native checks	2026-10-29T01:37:49.8706403Z         "maturity_keeper_reward_if_this_ask_spent_lamports": null,
+replacement	Native checks	2026-10-29T01:37:49.8706694Z         "this_tested_ask_fits_budget": false
+replacement	Native checks	2026-10-29T01:37:49.8707258Z       },
+replacement	Native checks	2026-10-29T01:37:49.8707410Z       {
+replacement	Native checks	2026-10-29T01:37:49.8707606Z         "ask_upper_at_maximum_spread_lamports": 315000000,
+replacement	Native checks	2026-10-29T01:37:49.8707879Z         "bid_factor_bps_of_opening_notional": 30000,
+replacement	Native checks	2026-10-29T01:37:49.8708152Z         "bid_health_unhealthy_strict_boundary": true,
+replacement	Native checks	2026-10-29T01:37:49.8708521Z         "bid_lower_lamports": 300000000,
+replacement	Native checks	2026-10-29T01:37:49.8708782Z         "default_borrower_economic_sol_lamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8709042Z         "default_lender_sol_lamports": 248650000,
+replacement	Native checks	2026-10-29T01:37:49.8709316Z         "default_sol_as_bps_of_current_tested_ask": 7893,
+replacement	Native checks	2026-10-29T01:37:49.8709601Z         "illustrative_forced_budget_lamports": 248000000,
+replacement	Native checks	2026-10-29T01:37:49.8709923Z         "maturity_keeper_reward_if_this_ask_spent_lamports": null,
+replacement	Native checks	2026-10-29T01:37:49.8710222Z         "this_tested_ask_fits_budget": false
+replacement	Native checks	2026-10-29T01:37:49.8710440Z       }
+replacement	Native checks	2026-10-29T01:37:49.8710591Z     ],
+replacement	Native checks	2026-10-29T01:37:49.8710792Z     "minimum_size_positions_at_market_booked_cap": 50,
+replacement	Native checks	2026-10-29T01:37:49.8711050Z     "opening_examples": [
+replacement	Native checks	2026-10-29T01:37:49.8711238Z       {
+replacement	Native checks	2026-10-29T01:37:49.8711415Z         "borrower_margin_lamports": 150000000,
+replacement	Native checks	2026-10-29T01:37:49.8711780Z         "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 151000000,
+replacement	Native checks	2026-10-29T01:37:49.8712149Z         "collateral_lamports": 250000000,
+replacement	Native checks	2026-10-29T01:37:49.8712404Z         "history_ask_upper_max_lamports": 100000000,
+replacement	Native checks	2026-10-29T01:37:49.8712664Z         "lender_fee_lamports": 800000,
+replacement	Native checks	2026-10-29T01:37:49.8712898Z         "live_ask_upper_lamports": 100000000,
+replacement	Native checks	2026-10-29T01:37:49.8713132Z         "notional_lamports": 100000000,
+replacement	Native checks	2026-10-29T01:37:49.8713361Z         "protocol_fee_lamports": 200000,
+replacement	Native checks	2026-10-29T01:37:49.8713592Z         "sale_lamports": 100000000,
+replacement	Native checks	2026-10-29T01:37:49.8713951Z         "upfront_fee_lamports": 1000000
+replacement	Native checks	2026-10-29T01:37:49.8714160Z       },
+replacement	Native checks	2026-10-29T01:37:49.8714303Z       {
+replacement	Native checks	2026-10-29T01:37:49.8714474Z         "borrower_margin_lamports": 375000000,
+replacement	Native checks	2026-10-29T01:37:49.8714831Z         "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 377500000,
+replacement	Native checks	2026-10-29T01:37:49.8715192Z         "collateral_lamports": 625000000,
+replacement	Native checks	2026-10-29T01:37:49.8715453Z         "history_ask_upper_max_lamports": 250000000,
+replacement	Native checks	2026-10-29T01:37:49.8715715Z         "lender_fee_lamports": 2000000,
+replacement	Native checks	2026-10-29T01:37:49.8715945Z         "live_ask_upper_lamports": 250000000,
+replacement	Native checks	2026-10-29T01:37:49.8716186Z         "notional_lamports": 250000000,
+replacement	Native checks	2026-10-29T01:37:49.8716419Z         "protocol_fee_lamports": 500000,
+replacement	Native checks	2026-10-29T01:37:49.8716650Z         "sale_lamports": 250000000,
+replacement	Native checks	2026-10-29T01:37:49.8716873Z         "upfront_fee_lamports": 2500000
+replacement	Native checks	2026-10-29T01:37:49.8717089Z       },
+replacement	Native checks	2026-10-29T01:37:49.8717243Z       {
+replacement	Native checks	2026-10-29T01:37:49.8717419Z         "borrower_margin_lamports": 1500000000,
+replacement	Native checks	2026-10-29T01:37:49.8717795Z         "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 1510000000,
+replacement	Native checks	2026-10-29T01:37:49.8718145Z         "collateral_lamports": 2500000000,
+replacement	Native checks	2026-10-29T01:37:49.8718398Z         "history_ask_upper_max_lamports": 1000000000,
+replacement	Native checks	2026-10-29T01:37:49.8718636Z         "lender_fee_lamports": 8000000,
+replacement	Native checks	2026-10-29T01:37:49.8718863Z         "live_ask_upper_lamports": 1000000000,
+replacement	Native checks	2026-10-29T01:37:49.8719101Z         "notional_lamports": 1000000000,
+replacement	Native checks	2026-10-29T01:37:49.8719354Z         "protocol_fee_lamports": 2000000,
+replacement	Native checks	2026-10-29T01:37:49.8719591Z         "sale_lamports": 1000000000,
+replacement	Native checks	2026-10-29T01:37:49.8719822Z         "upfront_fee_lamports": 10000000
+replacement	Native checks	2026-10-29T01:37:49.8720057Z       }
+replacement	Native checks	2026-10-29T01:37:49.8720214Z     ],
+replacement	Native checks	2026-10-29T01:37:49.8720378Z     "rounding_example": {
+replacement	Native checks	2026-10-29T01:37:49.8720596Z       "borrower_margin_lamports": 150000003,
+replacement	Native checks	2026-10-29T01:37:49.8720958Z       "borrower_opening_cash_excluding_account_rent_and_network_fee_lamports": 151000004,
+replacement	Native checks	2026-10-29T01:37:49.8721337Z       "collateral_lamports": 250000003,
+replacement	Native checks	2026-10-29T01:37:49.8721588Z       "history_ask_upper_max_lamports": 99999999,
+replacement	Native checks	2026-10-29T01:37:49.8722001Z       "lender_fee_lamports": 800001,
+replacement	Native checks	2026-10-29T01:37:49.8722230Z       "live_ask_upper_lamports": 100000001,
+replacement	Native checks	2026-10-29T01:37:49.8722465Z       "notional_lamports": 100000001,
+replacement	Native checks	2026-10-29T01:37:49.8722701Z       "protocol_fee_lamports": 200000,
+replacement	Native checks	2026-10-29T01:37:49.8722922Z       "sale_lamports": 100000000,
+replacement	Native checks	2026-10-29T01:37:49.8723259Z       "upfront_fee_lamports": 1000001
+replacement	Native checks	2026-10-29T01:37:49.8723463Z     },
+replacement	Native checks	2026-10-29T01:37:49.8723667Z     "small_loan_default_keeper_reward_lamports": 1350000,
+replacement	Native checks	2026-10-29T01:37:49.8724135Z     "small_loan_maturity_keeper_reward_at_initial_notional_lamports": 600000,
+replacement	Native checks	2026-10-29T01:37:49.8724512Z     "wallet_booked_notional_cap_lamports_per_market": 1000000000
+replacement	Native checks	2026-10-29T01:37:49.8724793Z   },
+replacement	Native checks	2026-10-29T01:37:49.8724964Z   "financial_source_sha256": {
+replacement	Native checks	2026-10-29T01:37:49.8725373Z     "crates/jupiter-route/src/isolation.rs": "79aaf751503f5cb2cc72431734c6e940f7335479442c09a1b0d21c8932c7b298",
+replacement	Native checks	2026-10-29T01:37:49.8725990Z     "programs/shortwin-simple/src/exits.rs": "82635c8195a86880d51c9831b9c38d9d4ea6d5203ae38865273fcd04f8bfd617",
+replacement	Native checks	2026-10-29T01:37:49.8726619Z     "programs/shortwin-simple/src/finance.rs": "11772d4eac5e7b0605368d27c4b686df3fa8ff9dad46a580287d842cf11533f2",
+replacement	Native checks	2026-10-29T01:37:49.8727253Z     "programs/shortwin-simple/src/open.rs": "8e407d9f69f6714f333d265000385dec4ddf784ec9debe81ac9dec928c4c1da5",
+replacement	Native checks	2026-10-29T01:37:49.8727851Z     "programs/shortwin-simple/src/route.rs": "0474656f4727875f0019d569295753ddb785442418d9632291cc3cb09db008bb",
+replacement	Native checks	2026-10-29T01:37:49.8728475Z     "programs/shortwin-simple/src/state.rs": "4588d9272a629165cb1bfaeaafa0a9d207127e493aedbefd5d28ca0504b9b8e9"
+replacement	Native checks	2026-10-29T01:37:49.8728884Z   },
+replacement	Native checks	2026-10-29T01:37:49.8729046Z   "operator_bounds": {
+replacement	Native checks	2026-10-29T01:37:49.8729235Z     "evidenceStatus": {
+replacement	Native checks	2026-10-29T01:37:49.8729438Z       "alertsDelivered": "pending",
+replacement	Native checks	2026-10-29T01:37:49.8729669Z       "currentRoutes": "pending",
+replacement	Native checks	2026-10-29T01:37:49.8729896Z       "payerFunding": "pending",
+replacement	Native checks	2026-10-29T01:37:49.8730113Z       "roles": "unassigned",
+replacement	Native checks	2026-10-29T01:37:49.8730341Z       "sustainedCoverage": "pending"
+replacement	Native checks	2026-10-29T01:37:49.8730552Z     },
+replacement	Native checks	2026-10-29T01:37:49.8730708Z     "execute": false,
+replacement	Native checks	2026-10-29T01:37:49.8730893Z     "maxAccounts": 2048,
+replacement	Native checks	2026-10-29T01:37:49.8731095Z     "maxActions": 8,
+replacement	Native checks	2026-10-29T01:37:49.8731315Z     "maxDailyPublicationFeesLamports": 1000000,
+replacement	Native checks	2026-10-29T01:37:49.8731587Z     "maxEventTransactions": 32,
+replacement	Native checks	2026-10-29T01:37:49.8731810Z     "maxFeeLamports": 25000,
+replacement	Native checks	2026-10-29T01:37:49.8732045Z     "maxNewReferenceAccounts": 4,
+replacement	Native checks	2026-10-29T01:37:49.8732283Z     "maxPassFeesLamports": 100000,
+replacement	Native checks	2026-10-29T01:37:49.8732533Z     "maxReferenceRentLamports": 10000000,
+replacement	Native checks	2026-10-29T01:37:49.8732789Z     "maxRouteSetupLamports": 0,
+replacement	Native checks	2026-10-29T01:37:49.8733022Z     "maxTemporaryLamports": 10000000,
+replacement	Native checks	2026-10-29T01:37:49.8733263Z     "minBalanceLamports": 50000000,
+replacement	Native checks	2026-10-29T01:37:49.8733525Z     "minTimerStartSpacingSeconds": 15,
+replacement	Native checks	2026-10-29T01:37:49.8733893Z     "overlappingPassesAllowed": false,
+replacement	Native checks	2026-10-29T01:37:49.8734159Z     "requiredEnvironment": [
+replacement	Native checks	2026-10-29T01:37:49.8734381Z       "SOLANA_RPC_URL",
+replacement	Native checks	2026-10-29T01:37:49.8734579Z       "JUPITER_API_KEY"
+replacement	Native checks	2026-10-29T01:37:49.8734759Z     ],
+replacement	Native checks	2026-10-29T01:37:49.8734994Z     "roleManifest": "config/production-roles.template.json",
+replacement	Native checks	2026-10-29T01:37:49.8735333Z     "settings": "config/production-service.proposed.json",
+replacement	Native checks	2026-10-29T01:37:49.8735640Z     "status": "proposed-not-commissioned",
+replacement	Native checks	2026-10-29T01:37:49.8735957Z     "suggestedInitialLamportsPerOperatingPayer": 100000000,
+replacement	Native checks	2026-10-29T01:37:49.8736245Z     "tick": true
+replacement	Native checks	2026-10-29T01:37:49.8736422Z   },
+replacement	Native checks	2026-10-29T01:37:49.8736735Z   "price_service_model_version": "shortwin-simple-exact-q-v3-generational-queue",
+replacement	Native checks	2026-10-29T01:37:49.8737087Z   "profiles": [
+replacement	Native checks	2026-10-29T01:37:49.8737253Z     {
+replacement	Native checks	2026-10-29T01:37:49.8737488Z       "all_identity_maximum_observation_spacing_only_round_ms": 6000,
+replacement	Native checks	2026-10-29T01:37:49.8737886Z       "all_maximum_observations_plus_one_execution_buy_search_spacing_ms": 22000,
+replacement	Native checks	2026-10-29T01:37:49.8738246Z       "configured_exact_quantity_slots": 1,
+replacement	Native checks	2026-10-29T01:37:49.8738661Z       "existing_service_worst_case_capacity_report": {
+replacement	Native checks	2026-10-29T01:37:49.8738942Z         "execution_buy_http_requests_maximum": 16,
+replacement	Native checks	2026-10-29T01:37:49.8739194Z         "identity_capacity_configured": 1,
+replacement	Native checks	2026-10-29T01:37:49.8739473Z         "maximum_http_requests_per_quote_probe": 2,
+replacement	Native checks	2026-10-29T01:37:49.8740009Z         "measured_latency_and_sustained_coverage": "pending",
+replacement	Native checks	2026-10-29T01:37:49.8740331Z         "nominal_identities_with_half_gap_margin": 2,
+replacement	Native checks	2026-10-29T01:37:49.8740651Z         "observation_requests_maximum": 6,
+replacement	Native checks	2026-10-29T01:37:49.8740914Z         "observation_requests_steady": 2,
+replacement	Native checks	2026-10-29T01:37:49.8741203Z         "observation_spacing_cycle_maximum_seconds": 6.0,
+replacement	Native checks	2026-10-29T01:37:49.8741513Z         "observation_spacing_cycle_steady_seconds": 2.0,
+replacement	Native checks	2026-10-29T01:37:49.8741771Z         "ready_for_mainnet": false,
+replacement	Native checks	2026-10-29T01:37:49.8742188Z         "reason": "Measured provider/RPC latency and active-loan coverage are required; this is a spacing lower bound",
+replacement	Native checks	2026-10-29T01:37:49.8742639Z         "requests_per_identity_worst_case": 6,
+replacement	Native checks	2026-10-29T01:37:49.8742890Z         "spacing_fits_target": true,
+replacement	Native checks	2026-10-29T01:37:49.8743124Z         "spacing_only_cycle_seconds": 6.0,
+replacement	Native checks	2026-10-29T01:37:49.8743354Z         "target_sampling_seconds": 15
+replacement	Native checks	2026-10-29T01:37:49.8743587Z       },
+replacement	Native checks	2026-10-29T01:37:49.8743986Z       "hypothetical_continuous_publication_1_signature_base_fee_5000_lamports_per_day": 28800000,
+replacement	Native checks	2026-10-29T01:37:49.8744483Z       "hypothetical_continuous_publication_at_25000_lamports_per_tx_per_day": 144000000,
+replacement	Native checks	2026-10-29T01:37:49.8744852Z       "maximum_http_starts_per_quote_probe": 2,
+replacement	Native checks	2026-10-29T01:37:49.8745109Z       "measured_live_coverage": "pending",
+replacement	Native checks	2026-10-29T01:37:49.8745357Z       "minimum_completed_history_seconds": 180,
+replacement	Native checks	2026-10-29T01:37:49.8745647Z       "minimum_loan_protocol_revenue_lamports": 200000,
+replacement	Native checks	2026-10-29T01:37:49.8746019Z       "model_hash": "7e282d429cb65694c844f7f321483a1cd9bcdd5c4e1f32d70e8a9942016643b8",
+replacement	Native checks	2026-10-29T01:37:49.8746408Z       "normal_latency_and_rpc_headroom_ms": 13000,
+replacement	Native checks	2026-10-29T01:37:49.8746672Z       "normal_spacing_only_round_ms": 2000,
+replacement	Native checks	2026-10-29T01:37:49.8746973Z       "normal_two_successful_gets_per_identity_assumption": true,
+replacement	Native checks	2026-10-29T01:37:49.8747323Z       "on_demand_two_publications_at_25000_lamports_per_loan": 50000,
+replacement	Native checks	2026-10-29T01:37:49.8747704Z       "one_execution_buy_search_additional_maximum_spacing_ms": 16000,
+replacement	Native checks	2026-10-29T01:37:49.8748076Z       "one_fallback_plus_other_normal_spacing_only_round_ms": 6000,
+replacement	Native checks	2026-10-29T01:37:49.8748372Z       "profile": "production",
+replacement	Native checks	2026-10-29T01:37:49.8748592Z       "ready_for_activation": false,
+replacement	Native checks	2026-10-29T01:37:49.8748819Z       "target_round_ms": 15000,
+replacement	Native checks	2026-10-29T01:37:49.8749091Z       "warmup_worst_case_without_boundary_latency_seconds": 240
+replacement	Native checks	2026-10-29T01:37:49.8749371Z     },
+replacement	Native checks	2026-10-29T01:37:49.8749527Z     {
+replacement	Native checks	2026-10-29T01:37:49.8749765Z       "all_identity_maximum_observation_spacing_only_round_ms": 12000,
+replacement	Native checks	2026-10-29T01:37:49.8750176Z       "all_maximum_observations_plus_one_execution_buy_search_spacing_ms": 44000,
+replacement	Native checks	2026-10-29T01:37:49.8750539Z       "configured_exact_quantity_slots": 1,
+replacement	Native checks	2026-10-29T01:37:49.8750825Z       "existing_service_worst_case_capacity_report": {
+replacement	Native checks	2026-10-29T01:37:49.8751116Z         "execution_buy_http_requests_maximum": 16,
+replacement	Native checks	2026-10-29T01:37:49.8751388Z         "identity_capacity_configured": 1,
+replacement	Native checks	2026-10-29T01:37:49.8751652Z         "maximum_http_requests_per_quote_probe": 2,
+replacement	Native checks	2026-10-29T01:37:49.8752000Z         "measured_latency_and_sustained_coverage": "pending",
+replacement	Native checks	2026-10-29T01:37:49.8752315Z         "nominal_identities_with_half_gap_margin": 2,
+replacement	Native checks	2026-10-29T01:37:49.8752584Z         "observation_requests_maximum": 6,
+replacement	Native checks	2026-10-29T01:37:49.8752831Z         "observation_requests_steady": 2,
+replacement	Native checks	2026-10-29T01:37:49.8753107Z         "observation_spacing_cycle_maximum_seconds": 12.0,
+replacement	Native checks	2026-10-29T01:37:49.8753424Z         "observation_spacing_cycle_steady_seconds": 4.0,
+replacement	Native checks	2026-10-29T01:37:49.8753790Z         "ready_for_mainnet": false,
+replacement	Native checks	2026-10-29T01:37:49.8754365Z         "reason": "Measured provider/RPC latency and active-loan coverage are required; this is a spacing lower bound",
+replacement	Native checks	2026-10-29T01:37:49.8754830Z         "requests_per_identity_worst_case": 6,
+replacement	Native checks	2026-10-29T01:37:49.8755083Z         "spacing_fits_target": true,
+replacement	Native checks	2026-10-29T01:37:49.8755428Z         "spacing_only_cycle_seconds": 12.0,
+replacement	Native checks	2026-10-29T01:37:49.8755679Z         "target_sampling_seconds": 30
+replacement	Native checks	2026-10-29T01:37:49.8755895Z       },
+replacement	Native checks	2026-10-29T01:37:49.8756214Z       "hypothetical_continuous_publication_1_signature_base_fee_5000_lamports_per_day": 14400000,
+replacement	Native checks	2026-10-29T01:37:49.8756726Z       "hypothetical_continuous_publication_at_25000_lamports_per_tx_per_day": 72000000,
+replacement	Native checks	2026-10-29T01:37:49.8757102Z       "maximum_http_starts_per_quote_probe": 2,
+replacement	Native checks	2026-10-29T01:37:49.8757372Z       "measured_live_coverage": "pending",
+replacement	Native checks	2026-10-29T01:37:49.8757632Z       "minimum_completed_history_seconds": 180,
+replacement	Native checks	2026-10-29T01:37:49.8757922Z       "minimum_loan_protocol_revenue_lamports": 200000,
+replacement	Native checks	2026-10-29T01:37:49.8758318Z       "model_hash": "e610c336a9bdbe1fc155f21f4f655dcb7c6938b04c009c20711097c4db2bede2",
+replacement	Native checks	2026-10-29T01:37:49.8758714Z       "normal_latency_and_rpc_headroom_ms": 26000,
+replacement	Native checks	2026-10-29T01:37:49.8758986Z       "normal_spacing_only_round_ms": 4000,
+replacement	Native checks	2026-10-29T01:37:49.8759288Z       "normal_two_successful_gets_per_identity_assumption": true,
+replacement	Native checks	2026-10-29T01:37:49.8759662Z       "on_demand_two_publications_at_25000_lamports_per_loan": 50000,
+replacement	Native checks	2026-10-29T01:37:49.8760037Z       "one_execution_buy_search_additional_maximum_spacing_ms": 32000,
+replacement	Native checks	2026-10-29T01:37:49.8760412Z       "one_fallback_plus_other_normal_spacing_only_round_ms": 12000,
+replacement	Native checks	2026-10-29T01:37:49.8760716Z       "profile": "keyless",
+replacement	Native checks	2026-10-29T01:37:49.8760930Z       "ready_for_activation": false,
+replacement	Native checks	2026-10-29T01:37:49.8761175Z       "target_round_ms": 30000,
+replacement	Native checks	2026-10-29T01:37:49.8761466Z       "warmup_worst_case_without_boundary_latency_seconds": 240
+replacement	Native checks	2026-10-29T01:37:49.8761767Z     }
+replacement	Native checks	2026-10-29T01:37:49.8761928Z   ],
+replacement	Native checks	2026-10-29T01:37:49.8762092Z   "role_setup": {
+replacement	Native checks	2026-10-29T01:37:49.8762309Z     "complete_public_identity_assignment": false,
+replacement	Native checks	2026-10-29T01:37:49.8762574Z     "execution_enabled": false,
+replacement	Native checks	2026-10-29T01:37:49.8762804Z     "missing_public_identity_fields": [
+replacement	Native checks	2026-10-29T01:37:49.8763034Z       "genesisHash",
+replacement	Native checks	2026-10-29T01:37:49.8763226Z       "governance",
+replacement	Native checks	2026-10-29T01:37:49.8763403Z       "emergency",
+replacement	Native checks	2026-10-29T01:37:49.8763582Z       "reporter",
+replacement	Native checks	2026-10-29T01:37:49.8763877Z       "feeRecipient",
+replacement	Native checks	2026-10-29T01:37:49.8764076Z       "keeper",
+replacement	Native checks	2026-10-29T01:37:49.8764278Z       "jupiterReview.deploySlot",
+replacement	Native checks	2026-10-29T01:37:49.8764545Z       "jupiterReview.programDataLength",
+replacement	Native checks	2026-10-29T01:37:49.8764812Z       "jupiterReview.elfSha256"
+replacement	Native checks	2026-10-29T01:37:49.8765034Z     ],
+replacement	Native checks	2026-10-29T01:37:49.8765547Z     "note": "Complete assignments still require deployment/loader review and commissioned operating evidence; this tool never signs or submits."
+replacement	Native checks	2026-10-29T01:37:49.8766120Z   },
+replacement	Native checks	2026-10-29T01:37:49.8766365Z   "status": "proposed_configuration_verified_offline_not_activated"
+replacement	Native checks	2026-10-29T01:37:49.8766673Z }
+replacement	Build replacement and check SBF stack	﻿2026-10-29T01:37:49.8834253Z ##[group]Run set -o pipefail
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8834465Z ^[[36;1mset -o pipefail^[[0m
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8834619Z ^[[36;1mmkdir -p target/deploy target/idl^[[0m
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8835031Z ^[[36;1mcargo build-sbf --manifest-path programs/shortwin-simple/Cargo.toml --tools-version v1.57 --arch v3 --sbf-out-dir target/deploy -- --locked 2>&1 | tee target/sbf-build.log^[[0m
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8835485Z ^[[36;1mpython3 ../scripts/check-sbf-stack.py target/sbf-build.log^[[0m
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8835866Z ^[[36;1mpython3 -c "import pathlib,struct; assert struct.unpack_from('<I',pathlib.Path('target/deploy/shortwin_simple.so').read_bytes(),48)[0]==3"^[[0m
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8836286Z ^[[36;1manchor idl build -p shortwin_simple -o target/idl/shortwin_simple.json -- --locked^[[0m
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8836594Z ^[[36;1mdiff -u client/idl/shortwin_simple.json target/idl/shortwin_simple.json^[[0m
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8852853Z shell: /usr/bin/bash -e {0}
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8853003Z env:
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8853117Z   CARGO_BUILD_JOBS: 2
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8853267Z   CARGO_INCREMENTAL: 0
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8853394Z   AGAVE_VERSION: 4.1.2
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8853610Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8854310Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8854568Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8854749Z   CACHE_ON_FAILURE: false
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8854881Z   MISE_LOG_LEVEL: info
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8856411Z   MISE_GITHUB_TOKEN: ***
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8856594Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8856782Z   MISE_YES: 1
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:49.8856904Z ##[endgroup]
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:50.5692131Z    Compiling shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:50.5693107Z    Compiling shortwin-pooled-core v1.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:50.9320322Z    Compiling shortwin-simple v1.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:57.1974189Z     Finished `release` profile [optimized] target(s) in 6.79s
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:57.2343599Z ok: no SBF frame/stack overflow diagnostics in supplied build logs
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:57.4716388Z    Compiling shortwin-pooled-core v1.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:57.4717194Z    Compiling shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+replacement	Build replacement and check SBF stack	2026-10-29T01:37:57.6030149Z    Compiling shortwin-simple v1.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+replacement	Build replacement and check SBF stack	2026-10-29T01:38:00.5441788Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 3.23s
+replacement	Build replacement and check SBF stack	2026-10-29T01:38:00.5550262Z      Running unittests src/lib.rs (/home/runner/work/short.win/short.win/simple/target/debug/deps/shortwin_simple-b518a23a3f1b751f)
+replacement	Actual-SBF runtime and ledger tests	﻿2026-10-29T01:38:00.5912197Z ##[group]Run cargo test --workspace --locked
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5912447Z ^[[36;1mcargo test --workspace --locked^[[0m
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5912756Z ^[[36;1mcargo run -p shortwin-pooled-core --example model_fuzz --release --locked -- 103410000 200000^[[0m
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5913292Z ^[[36;1mcargo run -p shortwin-simple-runtime-tests --example program_fuzz --locked -- --seed 103410000 --cases 32 --out "$RUNNER_TEMP/simple-program-fuzz-smoke"^[[0m
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5930553Z shell: /usr/bin/bash -e {0}
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5930714Z env:
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5930828Z   CARGO_BUILD_JOBS: 2
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5930965Z   CARGO_INCREMENTAL: 0
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5931093Z   AGAVE_VERSION: 4.1.2
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5931327Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5931660Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5931921Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5932134Z   CACHE_ON_FAILURE: false
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5932272Z   MISE_LOG_LEVEL: info
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5934037Z   MISE_GITHUB_TOKEN: ***
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5934227Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5934435Z   MISE_YES: 1
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.5934556Z ##[endgroup]
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.7918057Z    Compiling shortwin-pooled-core v1.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.7985117Z    Compiling shortwin-jupiter-route v0.1.0 (/home/runner/work/short.win/short.win/simple/crates/jupiter-route)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:00.9505321Z    Compiling shortwin-simple v1.1.0 (/home/runner/work/short.win/short.win/simple/programs/shortwin-simple)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:03.4935819Z    Compiling shortwin-simple-runtime-tests v1.1.0 (/home/runner/work/short.win/short.win/simple/tests/runtime)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8526535Z     Finished `test` profile [unoptimized + debuginfo] target(s) in 6.23s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8909496Z      Running unittests src/lib.rs (target/debug/deps/shortwin_jupiter_route-8ede3a037c7711a1)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8923512Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8923965Z running 14 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8933387Z test isolation::tests::explicit_writable_authority_mode_keeps_other_isolation_guards_and_strict_default ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8934402Z test isolation::tests::native_rent_lamports_and_delegated_amount_are_checked ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8934933Z test isolation::tests::refuses_hidden_extensions_state_and_authority_changes ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8935499Z test isolation::tests::refuses_protocol_state_keys_unexpected_signers_and_writable_mints ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8935828Z test isolation::tests::rejects_runtime_union_and_alias_privileges ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8936101Z test tests::amount_mode_ranges_slippage_and_both_fees_are_checked ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8936475Z test tests::every_fixed_key_is_bound_and_minimum_account_counts_hold ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8936889Z test tests::every_truncated_header_and_tail_is_rejected_without_panics ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8937346Z test tests::four_current_idl_headers_and_exact_u64_fields ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8937774Z test tests::opaque_route_data_is_deliberately_not_full_authorization ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8938227Z test isolation::tests::whole_debt_net_credit_bounded_funding_and_surplus ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8938652Z test tests::recipient_signer_and_writable_substitution_is_rejected ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8939109Z test tests::oversized_counts_lengths_and_u64_maximum_are_bounded ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8939519Z test tests::shared_id_and_trusted_binding_sanity_are_checked ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8939763Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8940104Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8940409Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8940571Z      Running unittests src/lib.rs (target/debug/deps/shortwin_pooled_core-4ebeb23cbe60ff84)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8951532Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8951719Z running 16 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8954264Z test tests::a_donated_token_surplus_increases_existing_share_value ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8954837Z test tests::all_failed_mutations_preserve_the_inputs ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8955361Z test tests::default_allocates_loss_and_real_sol_only_to_current_pool_holders ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8955811Z test tests::newcomer_cannot_claim_previously_paid_fees ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8956204Z test tests::no_generation_reset_or_income_without_real_owners ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8956674Z test tests::final_receipt_exit_clears_fraction_and_last_holder_receives_tracked_dust ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8957206Z test tests::outstanding_principal_limits_withdrawal_and_forbids_last_share_exit ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8957714Z test tests::repeated_claims_keep_receipt_fraction_until_whole_lamport_exists ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8958154Z test tests::reward_and_generation_overflows_are_atomic ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8958764Z test tests::tiny_floor_share_mint_is_refused_before_state_changes ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8959242Z test tests::paid_income_is_attributed_before_deposit_and_share_changes ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8959765Z test tests::persisted_state_validation_rejects_inconsistent_aggregates_and_receipts ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8960270Z test tests::wiped_generation_keeps_claims_separate_from_new_lenders ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8960965Z test tests::wide_income_index_survives_multiple_u64_lifetimes_without_truncation ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.8971836Z test tests::deterministic_multi_lender_sequences_conserve_all_paid_income_and_principal ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.9018260Z test tests::wide_mul_div_vectors_cover_high_limbs_and_remainders ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.9018544Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.9018776Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.9019006Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.9021414Z      Running tests/model_sequences.rs (target/debug/deps/model_sequences-e555a8783e25b4d0)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.9031992Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:06.9032114Z running 1 test
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3793482Z test model_sequences_cover_randomized_loans_defaults_shares_and_generations ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3794264Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3794421Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3794627Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3796352Z      Running unittests src/lib.rs (target/debug/deps/shortwin_simple-d090ea2780a7f249)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3807920Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3808019Z running 12 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3811331Z test finance::tests::checked_bounds_and_exact_cr_boundary ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3811921Z test exits::tests::second_quote_must_itself_postdate_both_confirmation_delays ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3812745Z test exits::tests::surplus_output_cannot_make_an_otherwise_healthy_loan_liquidatable ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3813447Z test finance::tests::fixed_paid_fee_and_conservative_margin ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3814222Z test finance::tests::reward_and_budget_never_consume_rent_or_borrower_surplus ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3814919Z test route::tests::deployment_tuple_binds_current_loader_instance_without_a_fresh_hash_claim ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3815609Z test route::tests::mint_scope_is_plain_initialized_unfrozen_spl_or_token2022 ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3816349Z test route::tests::authority_postcondition_rejects_foreign_owner_data_signer_and_unaccounted_sol ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3817007Z test route::tests::token2022_metadata_bounds_canonical_base_and_full_tlv_are_checked ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3817572Z      Running unittests src/lib.rs (target/debug/deps/shortwin_simple_runtime_tests-539a686d588b4c67)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3818085Z test route::tests::token2022_behavior_unknown_and_duplicate_extensions_are_rejected ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3818548Z test route::tests::token_metadata_comparison_allows_only_the_amount_to_change ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3819014Z test route::tests::token2022_metadata_only_mints_and_zero_tail_keep_plain_account_semantics ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3819634Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3819929Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3820300Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3830324Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.3830538Z running 1 test
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7580695Z test jupiter::tests::pinned_real_elf_snapshot_loads_without_the_historical_product ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7581003Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7581162Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7581386Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7597852Z      Running tests/client_compat.rs (target/debug/deps/client_compat-f5cb11b3584c924e)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7609656Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7609773Z running 1 test
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7612489Z test rust_client_wire_contract ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7612699Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7612923Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7613157Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7615055Z      Running tests/jupiter_route.rs (target/debug/deps/jupiter_route-d7c1f9e304425723)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7627903Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:07.7628002Z running 10 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:08.5505395Z test direct_full_repayment_works_during_price_hold_without_jupiter_and_preserves_fee ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:08.5995294Z test exact_grace_boundary_is_default_only_and_recovers_collateral_without_price_token_or_router ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:08.6085009Z test confirmed_bad_cr_executes_full_debt_after_a_synthetic_market_price_rise ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:08.7294951Z test delayed_source_observations_health_clear_and_actual_fill_veto_are_atomic ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.3014812Z test expiry_buyback_pays_capped_keeper_and_refunds_surplus_before_grace_end ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.3395232Z test real_token2022_metadata_mint_registers_and_lends_with_plain_165_byte_token_accounts ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.3396189Z test real_borrower_buyback_refunds_both_rents_and_prefunds_and_credits_token_surplus ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.5907752Z test reporter_rotation_invalidates_old_cr_arm_until_a_new_epoch_is_armed ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9204970Z test retiring_one_of_two_loans_preserves_other_debt_and_exposure_rent ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9826354Z test wrong_input_and_actual_router_underfill_revert_pool_loan_user_and_dex ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9826629Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9826786Z test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9826986Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9900019Z      Running tests/lender.rs (target/debug/deps/lender-9ff04f626c245c20)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9915211Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:09.9915610Z running 5 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:10.8765106Z test actual_roll_and_old_claims_separate_wiped_generation_from_new_deposits ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:10.8984944Z test actual_claims_preserve_fraction_and_last_exit_pays_tracked_dust ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:11.4465996Z test registration_fee_rent_and_plain_mint_rules_are_actual_handler_checks ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:11.4886413Z test spl_and_t22_deposit_withdraw_move_exact_principal_and_obey_signed_minima ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.2593566Z test unsolicited_tokens_remain_untracked_and_in_their_original_generation ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.2594059Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.2594220Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.27s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.2594433Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.2674044Z      Running tests/open_position.rs (target/debug/deps/open_position-1c781516a05fed66)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.2688740Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.2688868Z running 2 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8479203Z test real_jupiter_open_books_principal_and_pays_fixed_upfront_fee_exactly ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8646563Z test signed_max_fee_margin_and_market_nonce_refuse_atomically ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8646817Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8646973Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8647171Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8694572Z      Running tests/reference.rs (target/debug/deps/reference-162762d216da53a8)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8710537Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:12.8710848Z running 4 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.6045089Z test old_immutable_policy_remains_publishable_and_price_hold_can_be_refreshed ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.6215004Z test unknown_clears_eligibility_and_reporter_rotation_keeps_monotonic_identity ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.6548069Z test only_reporter_can_publish_and_creation_rent_is_explicitly_bounded ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.7535232Z test reference_sequence_exact_history_spread_and_dual_clock_checks_are_atomic ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.7535503Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.7535646Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.7535838Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.7643878Z      Running tests/writable_authority.rs (target/debug/deps/writable_authority-a1e1c6ca68caf046)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.7657897Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:13.7658193Z running 4 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:14.8734754Z test readonly_authority_gift_stays_outside_the_loan_and_route ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:14.8834648Z test writable_authority_gifts_stay_untracked_and_return_separately_on_buyback ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.4735534Z test writable_foreign_or_data_bearing_authority_is_refused_atomically ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7589243Z test signed_setup_maximum_and_total_advance_refuse_without_spending ... ok
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7589637Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7589885Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.99s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7590216Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7649293Z    Doc-tests shortwin_jupiter_route
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7837372Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7837764Z running 0 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7838227Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7838644Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7839113Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.7851835Z    Doc-tests shortwin_pooled_core
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.8022832Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.8023400Z running 0 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.8023929Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.8025273Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.8025815Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:15.8035206Z    Doc-tests shortwin_simple
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1076483Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1077110Z running 0 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1077303Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1077644Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1078065Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1104203Z    Doc-tests shortwin_simple_runtime_tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1628741Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1629378Z running 0 tests
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1629576Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1629855Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.1630185Z 
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:16.2517338Z    Compiling shortwin-pooled-core v1.1.0 (/home/runner/work/short.win/short.win/simple/crates/pooled-core)
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:18.7504795Z     Finished `release` profile [optimized] target(s) in 2.55s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:18.7528817Z      Running `target/release/examples/model_fuzz 103410000 200000`
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:18.8024086Z {"scope":"pure-core-model-only","seed":103410000,"steps":200000,"successes":105793,"rejected":94207,"generations":12105,"deposits":15248644,"donations":4649971,"withdrawn_tokens":1533439,"defaulted_tokens":18365176,"paid_sol":12994903,"claimed_sol":12994903}
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:18.9698903Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:18.9814559Z      Running `target/debug/examples/program_fuzz --seed 103410000 --cases 32 --out /home/runner/work/_temp/simple-program-fuzz-smoke`
+replacement	Actual-SBF runtime and ledger tests	2026-10-29T01:38:41.7371766Z {"anomalies":0,"completed_cases":32,"coverage":{"actual_cpmm_success_logs":65,"attempted_fixture_setups":32,"attempted_transactions":147,"expected_rejected_transactions":49,"fixture_setup_transactions_instrumented":false,"operation_counts_attempt_success_reject":{"actual_fill_veto":[3,0,3],"add_margin":[8,8,0],"arm":[6,6,0],"close":[5,5,0],"cr_force":[3,3,0],"default":[5,5,0],"early_cr_force":[3,0,3],"expiry_force":[5,5,0],"late_close":[5,0,5],"late_margin":[5,0,5],"late_repay":[5,0,5],"margin_clear":[3,3,0],"open":[32,32,0],"publish_reference":[17,17,0],"rejected_open":[25,0,25],"repay":[14,14,0],"underfill":[3,0,3]},"scenario_counts":{"close":2,"cr_fill_veto":3,"cr_market_rise":3,"default_boundary":5,"expiry":5,"margin_repay":8,"repay":3,"underfill":3},"successful_fixture_setups":32,"successful_transactions":98},"failures":0,"finished_cleanly":true,"invariant_failures":0,"requested_duration_seconds":null,"schema_version":1,"scope":"actual-new-SBF deterministic scenario runner; setup transactions not counted; no inherited duration","setup_failures":0,"wall_seconds":20.197177267}
+replacement	Current route compatibility from pinned mainnet snapshots	﻿2026-10-29T01:38:41.7441585Z ##[group]Run python3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/simple-current-route-suite"
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7442094Z ^[[36;1mpython3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/simple-current-route-suite"^[[0m
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7459534Z shell: /usr/bin/bash -e {0}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7459703Z env:
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7459829Z   CARGO_BUILD_JOBS: 2
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7459979Z   CARGO_INCREMENTAL: 0
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7460108Z   AGAVE_VERSION: 4.1.2
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7460336Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7460678Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7460940Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7461121Z   CACHE_ON_FAILURE: false
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7461259Z   MISE_LOG_LEVEL: info
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7462912Z   MISE_GITHUB_TOKEN: ***
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7463106Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7463343Z   MISE_YES: 1
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.7463468Z ##[endgroup]
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:41.9588636Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:42.3387489Z {"account_count": 20, "candidate": "/home/runner/work/_temp/simple-current-route-suite/bonk-production/candidate/candidate.json", "sha256": "dc9c90e756465c2b3cddbb896b94843037301b2b28c6d18dd630263daabdbbff"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:45.6772710Z {"account_count": 20, "candidate": "/home/runner/work/_temp/simple-current-route-suite/jup-production/candidate/candidate.json", "sha256": "7e8f8035035205a6043b6fe000114cb1eb5fd68fdddbc21ffd62c80b64efdce1"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:48.9846743Z {"account_count": 30, "candidate": "/home/runner/work/_temp/simple-current-route-suite/ray-production-retry/candidate/candidate.json", "sha256": "f6225032527d55ebeab980be5e5fe8a05295341578156ed00751193da5341021"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:52.5438477Z {"account_count": 19, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-curve-production/candidate/candidate.json", "sha256": "c6da1403f895817480e1dc435e5bfb8e3b02452aceff0a4aed88e2cef53cfd62"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:55.9604770Z {"account_count": 20, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-graduated-production/candidate/candidate.json", "sha256": "3546b016fb1a33ebb19e7f049fe2aaaeb4f0ada9f600db45bc369f4393843ff3"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:38:59.3595258Z {"account_count": 19, "candidate": "/home/runner/work/_temp/simple-current-route-suite/pump-metadata-current-8GV/candidate/candidate.json", "sha256": "41e3303d79009bf8fafecf005c13c9ddc8f7a9e5c454874ba1d93f0696dbc800"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:02.7357485Z {"account_count": 22, "candidate": "/home/runner/work/_temp/simple-current-route-suite/jup-scorch-negative/candidate/candidate.json", "sha256": "19f1919872d6eb1104c8f8ec90b01e6c5ecf10be19f5fe18f8152aa6f37e7c44"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:05.6397911Z {"account_count": 22, "candidate": "/home/runner/work/_temp/simple-current-route-suite/ray-scorch-negative/candidate/candidate.json", "sha256": "ddda2a7692ab733332191361a7d762e7691f6a85e466bf09938c2b59a2192dba"}
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4842294Z {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4842599Z   "cases": [
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4842804Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4842991Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4843267Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4843526Z       "name": "bonk-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4844132Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4844664Z       "stdout_sha256": "dbb2f9896684b723678a0f7ec0e0b8d215e49fad1c6d835ae25ab85dec3b0217",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4845187Z       "summary_sha256": "5bc6997be86a0c136ef2ca48ad84345302e804608ec021510abc870e3ff84cf0",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4845573Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4845784Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4845948Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4846121Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4846338Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4846874Z       "name": "jup-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4847229Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4847721Z       "stdout_sha256": "627c22b1a36685751fe74821413c4253ad15dec15febc7f4d96fe4902298e9fc",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4848229Z       "summary_sha256": "5ee0b52d40bac101e0de04e94d3ca19b5c2a264994c0eb6bab02174bb61cf94d",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4848613Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4848803Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4848956Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4849124Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4849332Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4849573Z       "name": "ray-production-retry",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4849936Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4850426Z       "stdout_sha256": "5cc20826c3fc10b9131472adc7f8fbf6207236619eaffde187be7b010d403459",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4850934Z       "summary_sha256": "fac3c2de8e8c5f4586b04ddf79fbe7c638f218de91f3ba2d9aeaa999a79124a0",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4851320Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4851502Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4851657Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4851815Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4852026Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4852267Z       "name": "pump-curve-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4852633Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4853294Z       "stdout_sha256": "464da7de80448f7924799f572ca9c58ea7d73c6085e427ca527ec8bf74d6907b",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4853901Z       "summary_sha256": "f80222139d00c37822f62e91e88f94dab5fe76fb3cdfd839b2942f63c75c7c29",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4854269Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4854456Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4854614Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4854793Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4855012Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4855279Z       "name": "pump-graduated-production",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4855684Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4856215Z       "stdout_sha256": "bec544d0fdf8ba039e2b7bf5b17e8d06e900486f0cf72eb497e83667b7850181",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4856760Z       "summary_sha256": "c9a1ad4c8f6f1b56e7c238bc8ff9283e1ae805513a62f3e26c7200e474560556",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4857165Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4857368Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4857532Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4857709Z       "actual": "passed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4857935Z       "expected": "expected_pass",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4858199Z       "name": "pump-metadata-current-8GV",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4858594Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4859131Z       "stdout_sha256": "88c8ef668daabd51b82222da6eee5579bd94d728f4fe513f111638672b77c3e2",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4859654Z       "summary_sha256": "434efdacb68f6c414533930cb66b24ec799663ebfe5a47c472d54e18a79d436f",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4860031Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4860226Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4860395Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4860566Z       "actual": "failed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4860800Z       "expected": "expected_fail",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4861047Z       "name": "jup-scorch-negative",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4861439Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4861991Z       "stdout_sha256": "8ed1f035a1834f0ad2be8728fd2854f44f8187d20bd10ab7413eb82492a2356f",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4862539Z       "summary_sha256": "ea90836c5b2d18f0a982c673b51fe77769d9c31d1ac2c33408afd49bf3414f95",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4862941Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4863139Z     },
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4863313Z     {
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4863488Z       "actual": "failed",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4863828Z       "expected": "expected_fail",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4864082Z       "name": "ray-scorch-negative",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4864653Z       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4865201Z       "stdout_sha256": "95697a0de2de1ed4e9fb4e0054b91065d45d0c3f0ea37e7c3f6e500bce4f8144",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4865763Z       "summary_sha256": "b95a7e7b70f612643a4a155cd5457fb3a0bb49cfbd106e60b695b5346027004f",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4866156Z       "verified": true
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4866367Z     }
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4866530Z   ],
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4866706Z   "live_transactions_sent": 0,
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4867080Z   "matrix_sha256": "86e4aac03cde449b491059c77c947e0e788a072863ee958b494885e982f70abf",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4867651Z   "native_runner_sha256": "b72b1483a2ae48eb06ed3a9b708738559dbe3f17616d09b623190f706e57456e",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4868229Z   "own_program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4868644Z   "pending": [],
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4868840Z   "schema": 1,
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4869287Z   "scope": "additive non-atomic snapshot compatibility; no live execution, history provenance or 24h qualification",
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4869766Z   "status": "passed"
+replacement	Current route compatibility from pinned mainnet snapshots	2026-10-29T01:39:08.4869960Z }
+replacement	Client and web	﻿2026-10-29T01:39:08.4928331Z ##[group]Run pnpm install --frozen-lockfile
+replacement	Client and web	2026-10-29T01:39:08.4928593Z ^[[36;1mpnpm install --frozen-lockfile^[[0m
+replacement	Client and web	2026-10-29T01:39:08.4928772Z ^[[36;1mpnpm --dir client generate^[[0m
+replacement	Client and web	2026-10-29T01:39:08.4929104Z ^[[36;1mgit diff --exit-code -- client/src/generated^[[0m
+replacement	Client and web	2026-10-29T01:39:08.4929290Z ^[[36;1mpnpm check^[[0m
+replacement	Client and web	2026-10-29T01:39:08.4929418Z ^[[36;1mpnpm build^[[0m
+replacement	Client and web	2026-10-29T01:39:08.4946896Z shell: /usr/bin/bash -e {0}
+replacement	Client and web	2026-10-29T01:39:08.4947047Z env:
+replacement	Client and web	2026-10-29T01:39:08.4947166Z   CARGO_BUILD_JOBS: 2
+replacement	Client and web	2026-10-29T01:39:08.4947300Z   CARGO_INCREMENTAL: 0
+replacement	Client and web	2026-10-29T01:39:08.4947436Z   AGAVE_VERSION: 4.1.2
+replacement	Client and web	2026-10-29T01:39:08.4947667Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Client and web	2026-10-29T01:39:08.4948012Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Client and web	2026-10-29T01:39:08.4948281Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Client and web	2026-10-29T01:39:08.4948465Z   CACHE_ON_FAILURE: false
+replacement	Client and web	2026-10-29T01:39:08.4948600Z   MISE_LOG_LEVEL: info
+replacement	Client and web	2026-10-29T01:39:08.4950274Z   MISE_GITHUB_TOKEN: ***
+replacement	Client and web	2026-10-29T01:39:08.4950473Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Client and web	2026-10-29T01:39:08.4950685Z   MISE_YES: 1
+replacement	Client and web	2026-10-29T01:39:08.4950807Z ##[endgroup]
+replacement	Client and web	2026-10-29T01:39:08.5124856Z Scope: all 3 workspace projects
+replacement	Client and web	2026-10-29T01:39:08.5233006Z ? Verifying lockfile against supply-chain policies (137 entries)...
+replacement	Client and web	2026-10-29T01:39:09.2423102Z Packages are hard linked from the content-addressable store to the virtual store.
+replacement	Client and web	2026-10-29T01:39:09.2423891Z   Content-addressable store is at: /home/runner/.local/share/pnpm/store/v11
+replacement	Client and web	2026-10-29T01:39:09.2424330Z   Virtual store is at:             node_modules/.pnpm
+replacement	Client and web	2026-10-29T01:39:09.3294333Z Downloading @rolldown/binding-linux-x64-gnu@1.2.14: 0.00 B/8.27 MB
+replacement	Client and web	2026-10-29T01:39:10.3000831Z ✓ Lockfile passes supply-chain policies (137 entries in 1.8s)
+replacement	Client and web	2026-10-29T01:39:10.3001186Z Lockfile is up to date, resolution step is skipped
+replacement	Client and web	2026-10-29T01:39:10.3031054Z Packages: +112
+replacement	Client and web	2026-10-29T01:39:10.3031409Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+replacement	Client and web	2026-10-29T01:39:10.3179546Z Progress: resolved 112, reused 0, downloaded 112, added 112, done
+replacement	Client and web	2026-10-29T01:39:10.3760900Z Done in 1.9s using pnpm v12.7.0
+replacement	Client and web	2026-10-29T01:39:10.4172867Z $ codama run js --config codama.json
+replacement	Client and web	2026-10-29T01:39:10.5100422Z PDA name collision: "tokenVault" has different seeds across instructions. Renaming to "rollPoolTokenVault".
+replacement	Client and web	2026-10-29T01:39:10.6310935Z ^[[94m→^[[39m Running script "js" with 1 visitor...
+replacement	Client and web	2026-10-29T01:39:10.7023987Z ^[[32m✔^[[39m ^[[32mExecuted script "js" with 1 visitor!^[[39m
+replacement	Client and web	2026-10-29T01:39:11.5719787Z $ pnpm -r check
+replacement	Client and web	2026-10-29T01:39:11.5851454Z $ tsc --noEmit && node --test test/*.test.ts
+replacement	Client and web	2026-10-29T01:39:15.0575799Z ✔ generated client decodes exact Rust account and instruction bytes without precision loss (3.600539ms)
+replacement	Client and web	2026-10-29T01:39:15.0661426Z ✔ route uses loan-local scratch, with no outer PDA signature or API setup instructions (16.000202ms)
+replacement	Client and web	2026-10-29T01:39:15.0715353Z ✔ route rejects wrong mode, quantity, threshold, and unexpected signer (6.151138ms)
+replacement	Client and web	2026-10-29T01:39:15.0890570Z ✔ buy minimum output must cover whole token debt (6.143417ms)
+replacement	Client and web	2026-10-29T01:39:15.0918024Z ✔ wallet signatures may change but reviewed message bytes may not (11.14865ms)
+replacement	Client and web	2026-10-29T01:39:15.0992029Z ✔ Jupiter request leaves envelope room and still refuses over-budget responses (8.419602ms)
+replacement	Client and web	2026-10-29T01:39:17.1051870Z ✔ managed request tries16 then32 for no-route or unsupported shape and stops on rate limits (2007.034675ms)
+replacement	Client and web	2026-10-29T01:39:17.1075636Z ✔ native setup allowance is separately signed and marks only loan-local authority writable (3.318795ms)
+replacement	Client and web	2026-10-29T01:39:21.1161348Z ✔ direct requests reject provider-widened slippage and excluded venue responses (4008.531104ms)
+replacement	Client and web	2026-10-29T01:39:21.1292465Z ✔ mint discovery and HTTP admission accept metadata-only Token2022 and reject changed token behavior (3.1363ms)
+replacement	Client and web	2026-10-29T01:39:21.1293369Z ✔ queue state parsing refuses duplicate, ambiguous and unsafe generation data (1.761812ms)
+replacement	Client and web	2026-10-29T01:39:21.1294944Z ✔ confirmed or post-snapshot publication holds capacity until finalized state includes it (11.136702ms)
+replacement	Client and web	2026-10-29T01:39:21.1295897Z ✔ missing/malformed finalized error fields never become failed-publication proof (14.227223ms)
+replacement	Client and web	2026-10-29T01:39:21.1296625Z ✔ finalized success absent from complete snapshot blocks retirement; exact failed proof can release (3.41486ms)
+replacement	Client and web	2026-10-29T01:39:21.1297364Z ✔ lifecycle envelope binds complete bank clock and generation-specific fulfillment (2.615266ms)
+replacement	Client and web	2026-10-29T01:39:21.1298041Z ✔ publisher OS lock excludes another process and releases after holder exit (275.963421ms)
+replacement	Client and web	2026-10-29T01:39:21.1298761Z ✔ operator database cannot silently adopt another program or an unbound existing snapshot (1.089179ms)
+replacement	Client and web	2026-10-29T01:39:21.1299514Z ✔ real Python queue frees an expired inactive identity and admits another without API calls (739.200772ms)
+replacement	Client and web	2026-10-29T01:39:21.1300288Z ✔ publisher pairing preserves allowances and rejects operator switches and history replacement (21.266449ms)
+replacement	Client and web	2026-10-29T01:39:21.1301024Z ✔ history mirror rejects a replacement operator even if the lock anchor is lost (15.797987ms)
+replacement	Client and web	2026-10-29T01:39:21.1301741Z ✔ fresh default-only local pairing can bind its first history later without resetting store identity (12.295786ms)
+replacement	Client and web	2026-10-29T01:39:21.1302409Z ✔ competing histories cannot both claim the same operator store (304.612586ms)
+replacement	Client and web	2026-10-29T01:39:21.1303060Z ✔ default boundary wins without price, pause, history or route; expiry requires fresh feed (1.050691ms)
+replacement	Client and web	2026-10-29T01:39:21.1303897Z ✔ CR actions bind both bad bids, strict sequence, source delays and reporter epoch (0.276726ms)
+replacement	Client and web	2026-10-29T01:39:21.1304495Z ✔ service model drift and fee/funding caps fail before signing (0.608946ms)
+replacement	Client and web	2026-10-29T01:39:21.1305138Z ✔ confirmed publication continues to a priced action; dry-run never assumes publication (0.333802ms)
+replacement	Client and web	2026-10-29T01:39:21.1305857Z ✔ finalized event pagination is resumable and idempotent; failed tx is never projected (4.493813ms)
+replacement	Client and web	2026-10-29T01:39:21.1306598Z ✔ empty authoritative loan snapshot reconciles capacity and processes queued warm work (28.680472ms)
+replacement	Client and web	2026-10-29T01:39:21.1307381Z ✔ post-tick confirmed clock accepts newer sources than initial finalized snapshot and rejects actual future (0.772112ms)
+replacement	Client and web	2026-10-29T01:39:21.1308134Z ✔ an inactive warmed quantity publishes before the first loan without reading a keyfile (40.163415ms)
+replacement	Client and web	2026-10-29T01:39:21.1308741Z ✔ bounded rotation advances beyond a persistently failing first identity (5.552878ms)
+replacement	Client and web	2026-10-29T01:39:21.1309409Z ✔ healthy private history stays off chain; requests, adverse prices and maturity publish on demand (0.289226ms)
+replacement	Client and web	2026-10-29T01:39:21.1310155Z ✔ reference allocation reservations survive unknown outcomes, restarts and duplicate submissions (7.148058ms)
+replacement	Client and web	2026-10-29T01:39:21.1310933Z ✔ UTC-day publication fee reservations survive failures and never consume default action budget (0.755947ms)
+replacement	Client and web	2026-10-29T01:39:21.1311646Z ✔ fresh local pairing permits deterministic default when price settings/service are unavailable (14.274415ms)
+replacement	Client and web	2026-10-29T01:39:21.1312293Z ✔ prewarm validates current policy and enqueues inactive exact-u64 identity only (7.979806ms)
+replacement	Client and web	2026-10-29T01:39:21.1312908Z ✔ Unknown or stale reference never becomes Finite and cannot authorize a sale route (4.951582ms)
+replacement	Client and web	2026-10-29T01:39:21.1313543Z ✔ route binds new loan nonce/scratch and returns fresh raw build plus verified table contents (10.383398ms)
+replacement	Client and web	2026-10-29T01:39:21.1314874Z ✔ CORS/body/IP limits and unsupported RPC overrides reject before provider calls (3.029079ms)
+replacement	Client and web	2026-10-29T01:39:21.1315276Z ℹ tests 39
+replacement	Client and web	2026-10-29T01:39:21.1315487Z ℹ suites 0
+replacement	Client and web	2026-10-29T01:39:21.1315687Z ℹ pass 39
+replacement	Client and web	2026-10-29T01:39:21.1315884Z ℹ fail 0
+replacement	Client and web	2026-10-29T01:39:21.1316076Z ℹ cancelled 0
+replacement	Client and web	2026-10-29T01:39:21.1316267Z ℹ skipped 0
+replacement	Client and web	2026-10-29T01:39:21.1316473Z ℹ todo 0
+replacement	Client and web	2026-10-29T01:39:21.1316667Z ℹ duration_ms 6457.763274
+replacement	Client and web	2026-10-29T01:39:21.1361927Z $ tsc --noEmit && node --test test/*.test.ts
+replacement	Client and web	2026-10-29T01:39:23.9634951Z ✔ amount entry is exact beyond Number precision and refuses truncation (1.222779ms)
+replacement	Client and web	2026-10-29T01:39:23.9655445Z ✔ preview follows floor principal and actually paid income without time accrual (0.342675ms)
+replacement	Client and web	2026-10-29T01:39:24.1292097Z ✔ editing or cancelling while route preparation is pending revokes later review (0.812962ms)
+replacement	Client and web	2026-10-29T01:39:24.1295701Z ✔ wallet account or feature changes while signing prevent broadcast and clean old subscriptions (0.582395ms)
+replacement	Client and web	2026-10-29T01:39:24.1299892Z ✔ wallets without change events are rechecked after their async reply, including chain support (0.286901ms)
+replacement	Client and web	2026-10-29T01:39:24.1300445Z ✔ cancel during the final blockheight check prevents even the broadcast RPC call (11.08436ms)
+replacement	Client and web	2026-10-29T01:39:24.1429356Z ✔ managed service preserves exact quantities and uses fixed endpoints (22.333458ms)
+replacement	Client and web	2026-10-29T01:39:24.1429920Z ✔ managed service rejects insecure hosted URLs and reports capacity refusals (0.904631ms)
+replacement	Client and web	2026-10-29T01:39:24.1436332Z ✔ managed buy input can shrink but cannot exceed or reinterpret the signed user budget (0.390337ms)
+replacement	Client and web	2026-10-29T01:39:24.1436754Z ℹ tests 9
+replacement	Client and web	2026-10-29T01:39:24.1436930Z ℹ suites 0
+replacement	Client and web	2026-10-29T01:39:24.1437142Z ℹ pass 9
+replacement	Client and web	2026-10-29T01:39:24.1437328Z ℹ fail 0
+replacement	Client and web	2026-10-29T01:39:24.1437515Z ℹ cancelled 0
+replacement	Client and web	2026-10-29T01:39:24.1437726Z ℹ skipped 0
+replacement	Client and web	2026-10-29T01:39:24.1437882Z ℹ todo 0
+replacement	Client and web	2026-10-29T01:39:24.1438012Z ℹ duration_ms 258.953157
+replacement	Client and web	2026-10-29T01:39:24.1629455Z $ pnpm -r build
+replacement	Client and web	2026-10-29T01:39:24.1750412Z $ tsc --noEmit
+replacement	Client and web	2026-10-29T01:39:27.0715834Z $ tsc --noEmit && vite build
+replacement	Client and web	2026-10-29T01:39:29.8505863Z ^[[36mvite v8.3.1 ^[[32mbuilding client environment for production...^[[36m^[[39m
+replacement	Client and web	2026-10-29T01:39:29.8556138Z transforming...
+replacement	Client and web	2026-10-29T01:39:29.8916737Z ✓ 116 modules transformed.
+replacement	Client and web	2026-10-29T01:39:29.9063425Z rendering chunks...
+replacement	Client and web	2026-10-29T01:39:29.9199450Z computing gzip size...
+replacement	Client and web	2026-10-29T01:39:29.9215506Z dist/index.html                   0.40 kB │ gzip:  0.29 kB
+replacement	Client and web	2026-10-29T01:39:29.9215941Z dist/assets/index-BWPJxP0o.css    3.59 kB │ gzip:  1.33 kB
+replacement	Client and web	2026-10-29T01:39:29.9216394Z dist/assets/index-P3kNBAKo.js   155.26 kB │ gzip: 40.60 kB
+replacement	Client and web	2026-10-29T01:39:29.9216612Z 
+replacement	Client and web	2026-10-29T01:39:29.9220974Z ^[[33m^[[33m[INEFFECTIVE_DYNAMIC_IMPORT] ^[[0m../node_modules/.pnpm/@solana+kit@8.3.0_typescript@5.9.3/node_modules/@solana/kit/dist/index.browser.mjs is dynamically imported by ../client/src/transactions.ts but also statically imported by ../client/src/chain.ts, ../client/src/generated/accounts/config.ts, ../client/src/generated/accounts/exposure.ts, ../client/src/generated/accounts/lenderReceipt.ts, ../client/src/generated/accounts/loan.ts, ..., dynamic import will not move module into another chunk.
+replacement	Client and web	2026-10-29T01:39:29.9222095Z ^[[39m
+replacement	Client and web	2026-10-29T01:39:29.9222288Z ^[[32m✓ built in 73ms^[[39m
+replacement	Hash replacement artifact	﻿2026-10-29T01:39:29.9436674Z ##[group]Run sha256sum simple/target/deploy/shortwin_simple.so || true
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9437140Z ^[[36;1msha256sum simple/target/deploy/shortwin_simple.so || true^[[0m
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9454621Z shell: /usr/bin/bash -e {0}
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9454860Z env:
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9455161Z   CARGO_BUILD_JOBS: 2
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9455381Z   CARGO_INCREMENTAL: 0
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9455646Z   AGAVE_VERSION: 4.1.2
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9455985Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9456448Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9456865Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9457128Z   CACHE_ON_FAILURE: false
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9457410Z   MISE_LOG_LEVEL: info
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9459189Z   MISE_GITHUB_TOKEN: ***
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9459495Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9459860Z   MISE_YES: 1
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9460132Z ##[endgroup]
+replacement	Hash replacement artifact	2026-10-29T01:39:29.9515683Z d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510  simple/target/deploy/shortwin_simple.so
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	﻿2026-10-29T01:39:29.9556456Z ##[group]Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9556851Z with:
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9557067Z   name: simple-pooled-validation
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9557531Z   retention-days: 7
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9557881Z   path: simple/target/deploy/shortwin_simple.so
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	simple/target/idl/shortwin_simple.json
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	simple/target/sbf-build.log
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9558226Z   if-no-files-found: warn
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9558370Z   compression-level: 6
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9558500Z   overwrite: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9558633Z   include-hidden-files: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9558774Z   archive: true
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9558893Z env:
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9559004Z   CARGO_BUILD_JOBS: 2
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9559133Z   CARGO_INCREMENTAL: 0
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9559260Z   AGAVE_VERSION: 4.1.2
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9559487Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9559813Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9560086Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9560262Z   CACHE_ON_FAILURE: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9560395Z   MISE_LOG_LEVEL: info
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9561946Z   MISE_GITHUB_TOKEN: ***
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9562133Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9562328Z   MISE_YES: 1
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:29.9562448Z ##[endgroup]
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.0541537Z Multiple search paths detected. Calculating the least common ancestor of all paths
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.0542790Z The least common ancestor is /home/runner/work/short.win/short.win/simple/target. This will be the root directory of the artifact
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.0543341Z With the provided path, there will be 3 files uploaded
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.0546488Z Artifact name is valid!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.0546720Z Root directory input is valid!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.3210364Z Uploading artifact: simple-pooled-validation.zip
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.3234715Z Beginning upload of artifact content to blob storage
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.6134350Z Uploaded bytes 206578
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.6536660Z Finished uploading artifact content to blob storage!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.6537272Z SHA256 digest of uploaded artifact is 9abe7f8122651ff9afbde4e6102ecf4e28a360e4295354bbddf0811c68153da6
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:30.6537738Z Finalizing artifact upload
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.1922414Z Artifact simple-pooled-validation successfully finalized. Artifact ID 12865729046
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.1923161Z Artifact simple-pooled-validation has been successfully uploaded! Final size is 206578 bytes. Artifact ID is 12865729046
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.1925542Z Artifact download URL: https://github.com/TodorBonchev/short.win/actions/runs/40801471141/artifacts/12865729046
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	﻿2026-10-29T01:39:31.2066668Z ##[group]Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2067075Z with:
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2067272Z   name: simple-pooled-fuzz-smoke
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2067523Z   retention-days: 7
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2067790Z   path: /home/runner/work/_temp/simple-program-fuzz-smoke
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2068112Z   if-no-files-found: warn
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2068354Z   compression-level: 6
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2068558Z   overwrite: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2068764Z   include-hidden-files: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2068991Z   archive: true
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2069173Z env:
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2069346Z   CARGO_BUILD_JOBS: 2
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2069552Z   CARGO_INCREMENTAL: 0
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2069754Z   AGAVE_VERSION: 4.1.2
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2070132Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2070686Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2071148Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2071440Z   CACHE_ON_FAILURE: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2071656Z   MISE_LOG_LEVEL: info
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2074706Z   MISE_GITHUB_TOKEN: ***
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2075032Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2075361Z   MISE_YES: 1
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.2075554Z ##[endgroup]
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.3464845Z With the provided path, there will be 387 files uploaded
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.3465600Z Artifact name is valid!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.3465935Z Root directory input is valid!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.6146955Z Uploading artifact: simple-pooled-fuzz-smoke.zip
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:31.6171674Z Beginning upload of artifact content to blob storage
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:33.1600700Z Uploaded bytes 8388608
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:33.7505117Z Uploaded bytes 16777216
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:33.9042309Z Uploaded bytes 25165824
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:34.4059417Z Uploaded bytes 33554432
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:34.6163480Z Uploaded bytes 35015687
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:34.6663258Z Finished uploading artifact content to blob storage!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:34.6667444Z SHA256 digest of uploaded artifact is e44c8e53881a9c6bf5efde0f5efb7dd517156e0a4d890cb5679a69f5f4290c74
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:34.6668793Z Finalizing artifact upload
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2094382Z Artifact simple-pooled-fuzz-smoke successfully finalized. Artifact ID 12865679449
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2095274Z Artifact simple-pooled-fuzz-smoke has been successfully uploaded! Final size is 35015687 bytes. Artifact ID is 12865679449
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2096126Z Artifact download URL: https://github.com/TodorBonchev/short.win/actions/runs/40801471141/artifacts/12865679449
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	﻿2026-10-29T01:39:35.2278281Z ##[group]Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2278544Z with:
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2278682Z   name: simple-current-route-suite
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2278848Z   retention-days: 7
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2279022Z   path: /home/runner/work/_temp/simple-current-route-suite
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2279227Z   if-no-files-found: warn
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2279374Z   compression-level: 6
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2279506Z   overwrite: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2279646Z   include-hidden-files: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2279798Z   archive: true
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2279921Z env:
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2280038Z   CARGO_BUILD_JOBS: 2
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2280171Z   CARGO_INCREMENTAL: 0
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2280316Z   AGAVE_VERSION: 4.1.2
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2280550Z   AGAVE_INSTALL_INIT_SHA256: 383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2280892Z   AGAVE_RELEASE_SHA256: 5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2281173Z   ANCHOR_REV: 84a63f9f7112b23581816436fbcf3f6c515779f9
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2281357Z   CACHE_ON_FAILURE: false
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2281499Z   MISE_LOG_LEVEL: info
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2283035Z   MISE_GITHUB_TOKEN: ***
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2283230Z   MISE_TRUSTED_CONFIG_PATHS: /home/runner/work/short.win/short.win
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2283437Z   MISE_YES: 1
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.2283563Z ##[endgroup]
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.3476025Z With the provided path, there will be 253 files uploaded
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.3480074Z Artifact name is valid!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.3480370Z Root directory input is valid!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.6246698Z Uploading artifact: simple-current-route-suite.zip
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:35.6271369Z Beginning upload of artifact content to blob storage
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.2248368Z Uploaded bytes 8388608
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.2798924Z Uploaded bytes 8494910
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.3200878Z Finished uploading artifact content to blob storage!
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.3203013Z SHA256 digest of uploaded artifact is 2f2ed8432bb4d007eb5382b29bd70522ecb413adbbbdb3e9165b35752f16a8fc
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.3204320Z Finalizing artifact upload
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.8099102Z Artifact simple-current-route-suite successfully finalized. Artifact ID 12865604902
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.8099851Z Artifact simple-current-route-suite has been successfully uploaded! Final size is 8494910 bytes. Artifact ID is 12865604902
+replacement	Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a	2026-10-29T01:39:37.8102903Z Artifact download URL: https://github.com/TodorBonchev/short.win/actions/runs/40801471141/artifacts/12865604902
+replacement	Post Cache pinned SBF tools and Anchor CLI	﻿2026-10-29T01:39:37.8312703Z Post job cleanup.
+replacement	Post Cache pinned SBF tools and Anchor CLI	2026-10-29T01:39:37.9155241Z Cache hit occurred on the primary key sbf-tools-agave-4.1.2-5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770-anchor-84a63f9f7112b23581816436fbcf3f6c515779f9-v1.57-Linux, not saving cache.
+replacement	Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	﻿2026-10-29T01:39:37.9261908Z Post job cleanup.
+replacement	Post Run Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6	2026-10-29T01:39:38.0078435Z Cache up-to-date.
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	﻿2026-10-29T01:39:38.0213615Z Post job cleanup.
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0862176Z [command]/usr/bin/git version
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0898771Z git version 2.56.0
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0923880Z Temporarily overriding HOME='/home/runner/work/_temp/560d0503-df1c-4d99-9c11-f10f86efe415' before making global git config changes
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0924590Z Adding repository directory to the temporary git global config as a safe directory
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0927902Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/short.win/short.win
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0960984Z Removing SSH command configuration
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0965670Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.0996718Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1216907Z Removing HTTP extra header
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1222552Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1263407Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1542173Z Removing includeIf entries pointing to credentials config files
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1549605Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1588577Z includeif.gitdir:/home/runner/work/short.win/short.win/.git.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1589338Z includeif.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1589686Z includeif.gitdir:/github/workspace/.git.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1589953Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1597201Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/short.win/short.win/.git.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1629669Z /home/runner/work/_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1637624Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/short.win/short.win/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-fb589c5f\-0805\-46c3\-81a7\-3970481ad80b\.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1679894Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1711580Z /home/runner/work/_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1719491Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/short.win/short.win/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-fb589c5f\-0805\-46c3\-81a7\-3970481ad80b\.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1758870Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1788044Z /github/runner_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1792979Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-fb589c5f\-0805\-46c3\-81a7\-3970481ad80b\.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1829873Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1859262Z /github/runner_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1865052Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-fb589c5f\-0805\-46c3\-81a7\-3970481ad80b\.config
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.1902911Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+replacement	Post Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1	2026-10-29T01:39:38.2101394Z Removing credentials config '/home/runner/work/_temp/git-credentials-fb589c5f-0805-46c3-81a7-3970481ad80b.config'
+replacement	Complete job	﻿2026-10-29T01:39:38.2236784Z Cleaning up orphan processes

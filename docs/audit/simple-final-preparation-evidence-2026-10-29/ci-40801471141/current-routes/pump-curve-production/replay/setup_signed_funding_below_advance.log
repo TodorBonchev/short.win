@@ -1,0 +1,13 @@
+Program ComputeBudget111111111111111111111111111111 invoke [1]
+Program ComputeBudget111111111111111111111111111111 success
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh invoke [1]
+Program log: Instruction: OpenPosition
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program log: AnchorError thrown in programs/shortwin-simple/src/open.rs:175. Error Code: FundingAboveMax. Error Number: 6032. Error Message: Temporary execution funding exceeds the signed maximum.
+Program log: Left: 0
+Program log: Right: 9078560
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh consumed 51649 of 1399850 compute units
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh failed: custom program error: 0x1790
