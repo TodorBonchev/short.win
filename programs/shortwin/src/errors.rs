@@ -390,6 +390,14 @@ pub enum ShortwinError {
 
     #[msg("Trusted price actions are paused for this market")]
     QuotePriceActionsPaused,
+
+    // ---- Appended for the I-09 S3-wait extension (6115; group in brackets) ----
+    /// [Lender] `deposit` while the market's no-route chain runs (`no_route_since != 0`) with an
+    /// open position: the pending S3 settles at the frozen EMA, so shares minted during the wait
+    /// would take a pro-rata share of that predetermined compensation from the lenders who bore
+    /// the risk. Reported by Defriza Crypto (defrizacrypto@gmail.com).
+    #[msg("Deposits are paused while a no-route S3 settlement is pending on this market")]
+    DepositDuringNoRoute,
 }
 
 impl From<MathError> for ShortwinError {
@@ -497,6 +505,7 @@ mod tests {
             (ShortwinError::OverdueDefaultNotReady, 6112),
             (ShortwinError::EpochRecordRentAboveMax, 6113),
             (ShortwinError::QuotePriceActionsPaused, 6114),
+            (ShortwinError::DepositDuringNoRoute, 6115),
             (ShortwinError::CurveStraddle, 6031),
         ];
         for (e, c) in pins {

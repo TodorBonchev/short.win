@@ -319,7 +319,19 @@ impl Walk {
                 self.mm.spec.program,
             );
             let ix = ix::deposit(&self.mm.lender_keys(), amount, 0);
-            ok(self.env.send(&[ix], &[&lender]));
+            let m = self.env.market(&self.mm.market());
+            let gated = m.no_route_since != 0 && m.open_positions > 0;
+            let res = self.env.send(&[ix], &[&lender]);
+            if gated {
+                // DFZ-01: deposits wait out a running no-route chain with a position open.
+                assert_eq!(
+                    custom_code(&res),
+                    Some(u32::from(E::DepositDuringNoRoute)),
+                    "deposit during a no-route chain"
+                );
+            } else {
+                ok(res);
+            }
         } else if let Some(l) = self.env.lender(&self.mm.market(), &lender.pubkey()) {
             let shares = l.shares / (2 + u128::from(self.rng.below(20)));
             let ix = ix::withdraw(&self.mm.lender_keys(), shares, 0);

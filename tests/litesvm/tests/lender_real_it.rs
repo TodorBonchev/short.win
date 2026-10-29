@@ -881,38 +881,39 @@ mod jit {
         sc.knobs(|k| k.disabled = true);
         sc.crank_every(30, 23);
         to_the_settling_second(&mut sc, 30);
-        let w = settlement_whale(&mut sc);
-        assert_eq!(w.ctl.condition, 3, "S3");
-        assert!(w.ctl.ema_age_s > 600, "at the frozen pre-halt EMA");
-        let x = w.ctl.lender_amount;
-        let before_fix = share_of(u128::from(x.min(w.v_ema + w.r_due) - w.r_due), w.whale_frac);
-        eprintln!(
-            "S3 (halted): take {x}, ⌊Q·P_ema⌋ {} + R_due {} (credited {}), lump {}; whale h = 0 \
-             paid {} ({before_fix} with ⌊Q·P_ema⌋ immediate), tokens back {} of {}",
-            w.v_ema, w.r_due, w.credited, w.ctl.lump, w.whale, w.tokens_back, w.amount
-        );
-        assert!(x > w.r_due && w.v_ema > 0);
-        assert_eq!(
-            w.whale, 0,
-            "the JIT whale swaps nothing at the frozen P_ema (it would take {before_fix})"
-        );
-        let top = shortwin_math::pool::rent_top_up(w.r_due, w.r_due, w.credited);
-        assert_eq!(w.ctl.lump, x - w.r_due, "all but R_due vests");
-        assert_eq!(
-            w.vested,
-            w.ctl.lump + top,
-            "the lump and the rent top-up vest"
-        );
+        // DFZ-01 (I-09 extension, reported by Defriza Crypto): the whale's deposit no longer
+        // lands at all while the no-route chain runs with the position open, so the
+        // `[deposit 9×, sol_settle, claim_sol, withdraw]` bundle is refused whole.
+        let m = sc.market();
         assert!(
-            w.tokens_back < w.amount,
-            "the whale's share of Q is gone with its unvested SOL"
+            m.no_route_since != 0 && m.open_positions > 0,
+            "the chain runs"
         );
-        assert!(
-            w.honest + 2 >= w.control_honest,
-            "the honest lender loses nothing to the bundle: {} vs {}",
-            w.honest,
-            w.control_honest
+        let lend = sc.mm.spec.lend;
+        let jit = sc.env.actor(&sc.mm, 9 * lend, 0);
+        let (kp, wk) = (sc.keeper.insecure_clone(), jit.kp.insecure_clone());
+        let keys = keys_of(&sc.mm, &jit);
+        let market = sc.mm.market();
+        let ixs = [
+            ix::deposit(&keys, 9 * lend, 0),
+            sc.settle_ix(),
+            ix::claim_sol(&jit.key(), &market),
+        ];
+        let res = sc.env.send(&ixs, &[&kp, &wk]);
+        assert_eq!(
+            shortwin_litesvm_tests::errors::custom_code(&res),
+            Some(u32::from(
+                shortwin::errors::ShortwinError::DepositDuringNoRoute
+            )),
+            "the JIT bundle is refused during the no-route chain"
         );
+        // The settlement alone still lands: S3 at the frozen pre-halt EMA, all but R_due vests.
+        let six = sc.settle_ix();
+        let meta = ok(sc.env.send(&[six], &[&kp]));
+        let ev = Outcome::of(&meta).settled.expect("settles");
+        assert_eq!(ev.condition, 3, "S3");
+        assert!(ev.ema_age_s > 600, "at the frozen pre-halt EMA");
+        assert!(ev.lump > 0, "the take vests");
     }
 
     /// The expiry at the deadline: the 2 % expiry fee vests (ECON §12.2's R3B-2 lump).

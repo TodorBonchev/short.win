@@ -6286,6 +6286,11 @@
       "code": 6114,
       "name": "QuotePriceActionsPaused",
       "msg": "Trusted price actions are paused for this market"
+    },
+    {
+      "code": 6115,
+      "name": "DepositDuringNoRoute",
+      "msg": "Deposits are paused while a no-route S3 settlement is pending on this market"
     }
   ],
   "types": [

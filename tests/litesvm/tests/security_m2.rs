@@ -113,17 +113,20 @@ mod box_collapse {
         (sc, book)
     }
 
-    /// A dust deposit by the whale: `deposit` runs the prologue's roll (ARCH §3.0 A16) but
-    /// records no observation, so it integrates the pending bucket without opening a new one.
+    /// A dust withdrawal by the seeding lender: `withdraw` runs the prologue's roll (ARCH §3.0
+    /// A16) but records no observation, so it integrates the pending bucket without opening a
+    /// new one. (This was a dust deposit by the whale; DFZ-01 — reported by Defriza Crypto —
+    /// refuses deposits while the no-route chain runs with positions open, so the roll now
+    /// rides the other ReadSet-less lender instruction.)
     fn roll_only(sc: &mut Sc) {
         let k = LenderKeys {
-            owner: sc.whale.key(),
+            owner: sc.mm.lender.pubkey(),
             mint: sc.mm.mint(),
             token_program: sc.mm.keys.token_program,
-            owner_token_account: sc.whale.base,
+            owner_token_account: sc.mm.lender_account,
         };
-        let kp = sc.whale.kp.insecure_clone();
-        ok(sc.env.send(&[ix::deposit(&k, 1_000_000, 0)], &[&kp]));
+        let kp = sc.mm.lender.insecure_clone();
+        ok(sc.env.send(&[ix::withdraw(&k, 1, 0)], &[&kp]));
     }
 
     /// The keeper observes and calls `sol_settle` for every position every second until all

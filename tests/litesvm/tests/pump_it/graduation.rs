@@ -516,7 +516,7 @@ fn plant_at_spot(env: &mut Env, pm: &PumpMarket, tokens: u64) -> fork::AnyPool {
 /// The curve completes with a position open, then pump migrates it **elsewhere** (reserves zeroed,
 /// no canonical pool; planted on pump's account): `PumpCurve → PumpMigrating → None` with the
 /// `graduated_elsewhere` flag. Returns the market, the borrower, the position's nonce and `q`.
-fn graduated_elsewhere_with_a_position() -> (Env, PumpMarket, Borrower, u64, u64) {
+pub fn graduated_elsewhere_with_a_position() -> (Env, PumpMarket, Borrower, u64, u64) {
     let (mut env, pm, q) = setup(PumpCoin::Near);
     let mut b = env.borrower();
     let (_, nonce, _) = open_ok(&mut env, &pm, &mut b, q);
@@ -536,7 +536,7 @@ fn graduated_elsewhere_with_a_position() -> (Env, PumpMarket, Borrower, u64, u64
 
 /// Pump migrates the completed curve elsewhere (reserves zeroed, no canonical pool) and a crank
 /// sees it: `PumpMigrating → None`, `graduated_elsewhere`.
-fn migrate_elsewhere(env: &mut Env, pm: &PumpMarket) {
+pub fn migrate_elsewhere(env: &mut Env, pm: &PumpMarket) {
     fork::set_curve_reserves(&mut env.svm, &pm.curve.curve, 0, 0, 0, 0);
     env.warp(1);
     venue_changed(&crank(env, pm), VenueKind::PumpMigrating, VenueKind::None);

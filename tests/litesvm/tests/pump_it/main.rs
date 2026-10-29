@@ -40,6 +40,8 @@ mod refusals;
 mod rent;
 mod straddle;
 mod structure;
+mod sw_h2;
+mod sw_h4;
 
 /// The curve fork E2E's machinery (`pump_curve_support.rs`): the keeper's view of a curve
 /// position (`CurveCtx`: the curve's pricing at the live fee or a cap), for `fees`.

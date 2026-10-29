@@ -134,6 +134,15 @@ pub fn handler<'info>(
             require!(pool.vest_bal == 0, ShortwinError::PoolDrained);
             market.deposit_hold_until = -1;
         }
+        // I-09 extension (S3 wait): while the no-route chain runs with a position open, that
+        // position's S3 settles at the frozen EMA and its lender take is fixed in advance; shares
+        // minted now would split it pro rata at the honest lenders' expense. Deposits resume
+        // once the chain clears or the last position exits (and then wait for the vest above).
+        // Reported by Defriza Crypto (defrizacrypto@gmail.com).
+        require!(
+            market.no_route_since == 0 || market.open_positions == 0,
+            ShortwinError::DepositDuringNoRoute
+        );
         // A16 step 5: roll a completed bucket (no ReadSet, so no record and no chains).
         prologue::roll_only(&market_key, &mut market, now, clock.slot)?;
 

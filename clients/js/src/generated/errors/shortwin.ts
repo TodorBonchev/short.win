@@ -244,6 +244,8 @@ export const SHORTWIN_ERROR__OVERDUE_DEFAULT_NOT_READY = 0x17e0; // 6112
 export const SHORTWIN_ERROR__EPOCH_RECORD_RENT_ABOVE_MAX = 0x17e1; // 6113
 /** QuotePriceActionsPaused: Trusted price actions are paused for this market */
 export const SHORTWIN_ERROR__QUOTE_PRICE_ACTIONS_PAUSED = 0x17e2; // 6114
+/** DepositDuringNoRoute: Deposits are paused while a no-route S3 settlement is pending on this market */
+export const SHORTWIN_ERROR__DEPOSIT_DURING_NO_ROUTE = 0x17e3; // 6115
 
 export type ShortwinError =
   | typeof SHORTWIN_ERROR__ABOVE_PRO_RATA_ALLOWANCE
@@ -272,6 +274,7 @@ export type ShortwinError =
   | typeof SHORTWIN_ERROR__CURVE_STRADDLE
   | typeof SHORTWIN_ERROR__DELEGATE_NOT_CLEARED
   | typeof SHORTWIN_ERROR__DENIED_ACCOUNT
+  | typeof SHORTWIN_ERROR__DEPOSIT_DURING_NO_ROUTE
   | typeof SHORTWIN_ERROR__EMA_WARMING_UP
   | typeof SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL
   | typeof SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH
@@ -391,6 +394,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [SHORTWIN_ERROR__CURVE_STRADDLE]: `Buyback exceeds what the curve and its post-migration pool can deliver`,
     [SHORTWIN_ERROR__DELEGATE_NOT_CLEARED]: `Pool vault delegate was not cleared`,
     [SHORTWIN_ERROR__DENIED_ACCOUNT]: `A protocol account was passed where it is denied (e.g. as a venue extra)`,
+    [SHORTWIN_ERROR__DEPOSIT_DURING_NO_ROUTE]: `Deposits are paused while a no-route S3 settlement is pending on this market`,
     [SHORTWIN_ERROR__EMA_WARMING_UP]: `The price state is warming up after a venue change; opens and keeper exits wait`,
     [SHORTWIN_ERROR__EMERGENCY_CANNOT_CANCEL]: `Only governance may cancel an authorities or timelock change`,
     [SHORTWIN_ERROR__EPOCH_RECORD_MISMATCH]: `A ShareEpoch record does not match the market or epoch`,
