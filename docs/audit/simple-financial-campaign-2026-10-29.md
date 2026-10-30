@@ -157,6 +157,8 @@ Production roles, privately backed-up key custody, actual loader/genesis setting
 funded payers/reserves, measured live free-key/RPC capacity, delivered operating
 alerts and mainnet commissioning remain pending. Present those operating receipts
 with this evidence for owner review before a stable `v1.1.0` tag/deployment decision.
-The candidate remains untagged and undeployed. No financial/governance transaction,
+At this completion checkpoint the candidate was untagged and undeployed. The
+owner subsequently authorized the [v1.1.0 software release](../release/POOLED-1.1.0.md)
+and consolidation into `main`; commissioning remains separate. No financial/governance transaction,
 external-firm audit or production readiness beyond the scoped checks is claimed.
 The heartbeat is stopped after publishing this completion follow-up.

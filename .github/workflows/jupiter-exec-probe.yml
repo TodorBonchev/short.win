@@ -1,36 +1,8 @@
 name: jupiter-exec-probe
 
+# Historical legacy-route probe; pooled automatic checks live in simple-pooled.yml.
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'tests/jupiter_exec_probe/**'
-      - 'tests/litesvm/tests/jupiter_exec_probe.rs'
-      - 'tests/litesvm/Cargo.toml'
-      - 'crates/shortwin-jupiter-route/**'
-      - 'scripts/build-jupiter-exec-probe.sh'
-      - 'scripts/materialize-jupiter-probe.py'
-      - '.github/workflows/jupiter-exec-probe.yml'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
-      - 'programs/shortwin/**'
-      - 'tests/litesvm/src/**'
-      - 'tests/fixtures/**'
-  push:
-    branches: [main, codex/jupiter-redesign-1.1]
-    paths:
-      - 'tests/jupiter_exec_probe/**'
-      - 'tests/litesvm/tests/jupiter_exec_probe.rs'
-      - 'tests/litesvm/Cargo.toml'
-      - 'crates/shortwin-jupiter-route/**'
-      - 'scripts/build-jupiter-exec-probe.sh'
-      - 'scripts/materialize-jupiter-probe.py'
-      - '.github/workflows/jupiter-exec-probe.yml'
-      - 'Cargo.lock'
-      - 'Cargo.toml'
-      - 'programs/shortwin/**'
-      - 'tests/litesvm/src/**'
-      - 'tests/fixtures/**'
 
 permissions:
   contents: read

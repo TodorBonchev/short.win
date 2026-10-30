@@ -1,0 +1,76 @@
+{
+  "all_original_branch_tips_to_be_retained_as_ancestors": true,
+  "archive": {
+    "all_worktree_heads_reachable_from_bundle": true,
+    "bundle_bytes": 145835700,
+    "bundle_sha256": "818c227ac8804a0e6c2880ce37c70e84361cbe252f95a1d68e9713b650e6a33e",
+    "directory": "/root/.local/share/shortwin/branch-archive/20261030T150859Z",
+    "refs": 30,
+    "verified": true,
+    "working_and_untracked_files": "Preserved in place, not part of the bundle; old worktrees are detached at their existing commits before removing branch refs.",
+    "worktrees": 6
+  },
+  "decision_date_local": "2026-10-30 Europe/Kyiv",
+  "historical_merge_strategy": "ours, only for independently reviewed incompatible legacy branch histories; no claim that their runtime patches are applied to pooled1.1.0",
+  "original_refs": [
+    "refs/heads/codex/1.0.3-release-ready|30ba1f54b09bb0fae5a01072c1b5750e8251b76d",
+    "refs/heads/codex/ai3-fr01|297c8f65ccceaf05474552777dfbdcdd03450e7f",
+    "refs/heads/codex/audit-1.0.3-fix-review|7c5ae42978a32cd7463c6cef991031485c39abb2",
+    "refs/heads/codex/capped-mainnet-1.0.3|a23a34283c9c83f6c35104867a0409baa7035617",
+    "refs/heads/codex/jupiter-compat-ci|79e7f5ee4b08aef287c2ea192cbf9265e86d87be",
+    "refs/heads/codex/jupiter-only-pooled|3d99f44e53fa5045f43cb1cced10ef5f2f248968",
+    "refs/heads/codex/jupiter-redesign-1.1|d978ebf27a128032f6a395d123416c7288abe6fc",
+    "refs/heads/codex/token2022-qualification-1.0.3|3776f9ed7ade8254c7a83f9e9dd8bf4c1a40bf17",
+    "refs/heads/main|297c8f65ccceaf05474552777dfbdcdd03450e7f",
+    "refs/remotes/origin/HEAD|3776f9ed7ade8254c7a83f9e9dd8bf4c1a40bf17",
+    "refs/remotes/origin/audit-1.0.3-full-2026-10-21|c89d95073f5e80323d86680c133880778b71de36",
+    "refs/remotes/origin/audit-1.0.3-gates|30ba1f54b09bb0fae5a01072c1b5750e8251b76d",
+    "refs/remotes/origin/ci/deploy-wrangler-npm|af90a249dd17bc68f0b695e70c0d9b75e0ffe58e",
+    "refs/remotes/origin/codex/capped-mainnet-1.0.3|a23a34283c9c83f6c35104867a0409baa7035617",
+    "refs/remotes/origin/codex/jupiter-compat-ci|79e7f5ee4b08aef287c2ea192cbf9265e86d87be",
+    "refs/remotes/origin/codex/jupiter-only-pooled|3d99f44e53fa5045f43cb1cced10ef5f2f248968",
+    "refs/remotes/origin/codex/jupiter-redesign-1.1|d978ebf27a128032f6a395d123416c7288abe6fc",
+    "refs/remotes/origin/codex/token2022-qualification-1.0.3|3776f9ed7ade8254c7a83f9e9dd8bf4c1a40bf17",
+    "refs/remotes/origin/devnet/local-services-web-2026-10-23|8d3c5e28bef42b3e5d849e0ec3a41ac207066792",
+    "refs/remotes/origin/devnet/trading-bootstrap-2026-10-23|636807d81e1b0d6361ef9ee5aee6aa4e3dc07ed3",
+    "refs/remotes/origin/fix/ki12-launch-cap-ema-notional|537971e6f5c340a1478cb1b42c86cda09ffaaac3",
+    "refs/remotes/origin/fix/no-route-deposit-gate|c0660b2434e21c6f7dcf6bae699fd7aa97760378",
+    "refs/remotes/origin/main|3776f9ed7ade8254c7a83f9e9dd8bf4c1a40bf17",
+    "refs/remotes/origin/release/1.0.3-devnet-prep-2026-10-22|a635425151948950718045927e1cd3552782b12e",
+    "refs/remotes/origin/release/1.0.3-final-2026-10-24|7e4fc7a59c29babda05178fcbb722d10222939ea",
+    "refs/remotes/origin/release/1.0.3-local-ops-evidence-2026-10-22|1cd304117264bbe80d5e3a7d356a707583fc3a4c",
+    "refs/remotes/origin/web/seo-2026-10-26|a42df1b04367b3f2a41ce312e71cdab83c2420c8",
+    "refs/tags/audit-1|a7be7c717c6f4458d9d327ec89a93ba128478036",
+    "refs/tags/v1.0.0|e30bfe05fd95b603e6b208154611fa6c27b26ee9",
+    "refs/tags/v1.0.3-devnet.1|1d0a11bac8f094b05e9854cbb80d8d40c34a14c8"
+  ],
+  "other_branches": "All other branch tips were already ancestors of the pooled review baseline; valuable source/docs/evidence history is already reachable.",
+  "owner_authorized_software_tag": "v1.1.0",
+  "owner_selected_remaining_branch": "main",
+  "review_attribution": "Three independent AI subagent reviews plus parent review; no external-firm audit",
+  "review_baseline": "3d99f44e53fa5045f43cb1cced10ef5f2f248968",
+  "runtime_policy_service_client_fixture_changes_required": false,
+  "schema": 1,
+  "tags": "Preserve existing tags. Never repoint a tag. Remove branch refs only after verified fast-forward of main.",
+  "unique_branch_reviews": [
+    {
+      "branch": "fix/ki12-launch-cap-ema-notional",
+      "disposition": "Retain legacy patch and tests in historical parent. Pooled opening notional already uses max(actual sale proceeds, live ask upper, historical ask upper) for caps and stored exposure.",
+      "tip": "537971e6f5c340a1478cb1b42c86cda09ffaaac3"
+    },
+    {
+      "branch": "fix/no-route-deposit-gate",
+      "disposition": "Retain legacy S3/frozen-EMA/vesting gate and tests in historical parent. Independent pooled ledger has different current-holder default allocation; do not import the legacy fixed finding status or claim fixed original-lender cohort protection.",
+      "tip": "c0660b2434e21c6f7dcf6bae699fd7aa97760378"
+    },
+    {
+      "branch": "release/1.0.3-final-2026-10-24",
+      "disposition": "Retain dated release review and legacy PumpSwap readiness-cache fix in history. Pooled Node operator has no such cache. Current lockfiles already include the applicable ctutils/Tokio upgrades; older CI exceptions are superseded.",
+      "tip": "7e4fc7a59c29babda05178fcbb722d10222939ea",
+      "unique_commits": [
+        "58285872b",
+        "7e4fc7a59"
+      ]
+    }
+  ]
+}

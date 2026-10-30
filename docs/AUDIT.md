@@ -1751,6 +1751,12 @@ roles, funded payers, measured live API capacity, delivered operating alerts and
 mainnet commissioning remain pending; no stable tag, deployment, legacy finding
 closure or official external audit is claimed.
 
+**Later owner software-release authorization, 2026-10-30:** the owner selected
+`v1.1.0` and sole branch `main`. The [release record](release/POOLED-1.1.0.md)
+separates qualified software identity from the still-pending operating/deployment
+gates. Branch review retains unique legacy commits in history without importing
+incompatible runtime changes or borrowing their finding dispositions.
+
 
 
 **Current replacement decision, 2026-10-28:** the owner selected a separate

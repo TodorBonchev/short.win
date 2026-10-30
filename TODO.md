@@ -6,7 +6,7 @@
 - [x] Add trusted exact-quantity history, bounded automatic warm-up/publication, keeper/indexer, generated client and wallet UI.
 - [x] Pass fresh focused CI and short actual-program fuzz; verify byte-identical program builds across checkout locations. [Checkpoint](docs/audit/simple-pooled-reproducibility-2026-10-28.md).
 - [x] Prepare the [production policy/service/payer proposal](simple/config/README.md), free-key profile, non-executable role setup and bounded on-demand publisher.
-- [x] Generate and privately custody the dedicated program key; rebuild the untagged 1.1.0 candidate and generated clients for its public identity.
+- [x] Generate and privately custody the dedicated program key; rebuild the 1.1.0 candidate and generated clients for its public identity.
 - [ ] Assign and review the other production roles and live loader/genesis configuration; commission real funding and capacity.
 - [x] Qualify the [dated current-route matrix](docs/audit/simple-production-readiness-2026-10-28.md): six real-program sell/full-buyback cases, including SPL/Token-2022 Pump curves and PumpSwap, plus two exact incompatible-route refusals; fresh CI passed.
 - [x] Select the actual production program identity/version and repeat current external loader/route checks on those inputs. [Final preparation](docs/audit/simple-final-preparation-2026-10-29.md).
@@ -14,7 +14,8 @@
 - [x] Complete the owner-authorized independently supervised >=24h financial campaign with separate route/queue checks. **VERIFIED PASS, 2026-10-30:** frozen source `0f4871c7`, 124,584 completed cases across all eight scenario families, runner wall 86,400.558399631s and supervisor elapsed 86,407.00566560202s; zero failures, anomalies, setup failures or invariant failures, no real crash/anomaly artifacts, and fixed startup/frozen/final hashes matched. [Campaign and scope limits](docs/audit/simple-financial-campaign-2026-10-29.md); [exact final evidence](docs/audit/simple-financial-campaign-evidence-2026-10-29/final/). This qualifies historical-CPMM financial scenarios with synthetic clocks/history/funding and one loan per fresh VM; current routes and queue/operator checks remain separately bounded. Stopped combined tooling stays isolated and no old duration transfers. Real funded operation and mainnet commissioning remain open.
 - [x] Qualify safe inactive exact-q retirement/re-admission against finalized active debt, finite references and pending publications; preserve cold generations, same-bank clocks, CAS/replay guards and local database identities/budgets. [Checks and limits](docs/audit/simple-final-preparation-2026-10-29.md).
 - [ ] Commission real funded operator/HTTP/web services with measured quote capacity, payer budgets and tested monitoring/alerts.
-- [ ] Present the concrete stable release/tag and mainnet deployment plan for owner review; no tag or deployment has occurred.
+- [x] Obtain owner authorization for the `v1.1.0` software tag and consolidation into sole branch `main`; retain historical branch work and the [release/commissioning plan](docs/release/POOLED-1.1.0.md).
+- [ ] Complete the operating prerequisites above and obtain separate mainnet deployment/activation approval; no deployment has occurred.
 
 The earlier checklist below is retained for the legacy implementation.
 

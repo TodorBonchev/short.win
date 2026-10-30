@@ -1,4 +1,4 @@
-> **2026-10-28 active replacement:** the owner selected a Jupiter-only pooled lending/shorting implementation with a fixed upfront SOL term fee. See [simple/README.md](simple/README.md), [the new specification](simple/docs/SPEC.md) and [operating prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement.
+> **Active software release: v1.1.0.** The Jupiter-only pooled implementation lives in [simple/](simple/README.md) on `main`. See the [release record](docs/release/POOLED-1.1.0.md), [specification](simple/docs/SPEC.md) and [commissioning prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement. Mainnet deployment and funded operation remain pending.
 
 # short.win
 

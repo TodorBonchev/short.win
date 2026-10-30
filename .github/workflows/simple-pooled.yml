@@ -1,7 +1,7 @@
 name: simple-pooled
 on:
   push:
-    branches: [codex/jupiter-only-pooled]
+    branches: [main]
     paths:
       - 'simple/**'
       - 'docs/audit/simple-current-route-evidence-2026-10-28/**'

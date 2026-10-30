@@ -1,27 +1,17 @@
+# Historical 1.0.x verification only. Active pooled 1.1.0 CI is simple-pooled.yml.
+# Keep manual dispatch for archived evidence; no automatic main/PR/nightly runs.
 # CI for the on-chain workspace (ARCHITECTURE §1.1, §8.4, §9 M0, M0b).
 # Actions are pinned to commit SHAs; the tag each SHA was resolved from is in the comment.
 # The host Rust toolchain (1.98.1, rustfmt, clippy, wasm32) comes from rust-toolchain.toml.
 name: ci
 
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
     inputs:
       fuzz_duration:
         description: "Run the fuzz-nightly job for this long per profile (e.g. 30m, 5h); empty: skip it"
         required: false
         default: ""
-  # M7: the invariant fuzzer's nightly run (fuzz-nightly). GitHub runs `schedule` on the default
-  # branch only. The nightly run builds the programs (anchor-build) and fuzzes; every other job
-  # carries `if: github.event_name != 'schedule'` (it already ran on the push that made main).
-  # Opt-in (owner decision 2026-10-02): the private repository's Actions minutes cannot carry
-  # 6 × 5 h every night, so a scheduled run does nothing unless the repository variable
-  # FUZZ_NIGHTLY is `true` (`gh variable set FUZZ_NIGHTLY --body true`); long fuzz runs are local
-  # (tests/fuzz/README.md). workflow_dispatch with `fuzz_duration` still runs it on demand.
-  schedule:
-    - cron: "17 1 * * *"
 
 permissions:
   contents: read
