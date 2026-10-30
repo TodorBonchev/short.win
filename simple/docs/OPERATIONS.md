@@ -36,7 +36,7 @@ The initial service uses Python stdlib/SQLite and Node 24, avoiding the old Post
 3. Use the implemented revision-checked queue reconciliation with complete finalized program accounts and their same-bank clock under the shared exclusive publisher/pass lock. Retain exact-q warm-up requests, pending publication barriers and active-debt priority. A slot can retire only after debt/pending work is absent, finite references have expired in both clocks and the warm-intent rule is satisfied. Re-admission advances the generation and starts cold history; retained prior evidence remains attributable. Capacity exhaustion or provider outage is unavailable coverage, not evidence of a healthy price. Observe all required history epochs before publishing a finite reference for a new quantity.
 4. Connect the generated publish/arm/force/default instructions to a bounded, funded runner. Publication uses current on-chain sequence+reporter epoch, actual RPC clock, retained local history evidence and simulation. Keeper action planning must reread the loan and immutable policy, choose the deadline/default path first, and submit a fresh simulated route for forced buyback. Do not forward Jupiter setup, cleanup or tip instructions around the protocol handler. The Node-only operator implements this bounded loop; dry-run is the default and explicit execute mode requires role keyfiles. Its funded automatic operation still needs to be commissioned and tested end to end.
 5. Record the actual running client/indexer/reporter/keeper artifact digests, RPC genesis hash and program identity. Fund rent, reporter updates, keeper temporary rent, priority fees and retries with explicit budgets. Add independent heartbeat, stale-reference, queue saturation, payer-low, pending-expiry and RPC/provider outage alerts and test their delivery. Code tests do not prove these operating conditions.
-6. Retain the fresh selected-ID deterministic qualification: six successful captured route lifecycles and two exact expected Scorch refusals, with actual lookup-table transaction sizes. These finite BONK/JUP/RAY and Pump curve/PumpSwap/metadata-token cases do not qualify every Jupiter route or live provider behavior. The fresh 24-hour whole-system qualification gate is still open; unfinished combined-campaign tooling was isolated after the provider stopped that work, and no new 24-hour run started. Existing duration tooling covers historical CPMM scenarios rather than the full current route set; neither it nor the pure-ledger model fills this gap. Do not substitute old duration or a short deterministic replay for missing final-runtime qualification.
+6. Retain the fresh selected-ID deterministic qualification: six successful captured route lifecycles and two exact expected Scorch refusals, with actual lookup-table transaction sizes. These finite BONK/JUP/RAY and Pump curve/PumpSwap/metadata-token cases do not qualify every Jupiter route or live provider behavior. The separately reviewed [financial-duration campaign](../../docs/audit/simple-financial-campaign-2026-10-29.md) passed on 30 October 2026; its historical CPMM scenarios do not establish 24-hour current-route or queue/operator coverage. Keep these distinct scopes and their frozen evidence attributable. Unfinished combined tooling remains isolated and unqualified; do not resume it or substitute legacy duration for changed inputs.
 7. Present the reviewed candidate commit, reproducible program hash, concrete parameter file, cost/coverage plan and operating receipts for the owner's stable-tag/deployment decision. Mainnet before external audit/bounty remains the owner's policy, with the limitations and trust terms disclosed. Never mark missing operating evidence passed.
 
 The minimal web UI defaults to a local RPC and supports wallet review after simulation. It is a development interface, not proof of hosted mainnet availability. Do not point the legacy web release at the new program.
@@ -49,7 +49,7 @@ The browser's service URL defaults to `http://127.0.0.1:8787`; Vite's developmen
 
 The Python `capacity` command reports a spacing-only request-budget bound and explicitly leaves measured coverage pending. Free API access can support only a small number of distinct quantities at a time. The example uses one queued exact quantity and conservative spacing; keyless access requires slower spacing. Increasing queue length alone does not increase quote capacity. Public requests are rate/size bounded, active debt is prioritized, and missing coverage yields Unknown. Automatic admission means no manual per-token approval, not unlimited instant quote availability.
 
-## Long-run qualification remains open
+## Scoped long-run qualification
 
 The existing actual-SBF `program_fuzz` example has bounded and duration modes for
 its historical CPMM scenarios. Its scenario and operation counts cannot be
@@ -57,12 +57,15 @@ presented as six-route current coverage. Fresh deterministic route qualification
 is recorded separately for the selected public ID, and does not claim a
 continuous campaign or history-service capacity.
 
+The owner-authorized financial-duration campaign passed on 30 October 2026;
+its [verified final record](../../docs/audit/simple-financial-campaign-2026-10-29.md)
+closes that selected scope with separate current-route and queue/operator checks.
 Unfinished combined-campaign tooling was isolated after the provider stopped
-that work. It has not supplied qualifying evidence, no new 24-hour run has
-started, and this guide does not authorize resuming it. The unresolved long-run
-gate remains open in the [final preparation record](../../docs/audit/simple-final-preparation-2026-10-29.md).
-Retain partial/error evidence and its actual scope; no legacy run, checkpoint or
-bounded smoke closes the gate.
+that work, supplied no qualifying evidence and remains unqualified; this guide
+does not authorize resuming it. Retain partial/error evidence with its actual
+scope. No legacy run, checkpoint or bounded smoke substitutes for the verified
+final campaign or qualifies changed runtime inputs. Funded operating evidence
+and mainnet commissioning remain pending.
 
 ## Initial production proposal and on-demand cost bounds (2026-10-29)
 
@@ -189,6 +192,12 @@ that choice and supersedes the earlier local combined-tooling launch hold. The
 existing actual-SBF financial runner uses historical CPMM fixtures; six current
 positive/two negative routes and service/operator checks remain separately named
 bounded evidence. No continuous Pump/queue duration or live provider history is
-claimed. Keep stopped combined work isolated. Freeze the manifest and verify host
-identity before starting; record actual launch and independently verify >=24h
-exit/duration/coverage/zero-error/frozen-hash evidence before marking this gate done.
+claimed. Keep stopped combined work isolated. The selected financial-duration gate
+passed on 30 October 2026 with 124,584 completed cases, summary duration
+86,400.558399631 seconds and supervisor duration 86,407.00566560202 seconds;
+failures, anomalies, setup failures and invariant failures were all zero. Fixed
+startup/control/source/input identities and exact final hashes passed independent
+verification. The [final receipts](../../docs/audit/simple-financial-campaign-evidence-2026-10-29/final/verification.json)
+retain actual counters and limits. This closes only that scoped duration gate;
+real roles, payer funding, provider capacity, delivered alerts and mainnet
+commissioning still require actual operating evidence.

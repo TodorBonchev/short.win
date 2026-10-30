@@ -1,0 +1,217 @@
+{
+  "actual_child_identity_matches_fixed_start_witness": true,
+  "all_40_source_and_342_input_hashes_independently_recomputed": true,
+  "exit_code": 0,
+  "explicit_verifier_invocation": "verify.verify(root, root/results, 86400, 86400, outer_completion)",
+  "failure_counts": {
+    "anomalies": 0,
+    "failures": 0,
+    "invariant_failures": 0,
+    "setup_failures": 0
+  },
+  "finished_at_utc": "2026-10-30T08:17:17.987518+00:00",
+  "finished_cleanly": true,
+  "host_release": {
+    "ac_line_status": 1,
+    "linux_child_and_supervisor_absent_after_completion": true,
+    "state": "supervisor_finished",
+    "system_required": false,
+    "windows_launcher_and_helper_absent_observed_at_utc": "2026-10-30T08:20:07.4698157+00:00"
+  },
+  "immutable_startup_witness_sha256": "b6a229dcbbf7b7dd78366011ecd3a274034124cea4e018220f2cc7dbf62dc4a5",
+  "limitations": [
+    "Historical CPMM actual-new-SBF financial scenarios, one loan per fresh VM",
+    "Synthetic clocks, history attestations and starting funding; labelled reserve shock",
+    "Current six positive/two expected-negative routes and queue/operator tests qualify separately",
+    "No 24-hour current Pump, queue/operator or real-provider-history claim",
+    "No arbitrary multi-loan interleaving, universal route, funded-operation or mainnet deployment proof",
+    "No previous duration transfers; fixture setup transactions are not included in transaction counters"
+  ],
+  "real_crash_or_anomaly_artifacts": [],
+  "retained_files": {
+    "alive-final.json": {
+      "bytes": 230,
+      "original_path": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/alive.json",
+      "sha256": "137cae351d5de9f56acf8bc7a875743cf81696ff38becdfbc136e5a6fd3590e3"
+    },
+    "child.stdout.log": {
+      "bytes": 1290,
+      "original_path": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/child.stdout.log",
+      "sha256": "38002e118a117d75f2448a72c8103046ddf4a2a6d9580b951b8c300248be1f61"
+    },
+    "completion.json": {
+      "bytes": 230,
+      "original_path": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results/completion.json",
+      "sha256": "cf2ae9cb8cdca89e2dfd8e4cd1f368c04176a41a23fea6ba84e88decf68f2f9f"
+    },
+    "metadata.json": {
+      "bytes": 53172,
+      "original_path": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results/metadata.json",
+      "sha256": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598"
+    },
+    "outer-completion.json": {
+      "bytes": 3724,
+      "original_path": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/outer-completion.json",
+      "sha256": "49d09ccaf297d1ef4f64d0d1aef33bfb7a4f1781d52222242936d2ee66e47547"
+    },
+    "run.log": {
+      "bytes": 13018453,
+      "original_path": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results/run.log",
+      "sha256": "f23fdd7de7ef5cecbda697f11e3c79d02eeacc455c062821c793c25dd4c401ff"
+    },
+    "summary.json": {
+      "bytes": 2179,
+      "original_path": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results/summary.json",
+      "sha256": "3dd86b3c7e130cf19d3b995a0b63b75cfe39aaf5c92e3afc2b29c8219a2fbdd9"
+    },
+    "windows-keepawake-state.json": {
+      "bytes": 303,
+      "original_path": "/mnt/c/Users/todor/.codex/runs/pooled-110-financial-20261029T080421Z-8c50fa75/keepawake-state.json",
+      "sha256": "ee40bcef2104ab3ebfbeca55f4af7db1de7dc1976dd3b09b6ec69e2fd69fd84c"
+    },
+    "windows-keepawake.stderr.log": {
+      "bytes": 0,
+      "original_path": "/mnt/c/Users/todor/.codex/runs/pooled-110-financial-20261029T080421Z-8c50fa75/keepawake.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "windows-keepawake.stdout.log": {
+      "bytes": 0,
+      "original_path": "/mnt/c/Users/todor/.codex/runs/pooled-110-financial-20261029T080421Z-8c50fa75/keepawake.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "windows-wsl.stderr.log": {
+      "bytes": 0,
+      "original_path": "/mnt/c/Users/todor/.codex/runs/pooled-110-financial-20261029T080421Z-8c50fa75/wsl.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "windows-wsl.stdout.log": {
+      "bytes": 0,
+      "original_path": "/mnt/c/Users/todor/.codex/runs/pooled-110-financial-20261029T080421Z-8c50fa75/wsl.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "schema": 1,
+  "summary_wall_seconds": 86400.558399631,
+  "supervisor_elapsed_seconds": 86407.00566560202,
+  "verification": {
+    "completed_cases": 124584,
+    "completion_sha256": "cf2ae9cb8cdca89e2dfd8e4cd1f368c04176a41a23fea6ba84e88decf68f2f9f",
+    "coverage": {
+      "actual_cpmm_success_logs": 280303,
+      "attempted_fixture_setups": 124584,
+      "attempted_transactions": 576668,
+      "expected_rejected_transactions": 186694,
+      "fixture_setup_transactions_instrumented": false,
+      "operation_counts_attempt_success_reject": {
+        "actual_fill_veto": [
+          15758,
+          0,
+          15758
+        ],
+        "add_margin": [
+          15751,
+          15751,
+          0
+        ],
+        "arm": [
+          31276,
+          31276,
+          0
+        ],
+        "close": [
+          31127,
+          31127,
+          0
+        ],
+        "cr_force": [
+          15518,
+          15518,
+          0
+        ],
+        "default": [
+          15354,
+          15354,
+          0
+        ],
+        "early_cr_force": [
+          15758,
+          0,
+          15758
+        ],
+        "expiry_force": [
+          15469,
+          15469,
+          0
+        ],
+        "late_close": [
+          15354,
+          0,
+          15354
+        ],
+        "late_margin": [
+          15354,
+          0,
+          15354
+        ],
+        "late_repay": [
+          15354,
+          0,
+          15354
+        ],
+        "margin_clear": [
+          15758,
+          15758,
+          0
+        ],
+        "open": [
+          124584,
+          124584,
+          0
+        ],
+        "publish_reference": [
+          78021,
+          78021,
+          0
+        ],
+        "rejected_open": [
+          93725,
+          0,
+          93725
+        ],
+        "repay": [
+          47116,
+          47116,
+          0
+        ],
+        "underfill": [
+          15391,
+          0,
+          15391
+        ]
+      },
+      "scenario_counts": {
+        "close": 15736,
+        "cr_fill_veto": 15758,
+        "cr_market_rise": 15518,
+        "default_boundary": 15354,
+        "expiry": 15469,
+        "margin_repay": 15751,
+        "repay": 15607,
+        "underfill": 15391
+      },
+      "successful_fixture_setups": 124584,
+      "successful_transactions": 389974
+    },
+    "input_files": 342,
+    "log_sha256": "f23fdd7de7ef5cecbda697f11e3c79d02eeacc455c062821c793c25dd4c401ff",
+    "metadata_sha256": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598",
+    "runner_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "scope": "24h existing actual-SBF financial scenarios on historical CPMM; current route and queue/operator checks separate",
+    "source_files": 40,
+    "summary_sha256": "3dd86b3c7e130cf19d3b995a0b63b75cfe39aaf5c92e3afc2b29c8219a2fbdd9",
+    "verified": true,
+    "wall_seconds": 86400.558399631
+  },
+  "verified_at_utc": "2026-10-30T08:21:37.174410+00:00",
+  "verified_control_sha256": "5657e979e8dedeb3368f72db2c8be88cb0a0150d8a2101f6b766bc20d4ec3be5"
+}

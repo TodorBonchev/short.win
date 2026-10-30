@@ -1,0 +1,68 @@
+{
+  "changed_tracked_paths_since_frozen_source": [
+    ".gitattributes",
+    "TODO.md",
+    "docs/AUDIT.md",
+    "docs/audit/simple-final-preparation-2026-10-29.md",
+    "docs/audit/simple-financial-campaign-2026-10-29.md",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/README.md",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/SHA256SUMS.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/ci-40840794732/artifacts.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/ci-40840794732/independent-validation.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/ci-40840794732/run-terminal.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/ci-40840794732/sbf-build.log",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/independent-scope-review.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/alive-observed.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/automation.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/launch-observation.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/launch.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/monitor-prompt.txt",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/runner-metadata.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/supervisor-running.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/windows-keepawake-launch.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/windows-keepawake-observed.json",
+    "docs/audit/simple-financial-campaign-evidence-2026-10-29/start/windows-wsl-launch.json",
+    "simple/README.md",
+    "simple/docs/OPERATIONS.md"
+  ],
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "scripts/audit_scope.py",
+        "check"
+      ],
+      "cwd": "/root/short.win-simple",
+      "exit_code": 0,
+      "finished_at_utc": "2026-10-30T08:26:00.703430+00:00",
+      "started_at_utc": "2026-10-30T08:26:00.533291+00:00",
+      "stderr": "",
+      "stdout": "ok: scope.txt matches git ls-files at HEAD; every watched file is classified\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "/root/short.win-simple",
+      "exit_code": 0,
+      "finished_at_utc": "2026-10-30T08:26:00.713201+00:00",
+      "started_at_utc": "2026-10-30T08:26:00.703450+00:00",
+      "stderr": "",
+      "stdout": ""
+    }
+  ],
+  "existing_campaign_index": {
+    "note": "Only the current evidence README is updated; its old exact bytes are retained for the original index. Existing raw start/preflight/CI/control/separate-gate evidence is unchanged.",
+    "original_entries_reverified": 93,
+    "original_sha256": "36b720f2f52a9f0e1422b1e17d078615591d7aae8b6f5f08c0a456f03c80ec72",
+    "preserved_index": "final/pre-completion-SHA256SUMS.json",
+    "preserved_readme": "final/pre-completion-README.md"
+  },
+  "final_documentation_review": "Separate AI agent compared counters, durations, finish time, log bytes/hashes and current/historical status; corrected stale operations-guide wording and found no remaining issues. No official external audit claimed.",
+  "independent_completion_review_sha256": "995f895449924a74c597695d65eaa4960f85a9a8ba0ac293536a27373271e628",
+  "recorded_at_utc": "2026-10-30T08:26:00.720766+00:00",
+  "schema": 1,
+  "scoped_runtime_changed_since_frozen_source": false
+}

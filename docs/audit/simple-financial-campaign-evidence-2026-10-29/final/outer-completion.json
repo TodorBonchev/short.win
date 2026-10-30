@@ -1,0 +1,144 @@
+{
+  "actual_child_identity": {
+    "boot_id": "4cceeacd-7e4b-442c-aa19-ee990440b802",
+    "cmdline": [
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+      "--seed",
+      "103410000",
+      "--duration-seconds",
+      "86400",
+      "--out",
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results"
+    ],
+    "exe": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+    "exe_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "pid": 122465,
+    "start_ticks": "9230986"
+  },
+  "baseline_sha256": "9e7ec4d00eb38a9a68a2f91bc645306fb93eabb590b28970cbec6b125160458f",
+  "elapsed_seconds": 86407.00566560202,
+  "exit_code": 0,
+  "finished_at_utc": "2026-10-30T08:17:17.987518+00:00",
+  "launch_sha256": "82666dd941b302b505995d70cc981e88d3fbffb6eb0ea268d4ea86026cc8231f",
+  "schema": 1,
+  "started_at_utc": "2026-10-29T08:17:10.982039+00:00",
+  "verification": {
+    "completed_cases": 124584,
+    "completion_sha256": "cf2ae9cb8cdca89e2dfd8e4cd1f368c04176a41a23fea6ba84e88decf68f2f9f",
+    "coverage": {
+      "actual_cpmm_success_logs": 280303,
+      "attempted_fixture_setups": 124584,
+      "attempted_transactions": 576668,
+      "expected_rejected_transactions": 186694,
+      "fixture_setup_transactions_instrumented": false,
+      "operation_counts_attempt_success_reject": {
+        "actual_fill_veto": [
+          15758,
+          0,
+          15758
+        ],
+        "add_margin": [
+          15751,
+          15751,
+          0
+        ],
+        "arm": [
+          31276,
+          31276,
+          0
+        ],
+        "close": [
+          31127,
+          31127,
+          0
+        ],
+        "cr_force": [
+          15518,
+          15518,
+          0
+        ],
+        "default": [
+          15354,
+          15354,
+          0
+        ],
+        "early_cr_force": [
+          15758,
+          0,
+          15758
+        ],
+        "expiry_force": [
+          15469,
+          15469,
+          0
+        ],
+        "late_close": [
+          15354,
+          0,
+          15354
+        ],
+        "late_margin": [
+          15354,
+          0,
+          15354
+        ],
+        "late_repay": [
+          15354,
+          0,
+          15354
+        ],
+        "margin_clear": [
+          15758,
+          15758,
+          0
+        ],
+        "open": [
+          124584,
+          124584,
+          0
+        ],
+        "publish_reference": [
+          78021,
+          78021,
+          0
+        ],
+        "rejected_open": [
+          93725,
+          0,
+          93725
+        ],
+        "repay": [
+          47116,
+          47116,
+          0
+        ],
+        "underfill": [
+          15391,
+          0,
+          15391
+        ]
+      },
+      "scenario_counts": {
+        "close": 15736,
+        "cr_fill_veto": 15758,
+        "cr_market_rise": 15518,
+        "default_boundary": 15354,
+        "expiry": 15469,
+        "margin_repay": 15751,
+        "repay": 15607,
+        "underfill": 15391
+      },
+      "successful_fixture_setups": 124584,
+      "successful_transactions": 389974
+    },
+    "input_files": 342,
+    "log_sha256": "f23fdd7de7ef5cecbda697f11e3c79d02eeacc455c062821c793c25dd4c401ff",
+    "metadata_sha256": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598",
+    "runner_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "scope": "24h existing actual-SBF financial scenarios on historical CPMM; current route and queue/operator checks separate",
+    "source_files": 40,
+    "summary_sha256": "3dd86b3c7e130cf19d3b995a0b63b75cfe39aaf5c92e3afc2b29c8219a2fbdd9",
+    "verified": true,
+    "wall_seconds": 86400.558399631
+  }
+}

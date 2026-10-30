@@ -1727,14 +1727,29 @@ qualifying or retrying the stopped work. Retain eight real financial family
 counts, frozen bytes and zero-failure/anomaly completion evidence; do not claim
 24h current-Pump/queue/operator coverage. A start is not a passed long run. Mainnet
 commissioning and accurately attributed review/finding requirements remain open.
-The scoped financial run actually started on 2026-10-29 at 08:17:10 UTC, with
-source commit `0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d` frozen, CI
+
+**Verified scoped financial completion, 2026-10-30:** the run started on
+2026-10-29 at 08:17:10 UTC and its supervisor finished on 2026-10-30 at
+08:17:17 UTC with exit 0. Source commit
+`0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d` stayed frozen; CI
 [40840794732](https://github.com/TodorBonchev/short.win/actions/runs/40840794732)
-green and exact program/IDL bytes independently matched. A fixed-anchor local
-monitor is active; the [start witness](audit/simple-financial-campaign-evidence-2026-10-29/start/launch-observation.json)
-records real process identities and the command. Completion cannot pass before
-2026-10-30 at about 08:17:15 UTC and remains subject to the full duration,
-zero-error, coverage and hash checks. The run is in progress, not qualified yet.
+passed and exact program/IDL bytes independently matched. Verification against
+the fixed [start witness](audit/simple-financial-campaign-evidence-2026-10-29/start/launch-observation.json)
+and the explicit final-verifier call passed: **124,584 completed cases**, all eight
+actual family counters nonzero, runner wall **86,400.558399631s**, supervisor
+elapsed **86,407.00566560202s**, zero failures/anomalies/setup/invariant failures,
+no real crash/anomaly artifacts, and matching frozen/metadata/summary/log/
+completion hashes. [Exact final evidence](audit/simple-financial-campaign-evidence-2026-10-29/final/)
+and the [campaign record](audit/simple-financial-campaign-2026-10-29.md) retain
+the counts, identities and limits. This closes only the selected financial-duration
+gate on historical CPMM with synthetic clocks/history/funding and one loan per
+fresh VM. The six positive/two expected negative current routes and 42 service,
+six configuration and 39 client/operator tests retain their separate bounded
+scope. It does not establish 24h current-Pump/queue/operator/provider-history
+coverage, arbitrary multi-loan interleavings or funded operation. Production
+roles, funded payers, measured live API capacity, delivered operating alerts and
+mainnet commissioning remain pending; no stable tag, deployment, legacy finding
+closure or official external audit is claimed.
 
 
 
@@ -1753,7 +1768,8 @@ implementation. Mainnet-before-external-audit/bounty funding timing remains the
 owner's policy, subject to fresh technical qualification of the new scope.
 The [pooled implementation/build checkpoint](audit/simple-pooled-reproducibility-2026-10-28.md)
 records the fresh green CI, matching build bytes and short-smoke limits;
-long-run and real operating qualification remain open. The later
+long-run and real operating qualification were open at that checkpoint. The
+scoped financial completion above does not supply operating evidence. The later
 [production/current-route record](audit/simple-production-readiness-2026-10-28.md)
 tracks the free-key proposal, metadata-only Token-2022 support, actual Pump/
 high-volume route tests and separately bounded actor-funded native DEX setup.
@@ -1764,12 +1780,13 @@ selects the dedicated program identity and untagged 1.1.0 version, rebuilds its
 ELF/IDL/client, repeats the six positive/two negative current-route checks and
 qualifies finalized inactive-slot retirement with cold generations and immutable
 local database pairing. The combined 24-hour campaign implementation was stopped
-by a provider filter and remains isolated/unqualified; no long run was started.
-Existing duration tooling exercises historical CPMM scenarios and cannot be
-relabeled as full current-route/queue coverage. Keep this gate open, retain the
-stopped work without retrying, and preserve all archived review checksums and
-finding dispositions. Real roles, funding, measured coverage and delivered alerts
-remain commissioning prerequisites.
+by a provider filter and remains isolated/unqualified; no long run had started
+at that checkpoint. The later owner-authorized financial scope and verified
+completion above supersede that launch hold. Existing duration tooling exercises
+historical CPMM scenarios and cannot be relabeled as full current-route/queue
+coverage. Retain the stopped work without retrying and preserve all archived
+review checksums and finding dispositions. Real roles, funding, measured coverage
+and delivered alerts remain commissioning prerequisites.
 
 
 

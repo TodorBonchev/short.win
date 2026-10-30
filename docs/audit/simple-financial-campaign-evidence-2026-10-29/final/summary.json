@@ -1,0 +1,118 @@
+{
+  "anomalies": 0,
+  "completed_cases": 124584,
+  "coverage": {
+    "actual_cpmm_success_logs": 280303,
+    "attempted_fixture_setups": 124584,
+    "attempted_transactions": 576668,
+    "expected_rejected_transactions": 186694,
+    "fixture_setup_transactions_instrumented": false,
+    "operation_counts_attempt_success_reject": {
+      "actual_fill_veto": [
+        15758,
+        0,
+        15758
+      ],
+      "add_margin": [
+        15751,
+        15751,
+        0
+      ],
+      "arm": [
+        31276,
+        31276,
+        0
+      ],
+      "close": [
+        31127,
+        31127,
+        0
+      ],
+      "cr_force": [
+        15518,
+        15518,
+        0
+      ],
+      "default": [
+        15354,
+        15354,
+        0
+      ],
+      "early_cr_force": [
+        15758,
+        0,
+        15758
+      ],
+      "expiry_force": [
+        15469,
+        15469,
+        0
+      ],
+      "late_close": [
+        15354,
+        0,
+        15354
+      ],
+      "late_margin": [
+        15354,
+        0,
+        15354
+      ],
+      "late_repay": [
+        15354,
+        0,
+        15354
+      ],
+      "margin_clear": [
+        15758,
+        15758,
+        0
+      ],
+      "open": [
+        124584,
+        124584,
+        0
+      ],
+      "publish_reference": [
+        78021,
+        78021,
+        0
+      ],
+      "rejected_open": [
+        93725,
+        0,
+        93725
+      ],
+      "repay": [
+        47116,
+        47116,
+        0
+      ],
+      "underfill": [
+        15391,
+        0,
+        15391
+      ]
+    },
+    "scenario_counts": {
+      "close": 15736,
+      "cr_fill_veto": 15758,
+      "cr_market_rise": 15518,
+      "default_boundary": 15354,
+      "expiry": 15469,
+      "margin_repay": 15751,
+      "repay": 15607,
+      "underfill": 15391
+    },
+    "successful_fixture_setups": 124584,
+    "successful_transactions": 389974
+  },
+  "failures": 0,
+  "finished_cleanly": true,
+  "invariant_failures": 0,
+  "requested_duration_seconds": 86400,
+  "schema_version": 1,
+  "scope": "actual-new-SBF deterministic scenario runner; setup transactions not counted; no inherited duration",
+  "setup_failures": 0,
+  "wall_seconds": 86400.558399631
+}

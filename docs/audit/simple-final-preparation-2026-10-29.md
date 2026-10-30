@@ -5,6 +5,11 @@
 > review and preflight. See [the selected campaign](simple-financial-campaign-2026-10-29.md).
 > This replaces the local combined-tooling launch hold below; stopped work remains
 > isolated and unqualified, and no continuous Pump/queue duration is claimed.
+> **Verified follow-up, 2026-10-30:** the selected financial-duration scope passed
+> 124,584 cases in 86,400.558399631 seconds with zero failures/anomalies/setup/
+> invariant failures. [Final evidence](simple-financial-campaign-evidence-2026-10-29/final/verification.json).
+> The body below preserves the earlier preparation checkpoint and its former hold;
+> its open/not-started wording is historical. Real commissioning remains pending.
 
 
 The owner's request was to finish monitoring-capacity reuse and preparation for a

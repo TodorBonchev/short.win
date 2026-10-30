@@ -31,3 +31,6 @@ docs/audit/simple-financial-campaign-evidence-2026-10-29/*.log -diff
 
 # Raw Windows process receipts retain their original CRLF bytes.
 docs/audit/simple-financial-campaign-evidence-2026-10-29/start/windows-*.json -diff
+
+# Final raw Windows release receipts preserve CRLF without text-diff rewriting.
+docs/audit/simple-financial-campaign-evidence-2026-10-29/final/windows-*.json -diff

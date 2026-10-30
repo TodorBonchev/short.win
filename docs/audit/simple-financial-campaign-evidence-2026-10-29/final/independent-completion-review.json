@@ -1,0 +1,272 @@
+{
+  "actual_child_identity": {
+    "boot_id": "4cceeacd-7e4b-442c-aa19-ee990440b802",
+    "cmdline": [
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+      "--seed",
+      "103410000",
+      "--duration-seconds",
+      "86400",
+      "--out",
+      "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/results"
+    ],
+    "exe": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75/package/runner",
+    "exe_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "pid": 122465,
+    "start_ticks": "9230986"
+  },
+  "actual_run_crash_or_anomaly_artifacts": [],
+  "blockers": [],
+  "disposition": "PASS for the selected financial campaign scope",
+  "failure_counts": {
+    "anomalies": 0,
+    "failures": 0,
+    "invariant_failures": 0,
+    "setup_failures": 0
+  },
+  "final_file_hashes": {
+    "outer-completion.json": {
+      "bytes": 3724,
+      "sha256": "49d09ccaf297d1ef4f64d0d1aef33bfb7a4f1781d52222242936d2ee66e47547"
+    },
+    "results/completion.json": {
+      "bytes": 230,
+      "sha256": "cf2ae9cb8cdca89e2dfd8e4cd1f368c04176a41a23fea6ba84e88decf68f2f9f"
+    },
+    "results/metadata.json": {
+      "bytes": 53172,
+      "sha256": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598"
+    },
+    "results/run.log": {
+      "bytes": 13018453,
+      "sha256": "f23fdd7de7ef5cecbda697f11e3c79d02eeacc455c062821c793c25dd4c401ff"
+    },
+    "results/summary.json": {
+      "bytes": 2179,
+      "sha256": "3dd86b3c7e130cf19d3b995a0b63b75cfe39aaf5c92e3afc2b29c8219a2fbdd9"
+    }
+  },
+  "finished_at_utc": "2026-10-30T08:17:17.987518+00:00",
+  "fixed_launch_observation_sha256": "b6a229dcbbf7b7dd78366011ecd3a274034124cea4e018220f2cc7dbf62dc4a5",
+  "independent_checks": [
+    "Fixed witness, launch, baseline, startup record, three controls and source archive hashes matched.",
+    "Package and runner-frozen copies independently matched all 40 source and 342 input hashes.",
+    "Outer child PID, start ticks, boot ID, executable and actual command exactly match immutable startup witness.",
+    "Outer and child exit codes 0; supervisor and summary duration each >=86400; readable clean summary with all eight scenario families nonzero.",
+    "Scenario sum, setup totals and transaction success/rejection totals independently checked; zero failures/anomalies/setup/invariant failures.",
+    "No real-run crash/anomaly files and no supervisor-error.json; preflight/bad-elf was excluded as intentional preflight evidence.",
+    "Final metadata, summary, exact log bytes, child completion and outer verification hashes independently recomputed.",
+    "Current tracked runtime/service/client/fixture content is unchanged versus frozen source and qualified CI; only documentation/evidence and evidence-format attributes differ.",
+    "Eight pre-existing checksum registries verified without mutating old files; archived review checksums remain byte-identical to observed HEAD.",
+    "Exact frozen-source CI 40840794732 success and independently matched program/IDL receipt retained.",
+    "Primary checkout fork_seed.rs hash preserved."
+  ],
+  "limitations": [
+    "24h actual-new-SBF financial scenarios on historical CPMM, synthetic clocks/history/funding and one loan per fresh VM.",
+    "Current six positive/two expected negative routes and 42 service, six configuration, 39 client/operator tests are separate evidence.",
+    "No 24h current Pump, queue/operator, real provider-history, arbitrary multi-loan interleavings or funded-operation coverage is claimed.",
+    "No inherited duration or equal per-route duration is claimed.",
+    "Production role assignment, payer funding, measured live API capacity, delivered operating alerts and mainnet commissioning remain pending.",
+    "No tag, deployment, financial/governance transaction or official external-firm audit is claimed."
+  ],
+  "observed_repository_HEAD": "ecb3155de34c9833164a90f5e615720d38a35027",
+  "pre_existing_checksum_registries": [
+    {
+      "path": "docs/audit/ai-review-3/SHA256SUMS",
+      "sha256": "d3f6b9f2be583ed59176c2f004bd0c1be5de74ae2d28264350f0509a80267052",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 90
+    },
+    {
+      "path": "docs/audit/probes/air2-fix-review-2026-10-21/SHA256SUMS",
+      "sha256": "94e5b95e8e0bb0409c84e4eb160b5943e55f7d4eb56fc3ca4ac2b2eb45aec847",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 45
+    },
+    {
+      "path": "docs/audit/probes/ai3-l10-2026-10-20/SHA256SUMS",
+      "sha256": "4ce62170730c247a277f1072c9475b460bfa25bce8ff8b047e537c7b3a132517",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 4
+    },
+    {
+      "path": "docs/audit/simple-pooled-evidence-2026-10-28/SHA256SUMS",
+      "sha256": "584f120163a4e715c52247294851f392824c3a0395296632850d2df3ed3b9619",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 34
+    },
+    {
+      "path": "docs/audit/simple-pooled-repro-evidence-2026-10-28/SHA256SUMS",
+      "sha256": "884ba0ea0694e43f2127d67bf21a104b864fafd74190280ca3797679a635b89d",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 29
+    },
+    {
+      "path": "docs/audit/simple-final-route-evidence-2026-10-29/archive-files.sha256.json",
+      "sha256": "3a55ec500ffb00981fee60fca7da26e902643ec58f5d316e4e8c7d2390ef6ce7",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 434
+    },
+    {
+      "path": "docs/audit/simple-final-preparation-evidence-2026-10-29/SHA256SUMS.json",
+      "sha256": "1d06d98382e4873d2a1a1707d97479091c55d6dffbf11bde031773ab89303d75",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 84
+    },
+    {
+      "path": "docs/audit/simple-financial-campaign-evidence-2026-10-29/SHA256SUMS.json",
+      "sha256": "36b720f2f52a9f0e1422b1e17d078615591d7aae8b6f5f08c0a456f03c80ec72",
+      "unchanged_from_observed_HEAD": true,
+      "verified_entries": 93
+    }
+  ],
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "program_sha256": "d4868d29c14f4a04abe1cdead451f197b2102286fec10abe34161d387f66c510",
+  "proof": {
+    "completed_cases": 124584,
+    "completion_sha256": "cf2ae9cb8cdca89e2dfd8e4cd1f368c04176a41a23fea6ba84e88decf68f2f9f",
+    "coverage": {
+      "actual_cpmm_success_logs": 280303,
+      "attempted_fixture_setups": 124584,
+      "attempted_transactions": 576668,
+      "expected_rejected_transactions": 186694,
+      "fixture_setup_transactions_instrumented": false,
+      "operation_counts_attempt_success_reject": {
+        "actual_fill_veto": [
+          15758,
+          0,
+          15758
+        ],
+        "add_margin": [
+          15751,
+          15751,
+          0
+        ],
+        "arm": [
+          31276,
+          31276,
+          0
+        ],
+        "close": [
+          31127,
+          31127,
+          0
+        ],
+        "cr_force": [
+          15518,
+          15518,
+          0
+        ],
+        "default": [
+          15354,
+          15354,
+          0
+        ],
+        "early_cr_force": [
+          15758,
+          0,
+          15758
+        ],
+        "expiry_force": [
+          15469,
+          15469,
+          0
+        ],
+        "late_close": [
+          15354,
+          0,
+          15354
+        ],
+        "late_margin": [
+          15354,
+          0,
+          15354
+        ],
+        "late_repay": [
+          15354,
+          0,
+          15354
+        ],
+        "margin_clear": [
+          15758,
+          15758,
+          0
+        ],
+        "open": [
+          124584,
+          124584,
+          0
+        ],
+        "publish_reference": [
+          78021,
+          78021,
+          0
+        ],
+        "rejected_open": [
+          93725,
+          0,
+          93725
+        ],
+        "repay": [
+          47116,
+          47116,
+          0
+        ],
+        "underfill": [
+          15391,
+          0,
+          15391
+        ]
+      },
+      "scenario_counts": {
+        "close": 15736,
+        "cr_fill_veto": 15758,
+        "cr_market_rise": 15518,
+        "default_boundary": 15354,
+        "expiry": 15469,
+        "margin_repay": 15751,
+        "repay": 15607,
+        "underfill": 15391
+      },
+      "successful_fixture_setups": 124584,
+      "successful_transactions": 389974
+    },
+    "input_files": 342,
+    "log_sha256": "f23fdd7de7ef5cecbda697f11e3c79d02eeacc455c062821c793c25dd4c401ff",
+    "metadata_sha256": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598",
+    "runner_sha256": "954278746bcaa740c72ca01301f02a9c34529ef49dca5baee4892c3081fc268d",
+    "scope": "24h existing actual-SBF financial scenarios on historical CPMM; current route and queue/operator checks separate",
+    "source_files": 40,
+    "summary_sha256": "3dd86b3c7e130cf19d3b995a0b63b75cfe39aaf5c92e3afc2b29c8219a2fbdd9",
+    "verified": true,
+    "wall_seconds": 86400.558399631
+  },
+  "reviewed_at_utc": "2026-10-30T08:23:11.016326+00:00",
+  "reviewer": "separate independent AI completion-review agent; no external firm audit claimed",
+  "run_root": "/root/fuzz/pooled-110-financial-20261029T080421Z-8c50fa75",
+  "runner_wall_seconds": 86400.558399631,
+  "schema": 1,
+  "source_commit": "0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d",
+  "source_equivalence": [
+    {
+      "base": "0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d",
+      "gitattributes_change": "Only -text/-diff rules for byte-preserved campaign evidence; independently inspected.",
+      "non_documentation_or_evidence_changes": [],
+      "tracked_changed_paths_count": 20
+    },
+    {
+      "base": "8c50fa75e1becd598520fa7e4bd95c84febbd798",
+      "gitattributes_change": "Only -text/-diff rules for byte-preserved campaign evidence; independently inspected.",
+      "non_documentation_or_evidence_changes": [],
+      "tracked_changed_paths_count": 174
+    }
+  ],
+  "stopped_combined_tooling_read_or_executed": false,
+  "supervisor_elapsed_seconds": 86407.00566560202,
+  "verification_call": "verify.verify(root, root/results, 86400, 86400, outer_completion), explicitly invoked after fixed verify.py hash check",
+  "verified_control_hashes": {
+    "keepawake.ps1": "924c1fdb8342d837f4723d7c6ac249b7cead8b62c617ba9b011681f5a8977581",
+    "supervise.py": "01dd7cc52616116ddc5f3aaef9eafd4a6fd869a720e01cf592f07e29c49c4ab6",
+    "verify.py": "5657e979e8dedeb3368f72db2c8be88cb0a0150d8a2101f6b766bc20d4ec3be5"
+  }
+}

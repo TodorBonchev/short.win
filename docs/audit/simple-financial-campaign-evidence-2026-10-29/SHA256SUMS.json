@@ -1,9 +1,9 @@
 {
   "files": [
     {
-      "bytes": 809,
+      "bytes": 1629,
       "path": "README.md",
-      "sha256": "978002a2a211b348feffb50eab607b611ccb8a4b5e9bfe704cb46e88d13bb045"
+      "sha256": "b696babbb00589c940fc3d31b660714f5de64c2fa47db49ab190555714b2890c"
     },
     {
       "bytes": 52224,
@@ -44,6 +44,91 @@
       "bytes": 4523,
       "path": "controls/verify.py",
       "sha256": "5657e979e8dedeb3368f72db2c8be88cb0a0150d8a2101f6b766bc20d4ec3be5"
+    },
+    {
+      "bytes": 230,
+      "path": "final/alive-final.json",
+      "sha256": "137cae351d5de9f56acf8bc7a875743cf81696ff38becdfbc136e5a6fd3590e3"
+    },
+    {
+      "bytes": 1290,
+      "path": "final/child.stdout.log",
+      "sha256": "38002e118a117d75f2448a72c8103046ddf4a2a6d9580b951b8c300248be1f61"
+    },
+    {
+      "bytes": 230,
+      "path": "final/completion.json",
+      "sha256": "cf2ae9cb8cdca89e2dfd8e4cd1f368c04176a41a23fea6ba84e88decf68f2f9f"
+    },
+    {
+      "bytes": 10383,
+      "path": "final/independent-completion-review.json",
+      "sha256": "995f895449924a74c597695d65eaa4960f85a9a8ba0ac293536a27373271e628"
+    },
+    {
+      "bytes": 53172,
+      "path": "final/metadata.json",
+      "sha256": "5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598"
+    },
+    {
+      "bytes": 3724,
+      "path": "final/outer-completion.json",
+      "sha256": "49d09ccaf297d1ef4f64d0d1aef33bfb7a4f1781d52222242936d2ee66e47547"
+    },
+    {
+      "bytes": 809,
+      "path": "final/pre-completion-README.md",
+      "sha256": "978002a2a211b348feffb50eab607b611ccb8a4b5e9bfe704cb46e88d13bb045"
+    },
+    {
+      "bytes": 17066,
+      "path": "final/pre-completion-SHA256SUMS.json",
+      "sha256": "36b720f2f52a9f0e1422b1e17d078615591d7aae8b6f5f08c0a456f03c80ec72"
+    },
+    {
+      "bytes": 3554,
+      "path": "final/prepublication-checks.json",
+      "sha256": "c6ad2c0e6cd0024dfa1e7059305e2fe46ec13bdfb11215976391dd2213cf0c94"
+    },
+    {
+      "bytes": 13018453,
+      "path": "final/run.log",
+      "sha256": "f23fdd7de7ef5cecbda697f11e3c79d02eeacc455c062821c793c25dd4c401ff"
+    },
+    {
+      "bytes": 2179,
+      "path": "final/summary.json",
+      "sha256": "3dd86b3c7e130cf19d3b995a0b63b75cfe39aaf5c92e3afc2b29c8219a2fbdd9"
+    },
+    {
+      "bytes": 7538,
+      "path": "final/verification.json",
+      "sha256": "cb6834599dfc4bbd4896da5971e8515ee4a8a702280493a4b72d70c23526e4c1"
+    },
+    {
+      "bytes": 303,
+      "path": "final/windows-keepawake-state.json",
+      "sha256": "ee40bcef2104ab3ebfbeca55f4af7db1de7dc1976dd3b09b6ec69e2fd69fd84c"
+    },
+    {
+      "bytes": 0,
+      "path": "final/windows-keepawake.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "final/windows-keepawake.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "final/windows-wsl.stderr.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 0,
+      "path": "final/windows-wsl.stdout.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "bytes": 2597,
@@ -466,6 +551,6 @@
       "sha256": "f3d9cd6323ac1a8c47f0605c4f1deac1205e24a221b5c7fc13dcbd095606c1cc"
     }
   ],
-  "recorded_at_utc": "2026-10-29T08:26:02.691916+00:00",
+  "recorded_at_utc": "2026-10-30T08:26:00.721445+00:00",
   "schema": 1
 }

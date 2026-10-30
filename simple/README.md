@@ -50,19 +50,22 @@ with actual lookup-table transaction construction. This is finite captured-route
 evidence, not universal Jupiter compatibility, live submission or long-run
 qualification. See the [dated final preparation record](../docs/audit/simple-final-preparation-2026-10-29.md).
 
-The candidate has not been tagged or deployed. The 24-hour qualification gate
-remains **open**: unfinished combined-campaign tooling was isolated after the
-provider stopped that work, and no new 24-hour run started. The existing duration
-runner exercises historical CPMM scenarios and does not establish full current
-route coverage. Legacy duration records, old local-placeholder captures and
-pre-identity-freeze reports remain historical. Governance and operating roles,
-funding, measured capacity on the real free API account and delivered alerts
-remain pending. The owner's selected policy is borrowing-capped mainnet before
-an external audit and funded bug bounty, with uncapped deposits and market count;
-that disclosure does not satisfy these remaining release prerequisites.
+The candidate has not been tagged or deployed. The independently reviewed
+[financial-duration campaign](../docs/audit/simple-financial-campaign-2026-10-29.md)
+passed on 30 October 2026: 124,584 completed cases over 86,400.558399631 seconds,
+all eight scenario families nonzero, and zero failures/anomalies/setup/invariant
+failures. The runner uses historical CPMM fixtures, synthetic clocks/history/funding
+and one loan per fresh VM. Current six positive/two expected-negative routes and
+queue/operator checks retain their separate bounded scope. No 24-hour current
+Pump/queue, real provider history, arbitrary multi-loan interleaving or universal
+Jupiter qualification is claimed. Stopped combined tooling remains isolated and
+unqualified; earlier duration/capture records remain historical.
 
-The owner subsequently authorized the [existing financial runner campaign](../docs/audit/simple-financial-campaign-2026-10-29.md)
-with separate current-route and queue/operator checks after independent review.
-That selected scope supersedes the local combined-tooling launch hold above;
-stopped work stays isolated and unqualified. Preflight passed; actual launch and
-verified >=24h completion are separate events and are recorded in that campaign.
+Governance and operating roles, privately backed-up key custody, actual loader/
+genesis settings, funding, measured capacity on the real free API/RPC accounts,
+delivered alerts and mainnet commissioning remain pending. The owner's selected
+policy is borrowing-capped mainnet before an external audit and funded bug bounty,
+with uncapped deposits and market count; that disclosure does not satisfy the
+remaining operating prerequisites. The selected financial scope superseded the
+former local combined-tooling launch hold; the exact final evidence and hashes
+are retained in the campaign record.

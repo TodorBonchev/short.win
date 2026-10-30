@@ -1,0 +1,11 @@
+{
+  "ac_line_status": 1,
+  "system_required": false,
+  "reason": "supervisor_finished",
+  "started_at_utc": "2026-10-29T08:15:56.9533220+00:00",
+  "at_utc": "2026-10-30T08:17:28.8873031+00:00",
+  "schema": 1,
+  "battery_percent": 96,
+  "initial_api_return": 2147483648,
+  "process_id": 17528
+}

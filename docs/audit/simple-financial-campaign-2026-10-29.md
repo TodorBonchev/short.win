@@ -79,36 +79,84 @@ no crash/anomaly artifact, and exact frozen/summary/log/completion hashes. Exit 
 alone cannot pass. Current routes and queue/operator checks retain their separate
 scope; no per-route duration is invented.
 
-## Status
+## Verified completion — 2026-10-30
 
-**RUNNING — not completed or passed.** The supervisor started on **29 October
-2026 at 10:17:10 Europe/Kyiv** (08:17:10 UTC). The runner requests 86,400 seconds
-with no case limit; the earliest expected finish is **30 October at 10:17:15 Kyiv**,
-plus its final in-flight case and supervisor flush. The [immutable start witness](simple-financial-campaign-evidence-2026-10-29/start/launch-observation.json)
-records actual Linux/Windows process identities, executable/command/boot checks,
-fixed hash anchors and advancing case evidence. Linux child PID is `122465` and
-supervisor PID `122456`; PID reuse is checked using start ticks and boot identity.
+**PASS for the selected financial-duration scope.** The existing runner finished
+naturally on **30 October 2026 at 10:17:17.987518 Europe/Kyiv**
+(08:17:17.987518 UTC supervisor receipt), with actual exit code **0**. The child
+summary records **86,400.558399631 seconds**; the supervisor independently records
+**86,407.00566560202 seconds**. Both exceed 24 hours. All **124,584 cases** completed,
+with **zero failures, anomalies, setup failures and invariant failures**, a clean
+finish and no actual-run crash/anomaly artifacts. The expected malformed-ELF
+preflight remains separate and non-qualifying.
 
-Frozen source commit: `0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d`.
-Launch manifest SHA256: `82666dd941b302b505995d70cc981e88d3fbffb6eb0ea268d4ea86026cc8231f`.
-Full source archive SHA256: `90bd37e0295031144270159b89ab4c851d6487607471467f9fc535d39d448083`
-(87,467,598 bytes, 5,407 archive entries; private deployment key and stopped WIP excluded).
-A 30-minute heartbeat, `monitor-pooled-1-1-0-financial-fuzz`, is active in this chat,
-with fixed startup anchors and quiet/non-restarting completion/failure handling.
-It will retain the final result and update the audit record only after verification.
-Leave the PC powered on and plugged in, keep the desktop app available for local
-monitoring, and avoid manual sleep/reboot or WSL termination. The standalone
-Windows WSL launcher survives the chat terminal ending; the system-awake request
-releases after supervisor completion.
+The fixed startup witness SHA256 remains
+`b6a229dcbbf7b7dd78366011ecd3a274034124cea4e018220f2cc7dbf62dc4a5`.
+After checking that witness and its fixed control anchors, completion was verified
+by explicitly importing the pinned `verify.py` and calling
+`verify.verify(root, root/results, 86400, 86400, outer_completion)`.
+The actual child PID/start ticks/boot/executable/command matched the startup
+witness. All 40 frozen source files, 342 inputs, runner, full source archive and
+control hashes were independently recomputed. The readable final summary,
+completion and log hashes agree. The Windows system-awake helper recorded
+`supervisor_finished`, released its request automatically and exited along with
+the persistent launcher; AC was connected. No process was signalled or restarted.
 
-[Fresh CI 40840794732](https://github.com/TodorBonchev/short.win/actions/runs/40840794732)
-also passed on the exact frozen source commit. Its downloaded validation archive
-matched GitHub's digest and the ELF/IDL bytes [matched independently](simple-financial-campaign-evidence-2026-10-29/ci-40840794732/independent-validation.json).
-This later commit changes documentation/evidence only; the original independently
-verified CI runner/source/fixture package remains unchanged. A later documentation
-commit retaining this launch receipt does not mutate the frozen package.
+[Exact final bytes and verification](simple-financial-campaign-evidence-2026-10-29/final/verification.json)
+and the [independent AI completion review](simple-financial-campaign-evidence-2026-10-29/final/independent-completion-review.json)
+retain the checks, actual coverage, identities and limits. The full 13,018,453-byte
+`run.log` is retained unchanged alongside final metadata, summary, child completion,
+outer completion, child output and Windows release receipts.
 
-No 24-hour completion is claimed.
-Production roles, funded payers, measured live provider capacity, delivered
-operating alerts and deployment remain separate mainnet commissioning requirements.
-No tag, mainnet transaction or external-firm audit is authorized or claimed here.
+| Scenario family | Completed cases |
+| --- | ---: |
+| close | 15,736 |
+| cr_fill_veto | 15,758 |
+| cr_market_rise | 15,518 |
+| default_boundary | 15,354 |
+| expiry | 15,469 |
+| margin_repay | 15,751 |
+| repay | 15,607 |
+| underfill | 15,391 |
+
+All eight actual scenario counters are nonzero and sum to 124,584. Driver
+transaction counters report **576,668 attempts**, **389,974 successes** and
+**186,694 expected refusals**; fixture setup transactions are not instrumented in
+those transaction totals. There were 124,584 successful fixture setups and
+280,303 successful actual CPMM invocation log occurrences. These are the runner's
+coverage proxies, not per-route durations, distinct-route counts or mainnet
+transaction receipts.
+
+| Exact final file | SHA256 |
+| --- | --- |
+| metadata.json | `5982f5eac290d05d869e67faa80b6ee824b2df78bfe4d8d91da2e562a3986598` |
+| summary.json | `3dd86b3c7e130cf19d3b995a0b63b75cfe39aaf5c92e3afc2b29c8219a2fbdd9` |
+| completion.json | `cf2ae9cb8cdca89e2dfd8e4cd1f368c04176a41a23fea6ba84e88decf68f2f9f` |
+| run.log | `f23fdd7de7ef5cecbda697f11e3c79d02eeacc455c062821c793c25dd4c401ff` |
+| outer-completion.json | `49d09ccaf297d1ef4f64d0d1aef33bfb7a4f1781d52222242936d2ee66e47547` |
+
+Frozen source remains `0f4871c7f90a4f1c4ddbc6ca14e9cc7821e4e76d`;
+the program and runner hashes above are unchanged. Green
+[CI 40840794732](https://github.com/TodorBonchev/short.win/actions/runs/40840794732)
+passed on that exact documentation/evidence-only source commit and its independently
+downloaded validation archive matched GitHub's digest and the ELF/IDL bytes.
+[CI 40801471141](https://github.com/TodorBonchev/short.win/actions/runs/40801471141)
+remains the qualified runtime baseline at `8c50fa75`. Later launch/completion
+records change documentation/evidence only. Any later program, service, client,
+policy or baseline fixture change requires appropriate fresh evidence; this run's
+duration cannot be transferred to changed inputs.
+
+The selected gate is complete; current six positive/two expected-negative route
+checks and 42 service, six configuration and 39 client/operator tests retain their
+separate bounded scope. This does not establish 24-hour current-Pump execution,
+queue/operator or real-provider-history coverage, arbitrary multi-loan interleavings,
+universal Jupiter compatibility or funded operation. Archived reviews and old
+campaigns retain their original attribution, inputs and limitations.
+
+Production roles, privately backed-up key custody, actual loader/genesis settings,
+funded payers/reserves, measured live free-key/RPC capacity, delivered operating
+alerts and mainnet commissioning remain pending. Present those operating receipts
+with this evidence for owner review before a stable `v1.1.0` tag/deployment decision.
+The candidate remains untagged and undeployed. No financial/governance transaction,
+external-firm audit or production readiness beyond the scoped checks is claimed.
+The heartbeat is stopped after publishing this completion follow-up.
