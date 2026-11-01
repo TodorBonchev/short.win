@@ -56,7 +56,7 @@ import traceback
 
 import decode as D
 import universe as U
-from rpc import MAINNET_BETA, MAX_RPS, PUBLICNODE, Rpc, RpcError
+from rpc import MAINNET_BETA, MAX_RPS, PUBLICNODE, Rpc, RpcError, canonical_signature
 
 CFG = {
     "fg_rps": 1.9,
@@ -135,6 +135,7 @@ class Store:
         for k, v in (("cursors", {}), ("last_list", {}), ("disc", {}), ("queue", []), ("hi", []),
                      ("last_change", {}), ("last_key", {}), ("quota", {}), ("calls", {})):
             self.state.setdefault(k, v)
+        self._canonicalize_state_signatures()
         self.files = {}  # tape -> (day, file object, csv writer, stats)
         self.finalize_past_days()
 
@@ -144,6 +145,25 @@ class Store:
             with open(path) as f:
                 return json.load(f)
         return default
+
+    def _canonicalize_state_signatures(self):
+        """Reject a poisoned resume state before it can be reserialized or used as a path."""
+        for name in ("cursors", "disc"):
+            for key, cursor in self.state[name].items():
+                if isinstance(cursor, str):
+                    self.state[name][key] = canonical_signature(cursor)
+                elif isinstance(cursor, dict) and "sig" in cursor:
+                    cursor["sig"] = canonical_signature(cursor["sig"])
+                else:
+                    raise ValueError(f"invalid {name} cursor for {key}: {cursor!r}")
+        for item in self.state["queue"]:
+            if not isinstance(item, list) or len(item) != 3 or not isinstance(item[2], list):
+                raise ValueError(f"invalid transaction queue item: {item!r}")
+            item[2] = [canonical_signature(sig) for sig in item[2]]
+        for item in self.state["hi"]:
+            if not isinstance(item, list) or len(item) < 2:
+                raise ValueError(f"invalid discovery queue item: {item!r}")
+            item[1] = canonical_signature(item[1])
 
     def save(self):
         with self.lock:
@@ -305,7 +325,10 @@ def list_since(rpc, address, cursor, max_pages, now, limit=1000):
     ``listing_gap`` only if the last successful listing is older than ``RETAIN_S`` as well;
     otherwise the market was quiet and nothing is lost. Without a cursor, one page is listed."""
     if isinstance(cursor, str):
-        cursor = {"sig": cursor}
+        cursor = {"sig": canonical_signature(cursor)}
+    elif cursor:
+        cursor = dict(cursor)
+        cursor["sig"] = canonical_signature(cursor["sig"])
     notes, sigs, before, pages = [], [], None, 0
     by_hand = bool(cursor) and (cursor.get("gone") or cursor.get("bt") is not None
                                 and now - cursor["bt"] > RETAIN_S)
@@ -658,6 +681,7 @@ class Crawler:
     # ---- bg: discovery transactions, trades, census ----
 
     def handle_discovery(self, kind, sig):
+        sig = canonical_signature(sig)
         tx = self.fg.transaction(sig)
         now = time.time()
         if tx is None:
@@ -849,6 +873,7 @@ def trade_rows(m, sig, tx):
     """Trade-tape rows of market ``m`` in transaction ``tx``."""
     if tx is None:
         return []
+    sig = canonical_signature(sig)
     v4 = {m["pool"]: m.get("sol_is_first", True)} if m["venue"] == "raydium_v4" else None
     rates = {m["pool"]: tuple(m["rates"])} if m.get("rates") else None
     trades, _ = D.decode_trades(tx, v4_orientation=v4, cpmm_rates=rates)

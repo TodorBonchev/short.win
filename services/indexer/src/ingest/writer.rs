@@ -197,6 +197,14 @@ impl Writer {
         let pools = self.pool_ctx(raw).await?;
         let decoded = decode::decode(raw, &self.ids, &pools, &|_| None);
         let mut tx = self.pool.begin().await?;
+        // Keep analytics outside every projection mutation. A late event may commit a
+        // `needs_rebuild` marker before the deferred rebuild starts; rollups acquire the same
+        // key before opening their repeatable-read snapshot and will see that marker rather
+        // than checkpointing the stale projection.
+        sqlx::query("SELECT pg_advisory_xact_lock($1)")
+            .bind(project::PROJECTION_ROLLUP_LOCK)
+            .execute(&mut *tx)
+            .await?;
         let inserted = insert_tx(&mut tx, raw, &decoded, self.source).await?;
         if !inserted {
             // One transaction can be listed by more than one tracked address. A later-discovered
@@ -717,7 +725,9 @@ async fn update_state(tx: &mut PgConnection, raw: &RawTx) -> anyhow::Result<()> 
         "UPDATE ingest_state SET \
            latest_block_time = GREATEST(COALESCE(latest_block_time, $1), $1), \
            confirmed_slot = GREATEST(confirmed_slot, $2), \
-           finalized_slot = CASE WHEN $3 AND NOT EXISTS ( \
+           finalized_slot = CASE \
+             WHEN NOT $3 THEN LEAST(finalized_slot, GREATEST(0, $2 - 1)) \
+             WHEN NOT EXISTS ( \
                SELECT 1 FROM ingest_txs WHERE commitment = 'confirmed' AND slot <= $2) \
              THEN GREATEST(finalized_slot, $2) ELSE finalized_slot END, \
            updated_at = now() WHERE id",

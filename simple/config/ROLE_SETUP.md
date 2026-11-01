@@ -1,6 +1,6 @@
 # Production role setup
 
-This is a preparation guide for untagged version **1.1.0**. The generated public
+This is a preparation guide for release candidate **1.1.1**. The generated public
 program ID is `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh`; its private
 deployment key remains outside the repository. Governance, emergency, reporter,
 fee recipient and keeper roles remain unassigned. No operating wallet is created,
@@ -10,7 +10,7 @@ execution or authorize deployment.
 
 | Identity | Proposed custody / purpose |
 | --- | --- |
-| Program ID | Generated public ID `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh` is the active build/qualification identity for untagged 1.1.0. Preserve its private key outside Git and confirm custody before deployment. The old local placeholder cannot be promoted. |
+| Program ID | Generated public ID `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh` is the active build/qualification identity for release candidate 1.1.1. Preserve its private key outside Git and confirm custody before deployment. The old local placeholder cannot be promoted. |
 | Governance / upgrade authority | Offline controlled signer; review the actual canonical loader authority used for initialization. Keep separate from the reporter and emergency role. |
 | Emergency | Separate controlled signer for the program's pause powers. |
 | Fee recipient | Dedicated public treasury address; no lender funds or collateral counted as protocol revenue. |

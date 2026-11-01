@@ -438,7 +438,8 @@ const Q_MARKET: &str = concat!(
      'quarantined_events', (SELECT count(*) FROM ingest_quarantine q \
          WHERE q.market = m.market AND q.ev_source < 2 AND NOT q.applied), \
      'tier_terms', (SELECT h.tiers -> (m.tier::int) FROM protocol_params_history h \
-         ORDER BY h.slot DESC, h.tx_index DESC, h.ix_index DESC LIMIT 1)) \
+         ORDER BY h.slot DESC, h.tx_index DESC, h.ix_index DESC, h.ev_source DESC, \
+           h.ev_seq DESC LIMIT 1)) \
      FROM markets m JOIN v_market_overview o ON o.market = m.market \
      LEFT JOIN v_sol_usd u ON TRUE WHERE m.mint = $1"
 );
@@ -461,14 +462,17 @@ async fn get_market(
 const Q_POSITIONS: &str = concat!(
     "SELECT ",
     position_json!(),
-    ", p.opened_slot, p.opened_tx_index, p.position::text \
+    ", p.opened_slot, p.opened_tx_index, p.opened_ix_index, p.opened_ev_source, p.opened_ev_seq, \
+       p.position::text \
      FROM positions p JOIN markets m ON m.market = p.market \
      WHERE ($1::text IS NULL OR p.market = $1) AND ($2::text IS NULL OR p.borrower = $2) \
        AND ($3::text IS NULL OR p.status = $3 OR ($3 = 'exited' AND p.status <> 'open')) \
-       AND ($4::bigint IS NULL OR (p.opened_slot, p.opened_tx_index, p.position::text COLLATE \"C\") \
-            < ($4, $5::int, $6::text COLLATE \"C\")) \
-     ORDER BY p.opened_slot DESC, p.opened_tx_index DESC, p.position::text COLLATE \"C\" DESC \
-     LIMIT $7"
+       AND ($4::bigint IS NULL OR (p.opened_slot, p.opened_tx_index, p.opened_ix_index, \
+            p.opened_ev_source, p.opened_ev_seq, p.position::text COLLATE \"C\") \
+            < ($4, $5::int, $6::smallint, $7::smallint, $8::int, $9::text COLLATE \"C\")) \
+     ORDER BY p.opened_slot DESC, p.opened_tx_index DESC, p.opened_ix_index DESC, \
+       p.opened_ev_source DESC, p.opened_ev_seq DESC, p.position::text COLLATE \"C\" DESC \
+     LIMIT $10"
 );
 
 async fn positions_page(
@@ -481,32 +485,46 @@ async fn positions_page(
     let limit = q.limit(st.cfg.default_page_limit, st.cfg.max_page_limit)?;
     let after = match q.cursor()? {
         Some(raw) => {
-            let c = Cursor::decode(raw, "pos", 3)?;
+            let c = Cursor::decode(raw, "pos", 6)?;
             Some((
                 c.int(0, 0, i64::MAX)?,
                 i32::try_from(c.int(1, 0, i64::from(i32::MAX))?)
                     .map_err(|_| ApiError::invalid_cursor())?,
-                c.key(2)?,
+                i16::try_from(c.int(2, i64::from(i16::MIN), i64::from(i16::MAX))?)
+                    .map_err(|_| ApiError::invalid_cursor())?,
+                i16::try_from(c.int(3, i64::from(i16::MIN), i64::from(i16::MAX))?)
+                    .map_err(|_| ApiError::invalid_cursor())?,
+                i32::try_from(c.int(4, i64::from(i32::MIN), i64::from(i32::MAX))?)
+                    .map_err(|_| ApiError::invalid_cursor())?,
+                c.key(5)?,
             ))
         }
         None => None,
     };
-    let rows: Vec<(Value, i64, i32, String)> = sqlx::query_as(Q_POSITIONS)
+    let rows: Vec<(Value, i64, i32, i16, i16, i32, String)> = sqlx::query_as(Q_POSITIONS)
         .bind(market)
         .bind(borrower)
         .bind(status)
         .bind(after.as_ref().map(|a| a.0))
         .bind(after.as_ref().map(|a| a.1))
-        .bind(after.as_ref().map(|a| a.2.clone()))
+        .bind(after.as_ref().map(|a| a.2))
+        .bind(after.as_ref().map(|a| a.3))
+        .bind(after.as_ref().map(|a| a.4))
+        .bind(after.as_ref().map(|a| a.5.clone()))
         .bind(limit + 1)
         .fetch_all(&st.pool)
         .await?;
     Ok(ok(page(
         rows.into_iter()
-            .map(|(j, s, t, p)| (j, (s, t, p)))
+            .map(|(j, s, t, i, r, q, p)| (j, (s, t, i, r, q, p)))
             .collect(),
         limit,
-        |(s, t, p)| Cursor::encode("pos", vec![json!(s), json!(t), json!(p)]),
+        |(s, t, i, r, q, p)| {
+            Cursor::encode(
+                "pos",
+                vec![json!(s), json!(t), json!(i), json!(r), json!(q), json!(p)],
+            )
+        },
     )))
 }
 
@@ -538,14 +556,23 @@ const Q_POSITION: &str = concat!(
     event_json!(),
     " AS j, e.slot, e.tx_index, e.ix_index, e.ev_source, e.ev_seq FROM events e \
          WHERE e.position = p.position \
+           AND (e.slot, e.tx_index, e.ix_index, e.ev_source, e.ev_seq) >= \
+               (p.opened_slot, p.opened_tx_index, p.opened_ix_index, \
+                p.opened_ev_source, p.opened_ev_seq) \
+           AND (p.exit_slot IS NULL OR \
+                (e.slot, e.tx_index, e.ix_index, e.ev_source, e.ev_seq) <= \
+                (p.exit_slot, p.exit_tx_index, p.exit_ix_index, \
+                 p.exit_ev_source, p.exit_ev_seq)) \
          ORDER BY e.slot, e.tx_index, e.ix_index, e.ev_source, e.ev_seq LIMIT 1000) x), \
          '[]'::jsonb), \
      (SELECT ",
     settlement_json!(),
     " FROM settlements s JOIN markets sm ON sm.market = s.market \
-         WHERE s.position = p.position) \
+         WHERE s.position = p.position \
+           AND (s.open_signature, s.opened_ix_index, s.opened_ev_source, s.opened_ev_seq) = \
+               (p.open_signature, p.opened_ix_index, p.opened_ev_source, p.opened_ev_seq)) \
      FROM positions p JOIN markets m ON m.market = p.market CROSS JOIN ingest_state st \
-     WHERE p.position = $1"
+     WHERE p.position = $1 AND p.is_current"
 );
 
 async fn get_position(
@@ -817,8 +844,12 @@ const Q_EXITS: &str = concat!(
     exit_json!(),
     ", e.slot, e.tx_index, e.ix_index, e.ev_source, e.ev_seq \
      FROM events e JOIN positions p ON p.position = e.position \
+       AND (p.exit_slot, p.exit_tx_index, p.exit_ix_index, p.exit_ev_source, p.exit_ev_seq) = \
+           (e.slot, e.tx_index, e.ix_index, e.ev_source, e.ev_seq) \
      JOIN markets m ON m.market = e.market \
      LEFT JOIN settlements s ON s.position = e.position AND e.kind = 'SolSettle' \
+       AND s.signature = e.signature AND s.ix_index = e.ix_index \
+       AND s.ev_source = e.ev_source AND s.ev_seq = e.ev_seq \
      CROSS JOIN ingest_state st \
      WHERE e.kind IN ('Liquidate', 'Expire', 'SolSettle', 'OverdueCollateralDefault') \
        AND ($1::text IS NULL OR e.market = $1) \
@@ -1312,7 +1343,8 @@ const Q_PROTOCOL_CONFIG: &str = "SELECT jsonb_build_object(\
     'util_kink_bps', h.util_kink_bps::bigint, 'pyth_sol_usd', h.pyth_sol_usd::text, \
     'pyth_feed_id', h.pyth_feed_id) \
     FROM protocol_params_history h CROSS JOIN protocol_state ps \
-    ORDER BY h.slot DESC, h.tx_index DESC, h.ix_index DESC LIMIT 1";
+    ORDER BY h.slot DESC, h.tx_index DESC, h.ix_index DESC, h.ev_source DESC, \
+      h.ev_seq DESC LIMIT 1";
 
 async fn protocol_config(State(st): State<AppState>) -> ApiResult {
     let v: Option<Value> = sqlx::query_scalar(Q_PROTOCOL_CONFIG)
@@ -1377,7 +1409,8 @@ async fn list_config_changes(State(st): State<AppState>, q: Params) -> ApiResult
 const Q_VENUES: &str = "SELECT jsonb_build_object(\
     'venue_enabled', COALESCE(ps.venue_enabled, (SELECT h.venue_enabled \
         FROM protocol_params_history h \
-        ORDER BY h.slot DESC, h.tx_index DESC, h.ix_index DESC LIMIT 1))::bigint, \
+        ORDER BY h.slot DESC, h.tx_index DESC, h.ix_index DESC, h.ev_source DESC, \
+          h.ev_seq DESC LIMIT 1))::bigint, \
     'route_broken_bits', ps.route_broken_bits::bigint, 'paused_opens', ps.paused_opens, \
     'guards', COALESCE((SELECT jsonb_agg(jsonb_build_object('venue', g.venue::int, \
         'name', sw_api_guard(g.venue), 'upgraded', g.upgraded, \

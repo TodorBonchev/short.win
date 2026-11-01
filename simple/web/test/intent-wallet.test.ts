@@ -11,7 +11,10 @@ import {
   address,
 } from "@solana/kit";
 import { submitSigned } from "@shortwin/simple-client";
-import { IntentRevision } from "../src/intent.ts";
+import {
+  IntentRevision,
+  reconcileSignatureStatus,
+} from "../src/intent.ts";
 import {
   connectWallet,
   watchWallet,
@@ -87,6 +90,29 @@ test("editing or cancelling while route preparation is pending revokes later rev
     assert.doesNotThrow(() => intent.assert(current));
     assert.throws(() => intent.assert(expected), /changed/);
   }
+});
+test("observed signatures remain unresolved after blockhash expiry", () => {
+  assert.equal(reconcileSignatureStatus(null, false), "pending");
+  assert.equal(reconcileSignatureStatus(null, true), "expired-absent");
+  assert.equal(
+    reconcileSignatureStatus(
+      { err: null, confirmationStatus: "processed" },
+      true,
+    ),
+    "pending",
+  );
+  for (const confirmationStatus of ["confirmed", "finalized"])
+    assert.equal(
+      reconcileSignatureStatus({ err: null, confirmationStatus }, true),
+      "confirmed",
+    );
+  assert.equal(
+    reconcileSignatureStatus(
+      { err: { InstructionError: [0, "Custom"] }, confirmationStatus: null },
+      false,
+    ),
+    "failed",
+  );
 });
 test("wallet account or feature changes while signing prevent broadcast and clean old subscriptions", async () => {
   for (const mode of ["account", "features", "cancel"]) {

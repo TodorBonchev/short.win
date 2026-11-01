@@ -7,6 +7,7 @@ import {
   type Address,
   type Instruction,
   type AddressesByLookupTableAddress,
+  type Signature,
 } from "@solana/kit";
 import * as sw from "@shortwin/simple-client";
 import {
@@ -17,7 +18,7 @@ import {
   redemption,
 } from "./amounts.ts";
 import { boundBuyInput, managedCall } from "./managed.ts";
-import { IntentRevision } from "./intent.ts";
+import { IntentRevision, reconcileSignatureStatus } from "./intent.ts";
 import {
   assertConnection,
   connectWallet,
@@ -77,6 +78,14 @@ let pending:
       url: string;
       connection: Connection;
       chain: string;
+    }
+  | undefined;
+let unresolved:
+  | {
+      signature: Signature;
+      url: string;
+      lastValidBlockHeight: bigint;
+      broadcastStarted: boolean;
     }
   | undefined;
 let busy = false;
@@ -148,6 +157,43 @@ async function review(
   intent.assert(activeRevision);
   if (!connection) throw new Error("Connect a wallet first");
   const url = input("rpc");
+  if (unresolved) {
+    if (unresolved.url !== url)
+      throw new Error(
+        `Signature ${unresolved.signature} has an unknown outcome on the previous RPC. Reconnect to that RPC and reconcile it before signing another transaction.`,
+      );
+    const rpc = createSolanaRpc(url);
+    const {
+      value: [known],
+    } = await rpc
+      .getSignatureStatuses([unresolved.signature], {
+        searchTransactionHistory: true,
+      })
+      .send();
+    const reconciliation = reconcileSignatureStatus(
+      known,
+      known === null &&
+        (await rpc.getBlockHeight({ commitment: "confirmed" }).send()) >
+          unresolved.lastValidBlockHeight,
+    );
+    if (reconciliation === "failed") unresolved = undefined;
+    else if (reconciliation === "confirmed") {
+      const signature = unresolved.signature;
+      unresolved = undefined;
+      throw new Error(
+        `The previous transaction confirmed as ${signature}. Refresh the pool before preparing another transaction.`,
+      );
+    } else if (reconciliation === "expired-absent")
+      unresolved = undefined;
+    else if (known)
+      throw new Error(
+        `Signature ${unresolved.signature} was observed as ${known.confirmationStatus ?? "processed"} and may still confirm. Wait for confirmation or an explicit failure before signing another transaction.`,
+      );
+    else
+      throw new Error(
+        `Signature ${unresolved.signature} may still land. Wait for confirmation or blockhash expiry before signing another transaction.`,
+      );
+  }
   await verifyGenesis(c, url);
   status("Simulating transaction…");
   const prepared = await sw.prepareTransaction(
@@ -741,20 +787,42 @@ el("sign").onclick = () =>
         reviewed.chain,
       ),
     );
+    const locallyDerived = sw.signedTransactionSignature(signed);
     if (connection !== reviewed.connection)
       throw new Error("Wallet changed; reconnect and prepare again");
-    status("Submitting exactly the reviewed transaction…");
-    const signature = await sw.submitSigned(
-      reviewed.url,
-      reviewed.prepared,
-      signed,
-      () => {
-        intent.assert(signingRevision);
-        if (connection !== reviewed.connection)
-          throw new Error("Wallet changed; reconnect and prepare again");
-        assertConnection(reviewed.connection, reviewed.chain);
-      },
-    );
+    unresolved = {
+      signature: locallyDerived,
+      url: reviewed.url,
+      lastValidBlockHeight: reviewed.prepared.lastValidBlockHeight,
+      broadcastStarted: false,
+    };
+    status(`Signed as ${locallyDerived}. Submitting exactly the reviewed transaction…`);
+    let signature: Signature;
+    try {
+      signature = await sw.submitSigned(
+        reviewed.url,
+        reviewed.prepared,
+        signed,
+        (derived) => {
+          if (derived !== locallyDerived)
+            throw new Error("Locally derived transaction signature changed");
+          intent.assert(signingRevision);
+          if (connection !== reviewed.connection)
+            throw new Error("Wallet changed; reconnect and prepare again");
+          assertConnection(reviewed.connection, reviewed.chain);
+          if (unresolved?.signature === derived)
+            unresolved = { ...unresolved, broadcastStarted: true };
+        },
+      );
+    } catch (e) {
+      if (
+        unresolved?.signature === locallyDerived &&
+        (!unresolved.broadcastStarted || e instanceof sw.TransactionFailedError)
+      )
+        unresolved = undefined;
+      throw e;
+    }
+    unresolved = undefined;
     status(`Confirmed signature: ${signature}
 Refresh the pool to load the resulting state.`);
   }, true);

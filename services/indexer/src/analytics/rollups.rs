@@ -15,11 +15,13 @@
 //! UPDATE`) by the SQL functions `sw_rollup_market_hours` / `sw_rollup_global_hours`
 //! (`migrations/0006_analytics.sql`).
 //!
-//! One pass is one `REPEATABLE READ` transaction holding a transaction-level advisory lock, so
-//! concurrent `rollups` processes serialise and every pass reads one snapshot.
+//! One pass takes the projection/rollup session lock before opening one `REPEATABLE READ`
+//! transaction, then holds the rollup transaction lock. Writers and rebuilds take the projection
+//! key while mutating state; concurrent rollup processes also serialise and every pass reads one
+//! canonical snapshot.
 
 use anyhow::Context;
-use sqlx::PgPool;
+use sqlx::{Connection, PgConnection, PgPool};
 
 /// Seconds per bucket.
 pub const BUCKET_S: i64 = 3_600;
@@ -55,7 +57,35 @@ pub async fn run_once(pool: &PgPool, until_ts: Option<i64>) -> anyhow::Result<u6
 
 /// [`run_once`] with the details of the pass.
 pub async fn pass(pool: &PgPool, until_ts: Option<i64>) -> anyhow::Result<RollupPass> {
-    let mut tx = pool.begin().await?;
+    // Take the projection lock before opening the repeatable-read transaction. Taking it from
+    // inside that transaction could establish a snapshot before a waiting writer commits its
+    // rebuild marker, which would recreate the very commit-to-rebuild race this lock closes.
+    // Detach so cancellation closes the session and releases the advisory lock instead of
+    // returning a lock-bearing connection to the pool.
+    let mut conn = pool.acquire().await?.detach();
+    sqlx::query("SELECT pg_advisory_lock($1)")
+        .bind(crate::ingest::project::PROJECTION_ROLLUP_LOCK)
+        .execute(&mut conn)
+        .await?;
+    let result = pass_locked(&mut conn, until_ts).await;
+    let unlock = sqlx::query("SELECT pg_advisory_unlock($1)")
+        .bind(crate::ingest::project::PROJECTION_ROLLUP_LOCK)
+        .execute(&mut conn)
+        .await;
+    match result {
+        Ok(report) => {
+            unlock.context("releasing the projection/rollup lock")?;
+            Ok(report)
+        }
+        Err(error) => {
+            let _ = unlock;
+            Err(error)
+        }
+    }
+}
+
+async fn pass_locked(conn: &mut PgConnection, until_ts: Option<i64>) -> anyhow::Result<RollupPass> {
+    let mut tx = conn.begin().await?;
     sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
         .execute(&mut *tx)
         .await?;
@@ -63,6 +93,17 @@ pub async fn pass(pool: &PgPool, until_ts: Option<i64>) -> anyhow::Result<Rollup
         .bind(ROLLUP_LOCK)
         .execute(&mut *tx)
         .await?;
+    let pending_rebuild: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM markets WHERE needs_rebuild) \
+           OR (SELECT needs_rebuild FROM protocol_state WHERE id)",
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if pending_rebuild {
+        // Do not consume source cursors while a canonical projection is deliberately stale.
+        tx.rollback().await?;
+        return Ok(RollupPass::default());
+    }
     let until = match until_ts {
         Some(t) => t,
         None => {

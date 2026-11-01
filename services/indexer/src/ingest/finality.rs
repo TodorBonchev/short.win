@@ -21,7 +21,8 @@
 //! every stream cursor that named it to the stream's newest finalized transaction (M8-SEC-5), log
 //! `ingest_rollbacks`, reset the rollup clock to the transaction's hour,
 //! `pg_notify(NOTIFY_ROLLBACK, <slot>)`; the writer then rebuilds.
-//! `ingest_state.finalized_slot` advances only past slots whose transactions are all resolved.
+//! `ingest_state.finalized_slot` is the current safe bound: it advances past resolved slots and
+//! moves back when late ingestion reveals an older unresolved confirmed transaction.
 //!
 //! The rollback functions run under the writer lock (the caller's [`Writer`]).
 
@@ -50,13 +51,19 @@ pub async fn rollback_signature(
     reason: &str,
 ) -> anyhow::Result<RollbackReport> {
     let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(super::project::PROJECTION_ROLLUP_LOCK)
+        .execute(&mut *tx)
+        .await?;
     let row: Option<(i64, Option<i64>, String)> = sqlx::query_as(
-        "SELECT slot, block_time, commitment FROM ingest_txs WHERE signature = $1 FOR UPDATE",
+        "SELECT t.slot, COALESCE(t.block_time, \
+             (SELECT min(e.ev_ts) FROM events e WHERE e.signature = t.signature)), t.commitment \
+         FROM ingest_txs t WHERE t.signature = $1 FOR UPDATE",
     )
     .bind(signature)
     .fetch_optional(&mut *tx)
     .await?;
-    let Some((slot, block_time, commitment)) = row else {
+    let Some((slot, earliest_rollup_ts, commitment)) = row else {
         return Ok(RollbackReport::default());
     };
     if commitment == "finalized" {
@@ -114,9 +121,10 @@ pub async fn rollback_signature(
             .execute(&mut *tx)
             .await?;
     }
-    if let Some(bt) = block_time {
-        // The rollup clock back to the transaction's hour (§3.4; ANALYTICS' own entry point).
-        crate::analytics::rollups::reset_from(&mut *tx, bt).await?;
+    if let Some(ts) = earliest_rollup_ts {
+        // Match analytics' timestamp rule: a null transaction time falls back to the earliest
+        // event time. Capture it before the cascading delete removes the evidence.
+        crate::analytics::rollups::reset_from(&mut *tx, ts).await?;
     }
     sqlx::query(
         "UPDATE ingest_state SET latest_block_time = (SELECT max(block_time) FROM ingest_txs), \
@@ -243,6 +251,7 @@ pub struct FinalityReport {
     pub reingested: u64,
     /// Transactions left `confirmed` because the cluster could not tell their fate.
     pub unresolved: u64,
+    /// Safe stored watermark after accounting for every known unresolved confirmed row.
     pub finalized_slot: u64,
 }
 
@@ -361,14 +370,15 @@ pub async fn run_once(
     }
     writer.end_batch().await?;
     // The finalized watermark: F, or below the oldest transaction still unresolved.
-    sqlx::query(
-        "UPDATE ingest_state SET finalized_slot = GREATEST(finalized_slot, LEAST($1, \
-           COALESCE((SELECT min(slot) - 1 FROM ingest_txs WHERE commitment = 'confirmed'), $1))), \
-           updated_at = now() WHERE id",
+    let safe_slot: i64 = sqlx::query_scalar(
+        "UPDATE ingest_state SET finalized_slot = LEAST($1, GREATEST(0, \
+           COALESCE((SELECT min(slot) - 1 FROM ingest_txs \
+                       WHERE commitment = 'confirmed'), $1))), \
+           updated_at = now() WHERE id RETURNING finalized_slot",
     )
     .bind(f_i64)
-    .execute(&pool)
+    .fetch_one(&pool)
     .await?;
-    report.finalized_slot = f;
+    report.finalized_slot = u64::try_from(safe_slot).unwrap_or(0);
     Ok(report)
 }

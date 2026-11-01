@@ -23,10 +23,16 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import decode as D  # noqa: E402
 import fetch as F  # noqa: E402
+import rpc as R  # noqa: E402
 import universe as U  # noqa: E402
 
 DAY = "2026-10-01"
 T_DAY = 1_790_856_000  # 2026-10-01T12:00:00Z
+
+
+def signature(i):
+    """Return a deterministic canonical 64-byte Solana signature for fixture row ``i``."""
+    return R.b58encode(i.to_bytes(64, "big"))
 
 
 def fixture(name):
@@ -325,7 +331,8 @@ class History:
     fails with -32020."""
 
     def __init__(self, n, kept=0):
-        self.sigs = [{"signature": f"s{i}", "slot": 1000 + i, "blockTime": 10_000 + i, "err": None}
+        self.sigs = [{"signature": signature(i), "slot": 1000 + i,
+                      "blockTime": 10_000 + i, "err": None}
                      for i in reversed(range(n))]
         self.kept, self.calls = kept, []
 
@@ -347,19 +354,23 @@ class Listing(unittest.TestCase):
 
     def test_a_live_cursor_lists_with_until(self):
         h = History(3000)
-        sigs, cur, notes = F.list_since(h, "A", {"sig": "s499", "slot": 1499, "bt": 10_499}, 10, 10_600)
-        self.assertEqual([s["signature"] for s in sigs], [f"s{i}" for i in reversed(range(500, 3000))])
-        self.assertEqual((cur["sig"], cur["slot"], cur["listed_at"], notes), ("s2999", 3999, 10_600, []))
-        self.assertTrue(all(u == "s499" for _, u in h.calls))
+        sigs, cur, notes = F.list_since(
+            h, "A", {"sig": signature(499), "slot": 1499, "bt": 10_499}, 10, 10_600)
+        self.assertEqual([s["signature"] for s in sigs],
+                         [signature(i) for i in reversed(range(500, 3000))])
+        self.assertEqual((cur["sig"], cur["slot"], cur["listed_at"], notes),
+                         (signature(2999), 3999, 10_600, []))
+        self.assertTrue(all(u == signature(499) for _, u in h.calls))
 
     def test_a_rejected_cursor_is_found_by_paging_back(self):
         h = History(3000)
         h.signatures = self._reject_until(h.signatures)
-        sigs, cur, notes = F.list_since(h, "A", {"sig": "s499", "slot": 1499, "bt": 10_499,
+        sigs, cur, notes = F.list_since(h, "A", {"sig": signature(499), "slot": 1499, "bt": 10_499,
                                                  "listed_at": 10_550}, 10, 10_600)
-        self.assertEqual([s["signature"] for s in sigs], [f"s{i}" for i in reversed(range(500, 3000))])
+        self.assertEqual([s["signature"] for s in sigs],
+                         [signature(i) for i in reversed(range(500, 3000))])
         self.assertEqual([k for k, _ in notes], ["cursor_expired"])  # no gap
-        self.assertEqual(cur["sig"], "s2999")
+        self.assertEqual(cur["sig"], signature(2999))
 
     @staticmethod
     def _reject_until(fn):
@@ -371,7 +382,8 @@ class Listing(unittest.TestCase):
 
     def test_a_cursor_past_retention_skips_until(self):
         h = History(3000, kept=10_000 + 2500)  # the cursor and 2,000 newer signatures are gone
-        cursor = {"sig": "s499", "slot": 1499, "bt": 10_499, "listed_at": self.NOW - 3600}
+        cursor = {"sig": signature(499), "slot": 1499, "bt": 10_499,
+                  "listed_at": self.NOW - 3600}
         sigs, cur, notes = F.list_since(h, "A", cursor, 10, self.NOW)
         self.assertEqual(len(sigs), 500)
         self.assertTrue(all(u is None for _, u in h.calls))  # no -32020 round trip
@@ -382,9 +394,10 @@ class Listing(unittest.TestCase):
 
     def test_a_quiet_market_keeps_listing(self):
         h = History(500, kept=10_000 + 600)  # everything gone, as for 92NvJRn… on 2026-10-02
-        sigs, cur, notes = F.list_since(h, "A", "s499", 10, self.NOW)  # a bare cursor: until fails
+        sigs, cur, notes = F.list_since(
+            h, "A", signature(499), 10, self.NOW)  # a bare cursor: until fails
         self.assertEqual((sigs, [k for k, _ in notes]), ([], ["cursor_expired", "listing_gap"]))
-        self.assertEqual((cur["sig"], cur["listed_at"]), ("s499", self.NOW))
+        self.assertEqual((cur["sig"], cur["listed_at"]), (signature(499), self.NOW))
         n = len(h.calls)
         sigs, _, notes = F.list_since(h, "A", cur, 10, self.NOW + 1800)
         self.assertEqual((sigs, notes, h.calls[n:]), ([], [], [(None, None)]))  # one call, the gap once
@@ -392,16 +405,19 @@ class Listing(unittest.TestCase):
     def test_a_bare_cursor_learns_its_slot(self):
         h = History(800)
         h.signatures = self._reject_until(h.signatures)
-        sigs, cur, notes = F.list_since(h, "A", "s700", 10, 11_000)
-        self.assertEqual([s["signature"] for s in sigs], [f"s{i}" for i in reversed(range(701, 800))])
-        self.assertEqual(cur["sig"], "s799")
-        sigs, cur, _ = F.list_since(h, "A", {"sig": "s799"}, 10, 11_000)
+        sigs, cur, notes = F.list_since(h, "A", signature(700), 10, 11_000)
+        self.assertEqual([s["signature"] for s in sigs],
+                         [signature(i) for i in reversed(range(701, 800))])
+        self.assertEqual(cur["sig"], signature(799))
+        sigs, cur, _ = F.list_since(h, "A", {"sig": signature(799)}, 10, 11_000)
         self.assertEqual((sigs, cur["slot"], cur["bt"]), ([], 1799, 10_799))
 
     def test_more_pages_than_allowed_is_a_gap(self):
         h = History(3500)
-        sigs, cur, notes = F.list_since(h, "A", {"sig": "s100", "slot": 1100, "bt": 10_100}, 1, 10_600)
-        self.assertEqual((len(sigs), cur["sig"], [k for k, _ in notes]), (1000, "s3499", ["listing_gap"]))
+        sigs, cur, notes = F.list_since(
+            h, "A", {"sig": signature(100), "slot": 1100, "bt": 10_100}, 1, 10_600)
+        self.assertEqual((len(sigs), cur["sig"], [k for k, _ in notes]),
+                         (1000, signature(3499), ["listing_gap"]))
         sigs, cur, notes = F.list_since(h, "A", None, 1, 10_600)  # first listing: one page, no gap
         self.assertEqual((len(sigs), notes), (1000, []))
 

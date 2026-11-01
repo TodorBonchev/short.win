@@ -588,8 +588,10 @@ pub struct PoolVenue {
     /// The live fee resolved on the pool's state (execution quotes when executable; the risk
     /// view keeps it while a halt makes the venue not executable). `None` if it does not resolve.
     pub fees: Option<FeeBps>,
-    /// M7-SEC-5: the one-way fee (ppm) the schedule charges at the stored `P_ema`'s market cap;
-    /// `u32::MAX` without a price or when it does not resolve (`VenueState::cap_fee_ppm`).
+    /// M7-SEC-5 / RISK-FEE-BASIS: the one-way fee (ppm) the schedule charges at the stored `P_ema`'s
+    /// market cap on pump's canonical launch supply. The risk view is deliberately independent
+    /// of the mint's live supply; `u32::MAX` without a price or when it does not resolve
+    /// (`VenueState::cap_fee_ppm`).
     pub fee_ppm_at_ema: u32,
 }
 
@@ -616,10 +618,11 @@ fn math_tiers(tiers: pump::FeeTiers<'_>) -> Vec<FeeTier> {
 }
 
 /// The venue state of a `PumpSwap` market from its key-checked ReadSet (module docs), with the
-/// mint's live `supply` (the fee tier's market cap; `None` makes the venue not executable). Never
-/// fails: whatever does not parse is "not executable" (A63). `ema_fee`: also resolve the fee at the
-/// stored `P_ema`'s market cap (`PoolVenue::fee_ppm_at_ema`, M7-SEC-5) — only `open_short`'s
-/// pre-trade read needs it, so no other instruction pays its compute.
+/// mint's live `supply` (the execution fee tier's market cap; `None` makes the venue not
+/// executable). Never fails: whatever does not parse is "not executable" (A63). `ema_fee`: also
+/// resolve the fee at the stored `P_ema` on pump's canonical launch supply
+/// (`PoolVenue::fee_ppm_at_ema`, M7-SEC-5 / RISK-FEE-BASIS), so a burn earlier in the transaction cannot
+/// raise an open or exit risk quote. Execution quotes continue to use live supply.
 pub fn read_state(
     market: &Market,
     read: &[AccountInfo],
@@ -710,17 +713,25 @@ pub fn read_state(
     let fee = schedule.as_ref().and_then(|sch| {
         fees::pump_amm(reserves.effective_quote, u128::from(reserves.base), sch).ok()
     });
-    // M7-SEC-5: the fee at the stored `P_ema`'s market cap (the tier's market cap is
-    // `effective_quote·supply/base`, i.e. the price times the supply).
+    // M7-SEC-5 / RISK-FEE-BASIS: the risk fee at the stored `P_ema` uses pump's canonical launch supply,
+    // not the mutable live mint supply used by the execution schedule above. A holder can burn
+    // before this instruction, but cannot move this tier inside the transaction.
+    let risk_schedule = PammFeeSchedule {
+        tiers: &tiers,
+        base_supply: u64::try_from(fees::PUMP_CURVE_MCAP_SUPPLY).unwrap_or(u64::MAX),
+        creator_fee_configurable: gc.creator_fee_configurable(),
+        pool_creator_fee_bps: pool.creator_fee_bps,
+        coin_creator_is_default: pool.coin_creator_is_default(),
+        cap_bps: None,
+    };
     let p_ema = market.ema_price.get();
-    let fee_ema = schedule
-        .as_ref()
-        .filter(|_| ema_fee && p_ema > 0)
-        .and_then(|sch| {
+    let fee_ema = (ema_fee && p_ema > 0)
+        .then(|| {
             let base = u128::from(reserves.base);
             let quote = mul_div(p_ema, base, WAD, Rounding::Floor).ok()?;
-            fees::pump_amm(quote, base, sch).ok()
-        });
+            fees::pump_amm(quote, base, &risk_schedule).ok()
+        })
+        .flatten();
     let disable_flags = gc.disable_flags();
     st.pool = Some(PoolVenue {
         disable_flags,

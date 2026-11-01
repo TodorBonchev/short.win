@@ -227,8 +227,11 @@ export function retryMode(s: TxFlowState): RetryMode {
     if (s.stage === 'review') return 'resimulate';
     if (s.stage !== 'failed' || !s.plan) return 'none';
     const e = s.error;
+    // A signature means the prior transaction can still be the transaction that lands. The
+    // current error shape has no explicit proof-of-final-rejection bit, so never offer a blind
+    // fresh transaction from a signed failure; reconciliation must clear it first.
+    if (s.signature) return 'none';
     if (e?.kind === 'unknown-outcome') return 'none';
-    if (e?.kind === 'integrity' && s.signature) return 'none';
     // The connected MWA account changed mid-sign (R-S2): the form re-reads with whatever is
     // connected now; the old plan is never re-simulated for another account.
     if (e?.kind === 'wallet-changed') return 'close';

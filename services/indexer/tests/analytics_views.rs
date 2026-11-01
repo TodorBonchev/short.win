@@ -474,10 +474,15 @@ async fn seed_position(
          n_open, fee_open, venue_rent, entry_price, spot_wad_open, ema_wad_open, b_spot_open, \
          b_ema_open, deadline, opened_slot, opened_tx_index, opened_ts, open_signature, status, \
          exit_ts, exit_keeper, buyback_cost, b_live_exit, liquidated_expired, settle_condition, \
-         duration_s) \
+         duration_s, opened_ix_index, opened_ev_source, opened_ev_seq, exit_slot, exit_tx_index, \
+         exit_ix_index, exit_ev_source, exit_ev_seq) \
          VALUES ($1, $2, $3, 0, 3, 6, $4::numeric, $5::numeric, 100, 200, 200, $5::numeric, 10, 0, \
                  0, $6::numeric, $7::numeric, 0, 0, $8 + 259200, $8 - 1789000000, 1, $8, $9, $10, \
-                 $11, $12, $13::numeric, $14::numeric, $15, $16, $11 - $8)",
+                 $11, $12, $13::numeric, $14::numeric, $15, $16, $11 - $8, 0, 0, 0, $17, \
+                 CASE WHEN $17::bigint IS NULL THEN NULL ELSE 0 END, \
+                 CASE WHEN $17::bigint IS NULL THEN NULL ELSE 0::smallint END, \
+                 CASE WHEN $17::bigint IS NULL THEN NULL ELSE 0::smallint END, \
+                 CASE WHEN $17::bigint IS NULL THEN NULL ELSE 0 END)",
     )
     .bind(position)
     .bind(market)
@@ -495,6 +500,7 @@ async fn seed_position(
     .bind(exit.map(|e| e.3.to_string()))
     .bind((status == "liquidated").then_some(false))
     .bind((status == "settled").then_some(1i16))
+    .bind(exit.map(|e| e.0 - 1_789_000_000))
     .execute(pool)
     .await
     .expect("positions");

@@ -9,6 +9,7 @@ import {
   getBase64EncodedWireTransaction,
   getBase64Decoder,
   getBase64Encoder,
+  getSignatureFromTransaction,
   getTransactionDecoder,
   getTransactionEncoder,
   getTransactionSize,
@@ -120,42 +121,101 @@ export function assertSameMessage(
       "Wallet returned a changed transaction; prepare it again for review",
     );
 }
+
+/** A signed transaction was handed to RPC, but the client cannot prove its final outcome. */
+export class OutcomeUnknownError extends Error {
+  readonly signature: Signature;
+  override readonly cause: unknown;
+
+  constructor(signature: Signature, reason: string, cause?: unknown) {
+    super(`${reason} Signature: ${signature}. Reconcile it before signing another transaction.`);
+    this.name = "OutcomeUnknownError";
+    this.signature = signature;
+    this.cause = cause;
+  }
+}
+
+/** RPC proved that the signed transaction failed on chain. A fresh transaction is safe. */
+export class TransactionFailedError extends Error {
+  readonly signature: Signature;
+
+  constructor(signature: Signature, error: unknown) {
+    super(`Transaction failed ${signature}: ${json(error)}`);
+    this.name = "TransactionFailedError";
+    this.signature = signature;
+  }
+}
+
+/** Derive the canonical signature locally; never depend on a send response to recover it. */
+export function signedTransactionSignature(signed: Uint8Array): Signature {
+  return getSignatureFromTransaction(getTransactionDecoder().decode(signed));
+}
+
 export async function submitSigned(
   url: string,
   prepared: PreparedTransaction,
   signed: Uint8Array,
-  beforeBroadcast?: () => void,
+  beforeBroadcast?: (signature: Signature) => void,
 ): Promise<Signature> {
   if (signed.length > 1232)
     throw new Error("Signed transaction exceeds packet limit");
   assertSameMessage(prepared.bytes, signed);
+  const transaction = getTransactionDecoder().decode(signed);
+  const signature = getSignatureFromTransaction(transaction);
   const rpc = createSolanaRpc(url);
   if (
     (await rpc.getBlockHeight({ commitment: "confirmed" }).send()) >
     prepared.lastValidBlockHeight
   )
     throw new Error("Reviewed transaction expired before send");
-  beforeBroadcast?.();
-  const sig = await rpc
-    .sendTransaction(
-      getBase64EncodedWireTransaction(getTransactionDecoder().decode(signed)),
-      { encoding: "base64", skipPreflight: false, maxRetries: 2n },
-    )
-    .send();
+  beforeBroadcast?.(signature);
+  let returned: Signature;
+  try {
+    returned = await rpc
+      .sendTransaction(getBase64EncodedWireTransaction(transaction), {
+        encoding: "base64",
+        skipPreflight: false,
+        maxRetries: 2n,
+      })
+      .send();
+  } catch (cause) {
+    throw new OutcomeUnknownError(
+      signature,
+      "Submission failed after broadcast began; the transaction may still land.",
+      cause,
+    );
+  }
+  if (returned !== signature)
+    throw new OutcomeUnknownError(
+      signature,
+      `RPC returned a different signature (${returned}); the signed transaction outcome is unknown.`,
+    );
   for (let i = 0; i < 60; i++) {
-    const {
-      value: [status],
-    } = await rpc.getSignatureStatuses([sig]).send();
+    let status;
+    try {
+      ({ value: [status] } = await rpc
+        .getSignatureStatuses([signature])
+        .send());
+    } catch (cause) {
+      throw new OutcomeUnknownError(
+        signature,
+        "Status lookup failed after submission; the transaction may still land.",
+        cause,
+      );
+    }
     if (status?.err)
-      throw new Error("Transaction failed " + sig + ": " + json(status.err));
+      throw new TransactionFailedError(signature, status.err);
     if (
       status?.confirmationStatus === "confirmed" ||
       status?.confirmationStatus === "finalized"
     )
-      return sig;
+      return signature;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  throw new Error("Outcome unknown; inspect signature before retrying: " + sig);
+  throw new OutcomeUnknownError(
+    signature,
+    "No confirmation arrived within the time limit; the transaction may still land.",
+  );
 }
 /** Read lookup table contents from RPC, never trust the API-supplied address list. */
 export async function readLookupTables(

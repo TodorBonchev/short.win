@@ -75,6 +75,39 @@ def b58decode(s):
     return b"\0" * (len(s) - len(s.lstrip("1"))) + body
 
 
+def canonical_signature(sig):
+    """Return a canonical Solana transaction signature or raise ``ValueError``.
+
+    Signatures are exactly 64 bytes and their serialized form is canonical base58.  Keeping this
+    check next to the codec makes every RPC, cursor and cache caller use the same filename-safe
+    representation.
+    """
+    if not isinstance(sig, str) or not 64 <= len(sig) <= 88:
+        raise ValueError(f"invalid Solana signature length: {sig!r}")
+    try:
+        raw = b58decode(sig)
+    except ValueError as e:
+        raise ValueError(f"invalid Solana signature encoding: {sig!r}") from e
+    if len(raw) != 64 or b58encode(raw) != sig:
+        raise ValueError(f"non-canonical Solana signature: {sig!r}")
+    return sig
+
+
+def confined_path(root, *parts):
+    """Join ``parts`` below the canonical ``root`` and reject symlink/path escapes."""
+    if root is None:
+        raise ValueError("cache root is not configured")
+    canonical_root = os.path.realpath(os.path.abspath(os.fspath(root)))
+    candidate = os.path.realpath(os.path.join(canonical_root, *parts))
+    try:
+        inside = os.path.commonpath((canonical_root, candidate)) == canonical_root
+    except ValueError:  # different Windows drives
+        inside = False
+    if not inside:
+        raise ValueError(f"cache path resolves outside {canonical_root}: {candidate}")
+    return candidate
+
+
 def anchor_event_disc(name):
     """Anchor's event discriminator ``sha256("event:<name>")[..8]``."""
     return hashlib.sha256(f"event:{name}".encode()).digest()[:8]
@@ -227,19 +260,36 @@ class Rpc:
         """One page of ``getSignaturesForAddress`` (finalized, newest first)."""
         opts = {"limit": limit, "commitment": "finalized"}
         if before:
-            opts["before"] = before
+            opts["before"] = canonical_signature(before)
         if until:
-            opts["until"] = until
-        return self.call("getSignaturesForAddress", [address, opts], endpoint=endpoint)
+            opts["until"] = canonical_signature(until)
+        rows = self.call("getSignaturesForAddress", [address, opts], endpoint=endpoint)
+        if not isinstance(rows, list):
+            raise RpcError("getSignaturesForAddress", self.urls[endpoint], "result is not a list")
+        out = []
+        for row in rows:
+            if not isinstance(row, dict) or "signature" not in row:
+                raise RpcError("getSignaturesForAddress", self.urls[endpoint],
+                               "row has no signature")
+            row = dict(row)
+            try:
+                row["signature"] = canonical_signature(row["signature"])
+            except ValueError as e:
+                raise RpcError("getSignaturesForAddress", self.urls[endpoint], str(e)) from e
+            out.append(row)
+        return out
 
     # ---- transactions (cached) ------------------------------------------------------------
 
     def _tx_paths(self, sig, root=None):
-        d = os.path.join(root or self.cache_dir, sig[:2])
-        return os.path.join(d, sig + ".json.gz"), os.path.join(d, sig + ".json")
+        sig = canonical_signature(sig)
+        cache_root = root if root is not None else self.cache_dir
+        return (confined_path(cache_root, sig[:2], sig + ".json.gz"),
+                confined_path(cache_root, sig[:2], sig + ".json"))
 
     def cached_transaction(self, sig):
         """The cached transaction of ``sig`` or None; never calls."""
+        sig = canonical_signature(sig)
         for root in ([self.cache_dir] if self.cache_dir else []) + self.seed_cache_dirs:
             gz, plain = self._tx_paths(sig, root)
             if os.path.exists(gz):
@@ -254,6 +304,7 @@ class Rpc:
         """The finalized transaction of ``sig`` (``encoding=json``), from the cache when present.
         A ``null`` from the primary endpoint (outside its retention) is retried on the archive
         endpoint when ``backfill``. Returns None if neither has it."""
+        sig = canonical_signature(sig)
         tx = self.cached_transaction(sig)
         if tx is not None:
             self.stats["cache_hits"] += 1
@@ -265,8 +316,13 @@ class Rpc:
         if tx is not None and self.cache_dir:
             gz, _ = self._tx_paths(sig)
             os.makedirs(os.path.dirname(gz), exist_ok=True)
-            tmp = gz + ".tmp"
+            # Re-resolve after creating the shard directory so a pre-existing symlink cannot
+            # redirect the write outside the canonical cache root.
+            gz, _ = self._tx_paths(sig)
+            tmp = confined_path(self.cache_dir, sig[:2], sig + ".json.gz.tmp")
             with gzip.open(tmp, "wt", compresslevel=6) as f:
                 json.dump(tx, f, separators=(",", ":"))
+            confined_path(self.cache_dir, sig[:2], sig + ".json.gz.tmp")
+            confined_path(self.cache_dir, sig[:2], sig + ".json.gz")
             os.replace(tmp, gz)
         return tx

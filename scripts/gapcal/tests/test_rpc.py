@@ -16,6 +16,10 @@ sys.path.insert(0, os.path.dirname(HERE))
 import rpc as R  # noqa: E402
 
 
+SIG_A = R.b58encode((1).to_bytes(64, "big"))
+SIG_B = R.b58encode((2).to_bytes(64, "big"))
+
+
 class Clock:
     def __init__(self):
         self.t = 1000.0
@@ -130,20 +134,20 @@ class Routing(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             tx = {"slot": 1, "blockTime": 2, "meta": {}, "transaction": {}}
             rpc, tr, _ = make([ok(None), ok(tx)], cache_dir=d)
-            self.assertEqual(rpc.transaction("SigA"), tx)
+            self.assertEqual(rpc.transaction(SIG_A), tx)
             self.assertEqual([(u, m) for _, u, m, _ in tr.requests],
                              [("https://primary", "getTransaction"), ("https://archive", "getTransaction")])
             # A second read, and a fresh client on the same cache, cost nothing.
-            self.assertEqual(rpc.transaction("SigA"), tx)
+            self.assertEqual(rpc.transaction(SIG_A), tx)
             rpc2, tr2, _ = make([], cache_dir=d)
-            self.assertEqual(rpc2.transaction("SigA"), tx)
+            self.assertEqual(rpc2.transaction(SIG_A), tx)
             self.assertEqual(tr2.requests, [])
             self.assertEqual(rpc2.stats["calls"], 0)
 
     def test_missing_transactions_are_not_cached(self):
         with tempfile.TemporaryDirectory() as d:
             rpc, tr, _ = make([ok(None), ok(None)], cache_dir=d)
-            self.assertIsNone(rpc.transaction("SigB"))
+            self.assertIsNone(rpc.transaction(SIG_B))
             self.assertEqual(os.listdir(d), [])
 
 

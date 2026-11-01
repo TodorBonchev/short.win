@@ -19,3 +19,31 @@ export class IntentRevision {
     return result;
   }
 }
+
+export type SignatureReconciliation =
+  | "failed"
+  | "confirmed"
+  | "expired-absent"
+  | "pending";
+
+/**
+ * Decide whether an earlier submission is resolved strongly enough to prepare
+ * another transaction. Expiry proves absence only while the RPC still has no
+ * status; any observed non-error status can continue toward confirmation.
+ */
+export function reconcileSignatureStatus(
+  known: {
+    readonly err: unknown;
+    readonly confirmationStatus?: string | null;
+  } | null,
+  blockhashExpired: boolean,
+): SignatureReconciliation {
+  if (known?.err != null) return "failed";
+  if (
+    known?.confirmationStatus === "confirmed" ||
+    known?.confirmationStatus === "finalized"
+  )
+    return "confirmed";
+  if (known === null && blockhashExpired) return "expired-absent";
+  return "pending";
+}

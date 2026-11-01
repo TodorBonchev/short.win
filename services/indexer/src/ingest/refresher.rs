@@ -108,7 +108,8 @@ pub async fn write_snapshot(
             sqlx::query(
                 "UPDATE positions SET rent_protocol_bps = $2, penalty_lender_bps = $3, \
                    penalty_protocol_bps = $4, penalty_keeper_bps = $5, expiry_fee_bps = $6, \
-                   terms_source = 'account' WHERE position = $1 AND terms_source IS NULL",
+                   terms_source = 'account' \
+                 WHERE position = $1 AND is_current AND terms_source IS NULL",
             )
             .bind(pubkey.to_string())
             .bind(i32::from(t[0]))
@@ -349,7 +350,8 @@ impl Refresher {
         }
         // Positions whose terms the parameters history could not give.
         let open: Vec<String> = sqlx::query_scalar(
-            "SELECT position::text FROM positions WHERE terms_source IS NULL AND status = 'open' LIMIT 100",
+            "SELECT position::text FROM positions \
+             WHERE is_current AND terms_source IS NULL AND status = 'open' LIMIT 100",
         )
         .fetch_all(pool)
         .await?;

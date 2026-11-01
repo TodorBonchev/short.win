@@ -23,6 +23,7 @@ pub const JUPITER_PROGRAM_DATA: Pubkey = pubkey!("4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2e
 pub const TOKEN_ID: Pubkey = Pubkey::new_from_array(header::SPL_TOKEN_PROGRAM);
 pub const TOKEN_2022_ID: Pubkey = Pubkey::new_from_array(header::TOKEN_2022_PROGRAM);
 pub const WSOL_MINT: Pubkey = Pubkey::new_from_array(isolation::WSOL_MINT);
+pub const WSOL_2022_MINT: Pubkey = pubkey!("9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP");
 pub const AUTHORITY_SEED: &[u8] = b"simple_exec";
 pub const BASE_SEED: &[u8] = b"simple_base";
 pub const WSOL_SEED: &[u8] = b"simple_wsol";
@@ -151,7 +152,8 @@ pub fn supported_mint(mint: &AccountInfo<'_>, token_program: &Pubkey) -> Result<
             && mint.owner == token_program
             && !mint.executable
             && !mint.is_writable
-            && mint.key != &WSOL_MINT,
+            && mint.key != &WSOL_MINT
+            && !(token_program == &TOKEN_2022_ID && mint.key == &WSOL_2022_MINT),
         SimpleError::RouteMintUnsupported
     );
     let bytes = mint.try_borrow_data()?;
@@ -1087,6 +1089,18 @@ mod tests {
             }
             bytes.truncate(82);
             bytes[46] = 1;
+            let account =
+                AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &owner, false);
+            assert!(supported_mint(&account, &owner).is_err());
+        }
+    }
+    #[test]
+    fn canonical_native_mints_are_outside_the_supported_mint_scope() {
+        for (owner, key) in [(TOKEN_ID, WSOL_MINT), (TOKEN_2022_ID, WSOL_2022_MINT)] {
+            let mut lamports = 1;
+            let mut bytes = vec![0; 82];
+            bytes[44] = 6;
+            bytes[45] = 1;
             let account =
                 AccountInfo::new(&key, false, false, &mut lamports, &mut bytes, &owner, false);
             assert!(supported_mint(&account, &owner).is_err());

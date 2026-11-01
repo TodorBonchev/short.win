@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {address,getBase58Encoder,getBase64Encoder,type Address,type Decoder,type AddressesByLookupTableAddress} from '@solana/kit';
 import * as g from './generated/index.ts';
 import {PROGRAM,TOKEN,TOKEN_2022,WSOL,configAddress,policyAddress,marketAddress,poolAddress,referenceAddress,loanAddress,executionAddresses} from './pdas.ts';
-import {validateMint} from './chain.ts';
+import {isCanonicalNativeMint,validateMint} from './chain.ts';
 import {planBundle,type BuildResponse} from './route.ts';
 import {readLookupTables} from './transactions.ts';
 import {pythonCommand,rpcTransport,validateServicePolicy,stringify,type RpcCall,type ServiceSettings} from './operator.ts';
@@ -53,7 +53,7 @@ export function liveDependencies(options:BridgeOptions,settings:ServiceSettings)
    const pool=await read(poolKey,g.getPoolGenerationDecoder(),g.getPoolGenerationSize(),g.ShortwinSimpleAccount.PoolGeneration);
    if(!policy||!pool||policy.config!==configKey||pool.market!==marketKey||pool.mint!==mint||pool.tokenProgram!==market.tokenProgram||pool.retired)throw new Refusal(503,'Canonical policy/pool binding mismatch');
    const result=await rpc('getAccountInfo',[mint,{encoding:'base64',commitment:'confirmed'}]);const m=result?.value;
-   if(!m||m.executable||![TOKEN,TOKEN_2022].includes(m.owner)||m.owner!==market.tokenProgram||m.data?.[1]!=='base64'||mint===WSOL)throw new Refusal(422,'Mint is outside supported SPL/metadata-only Token-2022 scope');
+   if(!m||m.executable||![TOKEN,TOKEN_2022].includes(m.owner)||m.owner!==market.tokenProgram||m.data?.[1]!=='base64'||isCanonicalNativeMint(mint,m.owner))throw new Refusal(422,'Mint is outside supported SPL/metadata-only Token-2022 scope');
    const data=getBase64Encoder().encode(m.data[0]);try{const eligible=validateMint(mint,m.owner,m.executable,Uint8Array.from(data));if(eligible.decimals!==market.decimals)throw new Error('Mint decimals changed');}catch{throw new Refusal(422,'Mint is outside supported SPL/metadata-only Token-2022 scope');}
    const slot=BigInt(await rpc('getSlot',[{commitment:'confirmed'}]));const timestamp=BigInt(await rpc('getBlockTime',[Number(slot)]));
    const now=BigInt(Math.floor(Date.now()/1000));if(slot<=0n||timestamp<=0n||timestamp>now+5n||now-timestamp>60n)throw new Refusal(503,'RPC clock unavailable or stale');

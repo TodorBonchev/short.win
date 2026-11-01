@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {getBase58Encoder,address} from '@solana/kit';
-import {validateMint} from '../src/chain.ts';
-import {TOKEN,TOKEN_2022} from '../src/pdas.ts';
+import {validateMint,WSOL_2022} from '../src/chain.ts';
+import {TOKEN,TOKEN_2022,WSOL} from '../src/pdas.ts';
 const mint=address('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 function metadata(){
  const data=new Uint8Array(318),view=new DataView(data.buffer);data[44]=6;data[45]=1;data[165]=1;
@@ -17,5 +17,9 @@ test('mint discovery and HTTP admission accept metadata-only Token2022 and rejec
  const duplicate=new Uint8Array(data.length+68);duplicate.set(data);duplicate.set(data.subarray(166,234),data.length);assert.throws(()=>validateMint(mint,TOKEN_2022,false,duplicate));
  assert.throws(()=>validateMint(mint,TOKEN_2022,false,new Uint8Array(4097)));
  assert.throws(()=>validateMint(mint,TOKEN_2022,true,data));
- const plain=data.slice(0,82);assert.equal(validateMint(mint,TOKEN,false,plain).decimals,6);
+ const plain=data.slice(0,82);
+ assert.equal(validateMint(mint,TOKEN,false,plain).decimals,6);
+ assert.equal(validateMint(mint,TOKEN_2022,false,plain).decimals,6);
+ assert.throws(()=>validateMint(WSOL,TOKEN,false,plain));
+ assert.throws(()=>validateMint(WSOL_2022,TOKEN_2022,false,plain));
 });

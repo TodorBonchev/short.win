@@ -1,6 +1,10 @@
-import {createSolanaRpc,getBase64Encoder,getBase58Encoder,type Address,type Decoder} from '@solana/kit';
+import {address,createSolanaRpc,getBase64Encoder,getBase58Encoder,type Address,type Decoder} from '@solana/kit';
 import * as g from './generated/index.ts';
 import {PROGRAM,TOKEN,TOKEN_2022,WSOL} from './pdas.ts';
+export const WSOL_2022=address('9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP');
+export function isCanonicalNativeMint(mint:Address,owner:Address):boolean {
+ return (owner===TOKEN&&mint===WSOL)||(owner===TOKEN_2022&&mint===WSOL_2022);
+}
 export async function readAccount<T>(url:string,key:Address,decoder:Decoder<T>,kind:number):Promise<T|null> {
  const {value}=await createSolanaRpc(url).getAccountInfo(key,{encoding:'base64',commitment:'confirmed'}).send();
  if(value===null)return null;
@@ -29,7 +33,7 @@ export async function readMint(url:string,mint:Address) {
  * financial identities. The program independently verifies current mint bytes. */
 export function validateMint(mint:Address,owner:Address,executable:boolean,bytes:Uint8Array){
  const reject=()=>{throw new Error('Mint is outside supported SPL/metadata-only Token-2022 scope');};
- if(!(owner===TOKEN||owner===TOKEN_2022)||executable||mint===WSOL||bytes.length<82||bytes.length>4096||bytes.length===355||(owner===TOKEN&&bytes.length!==82))reject();
+ if(!(owner===TOKEN||owner===TOKEN_2022)||executable||isCanonicalNativeMint(mint,owner)||bytes.length<82||bytes.length>4096||bytes.length===355||(owner===TOKEN&&bytes.length!==82))reject();
  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
  if(![0,1].includes(view.getUint32(0,true))||bytes[45]!==1||view.getUint32(46,true)!==0)reject();
  if(bytes.length>82){

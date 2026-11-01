@@ -1,4 +1,4 @@
-> **Active software release: v1.1.0.** The Jupiter-only pooled implementation lives in [simple/](simple/README.md) on `main`. See the [release record](docs/release/POOLED-1.1.0.md), [specification](simple/docs/SPEC.md) and [commissioning prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement. Mainnet deployment and funded operation remain pending.
+> **Active software release: v1.1.1.** The Jupiter-only pooled implementation lives in [simple/](simple/README.md) on `main`. See the [release record](docs/release/POOLED-1.1.1.md), [specification](simple/docs/SPEC.md) and [commissioning prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement. Mainnet deployment and funded operation remain pending.
 
 # short.win
 

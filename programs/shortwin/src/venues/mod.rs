@@ -815,8 +815,9 @@ impl VenueState {
     /// spot leg, the EMA leg on the ring, `B̂_ref`, the penalty base, the settlement box and
     /// FV): a position the honest state holds healthy was liquidated. At the EMA's market cap a
     /// same-transaction trade can only lower the fee the risk view takes; the execution quote
-    /// (`B̂_live`, the buyback itself) keeps the live fee. φ at `P_ema` is resolved on the live
-    /// mint supply, so a holder's burn earlier in the transaction still raises it (KI-72). Else
+    /// (`B̂_live`, the buyback itself) keeps the live fee. RISK-FEE-BASIS resolves φ at `P_ema` on pump's
+    /// canonical launch supply, so a holder's burn earlier in the transaction cannot raise it.
+    /// Else
     /// the hard cap alone: Raydium's fees are fixed, the curve's on the fixed 10¹⁵ supply but
     /// its synthetic fee past `rT`, on the live one: a burn can raise that too (KI-77).
     pub fn exit_risk_cap_bps(&self, hard_cap_bps: u64) -> u64 {
@@ -1071,9 +1072,9 @@ pub fn read_state_boxed_for_open(
 }
 
 /// [`read_state_boxed`] for the keeper exits (`liquidate`, `expire`) and `sol_settle` (AIR-10):
-/// on PumpSwap the fee is also resolved at the stored `P_ema`'s market cap, which caps their
-/// risk view (`VenueState::exit_risk_cap_bps`; ≈ 1.3–1.6 k CU); the other venues read as
-/// [`read_state_boxed`].
+/// on PumpSwap the fee is also resolved at the stored `P_ema` on pump's canonical launch supply,
+/// which caps their supply-stable risk view (`VenueState::exit_risk_cap_bps`; ≈ 1.3–1.6 k CU);
+/// the other venues read as [`read_state_boxed`].
 #[inline(never)]
 pub fn read_state_boxed_for_exit(
     market: &Market,

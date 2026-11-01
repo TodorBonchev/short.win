@@ -1,10 +1,10 @@
 # New pooled-version operating contract
 
 Use the `simple/` workspace and its generated client only. The selected software release
-is **v1.1.0**, with generated public program ID
+is **v1.1.1**, with generated public program ID
 `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh`; its selected deployment
 key stays private outside Git. Mainnet deployment and funded operation remain
-pending; the [software release record](../../docs/release/POOLED-1.1.0.md) does not
+pending; the [software release record](../../docs/release/POOLED-1.1.1.md) does not
 authorize activation. Legacy keeper,
 indexer projections, frontend and governance builders use different accounts and
 must not operate this program. Old placeholder-ID captures, pre-identity-freeze

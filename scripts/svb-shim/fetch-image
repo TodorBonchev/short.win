@@ -24,7 +24,9 @@ OCI) are supported; solana-verify's IMAGE_MAP pins those.
 import hashlib
 import json
 import os
+import posixpath
 import shutil
+import stat
 import sys
 import tarfile
 import urllib.request
@@ -33,6 +35,42 @@ MANIFEST_TYPES = (
     "application/vnd.docker.distribution.manifest.v2+json",
     "application/vnd.oci.image.manifest.v1+json",
 )
+RESERVED_ROOT_ENTRIES = frozenset({
+    ".svb-env.json",
+    ".svb-workdir",
+    ".svb-image",
+    ".complete",
+})
+
+
+def complete_root(root):
+    """A reusable tree has a real root directory and only regular shim metadata leaves."""
+    if os.path.islink(root) or not os.path.isdir(root):
+        return False
+    for name in RESERVED_ROOT_ENTRIES:
+        try:
+            leaf = os.lstat(os.path.join(root, name))
+        except FileNotFoundError:
+            return False
+        if not stat.S_ISREG(leaf.st_mode) or leaf.st_nlink != 1:
+            return False
+    return True
+
+
+def write_root_metadata(root, name, body):
+    """Create one reserved metadata leaf without following an image-created object."""
+    if name not in RESERVED_ROOT_ENTRIES:
+        raise ValueError(name)
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:
+        sys.exit("fetch-image: this platform cannot create metadata with O_NOFOLLOW")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | nofollow
+    try:
+        fd = os.open(os.path.join(root, name), flags, 0o600)
+    except OSError as e:
+        sys.exit(f"fetch-image: refusing metadata leaf {name}: {e}")
+    with os.fdopen(fd, "w") as f:
+        f.write(body)
 
 
 def main():
@@ -42,7 +80,7 @@ def main():
     if not digest.startswith("sha256:") or len(digest) != 71:
         sys.exit(f"fetch-image: DIGEST must be sha256:<64 hex>, got {digest!r}")
     root = os.path.join(cache, "rootfs-" + digest.removeprefix("sha256:"))
-    if os.path.exists(os.path.join(root, ".complete")):
+    if complete_root(root):
         print(root)
         return
     blobs = os.path.join(cache, "blobs")
@@ -88,19 +126,21 @@ def main():
     if cfg.get("architecture") != "amd64" or cfg.get("os", "linux") != "linux":
         sys.exit(f"fetch-image: image is {cfg.get('os')}/{cfg.get('architecture')}, need linux/amd64")
 
-    if os.path.exists(root):
-        make_removable(root)
-        shutil.rmtree(root)
+    if os.path.lexists(root):
+        if os.path.islink(root):
+            os.remove(root)
+        elif os.path.isdir(root):
+            make_removable(root)
+            shutil.rmtree(root)
+        else:
+            os.remove(root)
     os.makedirs(root)
     extract(root, [blob(layer["digest"]) for layer in man["layers"]])
     c = cfg.get("config") or {}
-    with open(os.path.join(root, ".svb-env.json"), "w") as f:
-        json.dump(c.get("Env") or [], f)
-    with open(os.path.join(root, ".svb-workdir"), "w") as f:
-        f.write((c.get("WorkingDir") or "/") + "\n")
-    with open(os.path.join(root, ".svb-image"), "w") as f:
-        f.write(f"{repo}@{digest}\n")
-    open(os.path.join(root, ".complete"), "w").close()
+    write_root_metadata(root, ".svb-env.json", json.dumps(c.get("Env") or []))
+    write_root_metadata(root, ".svb-workdir", (c.get("WorkingDir") or "/") + "\n")
+    write_root_metadata(root, ".svb-image", f"{repo}@{digest}\n")
+    write_root_metadata(root, ".complete", "")
     print(root)
 
 
@@ -142,6 +182,12 @@ def extract(root, layers):
         with tarfile.open(layer, "r:*") as tf:
             keep = []
             for m in tf.getmembers():
+                normalized = posixpath.normpath(m.name)
+                parts = [part for part in normalized.split("/") if part not in ("", ".")]
+                if parts and (parts[0] in RESERVED_ROOT_ENTRIES or
+                              parts[0].startswith(".wh.") and
+                              parts[0][4:] in RESERVED_ROOT_ENTRIES):
+                    sys.exit(f"fetch-image: layer member {m.name} uses reserved rootfs metadata")
                 d, b = os.path.split(m.name)
                 if b == ".wh..wh..opq":
                     t = os.path.join(root, d)

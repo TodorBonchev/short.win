@@ -206,6 +206,22 @@ async fn views_match_the_formulas_on_a_seeded_market() {
     .execute(&pool)
     .await
     .expect("markets");
+    // The lifecycle parent must exist before settlement rows reference its immutable Open key.
+    sqlx::query(
+        "INSERT INTO positions (position, market, borrower, nonce, tier, venue, q, s, m, v_open, \
+         v, n_open, fee_open, venue_rent, entry_price, spot_wad_open, ema_wad_open, b_spot_open, \
+         b_ema_open, deadline, opened_slot, opened_tx_index, opened_ix_index, opened_ev_source, \
+         opened_ev_seq, opened_ts, open_signature, status) \
+         VALUES ($1, $2, $3, 0, 3, 6, 10, 5, 95, 100, 100, 5, 25, 0, 0, 0, 0, 0, 0, \
+                 1790259200, 100, 0, 0, 0, 0, 1790000000, $4, 'open')",
+    )
+    .bind(&position)
+    .bind(&market)
+    .bind(&borrower)
+    .bind(&sig)
+    .execute(&pool)
+    .await
+    .expect("positions");
     // A gap settlement: q = 100 at P_ref = 2 lamports, lenders got 150.
     let p_ref = 2 * WAD;
     let outcome = formulas::settlement_outcome(150, 100, p_ref);
@@ -214,10 +230,10 @@ async fn views_match_the_formulas_on_a_seeded_market() {
          p_hi, l_lo, l_hi, x_lo, x_hi, pprime_lo, pprime_hi, fv, k_s, lender_amount, lump, \
          borrower_amount, ema_age_s, q, n_open, tier, expired, p_ref, p_ref_source, token_value, \
          lender_pnl, realised_lender_loss, signature, ix_index, ev_source, ev_seq, slot, \
-         tx_index, ts) \
+         tx_index, ts, open_signature, opened_ix_index, opened_ev_source, opened_ev_seq) \
          VALUES ($1, $2, $3, 1, 0, 0, 0, $4::numeric, $4::numeric, 0, 0, 0, 0, 0, 0, 0, 0, \
                  150, 0, 0, 0, 100, 400, 3, false, $4::numeric, 'box_point', $5::numeric, \
-                 $6::numeric, $7::numeric, $8, 0, 0, 1, 100, 0, 1790000000)",
+                 $6::numeric, $7::numeric, $8, 0, 0, 1, 100, 0, 1790000000, $8, 0, 0, 0)",
     )
     .bind(&position)
     .bind(&market)
@@ -241,21 +257,6 @@ async fn views_match_the_formulas_on_a_seeded_market() {
     .execute(&pool)
     .await
     .expect("fees");
-    sqlx::query(
-        "INSERT INTO positions (position, market, borrower, nonce, tier, venue, q, s, m, v_open, \
-         v, n_open, fee_open, venue_rent, entry_price, spot_wad_open, ema_wad_open, b_spot_open, \
-         b_ema_open, deadline, opened_slot, opened_tx_index, opened_ts, open_signature, status) \
-         VALUES ($1, $2, $3, 0, 3, 6, 10, 5, 95, 100, 100, 5, 25, 0, 0, 0, 0, 0, 0, \
-                 1790259200, 100, 0, 1790000000, $4, 'open')",
-    )
-    .bind(&position)
-    .bind(&market)
-    .bind(&borrower)
-    .bind(&sig)
-    .execute(&pool)
-    .await
-    .expect("positions");
-
     let (tvl, oi, util): (String, String, i64) = sqlx::query_as(
         "SELECT tvl_lamports::text, oi_lamports::text, util_bps FROM v_market_overview \
          WHERE market = $1",

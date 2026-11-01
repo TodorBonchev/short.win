@@ -2,7 +2,7 @@
 
 The independent implementation selected on 2026-10-28 lives in this workspace,
 on `main`. It does not import the legacy financial program.
-The selected software release is **v1.1.0**, with generated public program ID
+The selected software release is **v1.1.1**, with generated public program ID
 `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh`. Its selected deployment
 key remains private outside Git. The old worktrees and release evidence remain
 preserved as historical material.
@@ -51,7 +51,7 @@ evidence, not universal Jupiter compatibility, live submission or long-run
 qualification. See the [dated final preparation record](../docs/audit/simple-final-preparation-2026-10-29.md).
 
 The software release is prepared for commissioning; it is not deployed. The
-[release record](../docs/release/POOLED-1.1.0.md) separates the software tag from
+[release record](../docs/release/POOLED-1.1.1.md) separates the software tag from
 mainnet activation. The independently reviewed
 [financial-duration campaign](../docs/audit/simple-financial-campaign-2026-10-29.md)
 passed on 30 October 2026: 124,584 completed cases over 86,400.558399631 seconds,

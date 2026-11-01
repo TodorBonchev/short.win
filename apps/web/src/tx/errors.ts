@@ -304,15 +304,17 @@ export function mapThrown(e: unknown): TxError {
         code?: unknown;
         context?: Record<string, unknown>;
         cause?: unknown;
+        signature?: unknown;
     };
     const msg = String(err?.message ?? e);
     if (err?.name === 'LandedIntegrityError') return { kind: 'integrity', action: 'report', message: msg };
     if (err?.name === 'IntegrityError') return { kind: 'integrity', action: 'report', message: msg };
     if (err?.name === 'OutcomeUnknownError') {
+        const signature = typeof err.signature === 'string' ? ` Signature: ${err.signature}.` : '';
         return {
             kind: 'unknown-outcome',
             action: 'report',
-            message: `${msg} Check the explorer before trying again: a new attempt would be a second transaction.`,
+            message: `${msg}${signature} Check the explorer before trying again: a new attempt would be a second transaction.`,
         };
     }
     if (err?.name === 'PlanError' || err?.name === 'LendRefusal' || err?.name === 'VenueError') {

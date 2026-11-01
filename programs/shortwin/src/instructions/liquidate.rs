@@ -333,8 +333,9 @@ pub(crate) fn assess(
     let r_due = rent::due(&pos.pos_rent(), &market.basis()).math()?;
     let v_eff = risk::v_eff(pos.v, r_due);
     let k_s = risk::k_s(pos.v, &pos.settle_keeper_terms()).math()?;
-    // AIR-10: on PumpSwap the risk view at most φ at `P_ema`, so a sale earlier in this
-    // transaction cannot raise the fee of the spot and EMA legs (the execution quote stays live).
+    // AIR-10 / RISK-FEE-BASIS: on PumpSwap the risk view is at most φ at `P_ema` on pump's canonical
+    // launch supply, so an earlier trade or burn cannot raise the fee of the spot and EMA legs
+    // (the execution quote stays on the live fee and live supply).
     let cap = state.exit_risk_cap_bps(u64::from(pos.venue_fee_hard_cap_bps));
     let l_bps = pos.cr_liq_bps;
     let fresh = obs.last.is_fresh(now, pos.ref_max_age_s);
@@ -553,7 +554,8 @@ pub(crate) fn keeper_exit<'info>(
             },
             &deny,
         )?;
-        // AIR-10: on PumpSwap also φ at `P_ema`, which caps the risk view (`assess`, `B̂_ref`).
+        // AIR-10 / RISK-FEE-BASIS: on PumpSwap also φ at `P_ema` on the canonical launch supply, which
+        // caps the risk view (`assess`, `B̂_ref`) independently of a same-transaction burn.
         let state = venues::read_state_boxed_for_exit(
             &market,
             kind,

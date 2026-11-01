@@ -64,7 +64,7 @@ macro_rules! market_summary_json {
     };
 }
 
-/// `Position` of `positions p` with its market `markets m`.
+/// One immutable lifecycle of `positions p` with its market `markets m`.
 macro_rules! position_json {
     () => {
         "jsonb_build_object(\
@@ -94,7 +94,11 @@ macro_rules! position_json {
                  'credited_retired', od.credited_retired::text, 'vested', od.vested::text, \
                  'vest_flushed', od.vest_flushed::text, 'share_epoch_after', od.share_epoch_after::bigint, \
                  'position_account_refund', od.position_account_refund::text) \
-                 FROM overdue_defaults od WHERE od.position=p.position)) END)"
+                 FROM overdue_defaults od WHERE od.position = p.position \
+                   AND (od.open_signature, od.opened_ix_index, od.opened_ev_source, \
+                        od.opened_ev_seq) = \
+                       (p.open_signature, p.opened_ix_index, p.opened_ev_source, \
+                        p.opened_ev_seq))) END)"
     };
 }
 

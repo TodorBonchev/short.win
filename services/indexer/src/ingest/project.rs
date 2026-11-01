@@ -45,6 +45,14 @@ use crate::analytics::formulas;
 /// The single writer's advisory lock key ("SWINDX", §3.1).
 pub const WRITER_LOCK: i64 = 0x5357_494e_4458;
 
+/// Serialises projection mutations/rebuilds with analytics snapshots ("SWPRJL").
+///
+/// The writer takes this as a transaction lock before changing projection state. Rollups take
+/// the same key as a session lock *before* opening their repeatable-read transaction, so a
+/// snapshot can never be established in the commit-to-rebuild gap. A pass that observes a
+/// rebuild marker while holding the lock leaves its cursor unchanged.
+pub const PROJECTION_ROLLUP_LOCK: i64 = 0x5357_5052_4a4c;
+
 /// Event kinds of the global projection (their `market` field is `Pubkey::default()`).
 pub const GLOBAL_KINDS: [&str; 9] = [
     "ConfigProposed",
@@ -840,7 +848,7 @@ async fn fee_row(
 }
 
 /// The position row fields an exit needs.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct OpenPosition {
     q: u64,
     tier: u8,
@@ -849,6 +857,12 @@ struct OpenPosition {
     m: u64,
     margin_added: u64,
     fee_open: u64,
+    opened_slot: i64,
+    opened_tx_index: i32,
+    opened_ix_index: i16,
+    opened_ev_source: i16,
+    opened_ev_seq: i32,
+    open_signature: String,
     opened_ts: i64,
     deadline: i64,
     rent_protocol_bps: Option<u16>,
@@ -861,8 +875,9 @@ async fn load_position(
 ) -> anyhow::Result<Option<OpenPosition>> {
     let Some(r) = sqlx::query(
         "SELECT q::text, tier::smallint, n_open::text, v::text, m::text, margin_added::text, \
-           fee_open::text, opened_ts, deadline, rent_protocol_bps::integer, status \
-         FROM positions WHERE position = $1",
+           fee_open::text, opened_slot, opened_tx_index, opened_ix_index, opened_ev_source, \
+           opened_ev_seq, open_signature::text, opened_ts, deadline, rent_protocol_bps::integer, status \
+         FROM positions WHERE position = $1 AND is_current",
     )
     .bind(position.to_string())
     .fetch_optional(&mut *conn)
@@ -880,6 +895,12 @@ async fn load_position(
         m: get_u64(&r, "m")?,
         margin_added: get_u64(&r, "margin_added")?,
         fee_open: get_u64(&r, "fee_open")?,
+        opened_slot: r.try_get("opened_slot")?,
+        opened_tx_index: r.try_get("opened_tx_index")?,
+        opened_ix_index: r.try_get("opened_ix_index")?,
+        opened_ev_source: r.try_get("opened_ev_source")?,
+        opened_ev_seq: r.try_get("opened_ev_seq")?,
+        open_signature: r.try_get("open_signature")?,
         opened_ts: r.try_get("opened_ts")?,
         deadline: r.try_get("deadline")?,
         rent_protocol_bps: rp.map(u16::try_from).transpose()?,
@@ -946,12 +967,14 @@ async fn locked_terms(
 ) -> anyhow::Result<(Option<[u16; 5]>, Option<&'static str>)> {
     let row = sqlx::query(
         "SELECT params FROM protocol_params_history \
-         WHERE (slot, tx_index, ix_index) <= ($1, $2, $3) \
-         ORDER BY slot DESC, tx_index DESC, ix_index DESC LIMIT 1",
+         WHERE (slot, tx_index, ix_index, ev_source, ev_seq) <= ($1, $2, $3, $4, $5) \
+         ORDER BY slot DESC, tx_index DESC, ix_index DESC, ev_source DESC, ev_seq DESC LIMIT 1",
     )
     .bind(key.slot)
     .bind(key.tx_index)
     .bind(key.ix_index)
+    .bind(key.ev_source)
+    .bind(key.ev_seq)
     .fetch_optional(&mut *conn)
     .await?;
     if let Some(r) = row {
@@ -979,6 +1002,41 @@ async fn locked_terms(
         return Ok((Some(terms_of_position_account(&d)), Some("account")));
     }
     Ok((None, None))
+}
+
+/// Re-resolves every history-derived position term after a canonical global replay. A repaired
+/// older configuration can change the snapshot in force at an already projected Open; keeping a
+/// non-null `terms_source` must not exempt that dependent row from repair.
+async fn recompute_config_history_terms(conn: &mut PgConnection) -> anyhow::Result<()> {
+    sqlx::query(
+        "WITH resolved AS ( \
+           SELECT p.position, p.open_signature, p.opened_slot, p.opened_tx_index, \
+             p.opened_ix_index, p.opened_ev_source, p.opened_ev_seq, h.params FROM positions p \
+           LEFT JOIN LATERAL ( \
+             SELECT params FROM protocol_params_history \
+             WHERE (slot, tx_index, ix_index, ev_source, ev_seq) <= \
+               (p.opened_slot, p.opened_tx_index, p.opened_ix_index, \
+                p.opened_ev_source, p.opened_ev_seq) \
+             ORDER BY slot DESC, tx_index DESC, ix_index DESC, ev_source DESC, ev_seq DESC \
+             LIMIT 1) h ON TRUE \
+           WHERE p.terms_source = 'config_history') \
+         UPDATE positions p SET \
+           rent_protocol_bps = NULLIF(r.params ->> 'rent_protocol_bps', '')::integer, \
+           penalty_lender_bps = NULLIF(r.params ->> 'penalty_lender_bps', '')::integer, \
+           penalty_protocol_bps = NULLIF(r.params ->> 'penalty_protocol_bps', '')::integer, \
+           penalty_keeper_bps = NULLIF(r.params ->> 'penalty_keeper_bps', '')::integer, \
+           expiry_fee_bps = NULLIF(r.params ->> 'expiry_fee_bps', '')::integer, \
+           terms_source = CASE WHEN r.params IS NULL THEN NULL ELSE 'config_history' END \
+         FROM resolved r WHERE p.position = r.position AND p.open_signature = r.open_signature \
+           AND (p.opened_slot, p.opened_tx_index, p.opened_ix_index, \
+                p.opened_ev_source, p.opened_ev_seq) = \
+               (r.opened_slot, r.opened_tx_index, r.opened_ix_index, \
+                r.opened_ev_source, r.opened_ev_seq)",
+    )
+    .execute(&mut *conn)
+    .await
+    .context("recomputing history-derived position terms")?;
+    Ok(())
 }
 
 /// `[rent_protocol, penalty_lender, penalty_protocol, penalty_keeper, expiry_fee]` bps of a
@@ -1035,18 +1093,47 @@ async fn apply_to_market(
             let n_open = u64_field(d, "n_open");
             let (terms, source) = locked_terms(conn, ev.key, &position).await?;
             let t = |i: usize| terms.map(|t| i32::from(t[i]));
-            sqlx::query(
+            let retired = sqlx::query(
+                "UPDATE positions SET is_current = FALSE \
+                 WHERE position = $1 AND is_current AND status <> 'open' \
+                   AND (opened_slot, opened_tx_index, opened_ix_index, \
+                        opened_ev_source, opened_ev_seq) < ($2, $3, $4, $5, $6)",
+            )
+            .bind(position.to_string())
+            .bind(ev.key.slot)
+            .bind(ev.key.tx_index)
+            .bind(ev.key.ix_index)
+            .bind(ev.key.ev_source)
+            .bind(ev.key.ev_seq)
+            .execute(&mut *conn)
+            .await?
+            .rows_affected();
+            if retired == 0 {
+                let occupied: bool = sqlx::query_scalar(
+                    "SELECT EXISTS (SELECT 1 FROM positions WHERE position = $1 AND is_current)",
+                )
+                .bind(position.to_string())
+                .fetch_one(&mut *conn)
+                .await?;
+                if occupied {
+                    // The current lifecycle is still open, or this Open is not strictly newer.
+                    return Ok(());
+                }
+            }
+            let accepted = sqlx::query(
                 "INSERT INTO positions (position, market, borrower, nonce, tier, venue, q, s, m, \
                    v_open, margin_added, v, n_open, fee_open, venue_rent, entry_price, \
                    spot_wad_open, ema_wad_open, b_spot_open, b_ema_open, deadline, opened_slot, \
-                   opened_tx_index, opened_ts, open_signature, rent_protocol_bps, \
+                   opened_tx_index, opened_ix_index, opened_ev_source, opened_ev_seq, opened_ts, \
+                   open_signature, rent_protocol_bps, \
                    penalty_lender_bps, penalty_protocol_bps, penalty_keeper_bps, expiry_fee_bps, \
                    terms_source) \
                  VALUES ($1, $2, $3, $4::numeric, $5, $6, $7::numeric, $8::numeric, $9::numeric, \
                    $10::numeric, 0, $10::numeric, $11::numeric, $12::numeric, $13::numeric, \
                    $14::numeric, $15::numeric, $16::numeric, $17::numeric, $18::numeric, $19, $20, \
-                   $21, $22, $23, $24, $25, $26, $27, $28, $29) \
-                 ON CONFLICT (position) DO NOTHING",
+                   $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32) \
+                 ON CONFLICT (position, open_signature, opened_ix_index, \
+                              opened_ev_source, opened_ev_seq) DO NOTHING",
             )
             .bind(position.to_string())
             .bind(&mkt)
@@ -1069,6 +1156,9 @@ async fn apply_to_market(
             .bind(i64_field(d, "deadline"))
             .bind(ev.key.slot)
             .bind(ev.key.tx_index)
+            .bind(ev.key.ix_index)
+            .bind(ev.key.ev_source)
+            .bind(ev.key.ev_seq)
             .bind(ev.ev_ts)
             .bind(&ev.signature)
             .bind(t(0))
@@ -1079,7 +1169,14 @@ async fn apply_to_market(
             .bind(source)
             .execute(&mut *conn)
             .await
-            .context("positions (Open)")?;
+            .context("positions (Open)")?
+            .rows_affected();
+            if accepted == 0 {
+                // Replayed/stale opens must not advance aggregates or duplicate fee rows. A
+                // later genuine lifecycle is inserted only after its terminal predecessor is
+                // retained as immutable history and retired from current-PDA lookup.
+                return Ok(());
+            }
             let ti = usize::from(tier.min(3));
             m.tokens_free = m.tokens_free.saturating_sub(q);
             m.borrowed_q = m.borrowed_q.saturating_add(q);
@@ -1129,7 +1226,7 @@ async fn apply_to_market(
             sqlx::query(
                 "UPDATE positions SET armed = $2, s_count = $3::numeric, s_since = $4, \
                    arm_count = arm_count + $5, disarm_count = disarm_count + $6 \
-                 WHERE position = $1",
+                 WHERE position = $1 AND is_current AND status = 'open'",
             )
             .bind(key_field(d, "position").unwrap_or_default().to_string())
             .bind(armed)
@@ -1197,7 +1294,7 @@ async fn apply_to_market(
             let amount = u64_field(d, "amount");
             sqlx::query(
                 "UPDATE positions SET margin_added = margin_added + $2::numeric, \
-                   v = v + $2::numeric WHERE position = $1",
+                   v = v + $2::numeric WHERE position = $1 AND is_current AND status = 'open'",
             )
             .bind(key_field(d, "position").unwrap_or_default().to_string())
             .bind(amount.to_string())
@@ -1425,14 +1522,17 @@ async fn apply_exit(
     // the retained sale proceeds in borrower_payout must never become an invented profit.
     let pnl = (kind != "Repay")
         .then(|| formulas::borrower_pnl(borrower_payout, pos.m, pos.margin_added, pos.fee_open));
-    sqlx::query(
+    let exited = sqlx::query(
         "UPDATE positions SET status = $2, exit_slot = $3, exit_ts = $4, exit_signature = $5, \
            exit_keeper = $6, buyback_cost = $7::numeric, b_live_exit = $8::numeric, \
            rent_paid = $9::numeric, rent_protocol = $10::numeric, penalty = $11::numeric, \
            expiry_fee = $12::numeric, keeper_paid = $13::numeric, borrower_payout = $14::numeric, \
            token_surplus = $15::numeric, liquidated_expired = $16, settle_condition = $17, \
-           borrower_pnl = $18::numeric, duration_s = $19, armed = FALSE, exit_kind = $20 \
-         WHERE position = $1",
+           borrower_pnl = $18::numeric, duration_s = $19, armed = FALSE, exit_kind = $20, \
+           exit_tx_index = $21, exit_ix_index = $22, exit_ev_source = $23, exit_ev_seq = $24 \
+         WHERE position = $1 AND is_current AND status = 'open' \
+           AND (opened_slot, opened_tx_index, opened_ix_index, opened_ev_source, opened_ev_seq) \
+             = ($25, $26, $27, $28, $29)",
     )
     .bind(position.to_string())
     .bind(status)
@@ -1456,9 +1556,23 @@ async fn apply_exit(
     .bind(pnl.map(|amount| amount.to_string()))
     .bind(ev.ev_ts - pos.opened_ts)
     .bind(kind)
+    .bind(ev.key.tx_index)
+    .bind(ev.key.ix_index)
+    .bind(ev.key.ev_source)
+    .bind(ev.key.ev_seq)
+    .bind(pos.opened_slot)
+    .bind(pos.opened_tx_index)
+    .bind(pos.opened_ix_index)
+    .bind(pos.opened_ev_source)
+    .bind(pos.opened_ev_seq)
     .execute(&mut *conn)
     .await
-    .context("positions (exit)")?;
+    .context("positions (exit)")?
+    .rows_affected();
+    anyhow::ensure!(
+        exited == 1,
+        "current position lifecycle changed while applying exit"
+    );
     remove_position(m, &pos);
     let pos_key = Some(position);
     match kind {
@@ -1598,13 +1712,16 @@ async fn apply_exit(
                    p_lo, p_hi, l_lo, l_hi, x_lo, x_hi, pprime_lo, pprime_hi, fv, k_s, \
                    lender_amount, lump, borrower_amount, ema_age_s, q, n_open, tier, expired, \
                    p_ref, p_ref_source, p_ref_age_s, token_value, lender_pnl, \
-                   realised_lender_loss, signature, ix_index, ev_source, ev_seq, slot, tx_index, ts) \
+                   realised_lender_loss, signature, ix_index, ev_source, ev_seq, slot, tx_index, ts, \
+                   open_signature, opened_ix_index, opened_ev_source, opened_ev_seq) \
                  VALUES ($1, $2, $3, $4, $5::numeric, $6::numeric, $7::numeric, $8::numeric, \
                    $9::numeric, $10::numeric, $11::numeric, $12::numeric, $13::numeric, $14, $15, \
                    $16::numeric, $17::numeric, $18::numeric, $19::numeric, $20::numeric, $21, \
                    $22::numeric, $23::numeric, $24, $25, $26::numeric, $27, $28, $29::numeric, \
-                   $30::numeric, $31::numeric, $32, $33, $34, $35, $36, $37, $38) \
-                 ON CONFLICT (position) DO NOTHING",
+                   $30::numeric, $31::numeric, $32, $33, $34, $35, $36, $37, $38, \
+                   $39, $40, $41, $42) \
+                 ON CONFLICT (position, open_signature, opened_ix_index, opened_ev_source, \
+                              opened_ev_seq) DO NOTHING",
             )
             .bind(position.to_string())
             .bind(market.to_string())
@@ -1644,6 +1761,10 @@ async fn apply_exit(
             .bind(ev.key.slot)
             .bind(ev.key.tx_index)
             .bind(ev.ev_ts)
+            .bind(&pos.open_signature)
+            .bind(pos.opened_ix_index)
+            .bind(pos.opened_ev_source)
+            .bind(pos.opened_ev_seq)
             .execute(&mut *conn)
             .await
             .context("settlements")?;
@@ -1692,23 +1813,37 @@ async fn apply_overdue_default(
     );
     let borrower = key_field(d, "borrower").context("overdue default borrower")?;
     let keeper = key_field(d, "keeper").context("overdue default keeper")?;
-    sqlx::query("UPDATE positions SET status='defaulted',exit_kind='OverdueCollateralDefault',exit_slot=$2,exit_ts=$3, \
+    let exited = sqlx::query("UPDATE positions SET status='defaulted',exit_kind='OverdueCollateralDefault',exit_slot=$2,exit_ts=$3, \
         exit_signature=$4,exit_keeper=$5,buyback_cost=NULL,b_live_exit=NULL,rent_paid=NULL,rent_protocol=NULL, \
         penalty=NULL,expiry_fee=NULL,keeper_paid=$6::numeric,borrower_payout=0,token_surplus=NULL, \
-        liquidated_expired=NULL,settle_condition=NULL,borrower_pnl=NULL,duration_s=$7,armed=FALSE WHERE position=$1")
+        liquidated_expired=NULL,settle_condition=NULL,borrower_pnl=NULL,duration_s=$7,armed=FALSE, \
+        exit_tx_index=$8,exit_ix_index=$9,exit_ev_source=$10,exit_ev_seq=$11 \
+        WHERE position=$1 AND is_current AND status='open' \
+          AND (opened_slot,opened_tx_index,opened_ix_index,opened_ev_source,opened_ev_seq) \
+            = ($12,$13,$14,$15,$16)")
         .bind(position.to_string()).bind(ev.key.slot).bind(ev.ev_ts).bind(&ev.signature).bind(keeper.to_string())
-        .bind(keeper_payment.to_string()).bind(ev.ev_ts-pos.opened_ts).execute(&mut *conn).await?;
+        .bind(keeper_payment.to_string()).bind(ev.ev_ts-pos.opened_ts).bind(ev.key.tx_index).bind(ev.key.ix_index)
+        .bind(ev.key.ev_source).bind(ev.key.ev_seq).bind(pos.opened_slot).bind(pos.opened_tx_index)
+        .bind(pos.opened_ix_index).bind(pos.opened_ev_source).bind(pos.opened_ev_seq)
+        .execute(&mut *conn).await?.rows_affected();
+    anyhow::ensure!(
+        exited == 1,
+        "current position lifecycle changed while applying default"
+    );
     sqlx::query("INSERT INTO overdue_defaults(position,market,borrower,keeper,q_lost,default_at,collateral,keeper_payment, \
         lender_amount,borrower_amount,rent_due,credited_retired,vested,vest_flushed,share_epoch_after,position_account_refund, \
-        signature,ix_index,ev_source,ev_seq,slot,tx_index,ts) VALUES($1,$2,$3,$4,$5::numeric,$6,$7::numeric,$8::numeric, \
-        $9::numeric,0,$10::numeric,$11::numeric,$12::numeric,$13::numeric,$14,$15::numeric,$16,$17,$18,$19,$20,$21,$22) \
-        ON CONFLICT(position) DO NOTHING")
+        signature,ix_index,ev_source,ev_seq,slot,tx_index,ts,open_signature,opened_ix_index,opened_ev_source,opened_ev_seq) \
+        VALUES($1,$2,$3,$4,$5::numeric,$6,$7::numeric,$8::numeric,$9::numeric,0,$10::numeric,$11::numeric,$12::numeric, \
+        $13::numeric,$14,$15::numeric,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26) \
+        ON CONFLICT(position,open_signature,opened_ix_index,opened_ev_source,opened_ev_seq) DO NOTHING")
         .bind(position.to_string()).bind(market.to_string()).bind(borrower.to_string()).bind(keeper.to_string())
         .bind(q_lost.to_string()).bind(i64_field(d,"default_at")).bind(collateral.to_string()).bind(keeper_payment.to_string())
         .bind(lender_amount.to_string()).bind(u64_field(d,"rent_due").to_string()).bind(u64_field(d,"credited_retired").to_string())
         .bind(u64_field(d,"vested").to_string()).bind(u64_field(d,"vest_flushed").to_string()).bind(i64_of(u32_field(d,"share_epoch_after")))
         .bind(u64_field(d,"position_account_refund").to_string()).bind(&ev.signature).bind(ev.key.ix_index).bind(ev.key.ev_source)
-        .bind(ev.key.ev_seq).bind(ev.key.slot).bind(ev.key.tx_index).bind(ev.ev_ts).execute(&mut *conn).await?;
+        .bind(ev.key.ev_seq).bind(ev.key.slot).bind(ev.key.tx_index).bind(ev.ev_ts).bind(&pos.open_signature)
+        .bind(pos.opened_ix_index).bind(pos.opened_ev_source).bind(pos.opened_ev_seq)
+        .execute(&mut *conn).await?;
     remove_position(m, &pos);
     // No tokens_free increment and no invented fair-value/S3 row or lender PNL.
     m.lender_sol = m
@@ -2076,14 +2211,16 @@ async fn insert_params(
 ) -> anyhow::Result<()> {
     let zero = || Pubkey::default().to_string();
     sqlx::query(
-        "INSERT INTO protocol_params_history (signature, ix_index, slot, tx_index, ts, source, \
+        "INSERT INTO protocol_params_history (signature, ix_index, ev_source, ev_seq, slot, tx_index, ts, source, \
            params, tiers, ema, util_kink_bps, governance, pause_authority, coverage_authority, \
            fee_recipient, timelock_s, venue_enabled, pyth_sol_usd, pyth_feed_id) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) \
-         ON CONFLICT (signature, ix_index) DO NOTHING",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) \
+         ON CONFLICT (signature, ix_index, ev_source, ev_seq) DO NOTHING",
     )
     .bind(signature)
     .bind(key.ix_index)
+    .bind(key.ev_source)
+    .bind(key.ev_seq)
     .bind(key.slot)
     .bind(key.tx_index)
     .bind(ts)
@@ -2111,7 +2248,8 @@ async fn last_params(conn: &mut PgConnection) -> anyhow::Result<Option<ParamsSna
         "SELECT params, tiers, ema, util_kink_bps::bigint, governance::text, \
            pause_authority::text, coverage_authority::text, fee_recipient::text, \
            timelock_s::bigint, venue_enabled::bigint, pyth_sol_usd::text, pyth_feed_id \
-         FROM protocol_params_history ORDER BY slot DESC, tx_index DESC, ix_index DESC LIMIT 1",
+         FROM protocol_params_history ORDER BY slot DESC, tx_index DESC, ix_index DESC, \
+           ev_source DESC, ev_seq DESC LIMIT 1",
     )
     .fetch_optional(&mut *conn)
     .await?
@@ -2532,6 +2670,10 @@ pub async fn rebuild_marked(pool: &PgPool) -> anyhow::Result<u64> {
 /// Rebuilds one market from its events (module docs). The caller holds the writer lock.
 pub async fn rebuild_market(pool: &PgPool, market: &Pubkey) -> anyhow::Result<()> {
     let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(PROJECTION_ROLLUP_LOCK)
+        .execute(&mut *tx)
+        .await?;
     let mkt = market.to_string();
     for sql in [
         // Markets resolved by mint are re-resolved by the MarketCreated re-applied below.
@@ -2568,6 +2710,10 @@ pub async fn rebuild_market(pool: &PgPool, market: &Pubkey) -> anyhow::Result<()
 /// Rebuilds the global projection (module docs). The caller holds the writer lock.
 pub async fn rebuild_global(pool: &PgPool) -> anyhow::Result<()> {
     let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(PROJECTION_ROLLUP_LOCK)
+        .execute(&mut *tx)
+        .await?;
     for sql in [
         "DELETE FROM config_changes",
         "DELETE FROM protocol_params_history",
@@ -2616,6 +2762,7 @@ pub async fn rebuild_global(pool: &PgPool) -> anyhow::Result<()> {
     }
     items.sort_by_key(Item::key);
     apply(&mut tx, &items, false).await?;
+    recompute_config_history_terms(&mut tx).await?;
     tx.commit().await?;
     Ok(())
 }

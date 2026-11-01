@@ -92,6 +92,34 @@ export class LandedIntegrityError extends IntegrityError {
     }
 }
 
+/** A source-visible transaction error proves rejection; transport/readback failures do not. */
+function hasTransactionError(error: unknown): boolean {
+    let current: unknown = error;
+    for (let depth = 0; depth < 6 && current && typeof current === 'object'; depth++) {
+        const context = (current as { context?: Record<string, unknown> }).context;
+        if (context && ('transactionError' in context || (typeof context.code === 'number' && 'index' in context)))
+            return true;
+        current = (current as { cause?: unknown }).cause;
+    }
+    return false;
+}
+
+/** Preserve explicit final failures; make every other post-signature failure reconciliation-only. */
+function afterSignature(signature: Signature, error: unknown, phase: string): unknown {
+    if (
+        error instanceof OutcomeUnknownError ||
+        error instanceof LandedIntegrityError ||
+        error instanceof IntegrityError ||
+        hasTransactionError(error)
+    )
+        return error;
+    const message = String((error as { message?: unknown } | null)?.message ?? error).slice(0, 240);
+    return new OutcomeUnknownError(
+        signature,
+        `${phase} failed after the signature was known (${message}). The transaction may still land.`,
+    );
+}
+
 /** What the app learns at signing: the signature and, when the wallet changed it, the final fee. */
 export interface SignedInfo {
     readonly signature: Signature;
@@ -254,6 +282,8 @@ export async function signSendConfirm(a: SendArgs): Promise<Signature> {
                     }, timeoutMs);
                 }),
             ]);
+        } catch (error) {
+            throw afterSignature(signature, error, 'Submission or confirmation');
         } finally {
             clearTimeout(timer);
             a.abortSignal?.removeEventListener('abort', onAbort);
@@ -277,13 +307,17 @@ export async function signSendConfirm(a: SendArgs): Promise<Signature> {
         if (a.abortSignal?.aborted) throw new OutcomeUnknownError(signature, SENT_BY_WALLET_UNSEEN);
         // The wallet chose the blockhash it sent with; ours bounds it only loosely (it fetched its own
         // no earlier than we did, but possibly later), so running out of time is "unknown", not "expired".
-        await waitForSignature(a.client, signature, {
-            giveUpAfterHeight: lifetime.lastValidBlockHeight + MAX_BLOCKHASH_AGE,
-            timeoutMs,
-            ...(a.pollMs !== undefined ? { pollMs: a.pollMs } : {}),
-            ...(a.abortSignal ? { abortSignal: a.abortSignal } : {}),
-        });
-        await checkLanded(a.client, signature, expected, a.lookupTables, a.maxComputeUnitPrice, a.pollMs);
+        try {
+            await waitForSignature(a.client, signature, {
+                giveUpAfterHeight: lifetime.lastValidBlockHeight + MAX_BLOCKHASH_AGE,
+                timeoutMs,
+                ...(a.pollMs !== undefined ? { pollMs: a.pollMs } : {}),
+                ...(a.abortSignal ? { abortSignal: a.abortSignal } : {}),
+            });
+            await checkLanded(a.client, signature, expected, a.lookupTables, a.maxComputeUnitPrice, a.pollMs);
+        } catch (error) {
+            throw afterSignature(signature, error, 'Confirmation or landed-transaction readback');
+        }
         return signature;
     }
     throw new Error('the connected wallet cannot sign transactions');
