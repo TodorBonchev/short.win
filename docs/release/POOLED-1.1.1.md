@@ -5,23 +5,28 @@ v1.1.0 source audit and remediation work. This record describes the candidate
 state on 1 November 2026. It does not authorize deployment, initialization,
 governance or financial transactions, funded operation, or mainnet activation.
 
-`v1.1.0` is immutable. Never move or replace it. Tag `v1.1.1` only after every
-`PENDING` build identity below is replaced with evidence from the release build
-input commit. The documentation-only completion commit must change release
-evidence only. Its annotated `v1.1.1` tag identifies the final tag commit and tree,
-and that tagged tree must reproduce the same ELF and IDL hashes. If the post-tag
-24-hour campaign finds a defect, keep `v1.1.1` immutable and prepare a new `v1.1.2`
-fix release.
+`v1.1.0` is immutable. Never move or replace it. The release build input below
+passed the pinned `simple-pooled` workflow. This documentation-only completion
+commit changes release evidence only. The annotated `v1.1.1` tag identifies the
+final tag commit and tree in tag metadata, avoiding a self-referential commit field
+inside the tagged file. The tagged tree must keep the qualified program inputs and
+reproduce the same ELF and IDL hashes. If a later check finds a defect, keep
+`v1.1.1` immutable and prepare a new `v1.1.2` fix release.
 
 ## Candidate software identity
 
 | Item | Candidate value |
 | --- | --- |
 | Program ID | `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh` |
-| Release build input commit | `PENDING_BUILD_INPUT_COMMIT` |
-| Release build input tree | `PENDING_BUILD_INPUT_TREE` |
-| Program ELF SHA-256 | `PENDING_FINAL_ELF_SHA256` |
-| Generated IDL SHA-256 | `PENDING_FINAL_IDL_SHA256` |
+| Release build input commit | `61251bf427e6a805e2a9f9b207cbd0449026fad2` |
+| Release build input tree | `6286ba678c70304e683afdf468aecba2ac5495c5` |
+| Program ELF SHA-256 | `86147af04bda2c1fbab92ad670dc8d7cc272162724787dac666344bf24b547f2` |
+| Program ELF size | `787080` bytes |
+| Generated IDL SHA-256 | `b60f327736affd6d2b2904c6fc7487c3af258704cffebeb97e8b62e91bf541d5` |
+| Generated IDL size | `101361` bytes |
+| SBF build log SHA-256 | `c55158e99a57e374f5b8a248ab95a700bce9f004aa860ead3627258279e4cab8` |
+| Exact-commit CI | [`simple-pooled` run 41288472696](https://github.com/TodorBonchev/short.win/actions/runs/41288472696) |
+| CI artifacts | validation `13076083053`; fuzz-smoke `13076451575`; route-suite `13076202511` |
 | Audit baseline | `1fbd13c70ffc754563ec7647aa65aba17b9b5c4c` (`v1.1.0`) |
 | Audit report SHA-256 | `57db6d86ffb09283373d8a5001fa92f7f57743eae17ab1002d783898d7a34095` |
 | Structured findings SHA-256 | `69bb52c62732ee1f066a1f135e7d19313e7bc0234a3d2af04f168fbe740d9ede` |
@@ -79,30 +84,45 @@ hash-bound remediation fixtures in independently reviewed offline sandboxes:
   its existing program-loaded LiteSVM test still did not find the expected
   `target/deploy/shortwin.so`; no patched program was loaded in that test.
 
-These are partial successful checks, not a claim that every release surface ran.
-No executed Rust source assertion failed in the retained results.
+These local checks are partial successful evidence, not a claim that every release
+surface ran. No executed Rust source assertion failed in the retained results.
 
-## Open qualification gates
+The later exact-commit GitHub Actions run for
+`61251bf427e6a805e2a9f9b207cbd0449026fad2` completed successfully and provides
+the release qualification for the active pooled program:
 
-The following items remain open and must not be represented as passing:
+- Native format, metadata and source checks passed.
+- The pinned SBF v1.57/v3 toolchain built the program, and the stack diagnostic
+  gate passed.
+- The generated Anchor IDL matched the committed IDL byte for byte.
+- **71 Rust tests passed**, including the active program's existing native tests.
+- Actual-SBF runtime and ledger tests passed with the built program loaded.
+- The randomized model runner completed **200000 cases** and the program runner
+  completed **32 cases**.
+- The current-route compatibility suite passed.
+- Client tests passed **39/39**, web tests passed **10/10**, and the production web
+  build completed successfully.
 
-1. Build the active `shortwin-simple` program from the release build input commit
-   in the pinned offline SBF toolchain, put the ELF at the path expected by its
-   runtime suite, verify the declared program ID, and record the ELF SHA-256 above.
-2. Generate the Anchor IDL from the same build input commit, compare it with the
-   committed client IDL, regenerate the client if required, and record the final
-   IDL SHA-256.
-3. Run the program-loaded LiteSVM suite against that exact active-program ELF.
-4. Supply an offline PostgreSQL distribution/archive to the embedded-PostgreSQL
+The CI run retained the validation, fuzz-smoke and route-suite artifacts identified
+in the software-identity table. The recorded ELF, IDL and SBF-log hashes come from
+that exact run, not from the earlier partial local matrix.
+
+## Disclosed checks outside the pooled CI qualification
+
+The following repository or operational checks remain separate and must not be
+represented as passing:
+
+1. Supply an offline PostgreSQL distribution/archive to the embedded-PostgreSQL
    harness and run all four analytics integration assertions. The existing offline
    attempt compiled the tests but stopped while trying to bootstrap PostgreSQL.
-5. Restore the committed simple-client dependency closure without fetching during
-   validation, then run its TypeScript typecheck and Node tests. The existing
-   attempt stopped before pnpm could auto-install missing dependencies.
-6. Make a completion commit that changes release evidence only. Rebuild the tagged
-   tree, verify that it reproduces the recorded ELF and IDL hashes, run the
-   repository's release CI on that exact commit, and record its commit/tree, job
-   identifiers and artifact hashes in the annotated tag.
+2. The earlier local simple-client attempt lacked an offline dependency closure.
+   The exact-commit GitHub Actions run subsequently completed the client and web
+   tests and production build, but that does not turn the earlier local attempt
+   into a pass.
+3. Record the documentation-only completion commit and tree, the qualified build
+   input commit and tree, the CI URL, and the artifact hashes in the annotated
+   `v1.1.1` tag. Verify before tagging that no program input changed after the
+   qualified build-input commit.
 
 The release operator must also recheck every `needs_validation` item that depends
 on actual provider identity, loader/ProgramData, cluster genesis, operating policy,
