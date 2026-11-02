@@ -1,174 +1,29 @@
-# The licence of every file in this repository, in REUSE format (https://reuse.software/spec-3.3/).
-# When several annotations match a file, the last one wins. The licence texts are in LICENSES/;
-# third-party material is described in THIRD_PARTY_NOTICES.md.
+# File licensing for the Jupiter pooled implementation.
 version = 1
 SPDX-PackageName = "short.win"
 SPDX-PackageSupplier = "Todor Bonchev"
 
-# The protocol: the programs, crates, keeper, indexer, tests, scripts and configuration.
 [[annotations]]
 path = "**"
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Todor Bonchev"
 SPDX-License-Identifier = "BUSL-1.1"
 
-# The documentation: every Markdown file and everything under docs/.
 [[annotations]]
-path = ["*.md", "**/*.md", "docs/**"]
+path = ["*.md", "**/*.md"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Todor Bonchev"
 SPDX-License-Identifier = "CC-BY-NC-ND-4.0"
 
-# Code under docs/: the simulator, the CU-math crate and the design pass's helper scripts.
+# Raw public-chain account state and captured HTTP/RPC evidence.
 [[annotations]]
-path = ["docs/**/*.py", "docs/**/*.rs", "docs/**/*.toml", "docs/**/*.js", "docs/**/*.ts"]
-precedence = "override"
-SPDX-FileCopyrightText = "2026 Todor Bonchev"
-SPDX-License-Identifier = "BUSL-1.1"
-
-# The TypeScript client SDK with the IDL, and the indexer's API description.
-[[annotations]]
-path = ["clients/js/**", "services/indexer/openapi.yaml"]
-precedence = "override"
-SPDX-FileCopyrightText = "2026 Todor Bonchev"
-SPDX-License-Identifier = "Apache-2.0"
-
-# The web app, its WebAssembly package, promotional editor and brand assets.
-[[annotations]]
-path = ["apps/**", "packages/**", "tools/promo/**", "docs/design/design-pass-2026-10/artifacts/logo/**"]
-precedence = "override"
-SPDX-FileCopyrightText = "2026 Todor Bonchev"
-SPDX-License-Identifier = "LicenseRef-Proprietary"
-
-# The generated editable promo bundle includes this font with its upstream licence.
-[[annotations]]
-path = "tools/promo/public/fonts/**"
-precedence = "override"
-SPDX-FileCopyrightText = ["2016 The Inter Project Authors", "2015-2025 Renzhi Li", "2025 Jamie Gravendeel", "2025 Florian Müllner"]
-SPDX-License-Identifier = "OFL-1.1"
-
-# Quote arithmetic adapted from Raydium's Apache-2.0 sources (THIRD_PARTY_NOTICES.md).
-[[annotations]]
-path = [
-    "crates/shortwin-math/src/quote/cpmm.rs",
-    "crates/shortwin-math/src/quote/ray_v4.rs",
-    "crates/shortwin-math/tests/vectors/quotes/gen_port.py",
-]
-precedence = "override"
-SPDX-FileCopyrightText = ["2026 Todor Bonchev", "Raydium"]
-SPDX-License-Identifier = "BUSL-1.1 AND Apache-2.0"
-
-# Snapshots of public Solana mainnet state.
-[[annotations]]
-path = ["tests/fixtures/accounts/**", "scripts/gapcal/tests/fixtures/**", "services/keeper/tests/data/*.bin"]
+path = ["tests/fixtures/accounts/**", "tests/fixtures/current-routes/**", "tests/fixtures/jupiter-2026-10-27/*.json", "tests/fixtures/jupiter-2026-10-27/*.gz", "tests/fixtures/reference-rent/*.json"]
 precedence = "override"
 SPDX-FileCopyrightText = "Public Solana mainnet data; any rights belong to its respective owners"
 SPDX-License-Identifier = "LicenseRef-Public-Chain-Data"
 
-# Third-party program binaries and the Squads IDL (THIRD_PARTY_NOTICES.md).
 [[annotations]]
-path = "tests/fixtures/programs/raydium_*.so"
+path = "tests/fixtures/programs/raydium_cpmm_2026_10.so"
 precedence = "override"
 SPDX-FileCopyrightText = "Raydium"
 SPDX-License-Identifier = "Apache-2.0"
-
-[[annotations]]
-path = ["tests/fixtures/programs/token_2022.so", "tests/fixtures/programs/token_2022_2026_10_27.so", "tests/fixtures/programs/spl_memo_v3.so",
-    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022/observed-token-2022.so.gz"]
-precedence = "override"
-SPDX-FileCopyrightText = "The Solana Program Library authors"
-SPDX-License-Identifier = "Apache-2.0"
-
-[[annotations]]
-path = "tests/fixtures/programs/squads_v4.so"
-precedence = "override"
-SPDX-FileCopyrightText = "2023 Selimor Investments Limited"
-SPDX-License-Identifier = "LicenseRef-Squads-BUSL-1.1"
-
-[[annotations]]
-path = "tests/fixtures/idl/squads_multisig_program.json"
-precedence = "override"
-SPDX-FileCopyrightText = "Squads (npm package @sqds/multisig 2.1.4)"
-SPDX-License-Identifier = "MIT"
-
-[[annotations]]
-path = "tests/fixtures/programs/pump*.so"
-precedence = "override"
-SPDX-FileCopyrightText = "pump.fun"
-SPDX-License-Identifier = "LicenseRef-pump-fun-no-license"
-
-# Vendored embedded-Postgres archive helper, including its documentation and local security
-# patch: upstream licensing takes precedence over the repository-wide code/docs defaults.
-[[annotations]]
-path = "services/vendor/postgresql_archive/**"
-precedence = "override"
-SPDX-FileCopyrightText = ["2023 Theseus contributors", "2026 Todor Bonchev", "The PostgreSQL Global Development Group", "The Regents of the University of California"]
-SPDX-License-Identifier = "(Apache-2.0 OR MIT) AND PostgreSQL"
-
-# The Apache-2.0 licence text shipped in the published shortwin-math crate.
-[[annotations]]
-path = "crates/shortwin-math/LICENSE-APACHE"
-precedence = "override"
-SPDX-FileCopyrightText = "The Apache Software Foundation"
-SPDX-License-Identifier = "Apache-2.0"
-
-[[annotations]]
-path = "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022/getMultipleAccounts.json.gz"
-precedence = "override"
-SPDX-FileCopyrightText = "The Solana Program Library authors; public-chain account metadata"
-SPDX-License-Identifier = "Apache-2.0 AND LicenseRef-Public-Chain-Data"
-
-[[annotations]]
-path = ["docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-*.md", "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-*.md.original.gz"]
-precedence = "override"
-SPDX-FileCopyrightText = "RustSec Advisory Database contributors"
-SPDX-License-Identifier = "CC-BY-4.0"
-
-[[annotations]]
-path = "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/*.production.diff.gz"
-precedence = "override"
-SPDX-FileCopyrightText = "The Solana Program Library authors"
-SPDX-License-Identifier = "Apache-2.0"
-
-[[annotations]]
-path = [
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0395.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0395.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0396.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0396.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0397.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0397.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0399.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0399.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0400.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0400.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0401.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0401.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0402.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0402.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0404.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0404.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0405.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0405.md.original.gz",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0406.md",
-    "docs/audit/probes/dependency-advisories-2026-10-27/RUSTSEC-2026-0406.md.original.gz"
-]
-precedence = "override"
-SPDX-FileCopyrightText = "RustSec Advisory Database contributors"
-SPDX-License-Identifier = "CC0-1.0"
-
-[[annotations]]
-path = [
-    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__mod.rs.diff.gz",
-    "docs/audit/probes/mainnet-preparation-2026-10-27/token-2022-source-review/interface__src__extension__account_len.rs.new.rs.gz"
-]
-precedence = "override"
-SPDX-FileCopyrightText = "The Solana Program Library authors"
-SPDX-License-Identifier = "Apache-2.0"
-
-# Exact browser/source bytes retained in the Token-2022 qualification evidence.
-[[annotations]]
-path = ["docs/audit/probes/token2022-qualification-2026-10-27/devnet-policy/*.js.gz", "docs/audit/probes/token2022-qualification-2026-10-27/devnet-policy/*.html.gz", "docs/audit/probes/token2022-qualification-2026-10-27/ci-40440067371/positions-clock-fix.patch.gz"]
-precedence = "override"
-SPDX-FileCopyrightText = "2026 Todor Bonchev"
-SPDX-License-Identifier = "LicenseRef-Proprietary"

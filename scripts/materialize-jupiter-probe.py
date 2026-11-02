@@ -3,7 +3,7 @@
 from pathlib import Path
 import base64,gzip,hashlib,json,sys,zlib
 root=Path(__file__).resolve().parents[1]
-source=root/'tests/jupiter_exec_probe/fixtures/jupiter-2026-10-27'
+source=root/'tests/fixtures/jupiter-2026-10-27'
 out=Path(sys.argv[1])if len(sys.argv)>1 else root/'target/jupiter-exec-probe/jupiter-candidate'
 sha=lambda b:hashlib.sha256(b).hexdigest()
 raw=gzip.decompress((source/'getMultipleAccounts.json.gz').read_bytes())

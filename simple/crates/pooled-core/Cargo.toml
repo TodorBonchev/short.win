@@ -1,8 +1,0 @@
-[package]
-name = "shortwin-pooled-core"
-version = "1.1.1"
-edition = "2024"
-publish = false
-license-file = "../../../LICENSE"
-
-[dependencies]

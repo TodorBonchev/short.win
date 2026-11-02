@@ -1,0 +1,15 @@
+Lend
+
+Supply tokens, review your deposit, and receive pool shares. Lenders share in SOL fees actually paid by borrowers; withdrawals depend on available liquidity. A walkthrough of short.win on a local historical fork with test funds and synthetic price history. Experimental software.
+
+Short
+
+Set your token quantity and spending limits, then review the fixed upfront fee and SOL collateral. This local-fork walkthrough demonstrates borrowing and selling through the genuine Jupiter program, using test funds. Synthetic price history. No public-network trade is shown. Experimental software.
+
+Manage & close
+
+See your position, add SOL collateral, and review a full buyback. Closing requires repayment of every borrowed token; early closing does not refund the term fee. Local historical fork, test funds, and synthetic price history. Experimental software.
+
+Overview
+
+Choose your side. Know your terms. A short.win walkthrough: lend tokens, open a short through Jupiter, manage collateral, and close with full repayment. Captured on a local historical fork with test funds and synthetic price history. Experimental software; no mainnet availability or financial return is promised.

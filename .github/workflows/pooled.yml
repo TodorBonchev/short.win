@@ -1,0 +1,106 @@
+name: Jupiter pooled checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pooled-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  NO_DNA: '1'
+  CARGO_BUILD_JOBS: '2'
+  CARGO_INCREMENTAL: '0'
+  AGAVE_VERSION: '4.1.2'
+  AGAVE_INSTALL_INIT_SHA256: '383470506dcd9035fb57f9a16a308ba80916a30755c6d3ceff6724cf35bbdc98'
+  AGAVE_RELEASE_SHA256: '5991d027a686eb419a709a479178b33eb83501e8a2bfbf599a81a286bfcbf770'
+  ANCHOR_REV: '84a63f9f7112b23581816436fbcf3f6c515779f9'
+jobs:
+  qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install || rustup show
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: pooled-root-v1
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+      - name: Cache pinned SBF tools and Anchor CLI
+        id: tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/solana/install
+            ~/.cache/solana/v1.57
+            ~/.cargo/bin/anchor
+          key: sbf-tools-agave-${{ env.AGAVE_VERSION }}-${{ env.AGAVE_RELEASE_SHA256 }}-anchor-${{ env.ANCHOR_REV }}-v1.57-${{ runner.os }}
+      - name: Install pinned Agave
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: bash .github/workflows/scripts/install-agave.sh
+      - name: Select Agave
+        run: echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Install pinned Anchor CLI
+        if: steps.tools.outputs.cache-hit != 'true'
+        run: cargo install --force --git https://github.com/otter-sec/anchor --rev "$ANCHOR_REV" anchor-cli --locked
+      - name: Materialize hash-pinned historical Jupiter witness
+        run: python3 scripts/materialize-jupiter-probe.py
+      - name: Native checks
+        run: |
+          cargo fmt --all --check
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          python3 -m unittest discover -s services/tests -v
+          python3 -m unittest discover -s config -p 'test_*.py' -v
+          python3 config/verify-production-proposal.py
+      - name: Build program and check SBF stack
+        run: |
+          set -o pipefail
+          mkdir -p target/deploy target/idl
+          cargo build-sbf --manifest-path programs/shortwin-simple/Cargo.toml --tools-version v1.57 --arch v3 --sbf-out-dir target/deploy -- --locked 2>&1 | tee target/sbf-build.log
+          python3 scripts/check-sbf-stack.py target/sbf-build.log
+          python3 -c "import pathlib,struct; assert struct.unpack_from('<I',pathlib.Path('target/deploy/shortwin_simple.so').read_bytes(),48)[0]==3"
+          anchor idl build -p shortwin_simple -o target/idl/shortwin_simple.json -- --locked
+          diff -u client/idl/shortwin_simple.json target/idl/shortwin_simple.json
+      - name: Actual-SBF runtime and ledger tests
+        run: |
+          cargo test --workspace --locked
+          cargo run -p shortwin-pooled-core --example model_fuzz --release --locked -- 103410000 200000
+          cargo run -p shortwin-simple-runtime-tests --example program_fuzz --locked -- --seed 103410000 --cases 32 --out "$RUNNER_TEMP/program-fuzz-smoke"
+      - name: Current route compatibility from pinned mainnet snapshots
+        run: python3 scripts/qualify-current-route-suite.py --output "$RUNNER_TEMP/current-route-suite"
+      - name: Client and web
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir client generate
+          git diff --exit-code -- client/src/generated
+          pnpm check
+          pnpm build
+      - name: Hash program artifact
+        if: always()
+        run: sha256sum target/deploy/shortwin_simple.so || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: pooled-validation
+          retention-days: 7
+          path: |
+            target/deploy/shortwin_simple.so
+            target/idl/shortwin_simple.json
+            target/sbf-build.log
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: pooled-fuzz-smoke
+          retention-days: 7
+          path: ${{ runner.temp }}/program-fuzz-smoke
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: current-route-suite
+          retention-days: 7
+          path: ${{ runner.temp }}/current-route-suite
+          if-no-files-found: warn

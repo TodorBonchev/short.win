@@ -1,82 +1,50 @@
-> **Active software release: v1.1.1.** The Jupiter-only pooled implementation lives in [simple/](simple/README.md) on `main`. See the [release record](docs/release/POOLED-1.1.1.md), [specification](simple/docs/SPEC.md) and [commissioning prerequisites](simple/docs/OPERATIONS.md). The legacy content below and its qualification evidence remain historical to that program; they do not qualify the replacement. Mainnet deployment and funded operation remain pending.
-
 # short.win
 
-**Development scope update (2026-10-27): first mainnet is postponed for broad
-Jupiter support.** See the [recorded decision](docs/audit/owner-jupiter-redesign-decision-2026-10-27.md)
-and [design proposal](docs/design/JUPITER_REDESIGN.md). In-house price reporting
-and our own keeper with Jupiter swaps are selected. The owner accepts trusted
-VPS price history off chain with on-demand authenticated snapshots; continuous
-on-chain price publication is superseded. Concrete reporter/risk settings
-are under review. No Jupiter
-integration or new release is deployed.
+Jupiter Router V2 pooled lending, with SOL collateral, fixed-term token debt and paid SOL income for lenders. The Rust, Python and TypeScript workspaces run from this repository root.
 
-[![Discord](https://img.shields.io/badge/Discord-Join%20ShortWin-5865F2?logo=discord&logoColor=white)](https://discord.gg/sTcSSXDZqK)
+The software version is **1.1.1** and the program ID is `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh`. Deployment and funded operation remain to be commissioned. Package names, generated instruction identities and the program ID are preserved across the repository layout change.
 
-The implemented legacy baseline is a Solana protocol for permissionless peer-to-peer token lending, built to short memecoins,
-including pump.fun launches still on the bonding curve. Lenders deposit tokens into a
-per-token pool and earn rent. A borrower posts SOL margin; the program borrows the tokens
-and sells them in the same transaction, and buys them back on close, liquidation or
-expiry, pricing every leg with exact on-chain venue math (pump.fun curve, PumpSwap,
-Raydium AMM v4 and CPMM). When a buyback is impossible, lenders are repaid in SOL.
+- One active pooled vault per supported token, token-denominated lender shares and separately claimable paid SOL income.
+- Jupiter-only sale and whole-debt buyback; borrowers can also repay the exact token debt directly.
+- Fixed borrowing fee paid upfront; early close does not refund it.
+- Trusted off-chain exact-quantity price history, with public registration and bounded automatic warm-up.
+- Confirmed pre-maturity liquidation, maturity buyback and collateral default at deadline plus 24 hours.
+- Plain SPL and metadata-only Token-2022 mints, with borrowing, wallet and utilization limits. Deposits and market count are uncapped.
 
-- What it does and why: [`docs/SPEC.md`](docs/SPEC.md)
-- How it is built: [`docs/design/ARCHITECTURE.md`](docs/design/ARCHITECTURE.md) and
-  [`docs/design/ECONOMICS.md`](docs/design/ECONOMICS.md)
-- Toolchain, build and test commands: [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
-- For auditors: [`docs/AUDIT.md`](docs/AUDIT.md) (scope, threat model, known issues);
-  reporting a vulnerability: [`SECURITY.md`](SECURITY.md)
+Withdrawals depend on available token liquidity. Default can lose token principal and return SOL compensation. Read the [specification](docs/SPEC.md), [scope](docs/SCOPE.md), [operations guide](docs/OPERATIONS.md) and [production proposals](config/README.md).
 
-Status: milestones M0–M10 built (the ≥ 24-hour fuzz criterion met for M7 by run 2, for M10 by
-run 4 and on the final program bytes by run E, [`tests/fuzz/README.md`](tests/fuzz/README.md)):
-the program with every venue (pump.fun curve, PumpSwap, Raydium AMM v4 and CPMM), the keeper, the
-indexer and API, and the web frontend (`apps/web`, with its Playwright E2E on a local validator).
-**Launch policy (owner decision, 2026-10-27): capped mainnet before an external audit
-and a funded bug bounty.** Protocol fees are intended to accumulate funding for the
-bounty and audit; neither is required before this initial launch phase. Here capped
-means the existing **25 SOL aggregate opening-notional limit per market**; deposits
-and the number of markets remain uncapped. It is not a TVL or protocol-wide cap. The
-[1.0.3 mainnet plan](docs/release/MAINNET-1.0.3.md) records the exposure controls,
-remaining release gates and operator preflight. The repository's AI-assisted reviews
-are not an external security audit.
+## Repository
 
-The unreleased 1.0.3 program was [deployed to devnet on 2026-10-22](docs/deployment/DEVNET_1_0_3_DEPLOYMENT_2026_10_22.md).
-Its configuration is initialized, two Pump markets have lender deposits, and a
-[supervised short opened and closed](docs/deployment/devnet-trading-bootstrap-2026-10-23.md).
-New opens on the deeper market remain paused pending sustained keeper coverage
-and alert verification. There is no mainnet deployment.
+| Path | Purpose |
+| --- | --- |
+| `programs/shortwin-simple` | On-chain pooled lending program |
+| `crates/pooled-core` | Checked pool accounting |
+| `crates/jupiter-route` | Jupiter scalar-header and account-isolation checks |
+| `client` | Generated instruction client, transaction helpers, operator and HTTP bridge |
+| `services` | Trusted Python/SQLite price history and queue lifecycle |
+| `web` | Development wallet interface |
+| `tests/runtime` | Actual-SBF ledger, route and financial fuzz tests |
+| `tests/fixtures` | Pinned Jupiter execution inputs and captured route cases |
+| `config` | Non-executable operating and policy proposals |
 
-## Layout
+## Local checks
 
-```
-programs/shortwin/            Anchor 1.2.0 program
-crates/shortwin-math/         no_std protocol math shared by program, keeper and frontend
-crates/shortwin-math-wasm/    wasm-bindgen facade over shortwin-math
-crates/shortwin-venue-state/  no_std readers of venue, mint, Pyth and ProgramData accounts
-clients/js/                   @shortwin/client, generated by Codama from the IDL
-services/                     keeper and indexer + API (Rust workspace of its own)
-apps/web/                     the web frontend (M9; docs/design/FRONTEND.md)
-packages/math-wasm/           browser build of shortwin-math-wasm for apps/web
-tests/litesvm/                program tests (LiteSVM 0.16) with the invariant hooks
-tests/bench/                  Mollusk CU benches (math primitives, M1 instructions)
-tests/fixtures/               mainnet account dumps with checksums
-tests/mock_cpamm/             the test-only mock venue program (M2)
-scripts/                      config gate, test-venue build, protocol ALT, fixture dumps
-docs/                         spec, design, research, development guide
+Use the toolchain versions in `rust-toolchain.toml` and `mise.toml`. Run from the repository root:
+
+```sh
+python3 scripts/materialize-jupiter-probe.py
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+python3 -m unittest discover -s services/tests -v
+python3 -m unittest discover -s config -p 'test_*.py' -v
+python3 config/verify-production-proposal.py
+cargo build-sbf --manifest-path programs/shortwin-simple/Cargo.toml --tools-version v1.57 --arch v3 --sbf-out-dir target/deploy -- --locked
+cargo test --workspace --locked
+pnpm install --frozen-lockfile
+pnpm check
+pnpm build
 ```
 
-## Licence
+The [runtime guide](tests/runtime/README.md) describes seeded fuzzing and captured-route replay. Tests use pinned snapshots, synthetic history, clocks and initial allocations; they do not send transactions. Qualification and duration results apply to their exact frozen source, runner, program and inputs. A campaign running from a separate frozen checkout retains that checkout's identity.
 
-short.win is source-available, not open source. [`REUSE.toml`](REUSE.toml) gives every file's
-licence, and the licence texts are in [`LICENSES/`](LICENSES/).
-
-- The protocol (the program, crates, keeper, indexer, tests and scripts): the Business Source
-  License 1.1 ([`LICENSE`](LICENSE)). Non-production use is free. Production use is allowed when
-  it interacts with the official short.win deployment: keepers, liquidators, indexers, front
-  ends, wallets and CPI integrations ([`GRANTS.md`](GRANTS.md)). Each version becomes Apache-2.0
-  on 2030-10-01, or four years after its first public release if that is earlier.
-- The TypeScript client (`clients/js`, with the IDL) and the indexer's API description: Apache-2.0.
-- The documentation: CC BY-NC-ND 4.0.
-- The web app (`apps/web`, `packages/math-wasm`) and the brand (the name and the logo): all
-  rights reserved.
-- Third-party files keep their own licences: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The [security policy](SECURITY.md) explains private reporting. [LICENSE](LICENSE), [GRANTS.md](GRANTS.md), [REUSE.toml](REUSE.toml) and [third-party notices](THIRD_PARTY_NOTICES.md) define the applicable terms; a software tag does not authorize deployment or financial transactions.

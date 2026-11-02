@@ -1,86 +1,19 @@
 # Third-party notices
 
-This repository includes or adapts the third-party material below. [`REUSE.toml`](REUSE.toml)
-gives each file's licence, and the licence texts are in [`LICENSES/`](LICENSES/). Dependencies
-that Cargo and pnpm download are not part of the repository; they come under their own licences
-(`deny.toml` enforces the Rust allow-list).
+[REUSE.toml](REUSE.toml) assigns file licenses; texts are in [LICENSES](LICENSES/). Cargo and pnpm dependencies are downloaded separately and retain their upstream licenses. The repository's own [LICENSE](LICENSE) and [GRANTS.md](GRANTS.md) remain binding.
 
-## Promotional-video tooling
+## Jupiter and captured route state
 
-`tools/promo/` is an isolated workspace using Remotion 4.0.533 under the
-[Remotion license](https://www.remotion.dev/docs/license/pricing), rather than
-a permissive software license. Its dependencies are installed, not vendored.
-The generated local media bundle includes Adwaita Sans with its original SIL
-Open Font License notice in `public/fonts/LICENSE`. The original synthesized
-score uses no external recordings or samples. Existing ShortWin brand artwork
-retains the proprietary brand/application terms; see the
-[promo production instructions](tools/promo/README.md).
+`tests/fixtures/jupiter-2026-10-27` retains the pinned Jupiter Router V2 on-chain account response and decoded IDL. `tests/fixtures/current-routes` contains saved Jupiter build responses and the account/program snapshots needed by the maintained route matrix. These are interoperability test inputs. Runtime-byte identity is verified; Jupiter's private source build is not reproduced.
 
-## Vendored PostgreSQL archive helper
+Captured route replies may contain deployed DEX or token-program code inside account data. A public-chain snapshot is not a grant of rights in that program. Upstream rights remain with the respective owners; no first-party license in this repository covers third-party embedded program code. Pump/PumpSwap programs have no published source license; retain the [pump.fun notice](LICENSES/LicenseRef-pump-fun-no-license.txt) when handling those snapshots.
 
-`services/vendor/postgresql_archive/` contains `postgresql_archive` 0.21.0 from
-crates.io, from [theseus-rs/postgresql-embedded](https://github.com/theseus-rs/postgresql-embedded)
-at `a995b73d5b0b220f96b03634ec8cdfe117996c26`, by Brian Heineman. Its declared licence is
-`(Apache-2.0 OR MIT) AND PostgreSQL`; upstream Apache and MIT notices are preserved in
-the directory, and the [PostgreSQL licence](LICENSES/PostgreSQL.txt) is included here.
-The test-only helper has a ZIP 9 dependency update and two filename API adaptations,
-documented in [PATCH.md](services/vendor/postgresql_archive/PATCH.md), to address
-RUSTSEC-2026-0367, RUSTSEC-2026-0368, and RUSTSEC-2026-0369. Local changes retain the
-upstream licence expression; the repository's default code and documentation licences
-do not apply to this vendored directory.
+## CPMM runtime fixture
 
-## Program binaries (`tests/fixtures/programs/`)
-
-Unmodified copies of programs deployed on Solana mainnet, each stored with its loader header
-([`tests/fixtures/README.md`](tests/fixtures/README.md)), used as test fixtures.
-
-| File | Program | Source | Licence |
-|---|---|---|---|
-| `raydium_amm_v4.so` | Raydium AMM v4 (`675kPX9M…`) | [raydium-io/raydium-amm](https://github.com/raydium-io/raydium-amm) @ `d26944b` | Apache-2.0 |
-| `raydium_cpmm.so` | Raydium CPMM (`CPMMoo8L…`), the 445,763,504 deploy | [raydium-io/raydium-cp-swap](https://github.com/raydium-io/raydium-cp-swap) @ `59fb845` | Apache-2.0 |
-| `raydium_cpmm_2026_10.so` | Raydium CPMM, the 452,376,460 deploy | raydium-cp-swap @ `bdeee23` (reproduced byte for byte) | Apache-2.0 |
-| `token_2022.so` | SPL Token-2022 (`TokenzQd…`) | [solana-program/token-2022](https://github.com/solana-program/token-2022) @ `9bc02757` | Apache-2.0 |
-| `spl_memo_v3.so` | SPL Memo v3 (`MemoSq4g…`) | [solana-program/memo](https://github.com/solana-program/memo) | Apache-2.0 |
-| `squads_v4.so` | Squads Multisig v4 (`SQDS4ep6…`) | [Squads-Protocol/v4](https://github.com/Squads-Protocol/v4), probably @ `64af733` (unverified) | at `64af733`, the Business Source License 1.1 of Selimor Investments Limited ([text](LICENSES/LicenseRef-Squads-BUSL-1.1.txt)), which permits non-production use; the repository's main branch is AGPL-3.0 today |
-| `pump*.so` (10 files) | pump.fun's bonding curve (`6EF8rrec…`), PumpSwap (`pAMMBay6…`) and pump-fees (`pfeeUxB6…`) | no public source | none: not redistributable ([notice](LICENSES/LicenseRef-pump-fun-no-license.txt)) |
-
-None of the Apache-2.0 sources above has a NOTICE file.
-
-## Squads IDL (`tests/fixtures/idl/squads_multisig_program.json`)
-
-The Squads Multisig v4 IDL 2.1.0. It is byte-identical (sha256 `cb9a0a29…9f9b9b`) to
-`idl/squads_multisig_program.json` in the npm package `@sqds/multisig` 2.1.4, whose
-`package.json` declares the MIT licence ([text](LICENSES/MIT.txt)). The package ships no
-copyright line; the Squads v4 repository names Selimor Investments Limited as its licensor.
-
-## Code adapted from Raydium (Apache-2.0)
-
-These files reimplement Raydium's quote arithmetic so that short.win prices its legs exactly as
-the venues do. Each file's header names its source. The adapted parts stay under Apache-2.0; the
-rest of each file is under BUSL-1.1.
-
-- `crates/shortwin-math/src/quote/cpmm.rs`: from raydium-cp-swap @ `59fb845`
-  (`curve/calculator.rs`, `curve/fees.rs`, `instructions/swap_base_{input,output}.rs`).
-- `crates/shortwin-math/src/quote/ray_v4.rs`: from raydium-amm @ `d26944b` (`processor.rs`
-  `process_swap_base_{in,out}_v2`, `math.rs` `swap_token_amount_base_{in,out}`).
-- `crates/shortwin-math/tests/vectors/quotes/gen_port.py`: a port of raydium-cp-swap @ `59fb845`
-  (`calculator.rs`, `fees.rs`) that generates test vectors.
+`tests/fixtures/programs/raydium_cpmm_2026_10.so` is the pinned Raydium CPMM deployment at slot 452376460, from [raydium-io/raydium-cp-swap](https://github.com/raydium-io/raydium-cp-swap) at `bdeee23`, under [Apache-2.0](LICENSES/Apache-2.0.txt). The fixture includes its upgradeable-loader header, as described in the [fixture guide](tests/fixtures/README.md). Its upstream source has no NOTICE file.
 
 ## Public chain data
 
-`tests/fixtures/accounts/`, `scripts/gapcal/tests/fixtures/` and `services/keeper/tests/data/*.bin`
-are snapshots of public Solana mainnet state: account data and recorded RPC responses
-([notice](LICENSES/LicenseRef-Public-Chain-Data.txt)).
+The retained `tests/fixtures/accounts` files, Jupiter account replies, route captures and reference-rent receipt are public Solana state or recorded provider/RPC responses used for deterministic tests. The short.win authors claim no rights in this data; rights remain with their respective owners. See [the public-chain-data notice](LICENSES/LicenseRef-Public-Chain-Data.txt).
 
-## Quoted material
-
-[`docs/research/jupiter-cpi.md`](docs/research/jupiter-cpi.md) §7.1 quotes source code, for
-analysis, from three Jupiter repositories that carry no licence:
-`jup-ag/jupiter-cpi-swap-example` @ `b9bdc57075`, `jup-ag/sol-swap-cpi` @ `a9c3132893` and
-`jup-ag/docs` @ `16e9e9d5`. No licence in this repository covers those quotes.
-
-## Credits
-
-`crates/shortwin-math/src/num/u256.rs` implements Knuth's Algorithm D (The Art of Computer
-Programming, Vol. 2, §4.3.1). Some of its test vectors are scaled from the `divmnu` test vectors
-of Hacker's Delight (Henry S. Warren, Jr.).
+The pure Jupiter parser and pooled accounting crates are first-party source. No direct DEX pricing implementation or downloaded SDK source is vendored into those crates.

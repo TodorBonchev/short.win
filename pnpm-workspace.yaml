@@ -1,21 +1,4 @@
-# JS workspaces (ARCHITECTURE §1.2): the Codama client (clients/js), the web frontend (apps/web)
-# and the browser build of the math facade (packages/math-wasm).
 packages:
-  - "packages/*"
-  - "apps/*"
-  - "clients/*"
-
-# pnpm 12 reads overrides only here (it no longer reads package.json's "pnpm" field). The Mobile
-# Wallet Adapter's protocol is pinned exactly, and its own `@solana/kit: ^8.3.0` is held at the
-# app's Kit 8.3.0 (without it pnpm would add Kit 8.4.x for the protocol) (FRONTEND.md §9.6).
-overrides:
-  "@solana-mobile/mobile-wallet-adapter-protocol": "3.0.0"
-  "@solana-mobile/mobile-wallet-adapter-protocol>@solana/kit": "8.3.0"
-
-# Supply chain: nothing published less than 14 days ago is resolved, repo-wide. pnpm 12 also
-# checks every entry already in the lockfile, a --frozen-lockfile install included: CI fetches
-# every entry's metadata and fails on any locked version under 14 days old.
-# The two Mobile Wallet Adapter packages published 2026-10-07 have now aged past this gate;
-# their temporary exact-version exclusions were removed on 2026-10-22 (Europe/Kyiv).
-# The 21 earlier exclusions for 2026-09-29/30 publications were removed on 2026-10-16.
+  - client
+  - web
 minimumReleaseAge: 20160

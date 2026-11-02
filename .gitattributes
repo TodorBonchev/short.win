@@ -1,36 +1,8 @@
-
-# Exact command logs are byte evidence, not hand-edited source diffs.
-docs/audit/simple-pooled-evidence-2026-10-28/*.log -text -diff
-docs/audit/simple-pooled-repro-evidence-2026-10-28/*.log -text -diff
-docs/audit/simple-pooled-repro-evidence-2026-10-28/final-ci-terminal.json -text -diff
-
-# Current mainnet captures, hashes and replay logs retain their exact bytes.
-docs/audit/simple-current-route-evidence-2026-10-28/** -text
-docs/audit/simple-current-route-evidence-2026-10-28/**/*.log -diff
-docs/audit/simple-current-route-evidence-2026-10-28/official-*.md -diff
-
-docs/audit/simple-production-evidence-2026-10-28/** -text
-docs/audit/simple-production-evidence-2026-10-28/*.log -diff
-docs/audit/simple-production-evidence-2026-10-28/**/*.log -diff
-docs/audit/simple-production-evidence-2026-10-28/ci-40766940373/artifacts.json -diff
-docs/audit/simple-production-evidence-2026-10-28/ci-40766940373/run-terminal.json -diff
-
-# Final-identity route captures preserve exact raw response and replay bytes.
-docs/audit/simple-final-route-evidence-2026-10-29/** -text
-docs/audit/simple-final-route-evidence-2026-10-29/**/*.log -diff
-
-# Final preparation command receipts retain exact bytes.
-docs/audit/simple-final-preparation-evidence-2026-10-29/** -text
-docs/audit/simple-final-preparation-evidence-2026-10-29/**/*.log -diff
-docs/audit/simple-final-preparation-evidence-2026-10-29/*.log -diff
-
-# Existing-runner campaign receipts are byte evidence.
-docs/audit/simple-financial-campaign-evidence-2026-10-29/** -text
-docs/audit/simple-financial-campaign-evidence-2026-10-29/**/*.log -diff
-docs/audit/simple-financial-campaign-evidence-2026-10-29/*.log -diff
-
-# Raw Windows process receipts retain their original CRLF bytes.
-docs/audit/simple-financial-campaign-evidence-2026-10-29/start/windows-*.json -diff
-
-# Final raw Windows release receipts preserve CRLF without text-diff rewriting.
-docs/audit/simple-financial-campaign-evidence-2026-10-29/final/windows-*.json -diff
+# Pinned fixture bytes and captured HTTP/RPC responses must remain exact.
+tests/fixtures/accounts/** -text
+tests/fixtures/programs/** -text
+tests/fixtures/jupiter-2026-10-27/*.json -text
+tests/fixtures/jupiter-2026-10-27/*.gz -text
+tests/fixtures/current-routes/** -text
+tests/fixtures/current-routes/**/*.log -diff
+tests/fixtures/reference-rent/*.json -text
