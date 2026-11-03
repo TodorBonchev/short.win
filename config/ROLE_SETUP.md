@@ -2,11 +2,13 @@
 
 This is a preparation guide for release candidate **1.1.1**. The generated public
 program ID is `BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh`; its private
-deployment key remains outside the repository. Governance, emergency, reporter,
-fee recipient and keeper roles remain unassigned. No operating wallet is created,
-funded or submitted by these files. Put only public keys in
-`production-roles.template.json`. A completed manifest still does not enable
-execution or authorize deployment.
+deployment key remains outside the repository. Five distinct governance, emergency,
+reporter, fee recipient and keeper public addresses were generated locally on
+2026-11-03 at the owner's request and recorded for review in
+`production-roles.template.json`, with the canonical expected mainnet genesis.
+Private keyfiles remain outside Git. Owner custody review, offline backups,
+operating installation and funding remain pending; no deployment or transaction
+is implied. The public-assignment gate passes, while execution stays disabled.
 
 | Identity | Proposed custody / purpose |
 | --- | --- |
@@ -18,10 +20,12 @@ execution or authorize deployment.
 | Keeper | Separate VPS operating key paying transaction fees and temporary deposits; initial native setup allowance is zero. |
 | Deployment payer | Record separately in the deployment packet, with the actual program/buffer/loader rent quote. Operating-wallet balances do not cover that deposit. |
 
-If using local Solana keyfiles, prepare them on the machine that will hold each
-role, with private backups under the owner's control. For an operating key, run
-these commands **locally yourself**, outside the repository. They are examples,
-not an instruction to generate offline governance keys on the VPS:
+Review custody of the generated keyfiles and protect private backups under the
+owner's control before relying on these identities. Future replacement operating
+keys can be prepared on the machine that will hold them. These commands are
+examples for a separately reviewed replacement, outside the repository; do not
+overwrite the current keyfiles or silently replace the public assignments, and
+do not generate offline governance keys on the VPS:
 
 ```sh
 install -d -m 700 /data/shortwin/keys
@@ -59,10 +63,12 @@ roles, establish funded commissioning, extend the prior duration evidence's scop
 or provide external audit approval. A changed upstream deployment requires fresh
 compatibility review.
 
-Run the proposal verifier with `--require-assigned-roles`; incomplete
-or placeholder identities must fail. Prepare and simulate the exact initialization
-packet for owner review after freezing these identities; do not infer approval
-to sign it from a completed JSON file.
+Run the proposal verifier with `--require-assigned-roles`; the generated public
+assignments pass this identity check, while incomplete or placeholder identities
+must fail. This does not verify private custody, backups, funding or current loader
+authority. Prepare and simulate the exact initialization packet for owner review
+after freezing these identities; do not infer approval to sign it from a completed
+JSON file.
 
 Retain funding receipts for the reporter and keeper, low-balance thresholds,
 maximum fee/route setup/temporary advances, delivered alerts and process artifact

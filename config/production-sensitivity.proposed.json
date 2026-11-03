@@ -167,7 +167,7 @@
     "programs/shortwin-simple/src/exits.rs": "82635c8195a86880d51c9831b9c38d9d4ea6d5203ae38865273fcd04f8bfd617",
     "programs/shortwin-simple/src/finance.rs": "11772d4eac5e7b0605368d27c4b686df3fa8ff9dad46a580287d842cf11533f2",
     "programs/shortwin-simple/src/open.rs": "8e407d9f69f6714f333d265000385dec4ddf784ec9debe81ac9dec928c4c1da5",
-    "programs/shortwin-simple/src/route.rs": "0474656f4727875f0019d569295753ddb785442418d9632291cc3cb09db008bb",
+    "programs/shortwin-simple/src/route.rs": "9af054ca3a5994ce42a47b8de4a4ddba08fa617f41ab918135881ce6dabc29ea",
     "programs/shortwin-simple/src/state.rs": "4588d9272a629165cb1bfaeaafa0a9d207127e493aedbefd5d28ca0504b9b8e9"
   },
   "operator_bounds": {
@@ -175,7 +175,7 @@
       "alertsDelivered": "pending",
       "currentRoutes": "saved-fixtures-qualified-2026-11-03",
       "payerFunding": "pending",
-      "roles": "unassigned",
+      "roles": "generated-for-review",
       "sustainedCoverage": "pending"
     },
     "execute": false,
@@ -283,20 +283,18 @@
       "warmup_worst_case_without_boundary_latency_seconds": 240
     }
   ],
-  "role_setup": {
-    "complete_public_identity_assignment": false,
+  "reviewed_jupiter": {
     "execution_enabled": false,
-    "missing_public_identity_fields": [
-      "genesisHash",
-      "governance",
-      "emergency",
-      "reporter",
-      "feeRecipient",
-      "keeper",
-      "jupiterReview.deploySlot",
-      "jupiterReview.programDataLength",
-      "jupiterReview.elfSha256"
-    ],
+    "note": "Dated saved-route compatibility only; no funded commissioning, duration qualification, external audit approval or deployment authorization.",
+    "own_program_sha256": "86147af04bda2c1fbab92ad670dc8d7cc272162724787dac666344bf24b547f2",
+    "qualified_at_utc": "2026-11-03T07:21:27.767234+00:00",
+    "review_manifest_sha256": "553430c25e1589fe3363ff9734a4d7b97de3dae93bfe20993309f1a794296235",
+    "status": "reviewed-offline-compatibility"
+  },
+  "role_setup": {
+    "complete_public_identity_assignment": true,
+    "execution_enabled": false,
+    "missing_public_identity_fields": [],
     "note": "Complete assignments still require deployment/loader review and commissioned operating evidence; this tool never signs or submits."
   },
   "status": "proposed_configuration_verified_offline_not_activated"

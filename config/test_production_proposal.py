@@ -17,9 +17,18 @@ sys.modules[spec.name] = proposal
 spec.loader.exec_module(proposal)
 
 
+def unassigned_roles():
+    """Keep refusal fixtures independent of the current public role assignments."""
+    roles = json.loads((HERE / "production-roles.template.json").read_text())
+    roles["assignmentStatus"] = "unassigned"
+    roles["genesisHash"] = None
+    roles["rolePublicKeys"] = {name: None for name in roles["rolePublicKeys"]}
+    return roles
+
+
 class ProductionProposalTests(unittest.TestCase):
     def setUp(self):
-        self.roles = json.loads((HERE / "production-roles.template.json").read_text())
+        self.roles = unassigned_roles()
 
     def test_unassigned_proposal_cannot_pass_assignment_gate(self):
         result = proposal.verify_roles(self.roles)
@@ -27,6 +36,17 @@ class ProductionProposalTests(unittest.TestCase):
         self.assertFalse(result["execution_enabled"])
         with self.assertRaisesRegex(ValueError, "unassigned"):
             proposal.verify_roles(self.roles, require_assigned=True)
+
+    def test_generated_public_assignment_passes_identity_gate_without_execution(self):
+        roles = json.loads((HERE / "production-roles.template.json").read_text())
+        result = proposal.verify_roles(roles, require_assigned=True)
+        self.assertEqual(roles["assignmentStatus"], "assigned-for-review")
+        self.assertEqual(roles["genesisHash"], proposal.MAINNET_GENESIS)
+        self.assertEqual(len(set(roles["rolePublicKeys"].values())), 5)
+        self.assertTrue(result["complete_public_identity_assignment"])
+        self.assertEqual(result["missing_public_identity_fields"], [])
+        self.assertFalse(result["execution_enabled"])
+        self.assertFalse(roles["execute"])
 
     def test_execute_cannot_be_enabled_in_review_manifest(self):
         self.roles["execute"] = True
@@ -79,7 +99,7 @@ class ReviewedJupiterTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
-        self.roles = json.loads((HERE / "production-roles.template.json").read_text())
+        self.roles = unassigned_roles()
         self.roles["jupiterReview"].update(deploySlot=42, programDataLength=52, elfSha256="pending")
         self.pin = self.roles["jupiterReview"]
         alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

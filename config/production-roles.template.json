@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "assignmentStatus": "unassigned",
+  "assignmentStatus": "assigned-for-review",
   "network": "mainnet-beta",
   "programId": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
-  "genesisHash": null,
+  "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
   "rolePublicKeys": {
-    "governance": null,
-    "emergency": null,
-    "reporter": null,
-    "feeRecipient": null,
-    "keeper": null
+    "governance": "HDHsjgvAaqGS5iN7V23PFSTVhBhxMFr1vTxdzgaYuTea",
+    "emergency": "21A19cxbFqypqkfo2pCDY4hm1YyFVoMinDq9CTav62XY",
+    "reporter": "521nmZ5PRD5RfJi4suSJYfAmaYNDytu1MVLfEEJr8zBt",
+    "feeRecipient": "2CoYAGyRoyaQtkgPQfAbeDj7cierGnNxyDrRbGxRCqyV",
+    "keeper": "Etbq3LAVK8jjMKziNfaEV72gMcsSEZ8BAhwudfB9xHCe"
   },
   "jupiterReview": {
     "programId": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",

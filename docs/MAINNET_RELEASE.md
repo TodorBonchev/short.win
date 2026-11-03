@@ -37,15 +37,18 @@ hashes during release review. The successful sequential campaign and saved-route
 qualification do not establish arbitrary multi-loan interleaving, live service
 coverage or an external audit.
 
-After assigning only public mainnet identities, this additional preparation gate
-must pass:
+Five distinct public role addresses were generated locally at the owner's request
+and recorded for review with the canonical expected mainnet genesis. The private
+keyfiles remain outside Git; owner custody and offline backups are not yet verified.
+The public-assignment preparation gate passes:
 
 ```sh
 python3 config/verify-production-proposal.py --require-assigned-roles
 ```
 
 `prepare-mainnet-release.py --require-assigned-roles` applies the same gate when
-creating a fresh packet. It is expected to fail while any public identity is null.
+creating a fresh packet. It refuses any null or invalid public identity. Passing
+this check does not verify private custody, loader authority or on-chain state.
 Funding, alerts and commissioning remain separate gates even after it passes.
 The authoritative [release specification](../config/mainnet-release.proposed.json)
 keeps all activation gates pending and opens paused; setup-rent and market-fee
@@ -91,9 +94,10 @@ is distinct from reference-rent allocation allowance and program account capacit
 1. Freeze the reviewed commit and selected ELF. Recheck retained qualification and
    campaign hashes; resolve the conditional upstream loader-extension availability
    lead against the actual loader policy. Keep the reviewed Jupiter pin strict.
-2. Assign distinct controlled roles, confirm private custody and backups outside
-   Git, verify canonical mainnet genesis and actual loader/upgrade authority, and
-   identify the authorized initializer. Never reuse deterministic demo identities.
+2. Review the generated distinct role assignments, confirm private custody and
+   backups outside Git, verify canonical mainnet genesis and actual loader/upgrade
+   authority, and identify the authorized initializer. Never reuse deterministic
+   demo identities.
 3. Re-observe canonical Jupiter bytes/slot/allocation before the launch packet.
    Changed upstream bytes or reviewed source require renewed compatibility review.
 4. Obtain current deployment/buffer/account rent and fee quotes, identify the

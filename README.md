@@ -49,6 +49,6 @@ pnpm build
 
 The [runtime guide](tests/runtime/README.md) describes seeded fuzzing and captured-route replay. Tests use pinned snapshots, synthetic history, clocks and initial allocations; they do not send transactions. Qualification and duration results apply to their exact frozen source, runner, program and inputs. A campaign running from a separate frozen checkout retains that checkout's identity.
 
-The [capped-mainnet release guide](docs/MAINNET_RELEASE.md) prepares a hash-bound, non-executable packet for the exact qualified ELF. Role assignment, funding, alerts, operating capacity and final activation checks remain required before launch.
+The [capped-mainnet release guide](docs/MAINNET_RELEASE.md) prepares a hash-bound, non-executable packet for the exact qualified ELF. Five distinct public role addresses are generated and assigned for review. Owner custody/backups, funding, alerts, operating capacity and final activation checks remain required before launch.
 
 The [security policy](SECURITY.md) explains private reporting. [LICENSE](LICENSE), [GRANTS.md](GRANTS.md), [REUSE.toml](REUSE.toml) and [third-party notices](THIRD_PARTY_NOTICES.md) define the applicable terms; a software tag does not authorize deployment or financial transactions.

@@ -24,7 +24,7 @@
     "alertsDelivered": "pending",
     "sustainedCoverage": "pending",
     "currentRoutes": "saved-fixtures-qualified-2026-11-03",
-    "roles": "unassigned"
+    "roles": "generated-for-review"
   },
   "maxNewReferenceAccounts": 4,
   "maxDailyPublicationFeesLamports": 1000000,
