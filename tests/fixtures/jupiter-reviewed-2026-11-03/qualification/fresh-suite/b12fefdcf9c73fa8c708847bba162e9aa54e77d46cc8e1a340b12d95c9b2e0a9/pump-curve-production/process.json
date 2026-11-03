@@ -1,0 +1,11 @@
+{
+  "candidate_sha256": "59058240942fb3594a2291a2f409d2c0c23a65fa900f3173606e1e37b28e06c6",
+  "finished_unix_ns": 1793690236270916331,
+  "native_runner_sha256": "8e4f1d9148065af76ff5e08e307ed9b5e3138da201d99f4aab05c30ae6ff9847",
+  "own_program_sha256": "b12fefdcf9c73fa8c708847bba162e9aa54e77d46cc8e1a340b12d95c9b2e0a9",
+  "returncode": 0,
+  "started_unix_ns": 1793690233497194823,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "17203e19833dd3efec79d45f139e5dfb6d6518c731134058282daea6ca66a7f1",
+  "terminated_by_signal": null
+}

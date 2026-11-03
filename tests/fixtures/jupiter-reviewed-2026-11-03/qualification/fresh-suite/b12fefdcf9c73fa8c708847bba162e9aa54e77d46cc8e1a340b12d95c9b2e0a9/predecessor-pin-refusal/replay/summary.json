@@ -1,0 +1,80 @@
+{
+  "error": "predecessor reviewed deployment refused: InstructionError(0, Custom(6039))",
+  "execution_context": {
+    "slot": 464802261,
+    "source": "captured maximum account slot and getBlockTime",
+    "synthetic_vm_clock": true,
+    "unix_timestamp": 1793688235
+  },
+  "jupiter": {
+    "deploy_slot": 462802085,
+    "program_sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e",
+    "programdata_len": 2892269,
+    "programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+    "trimmed_elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "ba9dd9331947ab8ab8d6b442c1d9b941881ae25dae7b7070e93e7fdaf4df3fdb",
+  "name": "bonk-production",
+  "native_runner_sha256": "8e4f1d9148065af76ff5e08e307ed9b5e3138da201d99f4aab05c30ae6ff9847",
+  "own_program_sha256": "b12fefdcf9c73fa8c708847bba162e9aa54e77d46cc8e1a340b12d95c9b2e0a9",
+  "packet_fit_failures": {},
+  "predecessor_pin_protected_state_unchanged": true,
+  "predecessor_pin_rejected": true,
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "review_provenance": {
+    "current_deployment": {
+      "deploy_slot": 462802085,
+      "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+      "programdata_len": 2892269
+    },
+    "limitations": [],
+    "live_transactions_sent": 0,
+    "overlaid_accounts": [],
+    "overlay_historical": false,
+    "review_manifest_sha256": "c7b2fe1882375f6abe2177f55dca0c7c441e002b30ea24bb59621204638d3ac7",
+    "reviewed_current_clock": {
+      "address": "SysvarC1ock11111111111111111111111111111111",
+      "context_slot": 464802739,
+      "slot": 464802739,
+      "source_file": "jupiter-clock.json.gz",
+      "source_sha256": "a0a1237685d59ddf465300035122f336755eaabdc5ec264498e913cb04c92296",
+      "unix_timestamp": 1793688336
+    },
+    "scope": "fresh non-atomic route/account capture with exact current reviewed Jupiter bytes and synthetic snapshot VM Clock",
+    "source_capture": "tests/fixtures/current-routes-2026-11-03/captures/bonk-production",
+    "source_capture_context": {
+      "slot": 464802261,
+      "unix_timestamp": 1793688235
+    }
+  },
+  "reviewed_deployment": {
+    "deploy_slot": 459479624,
+    "elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+    "programdata_len": 2892269
+  },
+  "schema": 1,
+  "setup_budget_rejections": {},
+  "status": "failed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "transactions": {
+    "predecessor_pin_initialize": {
+      "compute_units": 19076,
+      "error": "InstructionError(0, Custom(6039))",
+      "log_file": "predecessor_pin_initialize.log",
+      "log_sha256": "ad80675ef4d23d81d090fdf1e04506cc3aff6c55074b92234717cb4eaf3d0040"
+    }
+  }
+}

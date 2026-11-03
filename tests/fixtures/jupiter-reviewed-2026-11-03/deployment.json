@@ -1,0 +1,101 @@
+{
+  "clock": {
+    "address": "SysvarC1ock11111111111111111111111111111111",
+    "context_slot": 464802739,
+    "slot": 464802739,
+    "source_file": "jupiter-clock.json.gz",
+    "source_sha256": "a0a1237685d59ddf465300035122f336755eaabdc5ec264498e913cb04c92296",
+    "unix_timestamp": 1793688336
+  },
+  "clock_account": {
+    "address": "SysvarC1ock11111111111111111111111111111111",
+    "context_slot": 464802739,
+    "executable": false,
+    "file": "clock_account.bin",
+    "lamports": 1169280,
+    "owner": "Sysvar1111111111111111111111111111111111111",
+    "rent_epoch": 18446744073709551615,
+    "sha256": "7363b50029e0108b38f00dba2e06d5499e3fc1d405b98511f1abbdeb0ed0d24c"
+  },
+  "deploy_slot": 462802085,
+  "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+  "elf_trimmed_length": 2047529,
+  "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "live_transactions_sent": 0,
+  "network": "mainnet-beta",
+  "observed_at": "2026-11-03T06:45:38.479626+00:00",
+  "padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+  "predecessor": {
+    "deploy_slot": 459479624,
+    "elf_sha256": "5e31d320f5d88ae93c7983ce82a1497067abd86ff540b35073abaeeb25ef397b",
+    "programdata_len": 2892269
+  },
+  "predecessor_source": "tests/fixtures/jupiter-2026-10-27/getMultipleAccounts.json.gz",
+  "program": {
+    "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "context_slot": 464802739,
+    "executable": true,
+    "file": "program.bin",
+    "lamports": 6975116527,
+    "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "rent_epoch": 18446744073709551615,
+    "sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e"
+  },
+  "program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "programdata": {
+    "address": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+    "context_slot": 464802739,
+    "executable": false,
+    "file": "programdata.bin",
+    "lamports": 14693376760,
+    "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "rent_epoch": 18446744073709551615,
+    "sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411"
+  },
+  "programdata_address": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+  "programdata_len": 2892269,
+  "requests": [
+    {
+      "file": "genesis.json.gz",
+      "finished_at": "2026-11-03T06:45:37.310368+00:00",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getGenesisHash",
+        "params": []
+      },
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "sha256": "072c547ad3321ad6379bf249c218bcf112eaa3bd0138f07ace4077db1785a37d",
+      "started_at": "2026-11-03T06:45:37.208873+00:00",
+      "status": 200,
+      "stored_sha256": "968d0469ee32b8c326bd5cda5fec11d00b67f342a699eeaf6ff1b10da3d623ff"
+    },
+    {
+      "file": "jupiter-clock.json.gz",
+      "finished_at": "2026-11-03T06:45:38.470952+00:00",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+            "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+            "SysvarC1ock11111111111111111111111111111111"
+          ],
+          {
+            "commitment": "finalized",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "sha256": "a0a1237685d59ddf465300035122f336755eaabdc5ec264498e913cb04c92296",
+      "started_at": "2026-11-03T06:45:37.310402+00:00",
+      "status": 200,
+      "stored_sha256": "aa73648e202aa056c675d2fbfbeea905594ec4f8aa3b6a15354fc2bbf218d47e"
+    }
+  ],
+  "schema": 1,
+  "scope": "Finalized same-bank read-only mainnet identity; not compatibility approval or deployment authorization"
+}

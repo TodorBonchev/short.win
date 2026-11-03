@@ -63,3 +63,11 @@ The replayer first constructs a bounded v0 transaction using actual captured loo
 Captured Pump routes exercise a separately signed native setup allowance, actual actor cost and refund, four setup/funding refusal cases and a subsequent whole-debt buyback with zero setup allowance. `writable_authority.rs` adds unused allowance, read-only prefunding, untracked gifts, invalid authority and signed-boundary tests. SOL conservation sums all external captured account lamports, including initially absent route PDAs; WSOL data deltas are diagnostic and are not counted again on top of backing lamports.
 
 Captured quotes and account reads can span slots, and a quote may correctly fail after the simulated sale changes DEX state. A passing case qualifies only its recorded route/state and program bytes. It does not establish future landing, every quantity, private history or every Jupiter DEX.
+
+## Reviewed deployment — November 3, 2026
+
+The [dated review](../fixtures/jupiter-reviewed-2026-11-03/README.md) qualifies Jupiter deployment slot `462802085` with six fresh successful lifecycles, two expected Scorch refusals, and an actual predecessor-pin initialization refusal on each of two financial-program ELFs. It preserves the exact 24-hour-fuzzed program identity separately from the root rebuild. Fresh quotes, account snapshots, packet feasibility, actual CPI logs, rollback, conservation and cleanup are hash-bound in the retained evidence.
+
+`scripts/qualify-reviewed-route-suite.py` consumes an already built native runner, explicit own-program ELF(s), the dated matrix and retained deployment manifest. It performs no network calls. Its default requires that fresh captures already contain the exact reviewed Jupiter bytes; `--overlay-historical` is a separately labelled compatibility diagnostic. `scripts/capture-jupiter-deployment.py` and `scripts/capture-current-route-matrix.py` are read-only network capture tools and never sign or submit public transactions.
+
+The selected matrix is `tests/runtime/current-routes-2026-11-03.json`. Unfunded or slippage-rejected discovery attempts remain preserved with their actual outcomes and are not promoted as successful cases. The loader pin remains a dated review, not permission to activate the production roles or skip a subsequent upstream-change check.

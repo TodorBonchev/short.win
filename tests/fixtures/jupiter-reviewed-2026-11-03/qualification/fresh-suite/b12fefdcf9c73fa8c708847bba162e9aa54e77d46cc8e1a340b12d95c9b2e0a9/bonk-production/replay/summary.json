@@ -1,0 +1,146 @@
+{
+  "actual_snapshot_packets_fit": true,
+  "base_token_conservation": true,
+  "binding": {
+    "execution_authority": "4PQuKJgChfxBcqHoCZEYckNykmNPzDy8DpP5DsVsexpi",
+    "execution_base": "2gu2EXxmK51pHxdiF7nm8PLG88X6tLxSYnfmgs89NPKD",
+    "execution_wsol": "GwVauCApk9fpLPhbVykLkFyhHyYm78CcZxeNTTcMUjWV",
+    "loan": "E1GG6jKTYCDnpE7namerKixUBSRgafTBUA7UVSjCAh6Y",
+    "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "q": 400000000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "buyback_spend": 125077066,
+  "error": null,
+  "execution_context": {
+    "slot": 464802261,
+    "source": "captured maximum account slot and getBlockTime",
+    "synthetic_vm_clock": true,
+    "unix_timestamp": 1793688235
+  },
+  "external_liquidity_account_count": 27,
+  "external_native_and_wrapped_lamports_delta": "5357452",
+  "full_buyback_net_credit": 417492082006,
+  "functional_execution_passed": true,
+  "invariants": "principal/exposure, whole-q net vault credit, actual paid fees, collateral, rent/scratch closure, immutable real mint bytes, full post-CPI rollback",
+  "jupiter": {
+    "deploy_slot": 462802085,
+    "program_sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e",
+    "programdata_len": 2892269,
+    "programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+    "trimmed_elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "lifecycle_invariants": {
+    "actor_rent_and_setup_refunds": true,
+    "actual_paid_fees_and_collateral": true,
+    "mint_and_dex_token_metadata_unchanged": true,
+    "post_cpi_rollback": true,
+    "principal_exposure_and_vault": true,
+    "scratch_closure": true,
+    "whole_q_buyback_credit": true
+  },
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "liquidity_conservation_scope": "All captured raw and both-route outer account keys, including initially absent PDAs; native curve/fee/rent plus WSOL vault lamports, excluding protocol financial actors/accounts and scratch; WSOL data delta retained separately without double counting.",
+  "live_transactions_sent": 0,
+  "manifest_sha256": "6542b89efd366799da57cf465bc323520a8b990263ffdd53cd8c3bedb7f6ac03",
+  "name": "bonk-production",
+  "native_lamport_conservation": true,
+  "native_runner_sha256": "8e4f1d9148065af76ff5e08e307ed9b5e3138da201d99f4aab05c30ae6ff9847",
+  "own_program_sha256": "b12fefdcf9c73fa8c708847bba162e9aa54e77d46cc8e1a340b12d95c9b2e0a9",
+  "packet_fit_failures": {},
+  "post_cpi_rollback": true,
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "rejected_route_protected_account_count": 40,
+  "rejected_route_protected_state_unchanged": true,
+  "review_provenance": {
+    "current_deployment": {
+      "deploy_slot": 462802085,
+      "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+      "programdata_len": 2892269
+    },
+    "limitations": [],
+    "live_transactions_sent": 0,
+    "overlaid_accounts": [],
+    "overlay_historical": false,
+    "review_manifest_sha256": "c7b2fe1882375f6abe2177f55dca0c7c441e002b30ea24bb59621204638d3ac7",
+    "reviewed_current_clock": {
+      "address": "SysvarC1ock11111111111111111111111111111111",
+      "context_slot": 464802739,
+      "slot": 464802739,
+      "source_file": "jupiter-clock.json.gz",
+      "source_sha256": "a0a1237685d59ddf465300035122f336755eaabdc5ec264498e913cb04c92296",
+      "unix_timestamp": 1793688336
+    },
+    "scope": "fresh non-atomic route/account capture with exact current reviewed Jupiter bytes and synthetic snapshot VM Clock",
+    "source_capture": "tests/fixtures/current-routes-2026-11-03/captures/bonk-production",
+    "source_capture_context": {
+      "slot": 464802261,
+      "unix_timestamp": 1793688235
+    }
+  },
+  "reviewed_deployment": {
+    "deploy_slot": 462802085,
+    "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+    "programdata_len": 2892269
+  },
+  "schema": 1,
+  "sell_proceeds": 119719614,
+  "setup_allowance": {
+    "closing_actual_actor_cost": 0,
+    "closing_signed_maximum": 0,
+    "closing_unused_refunded": 0,
+    "cost_excluded_from_WSOL_notional_collateral_and_protocol_fees": true,
+    "opening_actual_actor_cost": 0,
+    "opening_signed_maximum": 0,
+    "opening_unused_refunded": 0
+  },
+  "setup_budget_rejections": {},
+  "status": "passed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 125077066,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 500,
+    "live_ask_upper": 125077066,
+    "live_bid_lower": 119121016,
+    "spread_bps_ceiling": 500
+  },
+  "transactions": {
+    "full_buyback": {
+      "compute_units": 121661,
+      "error": null,
+      "log_file": "full_buyback.log",
+      "log_sha256": "6b153ba39208a2700b0048275c24bbe55acdd46af4b47b5e4a1ad201b91a8f37",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1086
+    },
+    "open_sell": {
+      "compute_units": 143597,
+      "error": null,
+      "log_file": "open_sell.log",
+      "log_sha256": "0244456a6e907ba90137b51ee4e0763cd7500d87b3908c31b1436fa43586d5bb",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1166
+    },
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 133523,
+      "error": "InstructionError(1, Custom(6024))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "d859167ae2b1abf48136fd161e8d22ca33a11c998ddf62efba336c79292418eb",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1166
+    }
+  },
+  "wsol_delta_lamports": "5357452"
+}

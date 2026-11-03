@@ -1,0 +1,48 @@
+{
+  "actual_sbf_qualification": "pending; matrix unchanged",
+  "buy_budget": 51467751,
+  "buy_minimum": 137055158,
+  "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-active-Ai66-pumpamm",
+  "decoded_account_entries_verified": 20,
+  "exact_captured_bank": {
+    "actual_outside_pool_circulation": 934861250918008,
+    "base_reserve": 29283748275710,
+    "checks": {
+      "actual_circulation_covers_ten_q": true,
+      "base_vault_binding": true,
+      "lamports_back_wsol": true,
+      "mint_metadata_unchanged": true,
+      "native_wsol_pool": true,
+      "quote_vault_binding": true,
+      "real_wsol_covers_ten_thousand_trades": true,
+      "same_bank": true
+    },
+    "context_slot": 464809445,
+    "real_wsol_reserve": 10891404819824
+  },
+  "post_capture_bank": {
+    "actual_outside_pool_circulation": 934852459227525,
+    "base_reserve": 29292539966193,
+    "checks": {
+      "actual_circulation_covers_ten_q": true,
+      "base_vault_binding": true,
+      "lamports_back_wsol": true,
+      "mint_metadata_unchanged": true,
+      "native_wsol_pool": true,
+      "quote_vault_binding": true,
+      "real_wsol_covers_ten_thousand_trades": true,
+      "same_bank": true
+    },
+    "context_slot": 464809615,
+    "real_wsol_reserve": 10888137539821
+  },
+  "quantity": 132636970,
+  "raw_response_hashes_verified": 11,
+  "route_labels_both": [
+    "Pump.fun Amm"
+  ],
+  "sell_minimum": 49016906,
+  "sell_quote": 49263222,
+  "whole_q_quote_available": true,
+  "within_500bps_spread": true
+}

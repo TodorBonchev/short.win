@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "status": "reviewed-offline-compatibility",
+  "qualifiedAtUtc": "2026-11-03T07:21:27.767234+00:00",
+  "execute": false,
+  "scope": "Dated fresh saved-route actual-SBF compatibility; no funded commissioning, live transaction, new duration qualification, external audit approval or deployment authorization.",
+  "ownProgram": {
+    "programId": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+    "elfSha256": "86147af04bda2c1fbab92ad670dc8d7cc272162724787dac666344bf24b547f2"
+  },
+  "jupiterReview": {
+    "programId": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+    "deploySlot": 462802085,
+    "programDataLength": 2892269,
+    "elfSha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895"
+  },
+  "elfDigestDefinition": "SHA-256 of ProgramData bytes after the 45-byte loader header with trailing zero bytes removed; full ProgramData and padded ELF digests remain in the retained deployment manifest.",
+  "deployment": {
+    "file": "tests/fixtures/jupiter-reviewed-2026-11-03/deployment.json",
+    "sha256": "c7b2fe1882375f6abe2177f55dca0c7c441e002b30ea24bb59621204638d3ac7"
+  },
+  "postQualificationDeployment": {
+    "file": "tests/fixtures/jupiter-reviewed-2026-11-03/post-qualification/deployment.json",
+    "sha256": "deb0b39697221eb372d2c544b38a9cd63e9b0094b7b9d83ee3246ed995505383"
+  },
+  "qualifications": [
+    {
+      "file": "tests/fixtures/jupiter-reviewed-2026-11-03/qualification/fresh-suite/summary.json",
+      "sha256": "d338bc3618c13ddbeeca6404febc98feb718ade9379a34c57b1b8ed0df529185",
+      "matrixFile": "tests/runtime/current-routes-2026-11-03.json",
+      "matrixSha256": "63bd4f700a7b826482d355ec489e9223f5a44bfb400abc685d4b01774136923d",
+      "overlayHistorical": false,
+      "retainedFiles": {
+        "file": "tests/fixtures/jupiter-reviewed-2026-11-03/qualification/fresh-suite/retained-files.json",
+        "sha256": "c97d97370f26b9966fe7f9615003678e814f877cee9e47e6be517fffebc5de6f"
+      }
+    }
+  ],
+  "supportingEvidence": [
+    {
+      "file": "tests/fixtures/jupiter-reviewed-2026-11-03/qualification/own-artifacts.json",
+      "sha256": "8ffdb5f76d09b26fbebe07b2d69b75ec5f99ac7312a5f32dfa48901e9bd212e0"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "Cargo.lock",
+      "sha256": "f8441f75c242e296bf432f73d675be3df95a438e70a05f3648ccdbbf9ec2799d"
+    },
+    {
+      "file": "Cargo.toml",
+      "sha256": "0e23f79a972da75bcb0124111dd9da7c947419c7065f39c2d67247c7f30b3d7c"
+    },
+    {
+      "file": "crates/jupiter-route/Cargo.toml",
+      "sha256": "b3fa3377b98afadd76c94a209df68979bfb64ee57616064098ff00cf47702ac5"
+    },
+    {
+      "file": "crates/jupiter-route/src/isolation.rs",
+      "sha256": "79aaf751503f5cb2cc72431734c6e940f7335479442c09a1b0d21c8932c7b298"
+    },
+    {
+      "file": "crates/jupiter-route/src/lib.rs",
+      "sha256": "1c95a7a0bb278825cffaab351b102ae15a376e704235a7e16fe996e8cc7dd07a"
+    },
+    {
+      "file": "crates/pooled-core/Cargo.toml",
+      "sha256": "82f9b34a0910e128f121221e05f51da25223a6ebe0c693efb2d6fafac6088f8c"
+    },
+    {
+      "file": "crates/pooled-core/src/lib.rs",
+      "sha256": "67b6de6f8c667c8340475374292bab58d0906ddde8afbc0566287330b5748204"
+    },
+    {
+      "file": "crates/pooled-core/src/tests.rs",
+      "sha256": "364959ca8d6c1df6fe20827175749fca60f60812009e6dd6118201573b7148af"
+    },
+    {
+      "file": "crates/pooled-core/src/wide.rs",
+      "sha256": "49151798119b11ed9a19b66f58c0144f4044bda8dc7cf42102177283bebdc1a6"
+    },
+    {
+      "file": "programs/shortwin-simple/Cargo.toml",
+      "sha256": "810c33754c62b57a18ab47f1bd3adf77d936caa8b3b9b8ffc244521ba59b6c37"
+    },
+    {
+      "file": "programs/shortwin-simple/src/errors.rs",
+      "sha256": "d714d22b8af5c93cf84bb76b855c53d7f7fef03e87e5a70902acbfc71b506d11"
+    },
+    {
+      "file": "programs/shortwin-simple/src/events.rs",
+      "sha256": "00dbe7df26b9a001ac9c903f99776a859978ad6e48ff229263a52a8d19aaa088"
+    },
+    {
+      "file": "programs/shortwin-simple/src/exits.rs",
+      "sha256": "82635c8195a86880d51c9831b9c38d9d4ea6d5203ae38865273fcd04f8bfd617"
+    },
+    {
+      "file": "programs/shortwin-simple/src/finance.rs",
+      "sha256": "11772d4eac5e7b0605368d27c4b686df3fa8ff9dad46a580287d842cf11533f2"
+    },
+    {
+      "file": "programs/shortwin-simple/src/initialization.rs",
+      "sha256": "92e485d6b470a640ecfc5f56183150d0893101e7cc4f908731f02f83bdec50c8"
+    },
+    {
+      "file": "programs/shortwin-simple/src/lender.rs",
+      "sha256": "799988e179e49d2739f0df767a32a0fe59e3de663909c203e15362cd097c4a72"
+    },
+    {
+      "file": "programs/shortwin-simple/src/lib.rs",
+      "sha256": "633ec11a2a3d04a22cfe1e6246289b3678778a2c8616de2e6eca2eef6d820b96"
+    },
+    {
+      "file": "programs/shortwin-simple/src/open.rs",
+      "sha256": "8e407d9f69f6714f333d265000385dec4ddf784ec9debe81ac9dec928c4c1da5"
+    },
+    {
+      "file": "programs/shortwin-simple/src/reference.rs",
+      "sha256": "b786577816dab47d688d1fdf5c10793ddd94cff1367a52cfc968b92341a88b67"
+    },
+    {
+      "file": "programs/shortwin-simple/src/route.rs",
+      "sha256": "9af054ca3a5994ce42a47b8de4a4ddba08fa617f41ab918135881ce6dabc29ea"
+    },
+    {
+      "file": "programs/shortwin-simple/src/state.rs",
+      "sha256": "4588d9272a629165cb1bfaeaafa0a9d207127e493aedbefd5d28ca0504b9b8e9"
+    },
+    {
+      "file": "scripts/capture-current-route-matrix.py",
+      "sha256": "195ebce968ccea486cba077d57017676fbdd4e31a678edd26388736199f9cc38"
+    },
+    {
+      "file": "scripts/capture-jupiter-deployment.py",
+      "sha256": "06a8bfafe7edd0d99c1a0034f2790da6f6b5322444069792e0217028db54d082"
+    },
+    {
+      "file": "scripts/materialize-current-route-candidate.py",
+      "sha256": "f503cd1395d7131c629bd7890d4ce65487a90f0870e1c53055a175b0338232d8"
+    },
+    {
+      "file": "scripts/materialize-reviewed-route-candidate.py",
+      "sha256": "92804610b88a0f3212a066f43e749943f14492227d5fba1180c726e6edca54ca"
+    },
+    {
+      "file": "scripts/qualify-current-routes.py",
+      "sha256": "75e2b1ac85d9a18de7d57402b0d2d7ec1b154fcc9081727ec6e6ac72b294dbbb"
+    },
+    {
+      "file": "scripts/qualify-reviewed-route-suite.py",
+      "sha256": "2f5a6fa42ee0dae55304534d35b4474d217ce96aa888dc5c5fd5199e55e8dd6d"
+    },
+    {
+      "file": "tests/runtime/Cargo.toml",
+      "sha256": "c35876971c1b73ec8df6d2d50ebb214c2149354686343173d896fe1ee13be88f"
+    },
+    {
+      "file": "tests/runtime/examples/qualify_current_route.rs",
+      "sha256": "68b05eb2792951c660a410a7618761ab3bbda2d3e6d956e88605dc5521292c8e"
+    },
+    {
+      "file": "tests/runtime/src/env.rs",
+      "sha256": "84d0548d41fa75393191161ffdf6e1c404ba65d372c35e1741f683991ce68541"
+    },
+    {
+      "file": "tests/runtime/src/exit_case.rs",
+      "sha256": "a4e0b8a53e6122213c41e3e3785e7251b518e5db8c088a16c10eb0e7190b82b2"
+    },
+    {
+      "file": "tests/runtime/src/jupiter.rs",
+      "sha256": "f303db7bde63df5ef9de9a05a5ae5322c686c3caad8d2eab5ff7dee0dc26bfd2"
+    },
+    {
+      "file": "tests/runtime/src/lib.rs",
+      "sha256": "0f200850502a86ca3e55da1f626c51eae10083d023b7ca96a3d58838aa7441be"
+    },
+    {
+      "file": "tests/runtime/src/position_case.rs",
+      "sha256": "915ef92d2753ae8021b1ec2ef0af5fbc061936442b7ea78c213800c674bc23d6"
+    },
+    {
+      "file": "tests/runtime/src/tokens.rs",
+      "sha256": "88cfcea3b5fded04d45fc35865a9f46b5ea543a149796fadccd4b16226f8973c"
+    }
+  ]
+}

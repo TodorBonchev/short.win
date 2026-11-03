@@ -45,6 +45,21 @@ fn n(v: &Value) -> Result<u64> {
 fn sha(b: &[u8]) -> String {
     format!("{:x}", Sha256::digest(b))
 }
+fn review_hash(value: &Value) -> Result<[u8; 32]> {
+    let text = value.as_str().ok_or("reviewed ELF digest missing")?;
+    if text.len() != 64 || !text.is_ascii() {
+        return Err("reviewed ELF digest must be 32-byte hex".into());
+    }
+    let mut bytes = [0; 32];
+    for (i, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&text[2 * i..2 * i + 2], 16)
+            .map_err(|_| "reviewed ELF digest is invalid hex")?;
+    }
+    if bytes == [0; 32] {
+        return Err("reviewed ELF digest cannot be zero".into());
+    }
+    Ok(bytes)
+}
 fn checked(root: &Path, file: &Value, expected: &Value) -> Result<Vec<u8>> {
     let relative = Path::new(file.as_str().ok_or("file missing")?);
     if relative.is_absolute()
@@ -244,6 +259,12 @@ fn run(manifest: &Path, out: &Path, report: &mut Value) -> Result<()> {
     }
     report["manifest_sha256"] = json!(sha(&bytes));
     report["name"] = v["name"].clone();
+    report["program_id"] = json!(shortwin_simple::ID.to_string());
+    for field in ["review_provenance", "execution_context"] {
+        if !v[field].is_null() {
+            report[field] = v[field].clone();
+        }
+    }
     let root = manifest.parent().ok_or("manifest directory missing")?;
     let own = std::fs::read(pda::program_so_path()).map_err(|e| e.to_string())?;
     if Some(sha(&own).as_str()) != v["own_program_sha256"].as_str() {
@@ -284,10 +305,27 @@ fn run(manifest: &Path, out: &Path, report: &mut Value) -> Result<()> {
     {
         return Err("current mint header is not initialized and no-freeze".into());
     }
+    let program = raw
+        .get(&route::JUPITER_ID)
+        .ok_or("Jupiter Program missing")?;
+    if program.owner != pda::LOADER
+        || !program.executable
+        || program.data.len() != 36
+        || program.data[..4] != 2u32.to_le_bytes()
+        || program.data[4..] != route::JUPITER_PROGRAM_DATA.to_bytes()
+    {
+        return Err("invalid canonical Jupiter Program/ProgramData binding".into());
+    }
     let pd = raw
         .get(&route::JUPITER_PROGRAM_DATA)
         .ok_or("Jupiter ProgramData missing")?;
-    if pd.owner != pda::LOADER || pd.data.len() < 45 || pd.data[..4] != 3u32.to_le_bytes() {
+    if pd.owner != pda::LOADER
+        || pd.executable
+        || pd.data.len() < 49
+        || pd.data[..4] != 3u32.to_le_bytes()
+        || pd.data[12] > 1
+        || pd.data[45..49] != *b"\x7fELF"
+    {
         return Err("invalid Jupiter ProgramData".into());
     }
     let deploy_slot = u64::from_le_bytes(pd.data[4..12].try_into().unwrap());
@@ -299,11 +337,18 @@ fn run(manifest: &Path, out: &Path, report: &mut Value) -> Result<()> {
         + 1;
     let digest = Sha256::digest(&pd.data[45..end]);
     let pd_len = pd.data.len() as u32;
-    report["jupiter"] = json!({"deploy_slot":deploy_slot,"programdata_len":pd_len,"programdata_sha256":sha(&pd.data),"trimmed_elf_sha256":sha(&pd.data[45..end])});
+    report["jupiter"] = json!({"deploy_slot":deploy_slot,"programdata_len":pd_len,"program_sha256":sha(&program.data),"programdata_sha256":sha(&pd.data),"trimmed_elf_sha256":sha(&pd.data[45..end])});
     let slot = n(&v["context_slot"])?;
     let timestamp = v["block_time"].as_i64().ok_or("block time missing")?;
     if slot <= deploy_slot {
         return Err("execution slot precedes reviewed deployment".into());
+    }
+    if !v["execution_context"].is_null()
+        && (v["execution_context"]["slot"] != slot
+            || v["execution_context"]["unix_timestamp"] != timestamp
+            || v["execution_context"]["synthetic_vm_clock"] != true)
+    {
+        return Err("execution context does not bind assigned synthetic VM Clock".into());
     }
     let mut clock = env.svm.get_sysvar::<Clock>();
     clock.slot = slot;
@@ -353,6 +398,76 @@ fn run(manifest: &Path, out: &Path, report: &mut Value) -> Result<()> {
     args.jupiter_deploy_slot = deploy_slot;
     args.jupiter_program_data_len = pd_len;
     args.jupiter_elf_hash = digest.into();
+    if !v["reviewed_deployment"].is_null() {
+        args.jupiter_deploy_slot = n(&v["reviewed_deployment"]["deploy_slot"])?;
+        args.jupiter_program_data_len =
+            u32::try_from(n(&v["reviewed_deployment"]["programdata_len"])?)
+                .map_err(|_| "reviewed ProgramData length exceeds u32")?;
+        args.jupiter_elf_hash = review_hash(&v["reviewed_deployment"]["elf_sha256"])?;
+        report["reviewed_deployment"] = v["reviewed_deployment"].clone();
+    }
+    if v["replay_mode"] == "predecessor_pin_initialization_refusal" {
+        if args.jupiter_deploy_slot >= deploy_slot {
+            return Err("predecessor review must predate loaded deployment".into());
+        }
+        let mut protected: Vec<_> = raw
+            .keys()
+            .copied()
+            .filter(|k| !dynamic.contains(k))
+            .collect();
+        protected.extend([
+            pda::config(),
+            pda::policy(1),
+            env.upgrade_authority.pubkey(),
+            env.governance.pubkey(),
+            env.emergency.pubkey(),
+            env.reporter.pubkey(),
+            env.fee_recipient.pubkey(),
+        ]);
+        protected.sort();
+        protected.dedup();
+        let before: Vec<_> = protected.iter().map(|k| env.svm.get_account(k)).collect();
+        let result = env.initialize(args);
+        let (metadata, error) = match result {
+            Ok(m) => (m, None),
+            Err(e) => (e.meta, Some(format!("{:?}", e.err))),
+        };
+        let logs = metadata.logs.join("\n") + "\n";
+        let log_file = "predecessor_pin_initialize.log";
+        std::fs::write(out.join(log_file), logs.as_bytes()).map_err(|e| e.to_string())?;
+        report["transactions"]["predecessor_pin_initialize"] = json!({"compute_units":metadata.compute_units_consumed,"error":error,"log_file":log_file,"log_sha256":sha(logs.as_bytes())});
+        if protected
+            .iter()
+            .map(|k| env.svm.get_account(k))
+            .collect::<Vec<_>>()
+            != before
+        {
+            return Err("predecessor pin refusal mutated protected initializer/DEX state".into());
+        }
+        report["predecessor_pin_protected_state_unchanged"] = json!(true);
+        if !error.as_ref().is_some_and(|e| e.contains("Custom(6039)"))
+            || !logs.contains("RouteAccounts")
+            || logs.contains(&format!("Program {} invoke", route::JUPITER_ID))
+        {
+            return Err(
+                "predecessor pin did not produce exact pre-CPI RouteAccounts refusal".into(),
+            );
+        }
+        report["predecessor_pin_rejected"] = json!(true);
+        return Err(format!(
+            "predecessor reviewed deployment refused: {}",
+            error.unwrap()
+        ));
+    }
+    if !v["replay_mode"].is_null() {
+        return Err("unsupported replay mode".into());
+    }
+    if args.jupiter_deploy_slot != deploy_slot
+        || args.jupiter_program_data_len != pd_len
+        || args.jupiter_elf_hash.as_slice() != digest.as_slice()
+    {
+        return Err("positive reviewed deployment differs from exact loaded bytes".into());
+    }
     assert_ok(env.initialize(args));
     let borrower = deterministic_key(100);
     let lender = deterministic_key(101);
@@ -662,6 +777,8 @@ fn run(manifest: &Path, out: &Path, report: &mut Value) -> Result<()> {
     {
         return Err("rejected transaction did not restore protected protocol/DEX state".into());
     }
+    report["rejected_route_protected_state_unchanged"] = json!(true);
+    report["rejected_route_protected_account_count"] = json!(protected.len());
     let rollback_log = std::fs::read_to_string(out.join("post_swap_fee_bound_rollback.log"))
         .map_err(|e| e.to_string())?;
     if !rollback_log
@@ -864,6 +981,8 @@ fn run(manifest: &Path, out: &Path, report: &mut Value) -> Result<()> {
     report["external_liquidity_account_count"] = json!(external.len());
     report["liquidity_conservation_scope"] = json!("All captured raw and both-route outer account keys, including initially absent PDAs; native curve/fee/rent plus WSOL vault lamports, excluding protocol financial actors/accounts and scratch; WSOL data delta retained separately without double counting.");
     report["base_token_conservation"] = json!(true);
+    report["native_lamport_conservation"] = json!(true);
+    report["lifecycle_invariants"] = json!({"principal_exposure_and_vault":true,"whole_q_buyback_credit":true,"actual_paid_fees_and_collateral":true,"actor_rent_and_setup_refunds":true,"scratch_closure":true,"mint_and_dex_token_metadata_unchanged":true,"post_cpi_rollback":true});
     report["wsol_delta_lamports"] = json!(wsol_delta.to_string());
     report["actual_snapshot_packets_fit"] = json!(report["packet_fit_failures"]
         .as_object()

@@ -1,0 +1,257 @@
+{
+  "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-active-8mC1",
+  "capture_snapshot_checks": {
+    "actual_circulation_outside_curve": 0,
+    "actual_curve_vault_tokens": 1000000000000000,
+    "actual_real_sol": 9,
+    "actual_supply": 1000000000000000,
+    "buy": {
+      "blockhash_metadata": {
+        "blockhash": [
+          241,
+          24,
+          181,
+          176,
+          18,
+          59,
+          116,
+          73,
+          20,
+          23,
+          244,
+          50,
+          135,
+          205,
+          132,
+          66,
+          189,
+          196,
+          23,
+          147,
+          112,
+          5,
+          255,
+          178,
+          239,
+          4,
+          213,
+          106,
+          70,
+          140,
+          130,
+          213
+        ],
+        "fetchedAt": {
+          "nanos_since_epoch": 702773950,
+          "secs_since_epoch": 1793689201
+        },
+        "lastValidBlockHeight": 442827937
+      },
+      "checks": {
+        "exact_domain": true,
+        "excluded_labels_absent": true,
+        "header_input": true,
+        "header_no_fees": true,
+        "header_quote": true,
+        "header_slippage50": true,
+        "header_threshold": true,
+        "jupiter_program": true,
+        "no_extra_signers": true,
+        "ordinary_route_v2": true,
+        "output_bounds": true,
+        "route_data_le768": true,
+        "service_total_metas_le40": true,
+        "slippage50": true,
+        "steps_le8": true,
+        "total_metas_le48": true
+      },
+      "cpi_execution_qualified": false,
+      "envelope_pass": true,
+      "expected_output": 1689316427236,
+      "history_qualified": false,
+      "labels": [
+        "Pump.fun"
+      ],
+      "minimum_output": 1680869845100,
+      "request_amount": 47897393,
+      "request_max_accounts": 32,
+      "response_file": "buy-1-accounts32.json",
+      "response_sha256": "da8e7eba37b97d8c6ad045a3417bdd5e111e4c6a43aae0e67e93e15827f5f9f8",
+      "route_data_bytes": 41,
+      "route_plan": [
+        {
+          "bps": 10000,
+          "percent": 100,
+          "swapInfo": {
+            "ammKey": "CE3qv6pxWZ1UTU2k7fWeQTvHUGQsXPq7htbveJ6kW4e",
+            "inAmount": "47897393",
+            "inputMint": "So11111111111111111111111111111111111111112",
+            "label": "Pump.fun",
+            "outAmount": "1689316427236",
+            "outputMint": "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump"
+          }
+        }
+      ],
+      "side": "buy",
+      "total_metas": 30
+    },
+    "checks": {
+      "snapshot_has_actual_circulation_for_ten_q": false,
+      "snapshot_mint_matches_discovery": true,
+      "snapshot_real_sol_covers_sell_quote": false
+    },
+    "sell": {
+      "blockhash_metadata": {
+        "blockhash": [
+          22,
+          251,
+          52,
+          217,
+          156,
+          212,
+          69,
+          156,
+          155,
+          107,
+          236,
+          241,
+          38,
+          105,
+          71,
+          167,
+          43,
+          243,
+          127,
+          78,
+          77,
+          251,
+          133,
+          157,
+          7,
+          102,
+          83,
+          227,
+          126,
+          15,
+          23,
+          215
+        ],
+        "fetchedAt": {
+          "nanos_since_epoch": 909924793,
+          "secs_since_epoch": 1793689192
+        },
+        "lastValidBlockHeight": 442827896
+      },
+      "checks": {
+        "exact_domain": true,
+        "excluded_labels_absent": true,
+        "header_input": true,
+        "header_no_fees": true,
+        "header_quote": true,
+        "header_slippage50": true,
+        "header_threshold": true,
+        "jupiter_program": true,
+        "no_extra_signers": true,
+        "ordinary_route_v2": true,
+        "output_bounds": true,
+        "route_data_le768": true,
+        "service_total_metas_le40": true,
+        "slippage50": true,
+        "steps_le8": true,
+        "total_metas_le48": true
+      },
+      "cpi_execution_qualified": false,
+      "envelope_pass": true,
+      "expected_output": 45845793,
+      "history_qualified": false,
+      "labels": [
+        "Pump.fun"
+      ],
+      "minimum_output": 45616565,
+      "request_amount": 1663081295316,
+      "request_max_accounts": 32,
+      "response_file": "sell-accounts32.json",
+      "response_sha256": "f6532db180fa60e959734a85579742771cefb37b8fa78423af9c81eb3d8f2d29",
+      "route_data_bytes": 40,
+      "route_plan": [
+        {
+          "bps": 10000,
+          "percent": 100,
+          "swapInfo": {
+            "ammKey": "CE3qv6pxWZ1UTU2k7fWeQTvHUGQsXPq7htbveJ6kW4e",
+            "inAmount": "1663081295316",
+            "inputMint": "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump",
+            "label": "Pump.fun",
+            "outAmount": "45845793",
+            "outputMint": "So11111111111111111111111111111111111111112"
+          }
+        }
+      ],
+      "side": "sell",
+      "total_metas": 30
+    },
+    "snapshot_slot": 464806818
+  },
+  "checks": {
+    "actual_circulation_covers_synthetic_ten_q": true,
+    "curve_incomplete": true,
+    "curve_lamports_cover_real_sol": true,
+    "freeze_authority_none": true,
+    "initialized": true,
+    "metadata_extension_types": [
+      18,
+      19
+    ],
+    "metadata_only_full_borsh_and_mint_binding": true,
+    "mint_owner_token2022": true,
+    "native_sol_quote": true,
+    "real_sol_at_least_twenty_target": true,
+    "same_bank": true
+  },
+  "quantity": 1663081295316,
+  "scope": "physical inventory and metadata-layout selection only; actual CPI replay separate",
+  "selected_matrix_unchanged": true,
+  "selected_mint": "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump",
+  "source_discovery_files": [
+    "tokens-toptraded-5m.json",
+    "tokens-recent.json"
+  ],
+  "target_lamports": 50000000,
+  "three_mints_max_checked": 3,
+  "witness": {
+    "cashback_flag": 0,
+    "circulating_outside_curve": 38257646482866,
+    "complete": 0,
+    "context_slot": 464806429,
+    "curve": "CE3qv6pxWZ1UTU2k7fWeQTvHUGQsXPq7htbveJ6kW4e",
+    "curve_sha256": "f10a049016c3f832382497c3658bbbb196ec0c2bab297c1939c42f677351bd76",
+    "curve_vault_tokens": 961742353517134,
+    "mayhem_flag": 0,
+    "metadata_extension_types": [
+      18,
+      19
+    ],
+    "metadata_tlv_bounded_only": true,
+    "mint": "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump",
+    "mint_length": 416,
+    "mint_sha256": "3e0588a5c0f64c8c0112341b56c145aadcf3a095afc814c14fa01eb75d5f581d",
+    "mint_supply": 1000000000000000,
+    "native_sol_quote": true,
+    "physical_candidate_only": false,
+    "real_quote_raw": 1109193412,
+    "real_tokens": 754842353517134,
+    "single_bank_inventory_witness": true,
+    "source_contexts": {
+      "curve": 464806429,
+      "mint": 464806429,
+      "vault": 464806429
+    },
+    "suggested_quantity_raw": 3326162590632,
+    "target_lamports_proxy": 100000000,
+    "ten_q_tokens": 33261625906320,
+    "vault": "5YajjwqsoJ9JKzgDTCScVwZU3eMJnHqQ9xUgcW43xbp7",
+    "vault_sha256": "016781cf05e1a0ad1314669b6274b79a0f9443d2c9277e1e62acc3966aa90f57",
+    "virtual_quote_raw": 31109193412,
+    "virtual_tokens": 1034742353517134
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "checked_at": "2026-11-03T06:58:42.885218+00:00",
+  "requests": [
+    {
+      "file": "mint-curve-vault-1.json",
+      "finished_at": "2026-11-03T06:58:42.884933+00:00",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "date": "Tue, 03 Nov 2026 06:58:42 GMT"
+      },
+      "length": 4523,
+      "method": "getMultipleAccounts",
+      "provider": "Solana public mainnet RPC",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "2J6RFFxoqYire6i4mMprvgfGehDWsVg9cLQjgatLpump",
+            "3Q5wnbqovSD57nDwRqfcSrQAcqNcg7cLJgn1CZ6L8MFJ",
+            "5YajjwqsoJ9JKzgDTCScVwZU3eMJnHqQ9xUgcW43xbp7",
+            "73fkr6uV7AzwgXcwjsH8Cs5DqsRu4znCBHXbBCb5AFkG",
+            "8U9YXarKgvZhxH9krTvQd2CduRk7TzF3mcfPbHFi1ZYJ",
+            "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump",
+            "8zxZ9S4EwogtSgPaDEV124wKS9CGHP9NuPLiySDy62w5",
+            "CE3qv6pxWZ1UTU2k7fWeQTvHUGQsXPq7htbveJ6kW4e",
+            "FnWp4AgJUGRLWiTeHbiXEE7BA1McUXfmNQFQqW2ppump"
+          ],
+          {
+            "commitment": "confirmed",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "sha256": "d55ae4d7fbb79ab19104828591baec78a99b16ff5b109f2cb7b293b236b80cde",
+      "started_at": "2026-11-03T06:58:42.766263+00:00",
+      "status": 200
+    }
+  ],
+  "rows": [
+    {
+      "cashback_flag": 0,
+      "circulating_outside_curve": 156957674129420,
+      "complete": 0,
+      "context_slot": 464806429,
+      "curve": "8zxZ9S4EwogtSgPaDEV124wKS9CGHP9NuPLiySDy62w5",
+      "curve_sha256": "1ce1a8df2d97e648ecd855f93a9c6b37bf1c7c597c7db9b28443380901c3f9d0",
+      "curve_vault_tokens": 843042325870580,
+      "mayhem_flag": 0,
+      "metadata_extension_types": [
+        18,
+        19
+      ],
+      "metadata_tlv_bounded_only": true,
+      "mint": "FnWp4AgJUGRLWiTeHbiXEE7BA1McUXfmNQFQqW2ppump",
+      "mint_length": 398,
+      "mint_sha256": "4ec7cc0445eb13d4b7ffba0c4fee3f89f5ac1b678139368e4d6c27c483208a77",
+      "mint_supply": 1000000000000000,
+      "native_sol_quote": false,
+      "physical_candidate_only": false,
+      "real_quote_raw": 4651054882,
+      "real_tokens": 636142325870580,
+      "single_bank_inventory_witness": true,
+      "source_contexts": {
+        "curve": 464806429,
+        "mint": 464806429,
+        "vault": 464806429
+      },
+      "suggested_quantity_raw": 2881024238662,
+      "target_lamports_proxy": 100000000,
+      "ten_q_tokens": 28810242386620,
+      "vault": "3Q5wnbqovSD57nDwRqfcSrQAcqNcg7cLJgn1CZ6L8MFJ",
+      "vault_sha256": "4ac5ccab97b0eb4d9ad8b96f448a82fb6475ec297b375ff2ca04eff981daf98a",
+      "virtual_quote_raw": 31795717425,
+      "virtual_tokens": 916042325870580
+    },
+    {
+      "cashback_flag": 0,
+      "circulating_outside_curve": 38257646482866,
+      "complete": 0,
+      "context_slot": 464806429,
+      "curve": "CE3qv6pxWZ1UTU2k7fWeQTvHUGQsXPq7htbveJ6kW4e",
+      "curve_sha256": "f10a049016c3f832382497c3658bbbb196ec0c2bab297c1939c42f677351bd76",
+      "curve_vault_tokens": 961742353517134,
+      "mayhem_flag": 0,
+      "metadata_extension_types": [
+        18,
+        19
+      ],
+      "metadata_tlv_bounded_only": true,
+      "mint": "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump",
+      "mint_length": 416,
+      "mint_sha256": "3e0588a5c0f64c8c0112341b56c145aadcf3a095afc814c14fa01eb75d5f581d",
+      "mint_supply": 1000000000000000,
+      "native_sol_quote": true,
+      "physical_candidate_only": false,
+      "real_quote_raw": 1109193412,
+      "real_tokens": 754842353517134,
+      "single_bank_inventory_witness": true,
+      "source_contexts": {
+        "curve": 464806429,
+        "mint": 464806429,
+        "vault": 464806429
+      },
+      "suggested_quantity_raw": 3326162590632,
+      "target_lamports_proxy": 100000000,
+      "ten_q_tokens": 33261625906320,
+      "vault": "5YajjwqsoJ9JKzgDTCScVwZU3eMJnHqQ9xUgcW43xbp7",
+      "vault_sha256": "016781cf05e1a0ad1314669b6274b79a0f9443d2c9277e1e62acc3966aa90f57",
+      "virtual_quote_raw": 31109193412,
+      "virtual_tokens": 1034742353517134
+    },
+    {
+      "cashback_flag": 0,
+      "circulating_outside_curve": 0,
+      "complete": 0,
+      "context_slot": 464806429,
+      "curve": "73fkr6uV7AzwgXcwjsH8Cs5DqsRu4znCBHXbBCb5AFkG",
+      "curve_sha256": "afd7b0d2d2c9a46e5f19f68498a498834c24f9bb04fbd742c52b047754f1ad12",
+      "curve_vault_tokens": 1000000000000000,
+      "mayhem_flag": 0,
+      "metadata_extension_types": [
+        18,
+        19
+      ],
+      "metadata_tlv_bounded_only": true,
+      "mint": "2J6RFFxoqYire6i4mMprvgfGehDWsVg9cLQjgatLpump",
+      "mint_length": 404,
+      "mint_sha256": "5bc76f79604a35753e146d9428d939a66032f17cd7485ddacfe4e05cb416e67c",
+      "mint_supply": 1000000000000000,
+      "native_sol_quote": false,
+      "physical_candidate_only": false,
+      "real_quote_raw": 17,
+      "real_tokens": 793100000000000,
+      "single_bank_inventory_witness": true,
+      "source_contexts": {
+        "curve": 464806429,
+        "mint": 464806429,
+        "vault": 464806429
+      },
+      "suggested_quantity_raw": 127988816683,
+      "target_lamports_proxy": 100000000,
+      "ten_q_tokens": 1279888166830,
+      "vault": "8U9YXarKgvZhxH9krTvQd2CduRk7TzF3mcfPbHFi1ZYJ",
+      "vault_sha256": "429a6adf95af5192a6905de1ac106ad4145fda89ce70611898d712b56cc9406d",
+      "virtual_quote_raw": 838354496756,
+      "virtual_tokens": 1073000000000000
+    }
+  ],
+  "scope": "Physical inventory witness only, not oracle price/admission/CPI qualification"
+}

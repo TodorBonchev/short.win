@@ -1,0 +1,90 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      14,
+      251,
+      78,
+      193,
+      137,
+      187,
+      35,
+      185,
+      239,
+      7,
+      54,
+      113,
+      27,
+      171,
+      186,
+      142,
+      33,
+      30,
+      42,
+      184,
+      152,
+      215,
+      228,
+      187,
+      251,
+      11,
+      17,
+      222,
+      11,
+      252,
+      144,
+      215
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 372101891,
+      "secs_since_epoch": 1793689535
+    },
+    "lastValidBlockHeight": 442829500
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 49826643,
+  "history_qualified": false,
+  "labels": [
+    "Meteora DLMM"
+  ],
+  "minimum_output": 49577510,
+  "request_amount": 132636970,
+  "request_max_accounts": 32,
+  "response_file": "sell-accounts32.json",
+  "response_sha256": "a5c75ca05bf461f72a252dec4050c312b4dabf9cfd8779834ebfbffba7c6b500",
+  "route_data_bytes": 43,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "CcG3fyDZn6uXTV5p2TV9cceCA2YhE3bUMLeXGn6vZSNr",
+        "inAmount": "132636970",
+        "inputMint": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+        "label": "Meteora DLMM",
+        "outAmount": "49826643",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  ],
+  "side": "sell",
+  "total_metas": 31
+}

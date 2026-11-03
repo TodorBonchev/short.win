@@ -1,0 +1,90 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      228,
+      188,
+      54,
+      127,
+      91,
+      216,
+      200,
+      199,
+      64,
+      138,
+      246,
+      48,
+      206,
+      247,
+      39,
+      35,
+      107,
+      190,
+      103,
+      176,
+      112,
+      50,
+      211,
+      157,
+      200,
+      172,
+      151,
+      129,
+      78,
+      72,
+      201,
+      215
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 716097379,
+      "secs_since_epoch": 1793689757
+    },
+    "lastValidBlockHeight": 442830532
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 49263222,
+  "history_qualified": false,
+  "labels": [
+    "Pump.fun Amm"
+  ],
+  "minimum_output": 49016906,
+  "request_amount": 132636970,
+  "request_max_accounts": 32,
+  "response_file": "sell-accounts32.json",
+  "response_sha256": "fd45d042f8885de9398eeb6630fc7997ff6e7cae968ea78dcddb011d96f74250",
+  "route_data_bytes": 40,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
+        "inAmount": "132636970",
+        "inputMint": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+        "label": "Pump.fun Amm",
+        "outAmount": "49263222",
+        "outputMint": "So11111111111111111111111111111111111111112"
+      }
+    }
+  ],
+  "side": "sell",
+  "total_metas": 30
+}

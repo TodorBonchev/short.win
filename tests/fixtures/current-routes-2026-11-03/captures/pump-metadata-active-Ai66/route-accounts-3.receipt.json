@@ -1,0 +1,61 @@
+{
+  "finished_at": "2026-11-03T07:05:46.703224+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 03 Nov 2026 07:05:45 GMT"
+  },
+  "length": 4040155,
+  "method": "getMultipleAccounts",
+  "provider": "Solana public mainnet RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "11111111111111111111111111111111",
+        "2Mb8ULSbpgRSp4fcN2pAa6GKSV8wPnsvGaZpxRrCnTUB",
+        "3MMDW4cLt5GEMTkb9B1cYB2E7z9pbss5Ki7C38kP7Kzr",
+        "3VBxTYx4QrdvQFj4fE8jvjpVtCwnuyHJyamKsHPhVn2C",
+        "3fAo2wmXaGkwSUfRjfKSwT3WjkrkfbYNZ13qGJatFejn",
+        "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+        "4ezG1FgUrxDcpoQ2ZX6gfQoBWCGLAAd9inFinwvK4f2R",
+        "5PHirr8joyTMp9JMm6nW7hNDVyEYdkzDqazxPD7RaTjx",
+        "6dVwpapuAWBZtaiT6asXbksYAD62EsuceYxFYBuEwqSm",
+        "6w94mKJbM8GwKnbTZLcnpxS8BK12giE8tWtkH49nG3Ps",
+        "78JekrQc3g9KKkipwEeG6kV4Epq573R3Pd6GDE4Xz9Hv",
+        "7jv3KTpMKEa8VVJfajRoK8CNH2LCPXnCXsVqgHAZTDu7",
+        "7ozrA7KWwbZDpEDac2cZxSgAWSeXydLgPsUFxmtgbpaJ",
+        "8ktMHvFCSq1JK7jBCQyojN29qkvMc7MaGKAT7PkvSKsS",
+        "97ZmY2bQrNRBwdNPZizy7T2bpB81bR34rCDKkYNj3jFu",
+        "ADyA8hdefvWN2dbGGWFotbzWxrAvLW83WG6QCVXvJKqw",
+        "AeTEdiKYaT25nUTGJZdjyR4qEWyjcQgNvQEVH1jR2CRw",
+        "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+        "BHfqFwNmsGahZuQYcpYUuP7UAzn1hDAG7xXeESmDz86K",
+        "CcG3fyDZn6uXTV5p2TV9cceCA2YhE3bUMLeXGn6vZSNr",
+        "D1ZN9Wj1fRSUQfCjhvnu1hqDMT7hzjzBBpi12nVniYD6",
+        "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+        "DmQsrKiD1gwkEHPrcvGCYs11dSSdYoKBXHgNH3RKduTa",
+        "GS4CU59F31iL7aR2Q8zVS8DRrcRnXX1yjQ66TqNVQnaR",
+        "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
+        "HjQjngTDqoHE6aaGhUqfz9aQ7WZcBRjy5xB8PScLSr8i",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+        "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+        "So11111111111111111111111111111111111111112",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "jyRYT9FBYZKEJ3o8Dfk1B9oA5Ah6aJe2nQe7nx9v6cf",
+        "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+        "xWrFcmY3QFCsdaspQNZmCayVNWKVnYwHJ1Bo3ELuz1s"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "c6d16a70c78c7609a6331cff0ce795f168a3efd5e5364bd2bd044c0471ea8e6c",
+  "started_at": "2026-11-03T07:05:46.365941+00:00",
+  "status": 200
+}

@@ -1,0 +1,9 @@
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh invoke [1]
+Program log: Instruction: Initialize
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program 11111111111111111111111111111111 invoke [2]
+Program 11111111111111111111111111111111 success
+Program log: AnchorError thrown in programs/shortwin-simple/src/route.rs:140. Error Code: RouteAccounts. Error Number: 6039. Error Message: Route accounts do not match the isolated execution.
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh consumed 19076 of 200000 compute units
+Program BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh failed: custom program error: 0x1797

@@ -1,0 +1,253 @@
+{
+  "api_key_present": false,
+  "live_transactions_sent": 0,
+  "matrix": "tests/runtime/current-routes-2026-11-03.json",
+  "matrix_sha256": "63bd4f700a7b826482d355ec489e9223f5a44bfb400abc685d4b01774136923d",
+  "metadata_selection_basis": "root approved after full lifecycle plus old-pin refusal actual-SBF probes passed on both financial ELFs; final full matrix run pending",
+  "metadata_selection_checks": "discovery-mature-metadata/ai66-pumpamm-selection-checks.json",
+  "preserved_initial_matrix": "initial-route-matrix.json",
+  "preserved_initial_quote_selection": "capture-selection-initial-quotes.json",
+  "rejected_attempts": [
+    {
+      "capture": "captures/pump-metadata-current-8GV",
+      "outcome": "collector legacy plain82 eligibility refusal; no route quote requested"
+    },
+    {
+      "capture": "captures/pump-metadata-current-8GV-retry",
+      "outcome": "whole-q virtual-curve quote available, but actual-SBF Pump SellV3 overflow6024; exact curve holds full mint supply and negligible real SOL; unavailable as positive"
+    },
+    {
+      "capture": "captures/pump-metadata-current-8GV-retry2",
+      "outcome": "fresh same-q virtual-curve recapture; curve still has no actual outside circulation and negligible real SOL; retained diagnostic"
+    },
+    {
+      "capture": "captures/pump-metadata-active-8mC1",
+      "outcome": "actual SOL and circulation present in discovery but absent at capture; rejected by independent captured-bank inventory checks"
+    },
+    {
+      "capture": "captures/pump-metadata-active-Ai66",
+      "outcome": "active actual inventory verified, but actual-SBF Jupiter6001 slippage after successful Meteora DLMM CPI with safe rollback; retained diagnostic"
+    }
+  ],
+  "schema": 1,
+  "scope": "fresh non-atomic mainnet inputs and input-integrity verification; full final-matrix actual-SBF execution results are separate",
+  "selected": [
+    {
+      "buy_labels": [
+        "Whirlpool"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/bonk-production",
+      "captured_at": "2026-11-03T06:43:58.227210+00:00",
+      "diagnostic_ineligible_capture": false,
+      "expected_replay_outcome": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+      "mint_eligible_plain82_rule": true,
+      "name": "bonk-production",
+      "quantity": 400000000000,
+      "request_dexes": null,
+      "request_exclude_dexes": "Scorch",
+      "sell_labels": [
+        "Whirlpool"
+      ],
+      "snapshot_slot": 464802261,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Whirlpool"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-production",
+      "captured_at": "2026-11-03T06:44:36.170076+00:00",
+      "diagnostic_ineligible_capture": false,
+      "expected_replay_outcome": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-production",
+      "quantity": 40000000,
+      "request_dexes": null,
+      "request_exclude_dexes": "Scorch",
+      "sell_labels": [
+        "Raydium CLMM"
+      ],
+      "snapshot_slot": 464802443,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Raydium CLMM"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-production-retry",
+      "captured_at": "2026-11-03T06:44:51.972038+00:00",
+      "diagnostic_ineligible_capture": false,
+      "expected_replay_outcome": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-production-retry",
+      "quantity": 10000000,
+      "request_dexes": null,
+      "request_exclude_dexes": "Scorch",
+      "sell_labels": [
+        "Raydium CLMM"
+      ],
+      "snapshot_slot": 464802517,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-curve-production",
+      "captured_at": "2026-11-03T06:45:14.552364+00:00",
+      "diagnostic_ineligible_capture": false,
+      "expected_replay_outcome": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "8FxewF272LJ7Usov6PZk2gu1JKoR5Dq1v4sDqavJpump",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-curve-production",
+      "quantity": 2500000000000,
+      "request_dexes": null,
+      "request_exclude_dexes": "Scorch",
+      "sell_labels": [
+        "Pump.fun"
+      ],
+      "snapshot_slot": 464802621,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun Amm"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-graduated-production",
+      "captured_at": "2026-11-03T06:45:36.961621+00:00",
+      "diagnostic_ineligible_capture": false,
+      "expected_replay_outcome": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-graduated-production",
+      "quantity": 3500000000000,
+      "request_dexes": null,
+      "request_exclude_dexes": "Scorch",
+      "sell_labels": [
+        "Pump.fun Amm"
+      ],
+      "snapshot_slot": 464802726,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun Amm"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-active-Ai66-pumpamm",
+      "captured_at": "2026-11-03T07:09:33.767578+00:00",
+      "diagnostic_ineligible_capture": true,
+      "expected_replay_outcome": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+      "mint_eligible_plain82_rule": false,
+      "name": "pump-metadata-active-Ai66-pumpamm",
+      "quantity": 132636970,
+      "request_dexes": "Pump.fun Amm",
+      "request_exclude_dexes": null,
+      "sell_labels": [
+        "Pump.fun Amm"
+      ],
+      "snapshot_slot": 464809455,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Scorch"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-scorch-negative",
+      "captured_at": "2026-11-03T06:45:55.413405+00:00",
+      "diagnostic_ineligible_capture": false,
+      "expected_replay_outcome": "expected_fail",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-scorch-negative",
+      "quantity": 40000000,
+      "request_dexes": "Scorch",
+      "request_exclude_dexes": null,
+      "sell_labels": [
+        "Scorch"
+      ],
+      "snapshot_slot": 464802810,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Scorch"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-scorch-negative",
+      "captured_at": "2026-11-03T06:46:11.158895+00:00",
+      "diagnostic_ineligible_capture": false,
+      "expected_replay_outcome": "expected_fail",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-scorch-negative",
+      "quantity": 10000000,
+      "request_dexes": "Scorch",
+      "request_exclude_dexes": null,
+      "sell_labels": [
+        "Scorch"
+      ],
+      "snapshot_slot": 464802883,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    }
+  ],
+  "selected_metadata_capture_command": [
+    "python3",
+    "scripts/qualify-current-routes.py",
+    "--output",
+    "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-active-Ai66-pumpamm",
+    "--mint",
+    "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+    "--quantity",
+    "132636970",
+    "--program-id",
+    "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+    "--borrower",
+    "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+    "--route-budgets",
+    "16,32",
+    "--production-observation",
+    "--max-spread-bps",
+    "500",
+    "--dexes",
+    "Pump.fun Amm",
+    "--capture-ineligible"
+  ],
+  "status": "final_eight_selected_and_hash_verified",
+  "verified_decoded_accounts": 181,
+  "verified_raw_responses": 73
+}

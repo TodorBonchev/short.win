@@ -1,0 +1,20 @@
+{
+  "base_mint": "C5xph2yL6gMdxmuLGxJBkGpmuDFfyi5fqkBNhvL6pump",
+  "can_edit_creator_fee": 0,
+  "coin_creator": "2aHg1PaiGhqFJbSNxocTqWn2CC5rdt1oo3VDu6HiVs1R",
+  "creator": "4SYwqqMwctjd4Lz89yF5xCYYwhTuBr8vPheAv3366cRR",
+  "creator_fee_bps": 300,
+  "creator_fees": 6284,
+  "index": 0,
+  "is_cashback_coin": 0,
+  "is_holder_reward": 1,
+  "is_mayhem_mode": 0,
+  "lp_mint": "5RMq1b3CctWyUBj19M86LZ2m2tLHHthM8xMDRjN6q7UH",
+  "lp_supply": 56612883591,
+  "pool_base_token_account": "AhVBxmfr4s7W4ZcGnwp5eNo5i4Nv4tCE1YQrCcGDWgas",
+  "pool_bump": 255,
+  "pool_quote_token_account": "3nQRB2Tsf7VFt3kv5eeD8zT9nB1Ad6DHTTmULC7mfnUd",
+  "protocol_fees": 1454,
+  "quote_mint": "3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh",
+  "virtual_quote_reserves": 3197279
+}

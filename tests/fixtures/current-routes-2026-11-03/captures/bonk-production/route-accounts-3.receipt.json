@@ -1,0 +1,55 @@
+{
+  "finished_at": "2026-11-03T06:43:53.866647+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 03 Nov 2026 06:43:52 GMT"
+  },
+  "length": 3964401,
+  "method": "getMultipleAccounts",
+  "provider": "configured Solana RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "2gu2EXxmK51pHxdiF7nm8PLG88X6tLxSYnfmgs89NPKD",
+        "2qJr7TWGCw3qdHXSfez1YftQcyqyfDVdVGbvvJNQZkPz",
+        "3ne4mWqdYuNiYrYZC9TrA3FcfuFdErghH97vNPbjicr1",
+        "47BkLC5ReY8tfQF5Web2nk3zA4TKskdk8NARKuMGV8gE",
+        "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+        "4PQuKJgChfxBcqHoCZEYckNykmNPzDy8DpP5DsVsexpi",
+        "4dmvFGeQH2eqa3ktNHMgm4wZ8vuTukBiK9M7gxW5oR9F",
+        "5exgoTBDmaCRsZh2nWNbr6UvQVofk9PjK2H3SKo6WoBR",
+        "5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9",
+        "6JepAn8RrWxRLvZb4sCp2vjuGPxQtVrbSpf1LGq6evcd",
+        "8W9soKsGvQy1wkpdcf4iH2h2h5DxUtsi46vUQ9kcCbL9",
+        "8awKRv1oTfwBWQrM5URSzB9b93DhEYPKiPn685Xq2Zri",
+        "8rEM7SiZRaSZLHU6ouo4NULBj7ZRcRYTvib2B16TqNFG",
+        "95k7D3PCFdiVzjwLA8sYhBR1hpeiFvp1ZFEqCrMf7LA",
+        "9MSyH6ptUM1a885FUhawyYLd6YfVjDRUhqib4Apqjm3Z",
+        "A8DtyyUj56kxoNitypBrD2H2MR8uam8z957PhKBeqcnC",
+        "AaRNwYQTyx8nEx3AjtvEXakfG9qfC4pEkpps2bpoVsvA",
+        "D8cy77BBepLMngZx6ZukaTff5hCt1HrWyKk3Hnd9oitf",
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        "DyWMNHuroBvz4mhA6TU5sbk12rGoQF9ynjfiZuaDtRkS",
+        "ES7yhSrYeFo4U1PfJHNRkbfCWxCwPLk2DjrEbmN8bg58",
+        "EXpqcVuTTPEmyeVu2LHM75ha7FwmjJ88MnhSMRRdy5Sh",
+        "EdnnSWsyWn8rYEVUdM1ok7dYZLFHnpuSkYoQoG8Se8cK",
+        "GwVauCApk9fpLPhbVykLkFyhHyYm78CcZxeNTTcMUjWV",
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+        "So11111111111111111111111111111111111111112",
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+        "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "bc5c816df92fc6a0fc71fc99812523dc120f5694113958b1db7ba20479a7caa3",
+  "started_at": "2026-11-03T06:43:53.476706+00:00",
+  "status": 200
+}

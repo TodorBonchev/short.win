@@ -47,7 +47,19 @@ shared; route construction and history use the same SQLite request gate.
 
 Before activation, verify actual mainnet genesis, the canonical program/loader
 upgrade authority and the current reviewed Jupiter tuple against retained RPC
-receipts. Run the proposal verifier with `--require-assigned-roles`; incomplete
+receipts. The [2026-11-03 review](jupiter-reviewed-deployment.json) records Jupiter
+deployment slot **462802085**, ProgramData length **2892269** and trimmed ELF
+SHA-256 `f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895`.
+Fresh saved-route actual-SBF qualification passed all 18 expected outcomes for
+two separately identified own ELFs, including the exact previously duration-tested
+ELF. The post-qualification finalized RPC recheck at
+**2026-11-03 09:19:31 Europe/Sofia** observed the same tuple and program bytes.
+This dated compatibility gate is complete for those captures; it does not assign
+roles, establish funded commissioning, extend the prior duration evidence's scope
+or provide external audit approval. A changed upstream deployment requires fresh
+compatibility review.
+
+Run the proposal verifier with `--require-assigned-roles`; incomplete
 or placeholder identities must fail. Prepare and simulate the exact initialization
 packet for owner review after freezing these identities; do not infer approval
 to sign it from a completed JSON file.

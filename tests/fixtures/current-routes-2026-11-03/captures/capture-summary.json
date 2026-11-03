@@ -1,0 +1,327 @@
+{
+  "api_key_present": false,
+  "cases": [
+    {
+      "buy_labels": [
+        "Whirlpool"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/bonk-production",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/bonk-production",
+        "--mint",
+        "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+        "--quantity",
+        "400000000000",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--exclude-dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_pass",
+      "historical_recipe_sha256": "2c58b11d492cca29a18e66ea2f07e79350575f53f7321c0e0e875ddc8b298a3d",
+      "mint_eligible_plain82_rule": true,
+      "name": "bonk-production",
+      "preserved_existing_case": true,
+      "returncode": 0,
+      "sell_labels": [
+        "Whirlpool"
+      ],
+      "snapshot_slot": 464802261,
+      "status": "captured",
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Whirlpool"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-production",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/jup-production",
+        "--mint",
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "--quantity",
+        "40000000",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--exclude-dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_pass",
+      "historical_recipe_sha256": "8e9fa4358d2b14b17fd5729c5ed51102778a7e0e045aee31db0cfd02ce2f10df",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-production",
+      "preserved_existing_case": false,
+      "returncode": 0,
+      "sell_labels": [
+        "Raydium CLMM"
+      ],
+      "snapshot_slot": 464802443,
+      "status": "captured",
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Raydium CLMM"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-production-retry",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/ray-production-retry",
+        "--mint",
+        "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "--quantity",
+        "10000000",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--exclude-dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_pass",
+      "historical_recipe_sha256": "fe50d12d664ff4ac1f04d53d3fbe98809a128b7a57b8beadd49ae6f46717828a",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-production-retry",
+      "preserved_existing_case": false,
+      "returncode": 0,
+      "sell_labels": [
+        "Raydium CLMM"
+      ],
+      "snapshot_slot": 464802517,
+      "status": "captured",
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-curve-production",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/pump-curve-production",
+        "--mint",
+        "8FxewF272LJ7Usov6PZk2gu1JKoR5Dq1v4sDqavJpump",
+        "--quantity",
+        "2500000000000",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--exclude-dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_pass",
+      "historical_recipe_sha256": "4730c2df2158325753dba29a08183819ffaa098a106df07c93d82f85534ee8cc",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-curve-production",
+      "preserved_existing_case": false,
+      "returncode": 0,
+      "sell_labels": [
+        "Pump.fun"
+      ],
+      "snapshot_slot": 464802621,
+      "status": "captured",
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun Amm"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-graduated-production",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/pump-graduated-production",
+        "--mint",
+        "Coyj3LtKn1BNSgWc9HsGK5SKoGfEoDaymig4wrN6pump",
+        "--quantity",
+        "3500000000000",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--exclude-dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_pass",
+      "historical_recipe_sha256": "92b75b0110a277a2fd18eb1cbafef86fee63b915f561a46c2e1516a99d05ba79",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-graduated-production",
+      "preserved_existing_case": false,
+      "returncode": 0,
+      "sell_labels": [
+        "Pump.fun Amm"
+      ],
+      "snapshot_slot": 464802726,
+      "status": "captured",
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-current-8GV",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-current-8GV",
+        "--mint",
+        "8GVcbvQa1HtLvwH5ZScmrPyf2ByvamqQkoPkpbknpump",
+        "--quantity",
+        "2663583160592",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--exclude-dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_pass",
+      "historical_recipe_sha256": "fdeafb2acb717238c9cdef6d8be138737657929f63de7e6903ceee3963860ca4",
+      "name": "pump-metadata-current-8GV",
+      "preserved_existing_case": false,
+      "returncode": 1,
+      "status": "capture_failed"
+    },
+    {
+      "buy_labels": [
+        "Scorch"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-scorch-negative",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/jup-scorch-negative",
+        "--mint",
+        "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+        "--quantity",
+        "40000000",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_fail",
+      "historical_recipe_sha256": "3592fb3ac9ffa3e780380528672cc492a598215df6ca23c85ea7eb086100fe89",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-scorch-negative",
+      "preserved_existing_case": false,
+      "returncode": 0,
+      "sell_labels": [
+        "Scorch"
+      ],
+      "snapshot_slot": 464802810,
+      "status": "captured",
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Scorch"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-scorch-negative",
+      "command": [
+        "/usr/bin/python3",
+        "/home/todor_dev/Projects/short.win/scripts/qualify-current-routes.py",
+        "--output",
+        "/home/todor_dev/Projects/short.win/tests/fixtures/current-routes-2026-11-03/captures/ray-scorch-negative",
+        "--mint",
+        "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+        "--quantity",
+        "10000000",
+        "--program-id",
+        "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+        "--borrower",
+        "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+        "--route-budgets",
+        "16,32",
+        "--production-observation",
+        "--max-spread-bps",
+        "500",
+        "--dexes",
+        "Scorch"
+      ],
+      "historical_expectation": "expected_fail",
+      "historical_recipe_sha256": "342c88c1f553fbc294031249ac3a2043b9c5cc846079ce2cac1eb64f7a9dc29a",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-scorch-negative",
+      "preserved_existing_case": false,
+      "returncode": 0,
+      "sell_labels": [
+        "Scorch"
+      ],
+      "snapshot_slot": 464802883,
+      "status": "captured",
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    }
+  ],
+  "collector_sha256": "75e2b1ac85d9a18de7d57402b0d2d7ec1b154fcc9081727ec6e6ac72b294dbbb",
+  "finished_at": "2026-11-03T06:46:11.170034+00:00",
+  "historical_recipe_matrix": "tests/runtime/current-routes.json",
+  "historical_recipe_matrix_sha256": "c2688cda6399796d6ea3cdf7b50020ae7f8b9b0119c169f6d4f3016b95dcdeef",
+  "jupiter_endpoint": "https://api.jup.ag/swap/v2/build",
+  "live_transactions_sent": 0,
+  "orchestrator_sha256": "cae34fb31dba56bb8b970d3d4eefa6ad953d83928d1ac69760278da6c1c6837b",
+  "rpc_endpoint": "https://api.mainnet-beta.solana.com",
+  "schema": 1,
+  "scope": "fresh non-atomic read-only mainnet quote/build and account capture; no execution qualification",
+  "started_at": "2026-11-03T06:44:20.375929+00:00",
+  "status": "incomplete"
+}

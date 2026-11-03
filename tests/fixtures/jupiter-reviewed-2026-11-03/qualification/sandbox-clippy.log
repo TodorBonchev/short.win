@@ -1,0 +1,5 @@
+    Checking shortwin-pooled-core v1.1.1 (/home/todor_dev/Projects/short.win/crates/pooled-core)
+    Checking shortwin-jupiter-route v0.1.0 (/home/todor_dev/Projects/short.win/crates/jupiter-route)
+    Checking shortwin-simple v1.1.1 (/home/todor_dev/Projects/short.win/programs/shortwin-simple)
+    Checking shortwin-simple-runtime-tests v1.1.1 (/home/todor_dev/Projects/short.win/tests/runtime)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.31s

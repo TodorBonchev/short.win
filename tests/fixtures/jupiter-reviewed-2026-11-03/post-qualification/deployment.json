@@ -1,0 +1,95 @@
+{
+  "clock": {
+    "address": "SysvarC1ock11111111111111111111111111111111",
+    "context_slot": 464812262,
+    "slot": 464812262,
+    "source_file": "jupiter-clock.json.gz",
+    "source_sha256": "805e64f17808797479d9b7f6ac7be3c06834518f933eca71cd26826aed648e2f",
+    "unix_timestamp": 1793690370
+  },
+  "clock_account": {
+    "address": "SysvarC1ock11111111111111111111111111111111",
+    "context_slot": 464812262,
+    "executable": false,
+    "file": "clock_account.bin",
+    "lamports": 1169280,
+    "owner": "Sysvar1111111111111111111111111111111111111",
+    "rent_epoch": 18446744073709551615,
+    "sha256": "ac59d5fd77695d0d686cd6946a45b9ba62afbaea0e32fa1874b9a5846c6b6730"
+  },
+  "deploy_slot": 462802085,
+  "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+  "elf_trimmed_length": 2047529,
+  "genesis_hash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "live_transactions_sent": 0,
+  "network": "mainnet-beta",
+  "observed_at": "2026-11-03T07:19:31.607068+00:00",
+  "padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+  "program": {
+    "address": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "context_slot": 464812262,
+    "executable": true,
+    "file": "program.bin",
+    "lamports": 6975116527,
+    "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "rent_epoch": 18446744073709551615,
+    "sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e"
+  },
+  "program_id": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+  "programdata": {
+    "address": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+    "context_slot": 464812262,
+    "executable": false,
+    "file": "programdata.bin",
+    "lamports": 14693376760,
+    "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+    "rent_epoch": 18446744073709551615,
+    "sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411"
+  },
+  "programdata_address": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+  "programdata_len": 2892269,
+  "requests": [
+    {
+      "file": "genesis.json.gz",
+      "finished_at": "2026-11-03T07:19:30.397108+00:00",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getGenesisHash",
+        "params": []
+      },
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "sha256": "072c547ad3321ad6379bf249c218bcf112eaa3bd0138f07ace4077db1785a37d",
+      "started_at": "2026-11-03T07:19:30.259650+00:00",
+      "status": 200,
+      "stored_sha256": "968d0469ee32b8c326bd5cda5fec11d00b67f342a699eeaf6ff1b10da3d623ff"
+    },
+    {
+      "file": "jupiter-clock.json.gz",
+      "finished_at": "2026-11-03T07:19:31.599294+00:00",
+      "request": {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "getMultipleAccounts",
+        "params": [
+          [
+            "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+            "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
+            "SysvarC1ock11111111111111111111111111111111"
+          ],
+          {
+            "commitment": "finalized",
+            "encoding": "base64"
+          }
+        ]
+      },
+      "rpc": "https://api.mainnet-beta.solana.com",
+      "sha256": "805e64f17808797479d9b7f6ac7be3c06834518f933eca71cd26826aed648e2f",
+      "started_at": "2026-11-03T07:19:30.397128+00:00",
+      "status": 200,
+      "stored_sha256": "98aa95755ea9f893fe27fe38e2671d3bbaf52edd5a8468c0d464b00043ec6658"
+    }
+  ],
+  "schema": 1,
+  "scope": "Finalized same-bank read-only mainnet identity; not compatibility approval or deployment authorization"
+}

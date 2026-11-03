@@ -1,0 +1,28 @@
+{
+  "finished_at": "2026-11-03T06:43:46.965937+00:00",
+  "headers": {
+    "Content-Type": "application/json",
+    "date": "Tue, 03 Nov 2026 06:43:46 GMT",
+    "x-ratelimit-current": "1",
+    "x-ratelimit-remaining": "4",
+    "x-ratelimit-reset": "1793688236"
+  },
+  "length": 15503,
+  "method": "GET",
+  "parameters": {
+    "amount": "400000000000",
+    "destinationTokenAccount": "GwVauCApk9fpLPhbVykLkFyhHyYm78CcZxeNTTcMUjWV",
+    "excludeDexes": "Scorch",
+    "inputMint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "maxAccounts": "16",
+    "outputMint": "So11111111111111111111111111111111111111112",
+    "slippageBps": "50",
+    "taker": "4PQuKJgChfxBcqHoCZEYckNykmNPzDy8DpP5DsVsexpi",
+    "transactionVersion": "0",
+    "wrapAndUnwrapSol": "false"
+  },
+  "provider": "Jupiter API",
+  "sha256": "2d0ee59c83636f225cd4f05246ebde0994098674e48195e8c8bf1d89d908d331",
+  "started_at": "2026-11-03T06:43:46.876359+00:00",
+  "status": 200
+}

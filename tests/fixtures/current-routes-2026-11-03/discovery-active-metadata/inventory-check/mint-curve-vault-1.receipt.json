@@ -1,0 +1,35 @@
+{
+  "finished_at": "2026-11-03T06:58:42.884933+00:00",
+  "headers": {
+    "content-type": "application/json; charset=utf-8",
+    "date": "Tue, 03 Nov 2026 06:58:42 GMT"
+  },
+  "length": 4523,
+  "method": "getMultipleAccounts",
+  "provider": "Solana public mainnet RPC",
+  "request": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "method": "getMultipleAccounts",
+    "params": [
+      [
+        "2J6RFFxoqYire6i4mMprvgfGehDWsVg9cLQjgatLpump",
+        "3Q5wnbqovSD57nDwRqfcSrQAcqNcg7cLJgn1CZ6L8MFJ",
+        "5YajjwqsoJ9JKzgDTCScVwZU3eMJnHqQ9xUgcW43xbp7",
+        "73fkr6uV7AzwgXcwjsH8Cs5DqsRu4znCBHXbBCb5AFkG",
+        "8U9YXarKgvZhxH9krTvQd2CduRk7TzF3mcfPbHFi1ZYJ",
+        "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump",
+        "8zxZ9S4EwogtSgPaDEV124wKS9CGHP9NuPLiySDy62w5",
+        "CE3qv6pxWZ1UTU2k7fWeQTvHUGQsXPq7htbveJ6kW4e",
+        "FnWp4AgJUGRLWiTeHbiXEE7BA1McUXfmNQFQqW2ppump"
+      ],
+      {
+        "commitment": "confirmed",
+        "encoding": "base64"
+      }
+    ]
+  },
+  "sha256": "d55ae4d7fbb79ab19104828591baec78a99b16ff5b109f2cb7b293b236b80cde",
+  "started_at": "2026-11-03T06:58:42.766263+00:00",
+  "status": 200
+}

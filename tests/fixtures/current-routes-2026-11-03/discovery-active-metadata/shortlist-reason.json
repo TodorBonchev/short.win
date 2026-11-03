@@ -1,0 +1,57 @@
+{
+  "criteria": "pump.fun Token2022, no graduatedPool, reported supply1e9, >=3holders, descending recent net buy volume",
+  "scope": "three candidate maximum; public API discovery selection only, actual inventory/admission checked separately",
+  "selected": [
+    {
+      "circSupply": 1000000000,
+      "holderCount": 13,
+      "id": "FnWp4AgJUGRLWiTeHbiXEE7BA1McUXfmNQFQqW2ppump",
+      "liquidity": 3948.324964479289,
+      "stats5m": {
+        "buyOrganicVolume": 267.5407463911466,
+        "buyVolume": 1582.7461936269383,
+        "holderChange": -18.75,
+        "numBuys": 26,
+        "numNetBuyers": 14,
+        "numSells": 14,
+        "numTraders": 26,
+        "priceChange": 29.358144140777725,
+        "sellOrganicVolume": 259.41943255637585,
+        "sellVolume": 949.4517357298829
+      },
+      "symbol": "RATIO",
+      "totalSupply": 1000000000
+    },
+    {
+      "circSupply": 1000000000,
+      "holderCount": 3,
+      "id": "2J6RFFxoqYire6i4mMprvgfGehDWsVg9cLQjgatLpump",
+      "liquidity": 3586.15522528541,
+      "stats5m": {
+        "buyVolume": 484.9766342749759,
+        "holderChange": -62.5,
+        "liquidityChange": -4.375980621356862,
+        "numBuys": 8,
+        "numNetBuyers": 2,
+        "numSells": 6,
+        "numTraders": 8,
+        "priceChange": -8.424683997799814,
+        "sellVolume": 183.3666084888396
+      },
+      "symbol": "nut",
+      "totalSupply": 1000000000
+    },
+    {
+      "circSupply": 1000000000,
+      "holderCount": 6,
+      "id": "8mC1MGToeiyupQn3rCENe9FRVH1f8pcDz89JS7pepump",
+      "liquidity": null,
+      "stats5m": {
+        "buyVolume": 161.90581219303783,
+        "numBuys": 5
+      },
+      "symbol": "RachelGPT",
+      "totalSupply": 1000000000
+    }
+  ]
+}

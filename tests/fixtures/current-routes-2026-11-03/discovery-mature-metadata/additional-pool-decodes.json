@@ -1,0 +1,22 @@
+[
+  {
+    "base_mint": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+    "base_vault": "8ktMHvFCSq1JK7jBCQyojN29qkvMc7MaGKAT7PkvSKsS",
+    "graduatedPool": "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
+    "id": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+    "mint_length": 366,
+    "mint_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "quote_mint": "So11111111111111111111111111111111111111112",
+    "quote_vault": "4ezG1FgUrxDcpoQ2ZX6gfQoBWCGLAAd9inFinwvK4f2R"
+  },
+  {
+    "base_mint": "nxPqZ4F7ux8Vph5NFu25rEP6Kx9Gr1U6Fmj36Rjpump",
+    "base_vault": "CpMeJ3bD9GHXnHKtNE3bYYroffv1Pup334iGN9nQe3oV",
+    "graduatedPool": "G2UuRbmVDzDFP4qyoBJrSKBXSi7d6V4bPP9tHPs36y4b",
+    "id": "nxPqZ4F7ux8Vph5NFu25rEP6Kx9Gr1U6Fmj36Rjpump",
+    "mint_length": 377,
+    "mint_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    "quote_mint": "TTWofwAge91oFhZs7kpQdyrVRkmevgM88xijGvQFbKo",
+    "quote_vault": "xaFEWkDafDHSu7JBDoXiG3mSsMrkNjxZPovmSh6nkgV"
+  }
+]

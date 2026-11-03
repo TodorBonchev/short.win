@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "scope": "2026-11-03 fresh production-ID public quote/build/account captures against Jupiter deployment slot 462802085; actual-SBF replay must be verified separately. No campaign, duration or seeded-variant qualification.",
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "expected_pass": [
+    {
+      "name": "bonk-production",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/bonk-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "jup-production",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "ray-production-retry",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-production-retry",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "pump-curve-production",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-curve-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "pump-graduated-production",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-graduated-production",
+      "requires_actual_snapshot_packets": true
+    },
+    {
+      "name": "pump-metadata-active-Ai66-pumpamm",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-active-Ai66-pumpamm",
+      "requires_actual_snapshot_packets": true,
+      "reason": "Active metadata-only Token-2022 mint; explicit Pump.fun AMM route in both directions with unchanged 50bps slippage and 500bps spread bounds."
+    }
+  ],
+  "expected_fail": [
+    {
+      "name": "jup-scorch-negative",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-scorch-negative",
+      "error_substring": "Custom(5460)",
+      "transaction": "post_swap_fee_bound_rollback",
+      "transaction_log_substring": "custom program error: 0x1554",
+      "reason": "Explicit Scorch diagnostic route, excluded from production request profile; actual downstream refusal must match."
+    },
+    {
+      "name": "ray-scorch-negative",
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-scorch-negative",
+      "error_substring": "Custom(5460)",
+      "transaction": "post_swap_fee_bound_rollback",
+      "transaction_log_substring": "custom program error: 0x1554",
+      "reason": "Explicit Scorch diagnostic route, excluded from production request profile; actual downstream refusal must match."
+    }
+  ],
+  "pending": [],
+  "own_program": {
+    "sha256_source": "explicit current verified local/CI build"
+  }
+}

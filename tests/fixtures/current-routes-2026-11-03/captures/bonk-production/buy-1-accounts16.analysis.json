@@ -1,0 +1,90 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      146,
+      77,
+      148,
+      205,
+      199,
+      220,
+      180,
+      247,
+      124,
+      236,
+      8,
+      169,
+      131,
+      203,
+      31,
+      84,
+      51,
+      84,
+      10,
+      20,
+      120,
+      145,
+      65,
+      152,
+      1,
+      185,
+      52,
+      160,
+      241,
+      237,
+      139,
+      77
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 168126346,
+      "secs_since_epoch": 1793688231
+    },
+    "lastValidBlockHeight": 442823377
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 417492082006,
+  "history_qualified": false,
+  "labels": [
+    "Whirlpool"
+  ],
+  "minimum_output": 415404621596,
+  "request_amount": 125077066,
+  "request_max_accounts": 16,
+  "response_file": "buy-1-accounts16.json",
+  "response_sha256": "9e3fb2219591295c282a669f1191a2b0a267f0a08e95e5e5f2c41797980d902e",
+  "route_data_bytes": 40,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "5zpyutJu9ee6jFymDGoK7F6S5Kczqtc9FomP3ueKuyA9",
+        "inAmount": "125077066",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Whirlpool",
+        "outAmount": "417492082006",
+        "outputMint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 22
+}

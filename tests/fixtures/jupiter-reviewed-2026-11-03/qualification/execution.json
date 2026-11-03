@@ -1,0 +1,48 @@
+{
+  "completed_at_utc": "2026-11-03T07:23:02.895501+00:00",
+  "final_configuration_status": "proposed_configuration_verified_offline_not_activated",
+  "network_submissions": 0,
+  "runs": [
+    {
+      "finished_unix": 1793690251.0076063,
+      "log_file": "sandbox-final.log",
+      "log_sha256": "e71f9d329296042f94eecb77c5cd78dd80231ebde163cee6cce8e01fc4e10212",
+      "name": "sandbox-final",
+      "returncode": 0
+    },
+    {
+      "finished_unix": 1793689375.3568118,
+      "log_file": "sandbox-checks2.log",
+      "log_sha256": "9ec33c9c19331a4dae8ee8c794e74fb71ae414c4cac7b2091f13c9172cc12626",
+      "name": "sandbox-checks2",
+      "returncode": 0
+    },
+    {
+      "finished_unix": 1793690623.8215616,
+      "log_file": "sandbox-pin.log",
+      "log_sha256": "17ddf9fa3bbab38b678bb069830179ff973cf228f05eef89f4413cc48e2cd3fd",
+      "name": "sandbox-pin",
+      "returncode": 0
+    },
+    {
+      "finished_unix": 1793690909.6292863,
+      "log_file": "sandbox-clippy.log",
+      "log_sha256": "90d3471c65201c8c83d6d54851c74bf3b8f62ce46f1d4fbcad4e41b32069bc47",
+      "name": "sandbox-clippy",
+      "returncode": 0
+    }
+  ],
+  "sandbox": {
+    "cpu_quota": "200%",
+    "environment": "empty with explicit non-secret allowlist",
+    "file_size_max": "1G",
+    "memory_max": "4G",
+    "network": "unshare-all",
+    "runtime_max_seconds": 1800,
+    "scratch": "tmpfs writes charged to memory cgroup",
+    "source": "read-only sanitized source snapshot",
+    "tasks_max": 96
+  },
+  "schema": 1,
+  "scope": "Local actual-SBF saved-route compatibility with mainnet reads only"
+}

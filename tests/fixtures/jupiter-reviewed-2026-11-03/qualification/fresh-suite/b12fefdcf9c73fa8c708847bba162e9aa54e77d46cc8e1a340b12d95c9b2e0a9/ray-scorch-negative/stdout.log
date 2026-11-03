@@ -1,0 +1,99 @@
+{
+  "binding": {
+    "execution_authority": "GJN1m9PPgk3g3CeocQaWE252XQc3vZuhRMqMzmUiz5G3",
+    "execution_base": "4fjeJUcVPPZSC1c5nrMAQ3d5JauMDvAwwFxumyfuM5xY",
+    "execution_wsol": "A64FFqgrKtfDPc8Vtvn8bZ7eAzdew3hgvtXZdCCs2atJ",
+    "loan": "CiQP7NQin2j3wxUhFWWvHsBupx6bJqgTXYPdyozUoMdj",
+    "mint": "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+    "q": 10000000,
+    "token_program": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+  },
+  "error": "rollback did not reach successful real Jupiter CPI and signed-bound refusal: post_swap_fee_bound_rollback: InstructionError(1, Custom(5460)); see exact runtime log",
+  "execution_context": {
+    "slot": 464802883,
+    "source": "captured maximum account slot and getBlockTime",
+    "synthetic_vm_clock": true,
+    "unix_timestamp": 1793688368
+  },
+  "jupiter": {
+    "deploy_slot": 462802085,
+    "program_sha256": "77969e6c064ab31f68250951941ad20690dfc23e97870e63006ccdad39c8a47e",
+    "programdata_len": 2892269,
+    "programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+    "trimmed_elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895"
+  },
+  "kind": "actual_SBF_candidate_snapshot_replay",
+  "limitations": [
+    "read-only snapshots can span slots; no atomic mainnet landing is claimed",
+    "buy response predates simulated sell and may fail after real DEX mutation",
+    "route-family/token scope is exactly this candidate; no universal Jupiter qualification"
+  ],
+  "live_transactions_sent": 0,
+  "manifest_sha256": "df474f44909d3b5f035c9410ef6bde44d0b558c7bbd5354d82cd275c2c46a9ad",
+  "name": "ray-scorch-negative",
+  "native_runner_sha256": "8e4f1d9148065af76ff5e08e307ed9b5e3138da201d99f4aab05c30ae6ff9847",
+  "own_program_sha256": "b12fefdcf9c73fa8c708847bba162e9aa54e77d46cc8e1a340b12d95c9b2e0a9",
+  "packet_fit_failures": {},
+  "program_id": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "rejected_route_protected_account_count": 35,
+  "rejected_route_protected_state_unchanged": true,
+  "review_provenance": {
+    "current_deployment": {
+      "deploy_slot": 462802085,
+      "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+      "programdata_len": 2892269
+    },
+    "limitations": [],
+    "live_transactions_sent": 0,
+    "overlaid_accounts": [],
+    "overlay_historical": false,
+    "review_manifest_sha256": "c7b2fe1882375f6abe2177f55dca0c7c441e002b30ea24bb59621204638d3ac7",
+    "reviewed_current_clock": {
+      "address": "SysvarC1ock11111111111111111111111111111111",
+      "context_slot": 464802739,
+      "slot": 464802739,
+      "source_file": "jupiter-clock.json.gz",
+      "source_sha256": "a0a1237685d59ddf465300035122f336755eaabdc5ec264498e913cb04c92296",
+      "unix_timestamp": 1793688336
+    },
+    "scope": "fresh non-atomic route/account capture with exact current reviewed Jupiter bytes and synthetic snapshot VM Clock",
+    "source_capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-scorch-negative",
+    "source_capture_context": {
+      "slot": 464802883,
+      "unix_timestamp": 1793688368
+    }
+  },
+  "reviewed_deployment": {
+    "deploy_slot": 462802085,
+    "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+    "programdata_len": 2892269
+  },
+  "schema": 1,
+  "setup_budget_rejections": {},
+  "status": "failed",
+  "synthetic_inputs": [
+    "local signers and funded SOL",
+    "initial lender token allocation from existing supply",
+    "two-epoch reference history attestation",
+    "financial policy for functional testing",
+    "synthetic ALT fallback only when explicitly reported"
+  ],
+  "synthetic_reference": {
+    "acquisition_reference": 173052390,
+    "completed_epochs": 2,
+    "functional_policy_max_spread_bps": 500,
+    "live_ask_upper": 173052390,
+    "live_bid_lower": 164811800,
+    "spread_bps_ceiling": 500
+  },
+  "transactions": {
+    "post_swap_fee_bound_rollback": {
+      "compute_units": 110086,
+      "error": "InstructionError(1, Custom(5460))",
+      "log_file": "post_swap_fee_bound_rollback.log",
+      "log_sha256": "a5b4af29ecf5822b1b9c3e01fb716259f4c32489df5330887bfcace86e350104",
+      "lookup_mode": "actual_snapshot_lookup_tables",
+      "wire_bytes": 1097
+    }
+  }
+}

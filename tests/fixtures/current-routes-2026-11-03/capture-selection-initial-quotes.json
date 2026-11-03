@@ -1,0 +1,195 @@
+{
+  "api_key_present": false,
+  "live_transactions_sent": 0,
+  "matrix": "tests/runtime/current-routes-2026-11-03.json",
+  "matrix_sha256": "b8fd20b880b17f9ddaff9c6409fe3dd457b525dba88027263c934ba3bc444e5c",
+  "metadata_retry_command": [
+    "python3",
+    "scripts/qualify-current-routes.py",
+    "--output",
+    "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-current-8GV-retry",
+    "--mint",
+    "8GVcbvQa1HtLvwH5ZScmrPyf2ByvamqQkoPkpbknpump",
+    "--quantity",
+    "2663583160592",
+    "--program-id",
+    "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+    "--borrower",
+    "3wpYnGqceZ8DzN3guiTd9rrYkWTwTHCChBSuo6cvkXTG",
+    "--route-budgets",
+    "16,32",
+    "--production-observation",
+    "--max-spread-bps",
+    "500",
+    "--exclude-dexes",
+    "Scorch",
+    "--capture-ineligible"
+  ],
+  "schema": 1,
+  "scope": "fresh non-atomic mainnet inputs only; actual-SBF execution qualification is separate",
+  "selected": [
+    {
+      "buy_labels": [
+        "Whirlpool"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/bonk-production",
+      "captured_at": "2026-11-03T06:43:58.227210+00:00",
+      "diagnostic_ineligible_capture": false,
+      "historical_expectation": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": true,
+      "name": "bonk-production",
+      "sell_labels": [
+        "Whirlpool"
+      ],
+      "snapshot_slot": 464802261,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Whirlpool"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-production",
+      "captured_at": "2026-11-03T06:44:36.170076+00:00",
+      "diagnostic_ineligible_capture": false,
+      "historical_expectation": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-production",
+      "sell_labels": [
+        "Raydium CLMM"
+      ],
+      "snapshot_slot": 464802443,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Raydium CLMM"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-production-retry",
+      "captured_at": "2026-11-03T06:44:51.972038+00:00",
+      "diagnostic_ineligible_capture": false,
+      "historical_expectation": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-production-retry",
+      "sell_labels": [
+        "Raydium CLMM"
+      ],
+      "snapshot_slot": 464802517,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-curve-production",
+      "captured_at": "2026-11-03T06:45:14.552364+00:00",
+      "diagnostic_ineligible_capture": false,
+      "historical_expectation": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-curve-production",
+      "sell_labels": [
+        "Pump.fun"
+      ],
+      "snapshot_slot": 464802621,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun Amm"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-graduated-production",
+      "captured_at": "2026-11-03T06:45:36.961621+00:00",
+      "diagnostic_ineligible_capture": false,
+      "historical_expectation": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": true,
+      "name": "pump-graduated-production",
+      "sell_labels": [
+        "Pump.fun Amm"
+      ],
+      "snapshot_slot": 464802726,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Pump.fun"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/pump-metadata-current-8GV-retry",
+      "captured_at": "2026-11-03T06:46:56.237438+00:00",
+      "diagnostic_ineligible_capture": true,
+      "historical_expectation": "expected_pass",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": false,
+      "name": "pump-metadata-current-8GV",
+      "sell_labels": [
+        "Pump.fun"
+      ],
+      "snapshot_slot": 464803090,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Scorch"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/jup-scorch-negative",
+      "captured_at": "2026-11-03T06:45:55.413405+00:00",
+      "diagnostic_ineligible_capture": false,
+      "historical_expectation": "expected_fail",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": true,
+      "name": "jup-scorch-negative",
+      "sell_labels": [
+        "Scorch"
+      ],
+      "snapshot_slot": 464802810,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    },
+    {
+      "buy_labels": [
+        "Scorch"
+      ],
+      "capture": "tests/fixtures/current-routes-2026-11-03/captures/ray-scorch-negative",
+      "captured_at": "2026-11-03T06:46:11.158895+00:00",
+      "diagnostic_ineligible_capture": false,
+      "historical_expectation": "expected_fail",
+      "jupiter_deploy_slot": 462802085,
+      "jupiter_padded_elf_sha256": "53d53f447f594158a259cbdca1f5e613caf40bc14ce759ffd5953580dc2af8dd",
+      "jupiter_programdata_sha256": "69a9fb380fdd440c546e836e4b49e3fe683425f51fb6fa966b249ee8360ad411",
+      "mint_eligible_plain82_rule": true,
+      "name": "ray-scorch-negative",
+      "sell_labels": [
+        "Scorch"
+      ],
+      "snapshot_slot": 464802883,
+      "whole_q_quote_available": true,
+      "within_500bps_spread": true
+    }
+  ],
+  "status": "all_eight_captured_and_hash_verified",
+  "verified_decoded_accounts": 180,
+  "verified_raw_responses": 73
+}

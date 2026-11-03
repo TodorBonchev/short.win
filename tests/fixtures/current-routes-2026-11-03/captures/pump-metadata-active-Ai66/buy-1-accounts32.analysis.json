@@ -1,0 +1,90 @@
+{
+  "blockhash_metadata": {
+    "blockhash": [
+      166,
+      73,
+      136,
+      223,
+      86,
+      118,
+      174,
+      58,
+      91,
+      159,
+      187,
+      247,
+      155,
+      5,
+      96,
+      7,
+      116,
+      27,
+      143,
+      81,
+      105,
+      48,
+      1,
+      246,
+      75,
+      76,
+      142,
+      41,
+      68,
+      179,
+      143,
+      35
+    ],
+    "fetchedAt": {
+      "nanos_since_epoch": 192732452,
+      "secs_since_epoch": 1793689544
+    },
+    "lastValidBlockHeight": 442829541
+  },
+  "checks": {
+    "exact_domain": true,
+    "excluded_labels_absent": true,
+    "header_input": true,
+    "header_no_fees": true,
+    "header_quote": true,
+    "header_slippage50": true,
+    "header_threshold": true,
+    "jupiter_program": true,
+    "no_extra_signers": true,
+    "ordinary_route_v2": true,
+    "output_bounds": true,
+    "route_data_le768": true,
+    "service_total_metas_le40": true,
+    "slippage50": true,
+    "steps_le8": true,
+    "total_metas_le48": true
+  },
+  "cpi_execution_qualified": false,
+  "envelope_pass": true,
+  "expected_output": 138539372,
+  "history_qualified": false,
+  "labels": [
+    "Pump.fun Amm"
+  ],
+  "minimum_output": 137846676,
+  "request_amount": 52056385,
+  "request_max_accounts": 32,
+  "response_file": "buy-1-accounts32.json",
+  "response_sha256": "b37da310ea972ea9eb3df98a46bf01fcc5480282f4d9499980f2e49e168ef25f",
+  "route_data_bytes": 40,
+  "route_plan": [
+    {
+      "bps": 10000,
+      "percent": 100,
+      "swapInfo": {
+        "ammKey": "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
+        "inAmount": "52056385",
+        "inputMint": "So11111111111111111111111111111111111111112",
+        "label": "Pump.fun Amm",
+        "outAmount": "138539372",
+        "outputMint": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump"
+      }
+    }
+  ],
+  "side": "buy",
+  "total_metas": 30
+}

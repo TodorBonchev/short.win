@@ -14,9 +14,9 @@
   "jupiterReview": {
     "programId": "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
     "programData": "4Ec7ZxZS6Sbdg5UGSLHbAnM7GQHp2eFd4KYWRexAipQT",
-    "deploySlot": null,
-    "programDataLength": null,
-    "elfSha256": null
+    "deploySlot": 462802085,
+    "programDataLength": 2892269,
+    "elfSha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895"
   },
   "keyfiles": {
     "reporter": null,
