@@ -22,10 +22,12 @@ Withdrawals depend on available token liquidity. Default can lose token principa
 | `crates/jupiter-route` | Jupiter scalar-header and account-isolation checks |
 | `client` | Generated instruction client, transaction helpers, operator and HTTP bridge |
 | `services` | Trusted Python/SQLite price history and queue lifecycle |
-| `web` | Development wallet interface |
+| `web` | Development wallet interface and public recorded showcase |
 | `tests/runtime` | Actual-SBF ledger, route and financial fuzz tests |
 | `tests/fixtures` | Pinned Jupiter execution inputs and captured route cases |
 | `config` | Non-executable operating and policy proposals |
+| `scripts` | [Capture, replay, build and release tools](scripts/README.md) |
+| `tools/social-video` | Editable social workflow films and verified exports |
 
 ## Local checks
 
@@ -46,5 +48,7 @@ pnpm build
 ```
 
 The [runtime guide](tests/runtime/README.md) describes seeded fuzzing and captured-route replay. Tests use pinned snapshots, synthetic history, clocks and initial allocations; they do not send transactions. Qualification and duration results apply to their exact frozen source, runner, program and inputs. A campaign running from a separate frozen checkout retains that checkout's identity.
+
+The [capped-mainnet release guide](docs/MAINNET_RELEASE.md) prepares a hash-bound, non-executable packet for the exact qualified ELF. Role assignment, funding, alerts, operating capacity and final activation checks remain required before launch.
 
 The [security policy](SECURITY.md) explains private reporting. [LICENSE](LICENSE), [GRANTS.md](GRANTS.md), [REUSE.toml](REUSE.toml) and [third-party notices](THIRD_PARTY_NOTICES.md) define the applicable terms; a software tag does not authorize deployment or financial transactions.

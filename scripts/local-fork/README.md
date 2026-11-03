@@ -87,7 +87,7 @@ The editable video project is in [`tools/social-video`](../../tools/social-video
 Install the standalone video dependencies and open its Remotion Studio:
 
 ```bash
-npm --prefix tools/social-video install
+npm --prefix tools/social-video ci
 npm --prefix tools/social-video run dev -- --port=3001
 ```
 
@@ -98,7 +98,7 @@ npm --prefix tools/social-video run previews
 npm --prefix tools/social-video run export
 ```
 
-The exporter checks the capture manifest and blocks incomplete exports. It writes three vertical workflow MP4s (`01-lend.mp4`, `02-short.mp4`, `03-manage-close.mp4`), a landscape `04-overview.mp4`, and matching poster JPGs to `/home/todor_dev/Videos/shortwin-2026-11-02` by default. Set `SHORTWIN_VIDEO_OUTPUT` to choose another directory. Keep the persistent local historical fork, test-funds and synthetic-history disclosures in published cuts. Suggested social captions and full media details live in the video project's README.
+The exporter checks the capture manifest and blocks incomplete exports. It writes three vertical workflow MP4s (`01-lend.mp4`, `02-short.mp4`, `03-manage-close.mp4`), a landscape `04-overview.mp4`, and matching poster JPGs to `tools/social-video/exports` by default. Set `SHORTWIN_VIDEO_OUTPUT` to choose another directory for rendering, verification and the public-site build. Previously saved exports remain in their original location. Keep the persistent local historical fork, test-funds and synthetic-history disclosures in published cuts. Suggested social captions and full media details live in the video project's README.
 
 ## Explicitly start over
 

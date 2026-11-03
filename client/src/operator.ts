@@ -41,7 +41,6 @@ import {
   prepareTransaction,
   submitSigned,
   readLookupTables,
-  type PreparedTransaction,
 } from "./transactions.ts";
 import { planBundle, appendRoute, type BuildResponse } from "./route.ts";
 
@@ -206,21 +205,70 @@ const accountSizes = [
 function selected<T>(rows: Row[], kind: number): Row<T>[] {
   return rows.filter((r) => r.kind === kind) as Row<T>[];
 }
+const CLOCK = "SysvarC1ock11111111111111111111111111111111";
+const SYSVAR_OWNER = "Sysvar1111111111111111111111111111111111111";
+async function rpcClock(
+  rpc: RpcCall,
+  commitment: "confirmed" | "finalized",
+  minContextSlot?: bigint,
+): Promise<{ slot: bigint; timestamp: bigint }> {
+  if (minContextSlot !== undefined && minContextSlot > BigInt(Number.MAX_SAFE_INTEGER))
+    throw new Error("Clock minContextSlot exceeds exact RPC number range");
+  const response = await rpc("getAccountInfo", [
+    CLOCK,
+    {
+      encoding: "base64",
+      commitment,
+      ...(minContextSlot === undefined ? {} : { minContextSlot: Number(minContextSlot) }),
+    },
+  ]);
+  const raw = response?.value;
+  if (
+    !response?.context || !raw || raw.owner !== SYSVAR_OWNER ||
+    raw.executable !== false || !Array.isArray(raw.data) ||
+    raw.data.length !== 2 || raw.data[1] !== "base64" ||
+    typeof raw.data[0] !== "string"
+  ) throw new Error("Invalid canonical Clock account");
+  const bytes = getBase64Encoder().encode(raw.data[0]);
+  if (bytes.length !== 40) throw new Error("Wrong Clock allocation");
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const slot = view.getBigUint64(0, true);
+  const timestamp = view.getBigInt64(32, true);
+  if (
+    slot !== u64(response.context.slot, "Clock context slot") ||
+    slot === 0n || timestamp <= 0n ||
+    (minContextSlot !== undefined && slot < minContextSlot)
+  ) throw new Error("Clock context/data mismatch");
+  return { slot, timestamp };
+}
 export async function readSnapshot(
   rpc: RpcCall,
   maxAccounts = 2048,
 ): Promise<Snapshot> {
-  const response = await rpc("getProgramAccounts", [
-    PROGRAM,
-    { encoding: "base64", commitment: "finalized", withContext: true },
-  ]);
-  if (
-    !response?.context ||
-    !Array.isArray(response.value) ||
-    response.value.length > maxAccounts
-  )
-    throw new Error("Incomplete/oversized finalized state snapshot");
-  const slot = u64(response.context.slot, "snapshot slot");
+  // The RPC block-time estimate is not the Clock sysvar. Retry the complete
+  // census when the finalized bank advances between these two reads.
+  let response: ObjectValue | undefined;
+  let snapshotClock: Awaited<ReturnType<typeof rpcClock>> | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const candidate = await rpc("getProgramAccounts", [
+      PROGRAM,
+      { encoding: "base64", commitment: "finalized", withContext: true },
+    ]);
+    if (
+      !candidate?.context || !Array.isArray(candidate.value) ||
+      candidate.value.length > maxAccounts
+    ) throw new Error("Incomplete/oversized finalized state snapshot");
+    const slot = u64(candidate.context.slot, "snapshot slot");
+    const clock = await rpcClock(rpc, "finalized", slot);
+    if (clock.slot === slot) {
+      response = candidate;
+      snapshotClock = clock;
+      break;
+    }
+  }
+  if (!response || !snapshotClock)
+    throw new Error("Unable to read same-bank finalized state and Clock");
+  const { slot, timestamp } = snapshotClock;
   const rows: Row[] = [];
   const seen = new Set<string>();
   for (const raw of response.value) {
@@ -252,10 +300,6 @@ export async function readSnapshot(
     !bytesEqual(getBase58Encoder().encode(genesis), config.data.genesisHash)
   )
     throw new Error("RPC genesis differs from initialized Config");
-  const timestamp = integer(
-    await rpc("getBlockTime", [Number(slot)]),
-    "finalized block time",
-  );
   const head = u64(
     await rpc("getSlot", [{ commitment: "finalized" }]),
     "head slot",
@@ -883,11 +927,7 @@ async function signerFile(path: string, expected: Address) {
 async function currentClock(
   rpc: RpcCall,
 ): Promise<{ slot: bigint; timestamp: bigint }> {
-  const slot = u64(await rpc("getSlot", [{ commitment: "confirmed" }]), "slot");
-  const timestamp = integer(
-    await rpc("getBlockTime", [Number(slot)]),
-    "block time",
-  );
+  const { slot, timestamp } = await rpcClock(rpc, "confirmed");
   if (
     timestamp <= 0n ||
     BigInt(Math.floor(Date.now() / 1000)) - timestamp > 60n ||
@@ -1031,10 +1071,9 @@ export async function runOperator(
     let count = 0;
     const reservedFunds = new Map<Address, bigint>();
     const projectedReferences = new Set<Address>();
-    const feeDay = Math.floor(Date.now()/86_400_000);
     const dailyPublicationMaximum = options.maxDailyPublicationFeesLamports ?? 1_000_000n;
     if (dailyPublicationMaximum < 0n) throw new Error("Negative publication fee allowance");
-    let projectedPublicationFees = store.publicationFees(feeDay);
+    const projectedPublicationFees = new Map<number, bigint>();
     const actor = options.keeperAddress ?? snapshot.config.data.reporter;
     const event = await eventAuthority();
     const dispatch = async (
@@ -1105,10 +1144,13 @@ export async function runOperator(
       await writeFile(artifact, stringify(record) + "\n", { mode: 0o600 });
       const plan: ObjectValue = { ...record, artifact, status: "simulated" };
       plans.push(plan);
-      if (kind === "publish-reference") {
-        if (projectedPublicationFees+prepared.feeLamports > dailyPublicationMaximum)
+      if (kind === "publish-reference" && !options.execute) {
+        const feeDay = Math.floor(Date.now()/86_400_000);
+        const projected = projectedPublicationFees.get(feeDay) ?? store.publicationFees(feeDay);
+        if (projected+prepared.feeLamports > dailyPublicationMaximum)
           throw new Error("UTC-day publication fee allowance exhausted; priced actions remain pending");
-        projectedPublicationFees += prepared.feeLamports;
+        projectedPublicationFees.set(feeDay, projected+prepared.feeLamports);
+        plan.publicationFeeUtcDay = feeDay;
       }
       if (!options.execute) {
         reservedFunds.set(
@@ -1126,8 +1168,13 @@ export async function runOperator(
       if (!keyfile)
         throw new Error("Explicit role keyfile required for execute");
       const signer = await signerFile(keyfile, payer);
-      if (kind === "publish-reference")
+      if (kind === "publish-reference") {
+        // Key loading and preparation can cross midnight. Reserve against the
+        // actual reservation day, immediately before signing, on every action.
+        const feeDay = Math.floor(Date.now()/86_400_000);
         store.reservePublicationFees(feeDay, prepared.feeLamports, dailyPublicationMaximum);
+        plan.publicationFeeUtcDay = feeDay;
+      }
       const signed = await signTransaction(
         [signer.keyPair],
         getTransactionDecoder().decode(prepared.bytes),

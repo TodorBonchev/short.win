@@ -1,10 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
+import {projectRoot as root, videoOutput as destination} from './paths.mjs';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const destination = process.env.SHORTWIN_VIDEO_OUTPUT || '/home/todor_dev/Videos/shortwin-2026-11-02';
 const assets = ['workspace', 'lend-form', 'lend-review', 'lend-success', 'short-form', 'short-review', 'short-success', 'position', 'margin', 'close-review', 'close-success'];
 const missing = assets.filter((name) => !fs.existsSync(path.join(root, 'public/captures', `${name}.jpg`)));
 if (missing.length) throw new Error(`Final export blocked: real captures still missing: ${missing.join(', ')}`);

@@ -24,6 +24,7 @@ U64 = (1 << 64) - 1
 U128 = (1 << 128) - 1
 SOL = 1_000_000_000
 CLOCK = "SysvarC1ock11111111111111111111111111111111"
+MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
 
 
 def require(condition: bool, message: str) -> None:
@@ -185,6 +186,7 @@ def verify_roles(roles: dict, require_assigned: bool = False) -> dict:
     for name, value in {"programId": roles.get("programId"), "genesisHash": roles.get("genesisHash"), **keys}.items():
         if value is None: missing.append(name)
         else: public_key(value, name)
+    require(roles.get("genesisHash") in (None, MAINNET_GENESIS), "role genesis must be canonical mainnet-beta")
     require(roles.get("programId") != "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2", "local placeholder program cannot be silently promoted")
     for name in ["deploySlot", "programDataLength", "elfSha256"]:
         if review.get(name) is None: missing.append("jupiterReview." + name)

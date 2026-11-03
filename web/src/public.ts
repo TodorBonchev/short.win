@@ -1,7 +1,7 @@
 import "./public.css";
 
 const repository = "https://github.com/TodorBonchev/short.win";
-const sourceRef = (import.meta.env.VITE_SOURCE_REF?.trim() || "codex/jupiter-root-cleanup")
+const sourceRef = (import.meta.env.VITE_SOURCE_REF?.trim() || "main")
   .split("/").map(encodeURIComponent).join("/");
 const sourceBase = `${repository}/blob/${sourceRef}`;
 const sourceTree = `${repository}/tree/${sourceRef}`;

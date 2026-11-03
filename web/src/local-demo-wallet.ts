@@ -90,7 +90,7 @@ export function installLocalDemoWallet(options: Options): boolean {
   const wallet: Wallet & { version: string; chains: readonly string[]; icon: string } = {
     version: "1.0.0",
     name: "Local demo wallet",
-    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' rx='12' fill='%23c5f777'/%3E%3Cpath d='M19 43 44 18M22 18h22v22' fill='none' stroke='%2317240e' stroke-width='6'/%3E%3C/svg%3E",
+    icon: "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#0b0e11"/><path fill="#e8ecf1" d="M1 4L4.75 20L8.44 20L12 13.53L12.4 14.25L12.4 7.2L12 6.47L7.14 15.3L4.49 4Z"/><path fill="#f0b90b" d="M12 13.53L15.56 20L19.25 20L23 4L19.51 4L16.86 15.3L12 6.47Z"/></svg>'),
     chains: [CHAIN],
     get accounts() { return account ? [account] : []; },
     features: {

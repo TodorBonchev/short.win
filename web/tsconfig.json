@@ -9,6 +9,8 @@
       "DOM.Iterable"
     ],
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
     "noEmit": true,

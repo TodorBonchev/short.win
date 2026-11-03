@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-not-activated",
+  "execute": false,
+  "readyForActivation": false,
+  "network": "mainnet-beta",
+  "expectedGenesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "programId": "BCPiRMTMoLNY5EHm2RYxoxJChgyrttkFX2Qe2Rnbe3jh",
+  "programSha256": "86147af04bda2c1fbab92ad670dc8d7cc272162724787dac666344bf24b547f2",
+  "reviewManifest": "config/jupiter-reviewed-deployment.json",
+  "policy": "config/production-policy.proposed.json",
+  "service": "config/production-service.proposed.json",
+  "operatorBounds": "config/operator-bounds.proposed.json",
+  "publicRoles": "config/production-roles.template.json",
+  "initializationIntent": {
+    "opensPaused": true,
+    "policyVersion": 1,
+    "marketCreationFeeLamports": null,
+    "maxSetupRentLamports": null
+  },
+  "releaseBounds": {
+    "minPositionNotionalLamports": 100000000,
+    "maxPositionNotionalLamports": 1000000000,
+    "maxMarketBookedNotionalLamports": 5000000000,
+    "walletMarketShareBps": 2000,
+    "openingUtilizationBps": 6000,
+    "termSeconds": 86400,
+    "graceSeconds": 86400,
+    "exactQuantityHistorySlots": 1,
+    "globalExposureCapLamports": null,
+    "depositCapRawTokens": null,
+    "marketCountCap": null
+  },
+  "activationGates": [
+    {"id": "public-role-assignment-and-custody", "status": "pending"},
+    {"id": "canonical-mainnet-loader-and-initializer-authority", "status": "pending"},
+    {"id": "current-jupiter-bytes-and-compatibility-recheck", "status": "pending"},
+    {"id": "selected-program-and-duration-receipt-custody", "status": "pending"},
+    {"id": "deployment-rent-quote-and-payer-funding", "status": "pending"},
+    {"id": "reporter-and-keeper-funded-budgets", "status": "pending"},
+    {"id": "delivered-alerts-and-account-count-headroom", "status": "pending"},
+    {"id": "measured-one-quantity-provider-and-operator-coverage", "status": "pending"},
+    {"id": "consistent-storage-backup-and-recovery", "status": "pending"},
+    {"id": "paused-initialization-and-reviewed-canary-lifecycle", "status": "pending"},
+    {"id": "owner-reviewed-final-activation-packet", "status": "pending"}
+  ]
+}

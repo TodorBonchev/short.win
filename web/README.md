@@ -20,13 +20,13 @@ The public website is a separate, read-only showcase of the four recorded workfl
 Render the films with `tools/social-video/scripts/export.mjs`, then build from the repository root:
 
 ```sh
-SHORTWIN_VIDEO_OUTPUT=/home/todor_dev/Videos/shortwin-2026-11-02 \
+SHORTWIN_VIDEO_OUTPUT="$PWD/tools/social-video/exports" \
   node scripts/build-public-web.mjs
 ```
 
 Set `SHORTWIN_VIDEO_OUTPUT` to another export directory as needed; its default is `tools/social-video/exports`. The helper requires all four MP4s and their matching `*-poster.jpg` files, runs the TypeScript check and public Vite build, and copies the eight media files into `web/dist/videos`. It checks the built page's four native video players, disclosure text, and documentation links; it also rejects operational app/SDK chunks, local RPC/service code, and source maps. MP4 exports are build inputs, not tracked repository files.
 
-`VITE_SOURCE_REF` pins GitHub source and documentation links to a branch or commit. It defaults to `codex/jupiter-root-cleanup`; deployment CI sets it to the exact source commit being published. To check the local app's unit tests separately, run:
+`VITE_SOURCE_REF` pins GitHub source and documentation links to a branch or commit. It defaults to `main`; deployment CI sets it to the exact source commit being published. To check the local app's unit tests separately, run:
 
 ```sh
 pnpm --filter @shortwin/simple-web check

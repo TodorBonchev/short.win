@@ -65,7 +65,7 @@ if component == "bridge":
         raise SystemExit("Existing bridge does not match this verified local demo")
 else:
     html = get("http://127.0.0.1:5173")
-    if "short.win" not in html or "/src/main.ts" not in html:
+    if "short.win" not in html or "/src/entry.ts" not in html:
         raise SystemExit("Port 5173 does not serve the expected short.win Vite app")
     source = get("http://127.0.0.1:5173/src/main.ts")
     if not source.startswith("import.meta.env = "):
@@ -76,6 +76,8 @@ else:
                 "VITE_SERVICE_URL": "http://127.0.0.1:8787", "VITE_DEMO_MINT": setup["mint"]}
     if any(environment.get(key) != value for key, value in expected.items()):
         raise SystemExit("Existing web app is not configured for this loopback demo")
+    if environment.get("VITE_PUBLIC_PREVIEW") == "true":
+        raise SystemExit("Existing web app serves the public showcase instead of the local demo")
 PY
 }
 

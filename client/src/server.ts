@@ -3,7 +3,7 @@ import {createServer,type IncomingMessage,type ServerResponse} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {address,getBase58Encoder,getBase64Encoder,type Address,type Decoder,type AddressesByLookupTableAddress} from '@solana/kit';
 import * as g from './generated/index.ts';
-import {PROGRAM,TOKEN,TOKEN_2022,WSOL,configAddress,policyAddress,marketAddress,poolAddress,referenceAddress,loanAddress,executionAddresses} from './pdas.ts';
+import {PROGRAM,TOKEN,TOKEN_2022,configAddress,policyAddress,marketAddress,poolAddress,referenceAddress,loanAddress,executionAddresses} from './pdas.ts';
 import {isCanonicalNativeMint,validateMint} from './chain.ts';
 import {planBundle,type BuildResponse} from './route.ts';
 import {readLookupTables} from './transactions.ts';

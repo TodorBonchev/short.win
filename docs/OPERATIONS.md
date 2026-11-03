@@ -57,6 +57,8 @@ A newer healthy or Unknown private observation vetoes this operator's use of an 
 
 A complete finalized same-bank account/clock snapshot, current queue revision and shared exclusive publisher/pass lock govern retirement. Active debt, pending publication, a finite reference fresh in either clock or an unresolved warm intent protects the slot. Re-admission advances the generation and starts cold history. Capacity exhaustion refuses admission; it does not evict protected work. Retiring a monitoring slot does not close a reference account or clear a financial reservation.
 
+The operator reads the canonical Clock sysvar and requires its decoded slot and RPC context to equal the finalized program-account census slot. It retries the complete pair at most three times and refuses retirement if the bank keeps moving. Estimated `getBlockTime` values do not satisfy this snapshot contract. Monitor snapshot retry failures and total program-account headroom: the initial scan ceiling is 2,048 accounts, with a 10,000 hard maximum, while permissionless market creation remains uncapped. Exceeding the scan bound stops the operator before dispatch; it does not disable direct on-chain repayment/default.
+
 Do not overlap operator passes. A timer must let the preceding pass finish. Quote capacity is shared between history and route construction. The Python `capacity` command reports spacing bounds, not measured availability. Commission the actual Free-key/RPC account and one exact quantity before expanding coverage.
 
 ## Persistent storage and recovery

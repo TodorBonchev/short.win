@@ -33,6 +33,13 @@ class ProductionProposalTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cannot enable execution"):
             proposal.verify_roles(self.roles)
 
+    def test_role_manifest_rejects_other_chain_genesis_even_when_key_shaped(self):
+        self.roles["genesisHash"] = proposal.service.JUPITER_PROGRAM
+        with self.assertRaisesRegex(ValueError, "canonical mainnet-beta"):
+            proposal.verify_roles(self.roles)
+        self.roles["genesisHash"] = proposal.MAINNET_GENESIS
+        self.assertIn("reporter", proposal.verify_roles(self.roles)["missing_public_identity_fields"])
+
     def test_local_placeholder_program_is_not_production_assignment(self):
         self.roles["programId"] = "kXYTnbz7MJ3g1d1cKX5wfZLy8KmN7Cctx4oePy5ndB2"
         with self.assertRaisesRegex(ValueError, "local placeholder"):

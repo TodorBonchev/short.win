@@ -4,9 +4,9 @@ import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {runInNewContext} from 'node:vm';
+import {videoOutput as mediaDirectory} from '../tools/social-video/scripts/paths.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const mediaDirectory = process.env.SHORTWIN_VIDEO_OUTPUT || path.join(root, 'tools/social-video/exports');
 const webDirectory = path.join(root, 'web');
 const destination = path.join(webDirectory, 'dist');
 const films = ['01-lend', '02-short', '03-manage-close', '04-overview'];
@@ -49,7 +49,7 @@ for (const name of films) {
 }
 assert.equal((rendered.innerHTML.match(/controls playsinline preload="none"/g) || []).length, 4, 'Public videos must use native controls and avoid preloading media.');
 assert(rendered.innerHTML.includes('synthetic price history'), 'Public demo disclosure is missing.');
-const sourceRef = (process.env.VITE_SOURCE_REF?.trim() || 'codex/jupiter-root-cleanup').split('/').map(encodeURIComponent).join('/');
+const sourceRef = (process.env.VITE_SOURCE_REF?.trim() || 'main').split('/').map(encodeURIComponent).join('/');
 for (const document of ['scripts/local-fork/README.md', 'docs/SPEC.md', 'docs/SCOPE.md', 'SECURITY.md']) {
   assert(rendered.innerHTML.includes(`https://github.com/TodorBonchev/short.win/blob/${sourceRef}/${document}`), `Public documentation link does not match source ref: ${document}.`);
 }

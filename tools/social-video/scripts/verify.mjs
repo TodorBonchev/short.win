@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import {videoOutput as destination} from './paths.mjs';
 
-const destination = process.env.SHORTWIN_VIDEO_OUTPUT || '/home/todor_dev/Videos/shortwin-2026-11-02';
 const films = [
   {name: '01-lend', width: 1080, height: 1920, seconds: 24},
   {name: '02-short', width: 1080, height: 1920, seconds: 28},

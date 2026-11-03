@@ -1,6 +1,6 @@
 # short.win — social workflow films
 
-Editable standalone Remotion project: `/home/todor_dev/Projects/short.win/tools/social-video`.
+Editable standalone Remotion project: `tools/social-video` in this repository.
 
 The films use real app screenshots captured against the local historical fork. Screenshots are assembled from separate successful local workflow takes; balances and position IDs can differ between scenes. They do not represent public-network transactions, live prices, or a production launch. All transactions shown use test funds. The demonstrated history service uses synthetic price history. Historical accounts were captured at multiple slots and are not a synchronized mainnet snapshot.
 
@@ -13,13 +13,13 @@ The films use real app screenshots captured against the local historical fork. S
 | `03-manage-close.mp4` | 1080 × 1920, 30 fps, H.264 + AAC | 28 seconds |
 | `04-overview.mp4` | 1920 × 1080, 30 fps, H.264 + AAC | 45 seconds |
 
-Matching `*-poster.jpg` files are still-image covers. `captions.txt` contains suggested copy for all four films. `shortwin-editable-project.zip` contains portable source, real captures, fonts, original audio, and dependency lockfile; run `npm install` after extracting it. Exports are saved to `/home/todor_dev/Videos/shortwin-2026-11-02` by default.
+Matching `*-poster.jpg` files are still-image covers. `captions.txt` contains suggested copy for all four films. `shortwin-editable-project.zip` contains portable source, real captures, fonts, original audio, and dependency lockfile; run `npm ci` after extracting it. Exports default to the ignored `tools/social-video/exports` directory. `SHORTWIN_VIDEO_OUTPUT` overrides the same shared path for rendering, verification and the public-site build. Previously saved exports remain in their original directory.
 
 ## Preview and export
 
 ```sh
-cd /home/todor_dev/Projects/short.win/tools/social-video
-npm install
+cd tools/social-video
+npm ci
 npm run dev -- --port=3001
 ```
 
@@ -34,7 +34,7 @@ node scripts/verify.mjs
 The export script blocks if a required capture is missing. The verification command checks dimensions, frame counts, H.264/AAC streams, full video/audio decoding and duration, poster sizes, and editable archive integrity with the original W branding, audio, and captions; it writes `verification.json`. Set `SHORTWIN_VIDEO_OUTPUT` to change the output directory. For an individual film:
 
 ```sh
-npx remotion render Lend /home/todor_dev/Videos/shortwin-2026-11-02/01-lend.mp4 --codec=h264 --crf=18 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=192k
+npx remotion render Lend exports/01-lend.mp4 --codec=h264 --crf=18 --pixel-format=yuv420p --audio-codec=aac --audio-bitrate=192k
 ```
 
 ## Capture manifest

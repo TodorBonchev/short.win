@@ -173,7 +173,7 @@
   "operator_bounds": {
     "evidenceStatus": {
       "alertsDelivered": "pending",
-      "currentRoutes": "pending",
+      "currentRoutes": "saved-fixtures-qualified-2026-11-03",
       "payerFunding": "pending",
       "roles": "unassigned",
       "sustainedCoverage": "pending"
