@@ -52,7 +52,7 @@ pub struct PolicyCreated {
 }
 #[event]
 pub struct ConfigChanged {
-    pub kind: u8,
+    pub kind: u8, // 1: opens pause, 2: prices pause, 3: reporter, 4: reviewed Jupiter instance.
 }
 
 #[event]
@@ -105,7 +105,7 @@ pub struct ForcedExit {
     pub borrower: Pubkey,
     pub keeper: Pubkey,
     pub quantity: u64,
-    pub kind: u8,
+    pub kind: u8, // 1: confirmed pre-maturity CR liquidation, 2: maturity buyback.
     pub buyback_cost: u64,
     pub token_surplus: u64,
     pub keeper_reward: u64,

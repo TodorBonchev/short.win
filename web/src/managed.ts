@@ -23,12 +23,23 @@ export async function managedCall(
     ),
     signal: AbortSignal.timeout(45000),
   });
-  const data = (await response.json()) as Record<string, unknown>;
+  const unavailable = `In-house service unavailable (HTTP ${response.status})`;
+  let raw: unknown;
+  try {
+    raw = await response.json();
+  } catch {
+    // A proxy can return an HTML/empty outage page before the JSON service runs.
+    // Report the service failure rather than leaking a JSON parser exception.
+    throw new Error(response.ok ? "In-house service returned invalid JSON" : unavailable);
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    throw new Error(response.ok ? "In-house service returned an invalid response" : unavailable);
+  const data = raw as Record<string, unknown>;
   if (!response.ok)
     throw new Error(
       typeof data.error === "string"
         ? data.error
-        : "In-house service unavailable",
+        : unavailable,
     );
   return data;
 }

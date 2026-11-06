@@ -23,6 +23,8 @@ const result = spawnSync('pnpm', ['--dir', webDirectory, 'build', '--manifest'],
 if (result.status !== 0) process.exit(result.status || 1);
 
 const manifest = JSON.parse(readFileSync(path.join(destination, '.vite/manifest.json'), 'utf8'));
+// entry.ts chooses the showcase at build time. Inspect the graph as well as its
+// text so an accidental wallet import cannot hide in an unreferenced chunk.
 const manifestEntries = Object.keys(manifest);
 assert.deepEqual(manifestEntries.sort(), ['index.html', 'src/public.ts'], 'Public build must contain only the entry and showcase; operational app/SDK chunks are forbidden.');
 assert(manifest['src/public.ts'].isDynamicEntry, 'The public showcase must be selected by the entry.');
@@ -39,6 +41,8 @@ assert(source.length < 80_000, 'Unexpectedly large public bundle; inspect for op
 assert(!/(?:@solana|createSolanaRpc|createNoopSigner|signTransaction|connectWallet|getGenesisHash|solana:devnet|127\.0\.0\.1:8899|127\.0\.0\.1:8787|localhost)/i.test(source), 'Public bundle contains operational SDK, wallet, or local RPC/service code.');
 assert(!/id=["'](?:connect|wallet|mint|sign)["']/.test(source), 'Public page contains operational wallet controls.');
 const rendered = {innerHTML: ''};
+// Execute only the built static entry with a tiny DOM substitute. This checks
+// the actual output rather than assuming that source markup survived bundling.
 runInNewContext(readFileSync(path.join(destination, manifest['src/public.ts'].file), 'utf8'), {
   document: {querySelector: (selector) => { assert.equal(selector, '#app'); return rendered; }},
 }, {timeout: 1000});
@@ -54,6 +58,8 @@ for (const document of ['scripts/local-fork/README.md', 'docs/SPEC.md', 'docs/SC
   assert(rendered.innerHTML.includes(`https://github.com/TodorBonchev/short.win/blob/${sourceRef}/${document}`), `Public documentation link does not match source ref: ${document}.`);
 }
 mkdirSync(path.join(destination, 'videos'), {recursive: true});
+// Media is copied only after the public-only graph and disclosures pass. Local
+// signing code and Vite metadata must never become public hosting inputs.
 for (const filename of media) copyFileSync(path.join(mediaDirectory, filename), path.join(destination, 'videos', filename));
 // Build metadata is useful for this check, but unnecessary in the deployed site.
 rmSync(path.join(destination, '.vite'), {recursive: true});

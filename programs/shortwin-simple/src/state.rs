@@ -82,7 +82,7 @@ impl FinancialPolicy {
         Ok(())
     }
 }
-
+// Reporter authorization is live; each loan instead captures an immutable Policy address.
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Config {
@@ -165,7 +165,7 @@ pub struct Market {
 impl Market {
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
-
+// Principal and paid SOL stay separate; rent and unsolicited transfers never mint shares.
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct PoolGeneration {
@@ -181,7 +181,7 @@ pub struct PoolGeneration {
     pub shares: u128,
     pub loan_count: u32,
     pub sol_reserve: u64,
-    pub sol_index: [u64; 4],
+    pub sol_index: [u64; 4], // Little-endian U256 paid-SOL index, scaled by SOL_SCALE.
     pub retired: bool,
     pub booked_notional_out: u64,
 }
@@ -226,7 +226,7 @@ pub struct LenderReceipt {
     pub generation: u64,
     pub shares: u128,
     pub checkpoint: [u64; 4],
-    pub fraction: u128,
+    pub fraction: u128, // Sub-lamport numerator retained modulo SOL_SCALE while shares remain.
     pub pending_sol: u64,
 }
 impl LenderReceipt {
@@ -283,7 +283,7 @@ pub struct Loan {
 impl Loan {
     pub const SPACE: usize = 8 + Self::INIT_SPACE;
 }
-
+// All of one borrower's loan nonces in this pool share the same booked exposure limit.
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Exposure {

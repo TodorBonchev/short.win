@@ -55,6 +55,7 @@ async function localRpc(url: string, method: "getGenesisHash" | "isBlockhashVali
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
     credentials: "omit",
     redirect: "error",
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error("Local demo RPC is unavailable");
   const result: unknown = await response.json();
@@ -65,6 +66,9 @@ async function localRpc(url: string, method: "getGenesisHash" | "isBlockhashVali
 async function verifyLocalChain(current: Settings): Promise<string> {
   const response = await fetch(new URL("/demo/info", current.service), {
     credentials: "omit", redirect: "error", cache: "no-store",
+    // The local service may be stopped while the page stays open; let connect
+    // and signing fail promptly so their caller can leave its busy state.
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error("The local demo service is unavailable");
   const info: unknown = await response.json();

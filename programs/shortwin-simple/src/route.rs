@@ -681,7 +681,7 @@ fn invoke_jupiter<'info>(
     invoke_signed(&ix, &infos, &[seeds])?;
     Ok(())
 }
-
+// Actor-funded rent returns after execution; it is neither sale proceeds nor keeper income.
 /// Required temporary peak rent. It is returned after every successful route.
 pub fn temporary_rent() -> Result<u64> {
     Rent::get()?
@@ -705,7 +705,7 @@ fn available(loan: &AccountInfo<'_>, floor: u64, need: u64) -> Result<()> {
     );
     Ok(())
 }
-
+// The pool signs local funding only; Jupiter receives the separate loan-local scratch signer.
 /// Sell exactly q newly transferred pool tokens. The caller applies principal/fee
 /// booking only after this succeeds. No pool/loan signer reaches Jupiter.
 #[allow(clippy::too_many_arguments)]

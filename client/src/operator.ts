@@ -755,37 +755,65 @@ export function pythonCommand(
       ],
       { shell: false, stdio: ["pipe", "pipe", "pipe"], env: process.env },
     );
-    let stdout = "",
-      stderr = "";
-    const timer = setTimeout(() => {
+    const stdout: Buffer[] = [], stderr: Buffer[] = [];
+    let stdoutBytes = 0, stderrBytes = 0;
+    let failure: Error | undefined, inputFailure: Error | undefined;
+    let settled = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const fail = (error: unknown) => {
+      if (settled || failure) return;
+      failure = error instanceof Error ? error : new Error(String(error));
+      child.stdin.destroy();
       child.kill();
-      reject(new Error("Price-service command timed out"));
-    }, 120_000);
+      // Do not release the publisher lock while a failed subprocess can still
+      // mutate its stores. Escalate termination, then settle on the close event.
+      killTimer = setTimeout(() => child.kill("SIGKILL"), 1000);
+    };
+    const timer = setTimeout(() => fail(new Error("Price-service command timed out")), 120_000);
     child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-      if (stdout.length > 4 * 1024 * 1024) {
-        child.kill();
-        reject(new Error("Price-service output exceeds bound"));
-      }
+      if (failure) return;
+      const bytes = Buffer.from(chunk);
+      stdoutBytes += bytes.length;
+      if (stdoutBytes > 4 * 1024 * 1024)
+        fail(new Error("Price-service output exceeds bound"));
+      else stdout.push(bytes);
     });
     child.stderr.on("data", (chunk) => {
-      if (stderr.length < 8192) stderr += chunk;
+      const bytes = Buffer.from(chunk).subarray(0, Math.max(0, 8192 - stderrBytes));
+      stderrBytes += bytes.length;
+      if (bytes.length) stderr.push(bytes);
     });
-    child.on("error", (e) => {
-      clearTimeout(timer);
-      reject(e);
+    child.stdout.on("error", fail);
+    child.stderr.on("error", fail);
+    child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+      // A settings/model refusal can exit before reading a large JSON request.
+      // Consume EPIPE here; preserve the child's more useful exit/stderr error.
+      inputFailure = error;
+      if (error.code !== "EPIPE") fail(error);
     });
+    child.on("error", fail);
     child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
-      if (code !== 0)
+      clearTimeout(killTimer);
+      if (failure) reject(failure);
+      else if (code !== 0)
         reject(
           new Error(
-            "Price-service " + command[0] + " failed: " + stderr.trim(),
+            "Price-service " + command[0] + " failed: " + Buffer.concat(stderr).toString("utf8").trim(),
           ),
         );
-      else resolvePromise(stdout.trim());
+      else if (inputFailure) reject(inputFailure);
+      else resolvePromise(Buffer.concat(stdout).toString("utf8").trim());
     });
-    child.stdin.end(input === undefined ? "" : stringify(input));
+    try {
+      child.stdin.end(input === undefined ? "" : stringify(input));
+    } catch (error) {
+      // Serialization may throw before end() can close the pipe. Terminate and
+      // reap that child instead of leaving a reader alive behind a rejected call.
+      fail(error);
+    }
   });
 }
 

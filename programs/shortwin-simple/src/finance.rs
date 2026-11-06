@@ -4,7 +4,7 @@ use crate::{
     state::FinancialPolicy,
 };
 use anchor_lang::prelude::*;
-
+// Round obligations up and distributions down so rounding cannot create additional value.
 pub fn ceil_bps(value: u64, bps: u32) -> Result<u64> {
     let n = u128::from(value).checked_mul(u128::from(bps)).checked()?;
     u64::try_from(n.checked_add(9_999).checked()? / 10_000)
@@ -28,7 +28,7 @@ pub fn opening(sale: u64, live_ask: u64, history_ask: u64, p: &FinancialPolicy) 
         sale > 0 && live_ask > 0 && history_ask > 0,
         SimpleError::BadReference
     );
-    let notional = sale.max(live_ask).max(history_ask);
+    let notional = sale.max(live_ask).max(history_ask); // A low sale cannot undercut either ask.
     let required = ceil_bps(notional, p.cr_open_bps)?;
     let margin = required.checked_sub(sale).checked()?;
     let collateral = sale.checked_add(margin).checked()?;
@@ -80,7 +80,7 @@ pub fn check_caps(
         SimpleError::WalletLimit
     );
     let debt = principal.checked_add(q).checked()?;
-    let total = cash.checked_add(principal).checked()?;
+    let total = cash.checked_add(principal).checked()?; // Borrowing does not create assets.
     require!(
         u128::from(debt) * 10_000 <= u128::from(total) * u128::from(p.utilization_cap_bps),
         SimpleError::UtilizationLimit

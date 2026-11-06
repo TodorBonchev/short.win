@@ -92,6 +92,8 @@ The fresh saved-route compatibility gate passed all **18 expected outcomes** acr
 
 This completes compatibility review for the captured routes and pinned bytes. Quotes/account reads can span slots and the VM signers, funding, history and clocks include labelled synthetic inputs. It establishes no future route landing, broader token/quantity coverage, new duration campaign, funded commissioning or external audit approval. The prior duration evidence retains its original program, runner and corpus scope.
 
+The [2026-11-06 source commentary review](source-commentary-review-2026-11-06.json) explains the refreshed Rust source hashes: only comments changed, source line counts stayed fixed, and the rebuilt ELF exactly matches the previous root build. All 71 Rust/runtime tests and 18 saved-route expected outcomes passed. The captured Jupiter inputs remain dated 2026-11-03. Off-chain recovery and timeout fixes have their own regression checks; their changed Python/TypeScript sources do not inherit the earlier duration campaign.
+
 The verifier accepts the generated assignments as a **non-executable proposal** and checks the retained review's hashes and coverage offline. The public-assignment gate passes; incomplete or invalid replacements must still fail. Assigned roles alone do not establish private custody, deployment approval or commissioned operation. `execute` remains false, and owner custody/backups, funding, alert delivery, measured service coverage, final activation review and fresh operating evidence remain pending. Qualification must be checked against the current frozen sources and inputs; a software tag does not establish funded operation.
 
 From the repository root:

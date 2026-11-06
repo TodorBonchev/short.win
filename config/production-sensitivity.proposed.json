@@ -163,12 +163,12 @@
     "wallet_booked_notional_cap_lamports_per_market": 1000000000
   },
   "financial_source_sha256": {
-    "crates/jupiter-route/src/isolation.rs": "79aaf751503f5cb2cc72431734c6e940f7335479442c09a1b0d21c8932c7b298",
-    "programs/shortwin-simple/src/exits.rs": "82635c8195a86880d51c9831b9c38d9d4ea6d5203ae38865273fcd04f8bfd617",
-    "programs/shortwin-simple/src/finance.rs": "11772d4eac5e7b0605368d27c4b686df3fa8ff9dad46a580287d842cf11533f2",
-    "programs/shortwin-simple/src/open.rs": "8e407d9f69f6714f333d265000385dec4ddf784ec9debe81ac9dec928c4c1da5",
-    "programs/shortwin-simple/src/route.rs": "9af054ca3a5994ce42a47b8de4a4ddba08fa617f41ab918135881ce6dabc29ea",
-    "programs/shortwin-simple/src/state.rs": "4588d9272a629165cb1bfaeaafa0a9d207127e493aedbefd5d28ca0504b9b8e9"
+    "crates/jupiter-route/src/isolation.rs": "ae698457a36433e1b79c3795495740f3b0084ca1cd8c551dafddca829d52b898",
+    "programs/shortwin-simple/src/exits.rs": "8022b7bc83fcfd3f76343b81174af39d1645e7a72afbbce024ff6c6e4894e85d",
+    "programs/shortwin-simple/src/finance.rs": "69992b2194f8d00d5ef2dbb6a89e1de7b85c181617458ea69a52158fdbb05f43",
+    "programs/shortwin-simple/src/open.rs": "a34aa5b1818de572e405ce6f115db24f6617f392f31e14532b8c0fed5486925f",
+    "programs/shortwin-simple/src/route.rs": "d217f1f72b603284a886769f655a64f3603b7f79315a638800176fd8e17b6e02",
+    "programs/shortwin-simple/src/state.rs": "55ac9f9b18b9cb34be6723f5f7e41c80b0f8bdf35b71306d7e7ba7c74e5b46e5"
   },
   "operator_bounds": {
     "evidenceStatus": {
@@ -288,7 +288,7 @@
     "note": "Dated saved-route compatibility only; no funded commissioning, duration qualification, external audit approval or deployment authorization.",
     "own_program_sha256": "86147af04bda2c1fbab92ad670dc8d7cc272162724787dac666344bf24b547f2",
     "qualified_at_utc": "2026-11-03T07:21:27.767234+00:00",
-    "review_manifest_sha256": "553430c25e1589fe3363ff9734a4d7b97de3dae93bfe20993309f1a794296235",
+    "review_manifest_sha256": "0433d2549a23e3272b4b63a6ae26dd998814c2750e0f36b59588192d1cb0c75a",
     "status": "reviewed-offline-compatibility"
   },
   "role_setup": {

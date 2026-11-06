@@ -167,7 +167,7 @@ function livePool() {
   return { ...c, market: c.market, pool: c.pool, poolKey: c.poolKey };
 }
 async function verifyGenesis(c: Context, url: string) {
-  const genesis = await createSolanaRpc(url).getGenesisHash().send();
+  const genesis = await sw.sendRpc(createSolanaRpc(url).getGenesisHash());
   if (
     (genesis === "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d") !==
     (input("chain") === "solana:mainnet")
@@ -192,6 +192,8 @@ async function review(
   if (!connection) throw new Error("Connect a wallet first");
   const url = input("rpc");
   if (unresolved) {
+    // An earlier signed message may have landed despite an RPC timeout. Resolve
+    // its signature before offering another economic action, including a retry.
     if (unresolved.url !== url)
       throw new Error(
         `Signature ${unresolved.signature} has an unknown outcome on the previous RPC. Reconnect to that RPC and reconcile it before signing another transaction.`,
@@ -199,15 +201,15 @@ async function review(
     const rpc = createSolanaRpc(url);
     const {
       value: [known],
-    } = await rpc
-      .getSignatureStatuses([unresolved.signature], {
+    } = await sw.sendRpc(
+      rpc.getSignatureStatuses([unresolved.signature], {
         searchTransactionHistory: true,
-      })
-      .send();
+      }),
+    );
     const reconciliation = reconcileSignatureStatus(
       known,
       known === null &&
-        (await rpc.getBlockHeight({ commitment: "confirmed" }).send()) >
+        (await sw.sendRpc(rpc.getBlockHeight({ commitment: "confirmed" }))) >
           unresolved.lastValidBlockHeight,
     );
     if (reconciliation === "failed") unresolved = undefined;
@@ -518,6 +520,8 @@ el("withdraw").onclick = () =>
       throw new Error(
         "Insufficient available token cash; choose fewer shares or wait for repayment",
       );
+    // Any withdrawal settles the receipt's whole paid income, rather than a
+    // proportional share. The debt-free final holder also receives tracked dust.
     const minSol =
       shares === c.pool.shares
         ? c.pool.solReserve

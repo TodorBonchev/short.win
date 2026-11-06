@@ -10,6 +10,7 @@ import argparse
 import base64
 from dataclasses import asdict, dataclass
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
@@ -215,7 +216,9 @@ class Jupiter:
             if error.code == 400:
                 raise RouteUnavailable("Jupiter has no route for this request budget") from None
             raise Unavailable(f"Jupiter read failed: HTTP {error.code}") from None
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, http.client.HTTPException) as error:
+            # Interrupted chunked reads are HTTPException, not OSError; they
+            # remain provider failures and must not trigger route fallback.
             # Never retain URLs, headers, credentials or provider error bodies.
             raise Unavailable(f"Jupiter read failed: {type(error).__name__}") from None
 
@@ -335,12 +338,22 @@ class Jupiter:
             raise Unavailable("bounded acquisition search exhausted")
         while used < self.settings.max_ask_requests and best.amount - low > 1:
             amount = (best.amount + low) // 2
-            quote = probe(amount)
+            try:
+                quote = probe(amount)
+            except RouteUnavailable:
+                # A smaller budget can have no route even though the retained
+                # larger quote works. It gives no monotonicity proof, so stop
+                # refining rather than discard an actually executable candidate.
+                break
             used += 1
             if quote.guaranteed_output >= job.quantity:
                 best = quote
             else:
                 low = amount
+        # A failed refinement can consume time in both account-budget attempts;
+        # probe() only checks elapsed time after a successful quote response.
+        if self.clock() - started > self.settings.reference_max_age_seconds:
+            raise Unavailable("acquisition search outlived reference freshness")
         return best
 
 
@@ -349,23 +362,28 @@ class RpcClock:
         self.url, self.timeout = url, timeout
 
     def _call(self, method: str, params: list) -> object:
-        request = urllib.request.Request(self.url, data=canonical({"jsonrpc": "2.0", "id": 1,
-            "method": method, "params": params}), headers={"Content-Type": "application/json"})
         try:
+            request = urllib.request.Request(self.url, data=canonical({"jsonrpc": "2.0", "id": 1,
+                "method": method, "params": params}), headers={"Content-Type": "application/json"})
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
                 body = response.read(1_000_001)
                 if len(body) > 1_000_000:
                     raise Unavailable("RPC response exceeds bounded size")
                 result = json.loads(body)
-            if result.get("error") or "result" not in result:
+            # Valid JSON can still be a scalar/array rather than an RPC reply.
+            # Reject its shape before mapping access, without echoing RPC URLs.
+            if not isinstance(result, dict) or result.get("error") or "result" not in result:
                 raise ValueError("RPC returned no result")
             return result["result"]
-        except (OSError, TypeError, ValueError, urllib.error.HTTPError) as error:
+        except (OSError, TypeError, ValueError, urllib.error.HTTPError, http.client.HTTPException) as error:
             raise Unavailable(f"RPC read failed: {type(error).__name__}") from None
 
     def read(self) -> tuple[int, int]:
-        slot = integer(self._call("getSlot", [{"commitment": "confirmed"}]), "RPC slot", 1)
-        timestamp = integer(self._call("getBlockTime", [slot]), "RPC block time", 1, (1 << 63) - 1)
+        try:
+            slot = integer(self._call("getSlot", [{"commitment": "confirmed"}]), "RPC slot", 1)
+            timestamp = integer(self._call("getBlockTime", [slot]), "RPC block time", 1, (1 << 63) - 1)
+        except ValueError:
+            raise Unavailable("RPC source clock is not a positive integer pair") from None
         return slot, timestamp
 
 
@@ -373,16 +391,23 @@ class History:
     def __init__(self, path: str | Path, settings: Settings) -> None:
         self.settings = settings
         self.db = sqlite3.connect(path)
+        try:
+            objects = {row[0] for row in self.db.execute("SELECT name FROM sqlite_master WHERE name NOT GLOB 'sqlite_*'")}
+            prior = self.db.execute("SELECT value FROM metadata WHERE key='model_hash'").fetchone() if "metadata" in objects else None
+            # Only an empty SQLite database is first boot. Missing metadata in
+            # an existing store is lost provenance, not permission to adopt old
+            # observations under the current model or generate a new identity.
+            if objects and prior is None:
+                raise ValueError("existing history model binding is missing; preserve this database for diagnosis")
+            if prior and prior[0] != settings.model_hash:
+                raise ValueError("history model changed: preserve the old database; use a new database and requalify history")
+            if prior and self.db.execute("SELECT 1 FROM metadata WHERE key='history_instance_id'").fetchone() is None:
+                raise ValueError("existing history instance identity is missing; preserve this database for diagnosis")
+        except BaseException:
+            self.db.close()
+            raise
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
-        exists = self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='metadata'").fetchone()
-        prior = self.db.execute("SELECT value FROM metadata WHERE key='model_hash'").fetchone() if exists else None
-        if prior and prior[0] != settings.model_hash:
-            self.db.close()
-            raise ValueError("history model changed: preserve the old database; use a new database and requalify history")
-        if prior and self.db.execute("SELECT 1 FROM metadata WHERE key='history_instance_id'").fetchone() is None:
-            self.db.close()
-            raise ValueError("existing history instance identity is missing; preserve this database for diagnosis")
         self.db.executescript("""
         CREATE TABLE IF NOT EXISTS metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS jobs(market TEXT NOT NULL,policy TEXT NOT NULL,q TEXT NOT NULL,
@@ -491,6 +516,8 @@ class History:
         except BaseException:
             self.db.rollback()
             raise
+        # Commit before waiting/network I/O: peers must see the reservation, but
+        # no process should hold the SQLite writer lock while an API call stalls.
         sleeper(max(0, scheduled-now))
 
     def enqueue(self, job: Job, now: int) -> bool:
@@ -609,6 +636,9 @@ class History:
             source_ts = integer(value["source_ts"], "reference source timestamp", 1, clock_ts)
             age_seconds = integer(value["max_age_seconds"], "reference max age seconds", 1, 60)
             age_slots = integer(value["max_age_slots"], "reference max age slots", 1, 1000)
+            # Retirement is deliberately stricter than a single stale clock:
+            # an outstanding finite reference keeps its cohort while either
+            # clock can still protect it, independently of warm-intent TTL.
             refs[item.key] = (item, clock_ts-source_ts > age_seconds and clock_slot-source_slot > age_slots)
         acknowledgments = {}
         values = payload["fulfilled_requests"]
@@ -744,6 +774,9 @@ class History:
         ts, slot, bid, ask = int(latest[0]), int(latest[1]), int(latest[2]), int(latest[3])
         if not (0 <= current_ts-ts <= s.reference_max_age_seconds and 0 <= current_slot-slot <= s.reference_max_age_slots):
             return unknown("latest observation is stale or ahead of current clock")
+        # Anchor completed epochs to the latest sample's source timestamp. The
+        # program checks that same window; rolling it from today's wall clock
+        # would mix a live sample with history from a different observation.
         epoch_start = ts // s.epoch_seconds * s.epoch_seconds
         start, end = epoch_start - s.history_epochs*s.epoch_seconds, epoch_start-1
         rows = self.db.execute("SELECT ts,slot,bid,ask,finite,evidence FROM observations WHERE market=? AND policy=? AND q=? AND generation=? AND ts>=? AND ts<=? ORDER BY ts", (*job.key, generation, start, end)).fetchall()
@@ -770,6 +803,17 @@ class History:
 
 def tick(history: History, jupiter: Jupiter, clock: Callable[[], tuple[int, int]], now: int,
          wall_clock: Callable[[], float] = time.time) -> list[dict]:
+    def source_clock() -> tuple[int, int]:
+        try:
+            slot, timestamp = clock()
+            slot = integer(slot, "RPC source slot", 1)
+            timestamp = integer(timestamp, "RPC source timestamp", 1, (1 << 63)-1)
+        except (TypeError, ValueError) as error:
+            raise Unavailable("RPC source clock has an invalid integer domain") from error
+        if abs(wall_clock()-timestamp) > history.settings.reference_max_age_seconds:
+            raise Unavailable("RPC block clock is stale relative to local wall clock")
+        return slot, timestamp
+
     output = []
     for job in history.plan(now):
         # If a usable RPC clock is unavailable, stop without fabricating source
@@ -777,18 +821,21 @@ def tick(history: History, jupiter: Jupiter, clock: Callable[[], tuple[int, int]
         generation = history.generation(job)
         if generation is None:
             continue
-        slot, timestamp = clock()
+        # Reject the initial clock before entering the observation failure path.
+        # Persisting Unknown at a bogus future time would advance both the
+        # monotonic history watermark and job due time beyond healthy samples.
+        slot, timestamp = source_clock()
         try:
-            if abs(wall_clock()-timestamp) > history.settings.reference_max_age_seconds:
-                raise Unavailable("RPC block clock is stale relative to local wall clock")
             bid, ask, evidence = jupiter.observe(job, history.previous_ask(job))
-            after_slot, after_ts = clock()
+            after_slot, after_ts = source_clock()
             if not (0 <= after_ts-timestamp <= history.settings.reference_max_age_seconds
                     and 0 <= after_slot-slot <= history.settings.reference_max_age_slots):
                 raise Unavailable("quote request outlived reference freshness limits")
             finite = history.record(job, timestamp, slot, bid, ask, evidence, expected_generation=generation)
             output.append({"job": asdict(job), "finite": finite})
         except Unavailable as error:
+            # Dependency/final-clock failures invalidate this observation, but
+            # only the validated initial clock may become a durable sample.
             history.record(job, timestamp, slot, 0, 0, reason=str(error), expected_generation=generation)
             output.append({"job": asdict(job), "finite": False, "reason": str(error)})
     return output

@@ -45,7 +45,7 @@ pub struct Initialize<'info> {
     pub jupiter_program_data: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
-
+// Only this program's current loader authority may choose governance at bootstrap.
 fn validate_initializer(
     program: &AccountInfo<'_>,
     data: &AccountInfo<'_>,
@@ -323,7 +323,7 @@ pub fn new_policy(ctx: Context<NewPolicy>, args: NewPolicyArgs) -> Result<()> {
     });
     Ok(())
 }
-
+// Emergency can stop risk-taking; governance alone can resume it or change dependencies.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct RoleAuthority<'info> {
@@ -379,7 +379,7 @@ pub fn set_reporter(ctx: Context<RoleAuthority>, reporter: Pubkey) -> Result<()>
     emit_cpi!(ConfigChanged { kind: 3 });
     Ok(())
 }
-
+// Review a loader instance after off-chain byte checks; the digest remains an attestation.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct ReviewJupiter<'info> {
@@ -419,7 +419,7 @@ pub fn review_jupiter(
     emit_cpi!(ConfigChanged { kind: 4 });
     Ok(())
 }
-
+// Rollover leaves old receipts and their SOL claims in place; it never migrates lenders.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct RollPool<'info> {

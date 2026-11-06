@@ -3,3 +3,4 @@ export * from './pdas.ts';
 export * from './chain.ts';
 export * from './transactions.ts';
 export * from './route.ts';
+export * from './rpc.ts';

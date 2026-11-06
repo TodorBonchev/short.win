@@ -1,12 +1,13 @@
 import {address,createSolanaRpc,getBase64Encoder,getBase58Encoder,type Address,type Decoder} from '@solana/kit';
 import * as g from './generated/index.ts';
 import {PROGRAM,TOKEN,TOKEN_2022,WSOL} from './pdas.ts';
+import {sendRpc} from './rpc.ts';
 export const WSOL_2022=address('9pan9bMn5HatX4EJdBwg9VgCa7Uz5HL8N1m5D3NdXejP');
 export function isCanonicalNativeMint(mint:Address,owner:Address):boolean {
  return (owner===TOKEN&&mint===WSOL)||(owner===TOKEN_2022&&mint===WSOL_2022);
 }
 export async function readAccount<T>(url:string,key:Address,decoder:Decoder<T>,kind:number):Promise<T|null> {
- const {value}=await createSolanaRpc(url).getAccountInfo(key,{encoding:'base64',commitment:'confirmed'}).send();
+ const {value}=await sendRpc(createSolanaRpc(url).getAccountInfo(key,{encoding:'base64',commitment:'confirmed'}));
  if(value===null)return null;
  if(value.owner!==PROGRAM||value.executable)throw new Error('Unexpected program account owner');
  const bytes=getBase64Encoder().encode(value.data[0]);
@@ -14,7 +15,7 @@ export async function readAccount<T>(url:string,key:Address,decoder:Decoder<T>,k
  return decoder.decode(bytes);
 }
 export async function listAccounts(url:string) {
- const rows=await createSolanaRpc(url).getProgramAccounts(PROGRAM,{encoding:'base64',commitment:'confirmed'}).send();
+ const rows=await sendRpc(createSolanaRpc(url).getProgramAccounts(PROGRAM,{encoding:'base64',commitment:'confirmed'}));
  return rows.map(({pubkey,account})=>{
   if(account.executable)throw new Error('Executable in state scan');
   const bytes=getBase64Encoder().encode(account.data[0]);const kind=g.identifyShortwinSimpleAccount(bytes);
@@ -23,7 +24,7 @@ export async function listAccounts(url:string) {
  });
 }
 export async function readMint(url:string,mint:Address) {
- const {value}=await createSolanaRpc(url).getAccountInfo(mint,{encoding:'base64',commitment:'confirmed'}).send();
+ const {value}=await sendRpc(createSolanaRpc(url).getAccountInfo(mint,{encoding:'base64',commitment:'confirmed'}));
  if(value===null)throw new Error('Mint does not exist');
  const bytes=getBase64Encoder().encode(value.data[0]);
  return validateMint(mint,value.owner,value.executable,Uint8Array.from(bytes));

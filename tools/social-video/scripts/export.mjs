@@ -7,8 +7,13 @@ const assets = ['workspace', 'lend-form', 'lend-review', 'lend-success', 'short-
 const missing = assets.filter((name) => !fs.existsSync(path.join(root, 'public/captures', `${name}.jpg`)));
 if (missing.length) throw new Error(`Final export blocked: real captures still missing: ${missing.join(', ')}`);
 const previewOnly = process.argv.includes('--previews');
+// Use this project's locked CLI; npx may otherwise fetch a different version
+// when dependencies are missing, making the exported film irreproducible.
+const cli = path.join(root, 'node_modules/@remotion/cli/remotion-cli.js');
+if (!fs.existsSync(cli)) throw new Error('Install the locked video dependencies with npm ci before exporting.');
 const run = (...args) => {
-  const result = spawnSync('npx', ['remotion', ...args], {cwd: root, stdio: 'inherit'});
+  const result = spawnSync(process.execPath, [cli, ...args], {cwd: root, stdio: 'inherit'});
+  if (result.error) throw new Error(`Could not start the pinned Remotion CLI: ${result.error.message}`);
   if (result.status !== 0) process.exit(result.status || 1);
 };
 fs.mkdirSync(destination, {recursive: true});
@@ -32,5 +37,6 @@ for (const document of ['README.md', 'captions.txt']) {
   fs.copyFileSync(path.join(root, document), path.join(destination, document));
 }
 const archive = spawnSync('zip', ['-qr', '-FS', path.join(destination, 'shortwin-editable-project.zip'), 'src', 'public', 'scripts', 'package.json', 'package-lock.json', 'remotion.config.ts', 'tsconfig.json', 'eslint.config.mjs', '.gitignore', '.prettierrc', 'README.md', 'captions.txt', '-x', 'public/audio/*.wav'], {cwd: root, stdio: 'inherit'});
+if (archive.error) throw new Error(`Could not create the editable project archive: ${archive.error.message}`);
 if (archive.status !== 0) process.exit(archive.status || 1);
 console.log(`Exports saved to ${destination}`);

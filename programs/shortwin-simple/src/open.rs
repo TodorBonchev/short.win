@@ -12,7 +12,7 @@ use anchor_spl::{
     token::Token,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
-
+// Signed maxima apply after the actual sale; refusal rolls back the complete transaction.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct OpenArgs {
     pub nonce: u64,
@@ -82,7 +82,7 @@ pub struct OpenPosition<'info> {
     pub jupiter_program_data: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
-
+// Keep actor-funded rent/setup advances separate from collateral and upfront economic fees.
 fn pay<'info>(
     from: &Signer<'info>,
     to: AccountInfo<'info>,

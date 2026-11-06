@@ -1,4 +1,4 @@
-//! Conservative first-probe isolation checks, independent of route parsing.
+//! Runtime-account and scratch-balance isolation checks, independent of route parsing.
 //!
 //! These functions inspect caller-supplied runtime snapshots. An integration must read
 //! genuine AccountInfo fields, construct CPI metas deliberately, verify the pinned
@@ -44,7 +44,7 @@ pub struct RuntimeAccount {
     pub executable: bool,
 }
 
-/// Restricts an ordinary ExactIn probe's CPI surface. Header/fixed-account checks
+/// Restricts an ordinary ExactIn CPI surface. Header/fixed-account checks
 /// must run separately. Runtime privileges can exceed proposed metas because of
 /// transaction-wide privilege union; the authority must remain read-only in both.
 /// Every protocol-owned account and every named critical key is refused, even read-only.
@@ -203,7 +203,7 @@ fn u64_at(data: &[u8], start: usize) -> u64 {
 
 /// Checks immutable identities, initialized state, no delegation/close authority,
 /// exact rent and native balance consistency. Reading base fields while ignoring
-/// Token-2022 extensions is deliberately insufficient for this first probe.
+/// Token-2022 extensions is deliberately insufficient for this isolation boundary.
 pub fn read_plain_scratch(
     actual: RuntimeAccount,
     data: &[u8],

@@ -1,11 +1,12 @@
 """Persistent local identity binding for history and operator financial storage."""
 from contextlib import redirect_stdout
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import importlib.util
 import io
 import json
 from pathlib import Path
 import sys
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -87,6 +88,42 @@ class OperatorBindingTests(unittest.TestCase):
         with sqlite3.connect(self.path) as db:
             self.assertEqual(db.execute("SELECT key,value FROM metadata ORDER BY key").fetchall(),before)
             self.assertIsNone(db.execute("SELECT value FROM metadata WHERE key='history_instance_id'").fetchone())
+    def test_missing_model_hash_cannot_adopt_existing_observations_or_repair_identity(self):
+        item=service.Job(PROGRAM,OTHER_PROGRAM,PROGRAM,1)
+        self.h.enqueue(item,600);self.h.record(item,600,600,100,101,{"fixture":True})
+        self.h.bind_operator(binding());self.h.close()
+        with sqlite3.connect(self.path) as db:
+            db.execute("DELETE FROM metadata WHERE key='model_hash'")
+        with sqlite3.connect(self.path) as db:
+            before=list(db.iterdump())
+        for configuration in [settings(),replace(settings(),slippage_bps=51)]:
+            with self.subTest(model=configuration.model_hash):
+                with self.assertRaisesRegex(ValueError,'existing history model binding is missing'):
+                    service.History(self.path,configuration)
+                with sqlite3.connect(self.path) as db:
+                    self.assertEqual(list(db.iterdump()),before)
+                    self.assertIsNone(db.execute("SELECT value FROM metadata WHERE key='model_hash'").fetchone())
+    def test_nonempty_unrecognized_database_is_preserved_before_journal_or_schema_changes(self):
+        for table in ['durable_record', 'sqlitex_record']:
+            with self.subTest(table=table):
+                path=self.root/(table+'.sqlite3')
+                with sqlite3.connect(path) as db:
+                    db.execute(f"CREATE TABLE {table}(value TEXT)")
+                    db.execute(f"INSERT INTO {table} VALUES('dummy record')")
+                with sqlite3.connect(path) as db:
+                    before=list(db.iterdump());journal=db.execute("PRAGMA journal_mode").fetchone()[0]
+                with self.assertRaisesRegex(ValueError,'existing history model binding is missing'):
+                    service.History(path,settings())
+                with sqlite3.connect(path) as db:
+                    self.assertEqual(list(db.iterdump()),before)
+                    self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0],journal)
+    def test_existing_empty_sqlite_file_can_initialize_as_a_fresh_history(self):
+        path=self.root/'empty.sqlite3';path.touch()
+        history=service.History(path,settings())
+        try:
+            self.assertEqual(history.db.execute("SELECT value FROM metadata WHERE key='model_hash'").fetchone()[0],settings().model_hash)
+            self.assertEqual(str(uuid.UUID(history.history_instance_id())),history.history_instance_id())
+        finally:history.close()
     def test_trusted_cli_accepts_stdin_and_queue_state_returns_identical_binding(self):
         config=self.root/'settings.json';config.write_text(json.dumps(asdict(settings())))
         args=['--settings',str(config),'--database',str(self.path)]

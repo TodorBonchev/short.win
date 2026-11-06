@@ -25,7 +25,7 @@ pub struct ForcedExitArgs {
     pub minimum_reference_sequence: u64,
     pub route: RouteArgs,
 }
-
+// Default must remain available through router, mint and price-service outages.
 /// State only: deterministic default never needs a mint, token vault, price or Jupiter account.
 #[derive(Accounts)]
 pub struct PositionAccounts<'info> {
@@ -447,7 +447,7 @@ fn buy<'info>(
     }
     Ok(result)
 }
-
+// Retire debt only after measured whole-q delivery; account closure refunds rent separately.
 pub fn repay(ctx: Context<Repay>) -> Result<()> {
     require!(
         ctx.remaining_accounts.is_empty(),
@@ -682,7 +682,7 @@ pub fn force_exit<'info>(
         args.minimum_reference_sequence,
         &clock,
     )?;
-    let expired = clock.unix_timestamp >= a.position.loan.deadline;
+    let expired = clock.unix_timestamp >= a.position.loan.deadline; // Maturity waives the CR test.
     if !expired {
         require!(
             bad_reference(&a.position, &a.reference)?,
@@ -764,7 +764,7 @@ pub fn default_loan(ctx: Context<DefaultLoan>) -> Result<()> {
         clock.unix_timestamp >= a.position.loan.default_at,
         SimpleError::NotOverdue
     );
-    let recovery = a.position.loan.collateral;
+    let recovery = a.position.loan.collateral; // Exclude account rent and untracked donations.
     let reward = finance::keeper_reward(recovery, recovery, &a.position.policy.terms)?;
     let lender_sol = recovery.checked_sub(reward).checked()?;
     finance::move_sol(

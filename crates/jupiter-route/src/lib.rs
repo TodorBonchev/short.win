@@ -8,7 +8,7 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
-/// Additional conservative checks for the isolated test executor; not production authorization.
+/// Runtime and scratch checks for isolated execution; callers retain financial authorization.
 pub mod isolation;
 
 /// A Solana address, without a runtime or SDK dependency.
@@ -211,7 +211,7 @@ fn read_u64(data: &[u8], start: usize) -> u64 {
 /// Proposed instruction metas, not live AccountInfo privileges, owners or signature proofs.
 ///
 /// Required writable and signer roles follow the IDL. Extra writability is not certified
-/// safe here; the future full remaining-account policy must authorize it. Signers other
+/// safe here; the integration's remaining-account policy must authorize it. Signers other
 /// than the expected transfer authority are rejected, including in the opaque tail.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AccountMeta {
@@ -265,7 +265,7 @@ impl AmountRange {
 ///
 /// In particular, max_quoted_input does not bound an ExactOut fill after slippage.
 /// No private Jupiter rounding formula is assumed. Independent absolute spend/output
-/// enforcement and balance accounting are required before any eventual CPI.
+/// enforcement and balance accounting are required before an actual CPI.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AmountExpectation {
     ExactIn {
@@ -278,7 +278,7 @@ pub enum AmountExpectation {
     },
 }
 
-/// Resource and slippage policy supplied by a future trusted integration.
+/// Resource and slippage policy supplied by the trusted integration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HeaderLimits {
     pub maximum_data_length: usize,

@@ -102,6 +102,45 @@ class PriceServiceTests(unittest.TestCase):
             with self.assertRaises(service.Unavailable):
                 jupiter.buy(job(), 100)
 
+    def test_buy_keeps_a_successful_quote_when_a_smaller_refinement_has_no_route(self):
+        provider = Provider()
+        def transport(params):
+            if int(params["amount"]) < 100:
+                provider.calls.append(params)
+                raise service.RouteUnavailable("smaller budget has no route")
+            return provider(params)
+        quote = client(settings(), transport).buy(job(), 100)
+        self.assertEqual(quote.amount, 100)
+        self.assertGreaterEqual(quote.guaranteed_output, job().quantity)
+        self.assertEqual(quote.raw_hash, service.digest(quote.raw))
+        self.assertEqual([p["amount"] for p in provider.calls], ["100", "50", "50"])
+
+    def test_buy_does_not_hide_initial_route_failure_or_refinement_outage(self):
+        def missing(_params):
+            raise service.RouteUnavailable("no initial candidate")
+        with self.assertRaisesRegex(service.RouteUnavailable, "no initial candidate"):
+            client(settings(), missing).buy(job(), 100)
+
+        provider = Provider()
+        def outage(params):
+            if int(params["amount"]) < 100:
+                raise service.Unavailable("provider outage")
+            return provider(params)
+        with self.assertRaisesRegex(service.Unavailable, "provider outage"):
+            client(settings(), outage).buy(job(), 100)
+
+    def test_buy_does_not_return_a_quote_that_aged_during_failed_refinement(self):
+        timer = FakeTime()
+        def transport(params):
+            if int(params["amount"]) < 100:
+                timer.now += 31
+                raise service.RouteUnavailable("smaller budget has no route")
+            return Provider()(params)
+        jupiter = service.Jupiter(settings(), MARKET, "unused", transport,
+                                  clock=timer.clock, sleeper=timer.sleep)
+        with self.assertRaisesRegex(service.Unavailable, "outlived reference freshness"):
+            jupiter.buy(job(), 100)
+
     def test_observation_reuses_actual_ask_and_caps_growing_budget_to_live_spread(self):
         provider = Provider()
         jupiter = client(settings(), provider)
@@ -227,6 +266,54 @@ class PriceServiceTests(unittest.TestCase):
         self.assertFalse(payload["finite"])
         self.assertEqual(payload["evidence_hash"], "00"*32)
 
+    def test_invalid_initial_clock_cannot_advance_history_or_scheduling(self):
+        class Quotes:
+            calls = 0
+            def observe(self, *_):
+                self.calls += 1
+                return 100, 105, {"fixture": True}
+        quotes = Quotes()
+        before = list(self.history.db.iterdump())
+        for invalid in [(600, 1_000_000), (600, 569), (0, 600), (600, -1)]:
+            with self.subTest(clock=invalid):
+                with self.assertRaises(service.Unavailable):
+                    service.tick(self.history, quotes, lambda: invalid, 600, wall_clock=lambda: 600)
+                self.assertEqual(list(self.history.db.iterdump()), before)
+                self.assertEqual(quotes.calls, 0)
+        # A healthy next tick remains due and can write the first observation.
+        result = service.tick(self.history, quotes, lambda: (600, 600), 600, wall_clock=lambda: 600)
+        self.assertTrue(result[0]["finite"])
+        self.assertEqual(quotes.calls, 1)
+        self.assertEqual(self.history.db.execute("SELECT ts,slot FROM observations").fetchall(), [(600, "600")])
+
+    def test_invalid_final_clock_records_unknown_only_at_validated_initial_time(self):
+        class Quotes:
+            def observe(self, *_):
+                return 100, 105, {"fixture": True}
+        for index, invalid in enumerate([(601, 1_000_000), (0, 601), (599, 601), (601, 599)]):
+            with self.subTest(clock=invalid):
+                history = service.History(Path(self.temp.name) / f"final-clock-{index}.sqlite3", settings())
+                try:
+                    history.enqueue(job(), 600)
+                    clock = iter([(600, 600), invalid]).__next__
+                    result = service.tick(history, Quotes(), clock, 600, wall_clock=lambda: 600)
+                    self.assertFalse(result[0]["finite"])
+                    self.assertEqual(history.db.execute("SELECT ts,slot,finite FROM observations").fetchall(), [(600, "600", 0)])
+                    self.assertEqual(history.db.execute("SELECT due FROM jobs").fetchone()[0], 602)
+                    recovered = service.tick(history, Quotes(), lambda: (602, 602), 602, wall_clock=lambda: 602)
+                    self.assertTrue(recovered[0]["finite"])
+                finally:
+                    history.close()
+
+    def test_clock_that_becomes_stale_during_observation_is_not_finite(self):
+        class Quotes:
+            def observe(self, *_):
+                return 100, 105, {"fixture": True}
+        result = service.tick(self.history, Quotes(), lambda: (600, 600), 600,
+                              wall_clock=iter([600, 631]).__next__)
+        self.assertFalse(result[0]["finite"])
+        self.assertEqual(self.history.db.execute("SELECT ts,slot,finite FROM observations").fetchall(), [(600, "600", 0)])
+
     def test_loan_sync_can_only_add_priority_and_rolls_back_capacity_failure(self):
         self.history.enqueue(job(101, True), 600)
         self.history.sync_loans([job(100)], 600)
@@ -311,6 +398,88 @@ class PriceServiceTests(unittest.TestCase):
             quote = jupiter.quote(MINT, service.WSOL, 100)
         self.assertEqual(quote.amount, 100)
         self.assertFalse(captured[0].has_header("X-api-key"))
+
+    def test_malformed_rpc_json_and_clock_results_are_unavailable(self):
+        class Response:
+            def __init__(self, value):
+                self.body = service.canonical(value)
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return None
+            def read(self, _limit):
+                return self.body
+        clock = service.RpcClock("https://rpc.invalid")
+        for reply in [None, [], 7, "not an RPC envelope", {},
+                      {"error": {"code": -1}}, {"result": None},
+                      {"result": True}, {"result": "not a clock"}]:
+            with self.subTest(reply=reply):
+                with patch.object(service.urllib.request, "urlopen", return_value=Response(reply)):
+                    with self.assertRaises(service.Unavailable):
+                        clock.read()
+        with patch.object(service.urllib.request, "urlopen", side_effect=[Response({"result": 600}), Response({"result": 601})]):
+            self.assertEqual(clock.read(), (600, 601))
+
+    def test_invalid_rpc_configuration_does_not_echo_its_url(self):
+        clock = service.RpcClock("invalid-rpc-url?dummy-private-marker")
+        with patch.object(service.urllib.request, "urlopen") as transport:
+            with self.assertRaises(service.Unavailable) as error:
+                clock.read()
+        self.assertNotIn("dummy-private-marker", str(error.exception))
+        transport.assert_not_called()
+
+    def test_interrupted_http_reads_are_sanitized_without_route_retry(self):
+        class Response:
+            def __init__(self, failure):
+                self.failure = failure
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return None
+            def read(self, _limit):
+                raise self.failure
+
+        for endpoint in ("Jupiter", "RPC"):
+            for failure in (service.http.client.IncompleteRead(b"dummy-private-marker", 1),
+                            service.http.client.HTTPException("dummy-private-marker")):
+                with self.subTest(endpoint=endpoint, failure=type(failure).__name__):
+                    timer = FakeTime()
+                    jupiter = service.Jupiter(settings(), MARKET, "", clock=timer.clock, sleeper=timer.sleep)
+                    read = (lambda: jupiter.quote(MINT, service.WSOL, 100)) if endpoint == "Jupiter" else service.RpcClock("https://rpc.invalid").read
+                    with patch.object(service.urllib.request, "urlopen", return_value=Response(failure)) as transport:
+                        with self.assertRaises(service.Unavailable) as error:
+                            read()
+                    self.assertIs(type(error.exception), service.Unavailable)
+                    self.assertNotIn("dummy-private-marker", str(error.exception))
+                    transport.assert_called_once()
+
+    def test_http_error_status_does_not_depend_on_readable_diagnostic_body(self):
+        class BrokenBody:
+            def __init__(self):
+                self.reads = 0
+            def read(self, _limit=None):
+                self.reads += 1
+                raise service.http.client.IncompleteRead(b"dummy-private-marker", 1)
+            def close(self):
+                pass
+
+        for endpoint in ("Jupiter", "RPC"):
+            for status in (400, 401, 429, 503):
+                with self.subTest(endpoint=endpoint, status=status):
+                    fallback = endpoint == "Jupiter" and status == 400
+                    bodies = [BrokenBody() for _ in range(2 if fallback else 1)]
+                    errors = [service.urllib.error.HTTPError("https://provider.invalid/?dummy-private-marker",
+                              status, "dummy-private-marker", {}, body) for body in bodies]
+                    timer = FakeTime()
+                    jupiter = service.Jupiter(settings(), MARKET, "", clock=timer.clock, sleeper=timer.sleep)
+                    read = (lambda: jupiter.quote(MINT, service.WSOL, 100)) if endpoint == "Jupiter" else service.RpcClock("https://rpc.invalid").read
+                    with patch.object(service.urllib.request, "urlopen", side_effect=errors) as transport:
+                        with self.assertRaises(service.Unavailable) as error:
+                            read()
+                    self.assertIs(type(error.exception), service.RouteUnavailable if fallback else service.Unavailable)
+                    self.assertNotIn("dummy-private-marker", str(error.exception))
+                    self.assertEqual(transport.call_count, len(bodies))
+                    self.assertTrue(all(body.reads == 0 for body in bodies))
 
     def test_routing_budget_is_distinct_from_total_envelope_and_pinned_in_model(self):
         provider = Provider()

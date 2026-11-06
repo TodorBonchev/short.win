@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-
+// Preserve variant ordering: published clients decode the resulting numeric error codes.
 #[error_code]
 pub enum SimpleError {
     #[msg("Checked arithmetic overflow")]

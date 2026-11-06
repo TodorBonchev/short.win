@@ -1,5 +1,9 @@
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 import { DatabaseSync } from "node:sqlite";
+import childProcess from "node:child_process";
+import { EventEmitter } from "node:events";
+import { syncBuiltinESMExports } from "node:module";
+import { PassThrough, Writable } from "node:stream";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -21,6 +25,7 @@ import {
   runOperator,
   readSnapshot,
   candidateReference,
+  pythonCommand,
   roundRobin,
   type ServiceSettings,
   type Snapshot,
@@ -28,6 +33,59 @@ import {
 } from "../src/operator.ts";
 const HISTORY="7d17ec71-b15b-4a08-bd8c-bdd2f81b3baf";
 function mockHistory(path:string){const db=new DatabaseSync(path);db.exec("CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL)");db.prepare("INSERT INTO metadata VALUES('history_instance_id',?)").run(HISTORY);db.close();}
+
+function serviceProcess(t: TestContext, stdin: Writable = new PassThrough()) {
+  const events = new EventEmitter();
+  const signals: string[] = [];
+  let closed = false;
+  const child = Object.assign(events, {
+    stdin, stdout: new PassThrough(), stderr: new PassThrough(),
+    kill(signal = "SIGTERM") {
+      signals.push(signal);
+      queueMicrotask(() => { closed = true; events.emit("close", null, signal); });
+      return true;
+    },
+  });
+  const mock = t.mock.method(childProcess, "spawn", () => child as unknown as ReturnType<typeof childProcess.spawn>);
+  syncBuiltinESMExports();
+  t.after(() => {
+    // Built-in named imports are live bindings; restore them after each fixture.
+    mock.mock.restore();
+    syncBuiltinESMExports();
+    child.emit("close", 0);
+    child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
+  });
+  return { child, signals, isClosed: () => closed };
+}
+
+test("service validation refusal retains its error when stdin closes early", async (t) => {
+  const stdin = new Writable({
+    write(_chunk, _encoding, callback) {
+      callback(Object.assign(new Error("Service input was closed"), { code: "EPIPE" }));
+    },
+  });
+  const { child, signals } = serviceProcess(t, stdin);
+  const request = pythonCommand("python3", "settings.json", "history.sqlite", ["bind-operator", "-"], { schema: 1 });
+  const rejected = assert.rejects(request, /Price-service bind-operator failed: Settings model mismatch/);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  child.stderr.end("Settings model mismatch");
+  child.emit("close", 2);
+  await rejected;
+  assert.deepEqual(signals, []); // The service already exited on its own refusal.
+});
+
+test("serialization failure closes input and reaps the service before rejecting", async (t) => {
+  const { child, signals, isClosed } = serviceProcess(t);
+  const circular: { self?: unknown } = {};
+  circular.self = circular;
+  await assert.rejects(
+    pythonCommand("python3", "settings.json", "history.sqlite", ["reference", "-"], circular),
+    /circular/i,
+  );
+  assert.equal(child.stdin.destroyed, true);
+  assert.equal(isClosed(), true);
+  assert.deepEqual(signals, ["SIGTERM"]);
+});
 const CLOCK = "SysvarC1ock11111111111111111111111111111111";
 function clockAccount(slot: number | bigint, timestamp: number | bigint) {
   const bytes = Buffer.alloc(40);

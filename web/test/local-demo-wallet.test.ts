@@ -43,6 +43,8 @@ function localFetch(options: { genesis?: string; valid?: boolean; onValid?: () =
   const original = globalThis.fetch;
   const methods: string[] = [];
   globalThis.fetch = async (input, init) => {
+    assert.ok(init?.signal instanceof AbortSignal, "every local handshake request has a deadline signal");
+    assert.equal(init.signal.aborted, false);
     const request = new Request(input, init);
     assert.equal(new URL(request.url).hostname, "127.0.0.1", "all requests stay on loopback");
     assert.equal(request.redirect, "error", "redirects cannot escape to an external server");

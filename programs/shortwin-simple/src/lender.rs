@@ -104,7 +104,7 @@ pub fn pay_pool_sol(
     **recipient.try_borrow_mut_lamports()? = recipient_after;
     Ok(())
 }
-
+// Owner/generation seeds bind claims; only measured new token transfers mint principal.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct DepositTokens<'info> {
@@ -226,7 +226,7 @@ pub fn deposit(
     });
     Ok(())
 }
-
+// Old generations remain withdrawable; available cash limits token payouts, not total claims.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct WithdrawTokens<'info> {
@@ -342,7 +342,7 @@ pub fn withdraw(
     }
     Ok(())
 }
-
+// Paid-income claims need no current market, mint, route or trusted price reference.
 #[event_cpi]
 #[derive(Accounts)]
 pub struct ClaimSol<'info> {

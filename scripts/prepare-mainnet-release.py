@@ -99,6 +99,8 @@ def validate_spec(spec: dict, inputs: dict[str, dict]) -> None:
 
 
 def read_program(path: Path) -> bytes:
+    # Source compatibility does not transfer a duration result to a new ELF.
+    # Read one stable file descriptor and accept only the preserved exact bytes.
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         before = os.fstat(fd)
@@ -124,6 +126,8 @@ def read_program(path: Path) -> bytes:
 
 
 def source_hashes() -> dict[str, str]:
+    # Include off-chain signing and service code, not just the on-chain ELF: its
+    # policy interpretation and storage recovery rules are part of this packet.
     roots = ["programs/shortwin-simple/src", "crates/pooled-core/src", "crates/jupiter-route/src",
              "client/src", "client/bin", "client/idl", "services/src", "scripts", "config",
              ".github/workflows", "web/src", "tests/runtime"]
@@ -158,6 +162,7 @@ def proposal_validation(require_assigned: bool) -> dict:
 
 
 def public_roles(roles: dict) -> dict:
+    # Keep runtime keyfile paths out of a packet intended for public review.
     return {key: roles[key] for key in [
         "schemaVersion", "assignmentStatus", "network", "programId", "genesisHash", "rolePublicKeys",
         "jupiterReview", "execute"]}

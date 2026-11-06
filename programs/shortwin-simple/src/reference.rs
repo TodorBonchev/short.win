@@ -45,7 +45,7 @@ pub struct PublishReference<'info> {
     pub reference: Box<Account<'info, PriceReference>>,
     pub system_program: Program<'info, System>,
 }
-
+// Both clocks must be fresh; a passing slot age cannot excuse an expired timestamp.
 fn check_clock(
     source_slot: u64,
     source_ts: i64,
@@ -108,7 +108,7 @@ fn check_finite(reference: &PriceReference, terms: &FinancialPolicy) -> Result<(
     );
     Ok(())
 }
-
+// Publishing Unknown clears all price fields; stale finite data must not survive that update.
 /// Accept old immutable policies for old loans, but only the current reporter epoch.
 /// Publication is allowed during a price hold so an operator can restore fresh
 /// references before governance clears the hold; priced economic actions stay held.
@@ -208,7 +208,7 @@ pub fn publish_reference(ctx: Context<PublishReference>, args: PublishReferenceA
     });
     Ok(())
 }
-
+// Re-derive every PDA at use time; valid contents cannot authorize a substituted account.
 pub fn checked_reference(
     reference: &Account<'_, PriceReference>,
     market: &Pubkey,

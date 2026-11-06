@@ -116,7 +116,7 @@ pub struct Withdrawal {
     pub tokens: u64,
     pub sol: u64,
 }
-
+// Retired generations may pay old claims, but cannot accept new principal or income.
 fn active(pool: &Pool) -> Result<()> {
     pool.validate()?;
     if pool.retired {
@@ -192,7 +192,7 @@ pub fn credit_tokens(pool: &mut Pool, amount: u64) -> Result<()> {
 pub fn donate_tokens(pool: &mut Pool, amount: u64) -> Result<()> {
     credit_tokens(pool, amount)
 }
-
+// Settle the old shares first: new deposits must not earn income paid before they joined.
 /// Mint floor(tokens*S/assets), or one share per raw token for the initial cohort.
 pub fn deposit(pool: &mut Pool, lender: &mut Lender, tokens: u64) -> Result<u128> {
     active(pool)?;
@@ -353,7 +353,7 @@ pub fn next_generation(pool: &Pool) -> Result<Pool> {
         pool.generation.checked_add(1).ok_or(Error::Overflow)?,
     ))
 }
-
+// Accounting validation is separate from the caller's account identity and transfer checks.
 /// Validate persisted pool primitives before a caller performs external effects.
 pub fn validate_pool(pool: &Pool) -> Result<()> {
     pool.validate()

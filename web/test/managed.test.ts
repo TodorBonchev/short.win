@@ -34,6 +34,26 @@ test("managed service rejects insecure hosted URLs and reports capacity refusals
   );
 });
 
+test("managed service reports ordinary proxy outages without JSON/parser errors", async () => {
+  for (const body of ["<html>Service temporarily unavailable</html>", "", "null"]) {
+    const fake = (async () => new Response(body, { status: 503 })) as typeof fetch;
+    await assert.rejects(
+      managedCall("https://prices.example.com", "/v1/requests", {}, fake),
+      /In-house service unavailable \(HTTP 503\)/,
+    );
+  }
+});
+
+test("managed service rejects malformed successful response envelopes", async () => {
+  for (const body of ["", "null", "[]"]) {
+    const fake = (async () => new Response(body, { status: 200 })) as typeof fetch;
+    await assert.rejects(
+      managedCall("https://prices.example.com", "/v1/route", {}, fake),
+      /In-house service returned (invalid JSON|an invalid response)/,
+    );
+  }
+});
+
 test("managed buy input can shrink but cannot exceed or reinterpret the signed user budget", () => {
   assert.equal(
     boundBuyInput("9007199254740993", 9007199254740994n),

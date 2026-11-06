@@ -25,6 +25,8 @@ export async function planBundle(build:BuildResponse,b:RouteBinding):Promise<Rou
  const sourceAta=await associatedToken(b.executionAuthority,input,sell?b.tokenProgram:TOKEN);
  const destAta=await associatedToken(b.executionAuthority,output,sell?TOKEN:b.tokenProgram);
  const source=sell?b.executionBase:b.executionWsol,dest=sell?b.executionWsol:b.executionBase;
+ // The execution authority is a PDA: the lending program signs for it inside
+ // Jupiter CPI. It is never an outer transaction signer the wallet must supply.
  const remainingAccounts=swap.accounts.map(a=>{
   const key=address(a.pubkey);
   if(a.isSigner&&key!==b.executionAuthority)throw new Error('Route asks for an unexpected signer');

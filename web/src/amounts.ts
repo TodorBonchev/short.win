@@ -34,6 +34,8 @@ export function claimable(pool: {
     const delta = index(pool.solIndex) - index(receipt.checkpoint);
     if (delta < 0n)
         throw new Error('Inconsistent receipt checkpoint');
+    // Carry the receipt's prior fraction through the full multiply before
+    // flooring, just like the program; rounding each term separately loses income.
     const amount = receipt.pendingSol + (receipt.shares * delta + receipt.fraction) / 1000000000000000000n;
     if (amount > pool.solReserve)
         throw new Error('Inconsistent income reserve');

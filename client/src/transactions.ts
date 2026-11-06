@@ -22,6 +22,7 @@ import {
   type Signature,
   type TransactionMessageBytesBase64,
 } from "@solana/kit";
+import { sendRpc } from "./rpc.ts";
 const json = (value: unknown) =>
   JSON.stringify(value, (_key, v) =>
     typeof v === "bigint" ? v.toString() : v,
@@ -44,9 +45,11 @@ export async function prepareTransaction(
   if (microLamports < 0n || microLamports > 1_000_000n)
     throw new Error("Priority fee is outside the client cap");
   const rpc = createSolanaRpc(url);
-  const { value: lifetime } = await rpc
-    .getLatestBlockhash({ commitment: "confirmed" })
-    .send();
+  const { value: lifetime } = await sendRpc(
+    rpc.getLatestBlockhash({ commitment: "confirmed" }),
+  );
+  // Keep one lifetime across the probe, final fee quote and wallet review. A
+  // refreshed blockhash would produce a different message that needs new review.
   const build = (limit: number) => {
     const m0 = setTransactionMessageFeePayerSigner(
       createNoopSigner(payer),
@@ -65,13 +68,13 @@ export async function prepareTransaction(
     throw new Error(
       "Transaction exceeds 1232 bytes; supply verified on-chain address lookup tables",
     );
-  const { value: simulation } = await rpc
-    .simulateTransaction(getBase64EncodedWireTransaction(probe), {
+  const { value: simulation } = await sendRpc(
+    rpc.simulateTransaction(getBase64EncodedWireTransaction(probe), {
       encoding: "base64",
       sigVerify: false,
       commitment: "confirmed",
-    })
-    .send();
+    }),
+  );
   if (simulation.err !== null)
     throw new Error(
       "Simulation failed: " +
@@ -86,14 +89,14 @@ export async function prepareTransaction(
   );
   const tx = build(limit);
   const bytes = Uint8Array.from(getTransactionEncoder().encode(tx));
-  const { value: fee } = await rpc
-    .getFeeForMessage(
+  const { value: fee } = await sendRpc(
+    rpc.getFeeForMessage(
       getBase64Decoder().decode(
         tx.messageBytes,
       ) as TransactionMessageBytesBase64,
       { commitment: "confirmed" },
-    )
-    .send();
+    ),
+  );
   if (fee === null)
     throw new Error("Fee quote unavailable or blockhash expired");
   return {
@@ -163,20 +166,22 @@ export async function submitSigned(
   const signature = getSignatureFromTransaction(transaction);
   const rpc = createSolanaRpc(url);
   if (
-    (await rpc.getBlockHeight({ commitment: "confirmed" }).send()) >
+    (await sendRpc(rpc.getBlockHeight({ commitment: "confirmed" }))) >
     prepared.lastValidBlockHeight
   )
     throw new Error("Reviewed transaction expired before send");
   beforeBroadcast?.(signature);
   let returned: Signature;
   try {
-    returned = await rpc
-      .sendTransaction(getBase64EncodedWireTransaction(transaction), {
+    // Even a transport deadline here cannot prove the node did not accept it.
+    // Keep the locally derived signature for reconciliation instead of retrying.
+    returned = await sendRpc(
+      rpc.sendTransaction(getBase64EncodedWireTransaction(transaction), {
         encoding: "base64",
         skipPreflight: false,
         maxRetries: 2n,
-      })
-      .send();
+      }),
+    );
   } catch (cause) {
     throw new OutcomeUnknownError(
       signature,
@@ -192,9 +197,7 @@ export async function submitSigned(
   for (let i = 0; i < 60; i++) {
     let status;
     try {
-      ({ value: [status] } = await rpc
-        .getSignatureStatuses([signature])
-        .send());
+      ({ value: [status] } = await sendRpc(rpc.getSignatureStatuses([signature])));
     } catch (cause) {
       throw new OutcomeUnknownError(
         signature,
@@ -225,9 +228,9 @@ export async function readLookupTables(
   const result: Record<string, Address[]> = {};
   const rpc = createSolanaRpc(url);
   for (const key of keys) {
-    const { value } = await rpc
-      .getAccountInfo(key, { encoding: "base64", commitment: "confirmed" })
-      .send();
+    const { value } = await sendRpc(
+      rpc.getAccountInfo(key, { encoding: "base64", commitment: "confirmed" }),
+    );
     if (!value || value.owner !== "AddressLookupTab1e1111111111111111111111111")
       throw new Error("Bad lookup table owner");
     const bytes = getBase64Encoder().encode(value.data[0]);

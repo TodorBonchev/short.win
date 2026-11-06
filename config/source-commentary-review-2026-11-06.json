@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "reviewedAtUtc": "2026-11-06T05:55:36.581153+00:00",
+  "baselineCommit": "1b974c5569918547dc336d316e403589b0d24214",
+  "scope": "Rust explanatory comments only, with unchanged source line counts and exact rebuilt financial-program ELF; saved November3Jupiter inputs replayed offline. No live-router freshness, deployment, or new duration claim.",
+  "sourceChanges": [
+    {
+      "file": "crates/jupiter-route/src/isolation.rs",
+      "previousSha256": "79aaf751503f5cb2cc72431734c6e940f7335479442c09a1b0d21c8932c7b298",
+      "sha256": "ae698457a36433e1b79c3795495740f3b0084ca1cd8c551dafddca829d52b898",
+      "lineCount": 562
+    },
+    {
+      "file": "crates/jupiter-route/src/lib.rs",
+      "previousSha256": "1c95a7a0bb278825cffaab351b102ae15a376e704235a7e16fe996e8cc7dd07a",
+      "sha256": "32fc328b0d050612d13b55be8dd6bbf059287b836a467f41697e5a6c3d8781c7",
+      "lineCount": 914
+    },
+    {
+      "file": "crates/pooled-core/src/lib.rs",
+      "previousSha256": "67b6de6f8c667c8340475374292bab58d0906ddde8afbc0566287330b5748204",
+      "sha256": "db5579df427ecfa683d53022232d6ae5668dc1f9a6664d5e5dce8fc7b8dcb4ee",
+      "lineCount": 368
+    },
+    {
+      "file": "programs/shortwin-simple/src/errors.rs",
+      "previousSha256": "d714d22b8af5c93cf84bb76b855c53d7f7fef03e87e5a70902acbfc71b506d11",
+      "sha256": "07a438ad8579891ee1e9326d5ff30a332e99eefccc3db2b12ee9119fe43a0473",
+      "lineCount": 112
+    },
+    {
+      "file": "programs/shortwin-simple/src/events.rs",
+      "previousSha256": "00dbe7df26b9a001ac9c903f99776a859978ad6e48ff229263a52a8d19aaa088",
+      "sha256": "72a94914bb8882fb72c7ab3050c7c70b40848715d3c368a45a1b4fb47c0214cb",
+      "lineCount": 155
+    },
+    {
+      "file": "programs/shortwin-simple/src/exits.rs",
+      "previousSha256": "82635c8195a86880d51c9831b9c38d9d4ea6d5203ae38865273fcd04f8bfd617",
+      "sha256": "8022b7bc83fcfd3f76343b81174af39d1645e7a72afbbce024ff6c6e4894e85d",
+      "lineCount": 905
+    },
+    {
+      "file": "programs/shortwin-simple/src/finance.rs",
+      "previousSha256": "11772d4eac5e7b0605368d27c4b686df3fa8ff9dad46a580287d842cf11533f2",
+      "sha256": "69992b2194f8d00d5ef2dbb6a89e1de7b85c181617458ea69a52158fdbb05f43",
+      "lineCount": 185
+    },
+    {
+      "file": "programs/shortwin-simple/src/initialization.rs",
+      "previousSha256": "92e485d6b470a640ecfc5f56183150d0893101e7cc4f908731f02f83bdec50c8",
+      "sha256": "b725afa74b44f6c39eee3aa30b2ec6718db2ad4ec5f26f153b7da25b01cf0f8c",
+      "lineCount": 486
+    },
+    {
+      "file": "programs/shortwin-simple/src/lender.rs",
+      "previousSha256": "799988e179e49d2739f0df767a32a0fe59e3de663909c203e15362cd097c4a72",
+      "sha256": "5cb8f27d2d71bc4506b33041d0783ed49bb9c29d84ffde03020622f4b6f55ee1",
+      "lineCount": 398
+    },
+    {
+      "file": "programs/shortwin-simple/src/open.rs",
+      "previousSha256": "8e407d9f69f6714f333d265000385dec4ddf784ec9debe81ac9dec928c4c1da5",
+      "sha256": "a34aa5b1818de572e405ce6f115db24f6617f392f31e14532b8c0fed5486925f",
+      "lineCount": 376
+    },
+    {
+      "file": "programs/shortwin-simple/src/reference.rs",
+      "previousSha256": "b786577816dab47d688d1fdf5c10793ddd94cff1367a52cfc968b92341a88b67",
+      "sha256": "70d84aef976b4b9e89365beb09bae3ca780835677282a25e0a3e6918e7ea263a",
+      "lineCount": 273
+    },
+    {
+      "file": "programs/shortwin-simple/src/route.rs",
+      "previousSha256": "9af054ca3a5994ce42a47b8de4a4ddba08fa617f41ab918135881ce6dabc29ea",
+      "sha256": "d217f1f72b603284a886769f655a64f3603b7f79315a638800176fd8e17b6e02",
+      "lineCount": 1276
+    },
+    {
+      "file": "programs/shortwin-simple/src/state.rs",
+      "previousSha256": "4588d9272a629165cb1bfaeaafa0a9d207127e493aedbefd5d28ca0504b9b8e9",
+      "sha256": "55ac9f9b18b9cb34be6723f5f7e41c80b0f8bdf35b71306d7e7ba7c74e5b46e5",
+      "lineCount": 327
+    }
+  ],
+  "programArtifacts": {
+    "baseline": {
+      "elfSha256": "b12fefdcf9c73fa8c708847bba162e9aa54e77d46cc8e1a340b12d95c9b2e0a9",
+      "bytes": 787080,
+      "textSha256": "0e0b791d394d09a11fbf2b883608632a9a48244c612d9c18bc14bff6740d74ec",
+      "textBytes": 764600
+    },
+    "fuzzed": {
+      "elfSha256": "86147af04bda2c1fbab92ad670dc8d7cc272162724787dac666344bf24b547f2",
+      "bytes": 787080,
+      "textSha256": "0e0b791d394d09a11fbf2b883608632a9a48244c612d9c18bc14bff6740d74ec",
+      "textBytes": 764600
+    },
+    "commented": {
+      "elfSha256": "b12fefdcf9c73fa8c708847bba162e9aa54e77d46cc8e1a340b12d95c9b2e0a9",
+      "bytes": 787080,
+      "textSha256": "0e0b791d394d09a11fbf2b883608632a9a48244c612d9c18bc14bff6740d74ec",
+      "textBytes": 764600
+    }
+  },
+  "validation": {
+    "rustFmt": "passed",
+    "clippyAllTargets": "passed-with-warnings-denied",
+    "workspaceTests": 71,
+    "savedRouteExpectedOutcomes": 18,
+    "savedRouteVerifiedOutcomes": 18,
+    "liveTransactionsSent": 0,
+    "savedMatrixSha256": "63bd4f700a7b826482d355ec489e9223f5a44bfb400abc685d4b01774136923d",
+    "reviewedDeployment": {
+      "deploy_slot": 462802085,
+      "elf_sha256": "f09c1c20bc5734da6ba759acbb276c36a0b3e82306a60ff4b94341364aa0b895",
+      "programdata_len": 2892269
+    }
+  },
+  "durationScope": "Original program ELF remains exact86147...547f2. Modified off-chain Python/TypeScript has new unit/scenario checks, not inherited24hour duration."
+}
