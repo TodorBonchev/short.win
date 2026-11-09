@@ -63,4 +63,15 @@ mkdirSync(path.join(destination, 'videos'), {recursive: true});
 for (const filename of media) copyFileSync(path.join(mediaDirectory, filename), path.join(destination, 'videos', filename));
 // Build metadata is useful for this check, but unnecessary in the deployed site.
 rmSync(path.join(destination, '.vite'), {recursive: true});
+// Search engines need real robots/sitemap files and a true 404, not the SPA shell.
+const robots = readFileSync(path.join(destination, 'robots.txt'), 'utf8');
+assert(robots.includes('Sitemap: https://short.win/sitemap.xml'), 'robots.txt must advertise the sitemap.');
+const sitemap = readFileSync(path.join(destination, 'sitemap.xml'), 'utf8');
+assert(sitemap.includes('<loc>https://short.win/</loc>'), 'sitemap.xml must list the canonical home URL.');
+assert(!sitemap.includes('<loc>https://short.win/robots.txt</loc>'), 'sitemap.xml must list only canonical page URLs.');
+const notFound = readFileSync(path.join(destination, '404.html'), 'utf8');
+assert(notFound.includes('name="robots" content="noindex"'), '404.html must ask crawlers not to index it.');
+const home = readFileSync(path.join(destination, 'index.html'), 'utf8');
+assert(home.includes('rel="canonical" href="https://short.win/"'), 'Public index.html must declare the canonical URL.');
+
 console.log(`Public showcase verified: ${javascript.length} JavaScript files, ${(source.length / 1024).toFixed(1)} KiB, four videos and four posters. No wallet/SDK chunks or source maps.`);
