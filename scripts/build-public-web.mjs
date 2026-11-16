@@ -73,5 +73,9 @@ const notFound = readFileSync(path.join(destination, '404.html'), 'utf8');
 assert(notFound.includes('name="robots" content="noindex"'), '404.html must ask crawlers not to index it.');
 const home = readFileSync(path.join(destination, 'index.html'), 'utf8');
 assert(home.includes('rel="canonical" href="https://short.win/"'), 'Public index.html must declare the canonical URL.');
+assert(home.includes('href="/favicon.ico"'), 'Public index.html must link the conventional favicon.ico.');
+assert(existsSync(path.join(destination, 'favicon.ico')), 'Public build must include favicon.ico.');
+const favicon = readFileSync(path.join(destination, 'favicon.ico'));
+assert(favicon.length > 16 && favicon[0] === 0 && favicon[1] === 0 && favicon[2] === 1 && favicon[3] === 0, 'favicon.ico must be a Windows icon file.');
 
 console.log(`Public showcase verified: ${javascript.length} JavaScript files, ${(source.length / 1024).toFixed(1)} KiB, four videos and four posters. No wallet/SDK chunks or source maps.`);
